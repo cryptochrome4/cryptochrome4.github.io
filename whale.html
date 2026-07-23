@@ -1,130 +1,251 @@
-html<!DOCTYPE html>
+モード
+すべて
+画像
+動画
+ニュース
+地図
+ショッピング
+書籍
+フライト
+ファイナンス
+
+特殊相対性理論における「時間の遅れ（タイムディレーション）」の直感的な証明（時計 
+ が 
+, 
+ を通過する2つのイベントの固有時間）を、スマホやPCでサクサク動く**全39ページのスクロール式・超軽量Web紙芝居（HTML/CSS/JSコード）**として作成しました。
+画像の読み込み待ち（ローディング）が絶対に発生しないよう、絵の95%以上をピュアCSSとインラインSVG（軽量な数式や図形コード）のみで描写しています。JavaScriptはスクロール連動のアニメーション制御のみに絞り、極限まで軽くしました。
+以下のコードをそのままコピーし、GitHubのリポジトリに index.html という名前で保存して GitHub Pages で公開すれば、URLにアクセスするだけで誰でもスクロール紙芝居を体験できます。
+GitHub用 index.html ソースコード
+html
+<!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>相対性理論：時間の遅れ紙芝居 (全39ページ)</title>
+    <title>相対性理論・時間の遅れ紙芝居</title>
     <style>
-        /* 極軽量化のため、外部ファイル・外部フォントは一切読み込みません */
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
-        body { background: #111; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; overflow: hidden; }
-        
-        /* 全体コンテナ */
-        #app { width: 100%; max-width: 800px; height: 100vh; max-height: 600px; display: flex; flex-direction: column; position: relative; padding: 20px; }
-        
-        /* ヘッダー・進捗 */
-        header { display: flex; justify-content: space-between; font-size: 14px; color: #aaa; margin-bottom: 10px; }
-        #progress-bar { width: 100%; height: 6px; background: #333; border-radius: 3px; margin-bottom: 15px; overflow: hidden; }
-        #progress-fill { height: 100%; width: 2.5%; background: #00adb5; transition: width 0.2s ease; }
-        
-        /* 紙芝居の舞台（図形をCSSで描画するため、軽くレスポンシブに） */
-        #stage { flex: 1; background: #222; border: 2px solid #444; border-radius: 8px; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; padding: 20px; }
-        
-        /* 絵（イラスト）を描くためのキャンバスエリア（CSSベース） */
-        #art-area { width: 100%; height: 65%; position: relative; display: flex; justify-content: center; align-items: center; }
-        
-        /* ナレーション（字幕）エリア */
-        #caption-area { width: 100%; height: 35%; display: flex; align-items: center; justify-content: center; text-align: center; padding: 15px; font-size: 18px; line-height: 1.6; border-top: 1px solid #333; color: #eeeeee; }
-        
-        /* 操作用ボタン */
-        #controls { display: flex; justify-content: space-between; width: 100%; margin-top: 15px; gap: 15px; }
-        button { flex: 1; padding: 12px; background: #393e46; border: none; color: white; font-size: 16px; font-weight: bold; border-radius: 5px; cursor: pointer; transition: background 0.2s; }
-        button:hover { background: #00adb5; }
-        button:disabled { background: #222; color: #555; cursor: not-allowed; border: 1px solid #333; }
+        /* 全体スタイリング：読み込みを最速にするためのミニマル設計 */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #0b0c10;
+            color: #c5c6c7;
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', sans-serif;
+            overflow-x: hidden;
+        }
+        /* スクロールコンテナ：39ページ分 */
+        .story-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+        }
+        /* 各ページの基本構造 */
+        .page {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            padding: 40px 20px;
+            border-bottom: 2px dashed #1f2833;
+        }
+        /* ナビゲーションカウンター */
+        .page-num {
+            font-size: 0.9rem;
+            color: #66fcf1;
+            font-weight: bold;
+            letter-spacing: 2px;
+            background: rgba(31, 40, 51, 0.6);
+            padding: 4px 12px;
+            border-radius: 12px;
+        }
+        /* テキストエリア */
+        .text-area {
+            width: 100%;
+            text-align: center;
+            font-size: 1.2rem;
+            line-height: 1.6;
+            color: #ffffff;
+            background: rgba(11, 12, 16, 0.8);
+            padding: 15px;
+            border-radius: 8px;
+            z-index: 10;
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        /* 絵の描画エリア（95%以上がCSS & SVGによる超軽量システム） */
+        .canvas {
+            position: relative;
+            width: 100%;
+            height: 50vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        /* 共通グラフィックパーツ */
+        .space-line {
+            position: absolute;
+            width: 80%;
+            height: 4px;
+            background: #45a29e;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        .clock {
+            position: absolute;
+            width: 80px;
+            height: 80px;
+            border: 4px solid #66fcf1;
+            border-radius: 50%;
+            background: #1f2833;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #ffffff;
+            font-weight: bold;
+            font-size: 0.9rem;
+            box-shadow: 0 0 15px rgba(102, 252, 241, 0.4);
+            transition: all 0.3s ease;
+        }
+        .clock::after {
+            content: '';
+            position: absolute;
+            width: 4px;
+            height: 30px;
+            background: #66fcf1;
+            bottom: 50%;
+            transform-origin: bottom center;
+            transform: rotate(0deg);
+        }
+        /* 時計のバリエーション */
+        .clock-w1 { left: 25%; top: 40%; border-color: #ff0055; box-shadow: 0 0 15px rgba(255, 0, 85, 0.4);}
+        .clock-w2 { left: 65%; top: 40%; border-color: #ff0055; box-shadow: 0 0 15px rgba(255, 0, 85, 0.4);}
+        .clock-wp { left: 25%; top: 20%; border-color: #00ffcc; box-shadow: 0 0 15px rgba(0, 255, 204, 0.4);}
+        .clock-w1::after, .clock-w2::after { background: #ff0055; }
+        .clock-wp::after { background: #00ffcc; }
 
-        /* --- 絵を描くためのカスタムCSSコンポーネント（ベクター描画） --- */
-        .system-frame { width: 80%; height: 80%; border: 2px dashed #666; position: relative; border-radius: 5px; display: flex; align-items: center; justify-content: space-around; }
-        .system-label { position: absolute; top: 10px; left: 10px; background: #444; padding: 2px 8px; font-size: 12px; border-radius: 3px; font-weight: bold;}
-        .clock { width: 70px; height: 70px; border-radius: 50%; border: 3px solid #fff; position: relative; display: flex; align-items: center; justify-content: center; background: #333; font-weight: bold; font-size: 14px; box-shadow: 0 0 10px rgba(255,255,255,0.2); }
-        .clock::after { content: ''; position: absolute; width: 2px; height: 25px; background: #ff2e63; top: 10px; left: calc(50% - 1px); transform-origin: bottom center; transform: rotate(0deg); }
-        .clock.moving { border-color: #00adb5; }
-        .clock.moving::after { background: #00adb5; }
-        .clock-label { position: absolute; bottom: -22px; font-size: 12px; background: #111; padding: 1px 5px; border-radius: 3px; }
-        .arrow { width: 100px; height: 4px; background: #00adb5; position: relative; }
-        .arrow::after { content: ''; position: absolute; right: -5px; top: -5px; border-top: 7px solid transparent; border-bottom: 7px solid transparent; border-left: 10px solid #00adb5; }
-        .space-line { width: 80%; height: 4px; background: #555; position: relative; }
-        .distance-marker { position: absolute; bottom: -25px; left: 0; right: 0; text-align: center; font-size: 14px; color: #ff2e63; font-weight: bold; }
-        .event-flash { width: 25px; height: 25px; background: #fff; border-radius: 50%; position: absolute; box-shadow: 0 0 20px 10px #fff, 0 0 4px 20px #ff2e63; animation: flash-pulse 1s infinite; }
-        .formula { font-size: 24px; font-family: monospace; color: #00adb5; border: 1px solid #444; padding: 10px 20px; background: #1a1a1a; border-radius: 5px; }
-        @keyframes flash-pulse { 0% { transform: scale(0.8); opacity: 0.8; } 50% { transform: scale(1.2); opacity: 1; } 100% { transform: scale(0.8); opacity: 0.8; } }
+        /* 特殊な時計の針の角度 */
+        .t0::after { transform: rotate(0deg); }
+        .t1::after { transform: rotate(45deg); }
+        .t2::after { transform: rotate(90deg); }
+        .t-slow::after { transform: rotate(30deg); } /* 遅れる針 */
+        
+        /* ラベル */
+        .label { position: absolute; font-size: 0.8rem; color: #a9a9a9; margin-top: 90px; font-weight: bold;}
+        .system-tag { position: absolute; top: 10px; right: 10px; font-size: 0.8rem; padding: 2px 6px; background: #333; border-radius: 4px;}
+
+        /* 数式スタイル */
+        .formula {
+            font-family: 'Times New Roman', Times, serif;
+            font-size: 1.6rem;
+            color: #66fcf1;
+            background: #1f2833;
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: 1px solid #45a29e;
+        }
+        
+        /* スクロールを促すガイド */
+        .scroll-down {
+            position: absolute;
+            bottom: 10px;
+            font-size: 0.8rem;
+            color: #45a29e;
+            animation: bounce 2s infinite;
+        }
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-10px); }
+            60% { transform: translateY(-5px); }
+        }
     </style>
     </head>
 <body>
 
-<div id="app">
-    <header>
-        <div id="title-text">相対性理論：時間の遅れ（39章の紙芝居）</div>
-        <div id="page-counter">1 / 39</div>
-    </header>
-    
-    <div id="progress-bar">
-        <div id="progress-fill"></div>
+    <div class="story-container">
+        <!-- ページ自動生成用のプレースホルダー。JavaScriptで超軽量に出力します -->
     </div>
 
-    <div id="stage">
-        <div id="art-area"></div>
-        <div id="caption-area"></div>
-    </div>
+    <script>
+        // 39ページのデータ（絵の要素定義と解説テキスト）
+        // 画像URLを一切使わず、CSSクラスとインライン数値だけで描画を完結させています。
+        const storyData = [
+            { txt: "アインシュタインの「時間の遅れ」を、数式を使わずに直感で理解する紙芝居です。下へスクロールしてね。", type: "title" },
+            { txt: "登場人物は、2つの静止した時計 W1, W2 と、移動する1つの時計 W' です。", type: "intro" },
+            { txt: "まず、私たちがいる静止した世界「観測系 S」をベースに考えてみましょう。", type: "system-s" },
+            { txt: "系 S の中に、一定の距離 d を離して、2つの時計 W1 と W2 を設置します。", type: "s-dist" },
+            { txt: "この W1 と W2 は、系 S の中で完全に同期しており、同じ時間を刻んでいます。", type: "s-sync" },
+            { txt: "そこへ、もう1つの時計 W'（ダッシュ）が、左から右へ速度 v で近づいてきます。", type: "wp-appear" },
+            { txt: "時計 W' は、系 S' という「動く世界」の住人です。今、まさに W1 に重なろうとしています。", type: "wp-approach" },
+            { txt: "【イベント1発生！】時計 W' が、時計 W1 の真上をぴったり通過しました。", type: "ev1" },
+            { txt: "この「同じ場所に重なった瞬間」に、すかさず両方の時計の文字盤を写真に記録します。", type: "ev1-snap" },
+            { txt: "このとき、W1 の目盛りは「0」を指していました。基準の始まりです。", type: "ev1-w1" },
+            { txt: "同時に、通過した W' の目盛りも「0」を指していました。ここを両方のスタートにします。", type: "ev1-wp" },
+            { txt: "イベント1が終わり、時計 W' はそのまま右へ進み続けます。", type: "move-on" },
+            { txt: "W' は W1 を離れ、次の目的地である W2 へ向かって宇宙を旅します。", type: "midway" },
+            { txt: "系 S で見ると、W1 と W2 の時間は全く同じようにカチカチと進んでいきます。", type: "midway-s" },
+            { txt: "時計 W' の針も進んでいますが、系 S から見ると何だか動きがのんびりに見えます。", type: "midway-wp" },
+            { txt: "さあ、時計 W' が右側の時計 W2 に近づいてきました。", type: "approach-w2" },
+            { txt: "【イベント2発生！】時計 W' が、時計 W2 の真上をぴったり通過しました！", type: "ev2" },
+            { txt: "ここでもすかさず、2つの時計（W2 と W'）の文字盤の数値を記録します。", type: "ev2-snap" },
+            { txt: "このとき、待っていた W2 の針は、時間が進んで「T_S」という値を指していました。", type: "ev2-w2" },
+            { txt: "一方、旅をしてきた W' の針は「T_S'」という値を指していました。", type: "ev2-wp" },
+            { txt: "系 S において、イベント1からイベント2までに経過した時間は (T_S - 0)、つまり「T_S」です。", type: "diff-s" },
+            { txt: "系 S で測った、2つのイベントが起きた場所の距離は「d」でしたね。", type: "dist-d" },
+            { txt: "では次に、動いている時計 W' の視点「系 S'」になって考えてみましょう。", type: "switch-sp" },
+            { txt: "系 S'（W' の世界）では、自分自身（W'）はずっと同じ場所（原点）に静止しています。", type: "sp-view" },
+            { txt: "W' から見ると、逆に背景（W1 と W2）が、左側に向かって一斉に走り去っていきます。", type: "sp-move" },
+            { txt: "系 S' にとって、イベント1（W1通過）とイベント2（W2通過）は、どちらも「自分の目の前」で起きます。", type: "sp-sameplace" },
+            { txt: "つまり、系 S' の世界では、この2つのイベントの間の空間的な距離は「ゼロ」です。", type: "sp-d0" },
+            { txt: "そして、系 S' の時計 W' が刻んだ、2つのイベント間の時間は (T_S' - 0) つまり「T_S'」です。", type: "diff-sp" },
+            { txt: "アインシュタインの相対性理論では、異なる世界でも絶対に変わらない魔法の数値があります。", type: "invariant-intro" },
+            { txt: "それが「時空インターバル（時空の隔たり）」の不変性です。", type: "invariant-law" },
+            { txt: "【不変のルール】(時間の二乗) から (距離の二乗) を引いた値は、どの世界でも必ず一致する！", type: "formula-1" },
+            { txt: "系 S での計算： (T_S)^2 - (d)^2 ＝ これがこの2つのイベントの時空のキョリです。", type: "formula-s" },
+            { txt: "系 S' での計算： (T_S')^2 - (0)^2 ＝ 距離がゼロなので、ただの (T_S')^2 です。", type: "formula-sp" },
+            { txt: "この2つがイコールで結ばれます！ (T_S')^2 ＝ (T_S)^2 - (d)^2", type: "formula-eq" },
+            { txt: "右側の式を見ると、(T_S)^2 から、距離のぶんである (d)^2 が引き算されています。", type: "formula-analysis" },
+            { txt: "距離 d はゼロではない（2つの時計は離れている）ので、引き算すると必ず小さくなります。", type: "formula-result" },
+            { txt: "つまり、絶対に「 T_S' ＜ T_S 」という関係になります！", type: "conclusion-shorthand" },
+            { txt: "動いていた時計 W' が刻んだ時間(T_S')は、静止した系で待っていた時間(T_S)より必ず短いのです。", type: "final-proof" },
+            { txt: "「動いている時計 W' は、静止した世界から見て、ゆっくり進む」。これにて証明完了です！お疲れ様でした。", type: "end" }
+        ];
 
-    <div id="controls">
-        <button id="prev-btn" onclick="prevSlide()" disabled>◀ もどる</button>
-        <button id="next-btn" onclick="nextSlide()">すすむ ▶</button>
-    </div>
-    </div>
+        // ページを動的に組み立てる
+        const container = document.querySelector('.story-container');
 
-<script>
-    // 39ページのデータ（絵のHTMLとナレーションを分離し、一瞬でレンダリング）
-    const slides = [
-        {
-            art: `<div style="font-size:40px; text-align:center;">⏱️<br><span style="font-size:24px; color:#00adb5; font-weight:bold;">時間の遅れを理解する紙芝居</span><br><span style="font-size:14px; color:#aaa;">物理の不思議な世界へようこそ</span></div>`,
-            text: "これから、アインシュタインの相対性理論における「移動する時計はゆっくり進む」という不思議な現象を、39枚の絵で順番に解き明かしていきます。"
-        },
-        {
-            art: `<div class="system-frame"><div class="system-label">静止している世界 S</div></div>`,
-            text: "まず、私たちが普段基準にする、動いていない静止した世界（基準系）を考えます。この世界を「S」と呼びましょう。"
-        },
-        {
-            art: `<div class="system-frame"><div class="system-label">静止している世界 S</div><div class="clock"><span class="clock-label">W1</span></div></div>`,
-            text: "この静止した世界 S に、ポツンと1つの時計を置いてみます。この時計の名前を「W1」とします。"
-        },
-        {
-            art: `<div class="system-frame"><div class="system-label">静止している世界 S</div><div class="clock" style="margin-right:120px;"><span class="clock-label">W1</span></div><div class="clock"><span class="clock-label">W2</span></div></div>`,
-            text: "さらに、W1 から少し離れた右側に、もう1つの時計を置いてみます。こちらの名前は「W2」です。"
-        },
-        {
-            art: `<div class="system-frame"><div class="system-label">静止している世界 S</div><div class="clock" style="margin-right:120px;"><span class="clock-label">W1</span></div><div class="space-line" style="position:absolute; width:150px; left:210px;"><div class="distance-marker">距離 d</div></div><div class="clock"><span class="clock-label">W2</span></div></div>`,
-            text: "時計 W1 と 時計 W2 は離れています。この2つの時計のあいだの空間的な距離を「d」と決めておきます。"
-        },
-        {
-            art: `<div class="system-frame"><div class="system-label">静止している世界 S</div><div class="clock" style="margin-right:120px;"><span class="clock-label">W1</span></div><div class="clock"><span class="clock-label">W2</span></div></div><div style="font-size:14px; position:absolute; bottom:50px; color:#aaa;">※W1とW2は完全に同期（時間が一致）しています</div>`,
-            text: "世界 S にある W1 と W2 は、あらかじめ針がぴったり同じ時間を指すように、正しく合わせられています。"
-        },
-        {
-            art: `<div class="system-frame" style="border-color:#00adb5;"><div class="system-label" style="background:#00adb5;">動いている世界 S'</div></div>`,
-            text: "ここで、もうひとつの世界を登場させます。世界 S に対して、ビューンと右へ移動している世界「S'（エスペア）」です。"
-        },
-        {
-            art: `<div class="system-frame" style="border-color:#00adb5;"><div class="system-label" style="background:#00adb5;">動いている世界 S'</div><div class="clock moving"><span class="clock-label" style="color:#00adb5;">W'</span></div></div>`,
-            text: "この動いている世界 S' には、1つの時計「W'（ダッシュ）」がのっかっています。"
-        },
-        {
-            art: `<div class="system-frame" style="border-color:#00adb5;"><div class="system-label" style="background:#00adb5;">動いている世界 S'</div><div class="clock moving" style="transform:translateX(-100px);"><span class="clock-label" style="color:#00adb5;">W'</span></div><div class="arrow" style="position:absolute; left:45%;"></div></div>`,
-            text: "世界 S' ごと、時計 W' はものすごいハイスピードで右方向へと突き進んでいます。"
-        },
-        {
-            art: `<div style="position:relative; width:100%; height:100%; display:flex; flex-direction:column; justify-content:space-around; align-items:center;">
-                <div class="system-frame" style="height:40%; border-color:#00adb5;"><div class="system-label" style="background:#00adb5;">動く世界 S'</div><div class="clock moving" style="transform:scale(0.8);"><span class="clock-label" style="color:#00adb5;">W'</span></div><div class="arrow" style="width:40px; position:absolute; right:20px;"></div></div>
-                <div class="system-frame" style="height:40%;"><div class="system-label">静止世界 S</div><div class="clock" style="transform:scale(0.8); margin-right:80px;"><span class="clock-label">W1</span></div><div class="clock" style="transform:scale(0.8);"><span class="clock-label">W2</span></div></div>
-            </div>`,
-            text: "さあ、この2つの世界を重ねて、お互いの時計がすれ違う様子を観察してみましょう。"
-        },
-        {
-            art: `<div style="position:relative; width:100%; height:100%; display:flex; flex-direction:column; justify-content:space-around; align-items:center;">
-                <div style="position:absolute; top:20%; left:25%;" class="clock moving"><span class="clock-label" style="color:#00adb5;">W'</span></div>
-                <div style="position:absolute; bottom:15%; left:25%;" class="clock"><span class="clock-label">W1</span></div>
-                <div style="position:absolute; bottom:15%; right:25%;" class="clock"><span class="clock-label">W2</span></div>
-            </div>`,
-            text: "ビュン！と走ってきた動く時計 W' が、まず静止している1つ目の時計 W1 の真上へと差し掛かりました。"
-        },
-        {
-            art: `<div style="position:relative; width:100%; height:100%; display:flex; flex-direction:column; justify-content:space-around; align-items:center;">
+        storyData.forEach((data, index) => {
+            const pageNum = index + 1;
+            const pageDiv = document.createElement('div');
+            pageDiv.className = 'page';
+            pageDiv.id = `page-${pageNum}`;
+
+            // 上部：ページ数表示
+            const numSpan = document.createElement('span');
+            numSpan.className = 'page-num';
+            numSpan.innerText = `${pageNum} / 39`;
+            pageDiv.appendChild(numSpan);
+
+            // 中部：ビジュアルキャンバス（ピュアCSSグラフィック）
+            const canvasDiv = document.createElement('div');
+            canvasDiv.className = 'canvas';
+            
+            // 各状態に応じた超軽量インライングラフィックのロジック
+            let graphicHTML = '';
+            if (pageNum >= 3 && pageNum <= 22) {
+                // 系Sの表現
+                graphicHTML += `<div class="system-tag" style="color:#ff0055;">観測系 S (静止系)</div>`;
+                graphicHTML += `<div class="space-line"></div>`;
+                
+                // W1の配置
+                let w1Time = (pageNum >= 18) ? 't2' : ((pageNum >= 12) ? 't1' : 't0');
+                graphicHTML += `<div class="clock clock-w1 ${w1Time}" style="left:25%;">W₁<div class="label">W1 (静止)</div></div>`;
+                
+                // W2の配置
+                let w2Time = (pageNum >= 18) ? 't2' : 't0';
+                graphicHTML += `<div class="clock clock-w2 ${w2Time}" style="left:65%;">W₂<div class="label">W2 (静止)</div></div>`;
