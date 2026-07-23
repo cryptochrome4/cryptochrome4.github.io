@@ -1,206 +1,280 @@
-html<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>相対性理論・時間の遅れ紙芝居</title>
+    <title>相対性理論・時間の遅れ紙芝居 (39ページ)</title>
     <style>
-        /* 全体設定：軽量化のため外部フォントや画像は一切不使用 */
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: sans-serif; background: #111; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; overflow: hidden; }
-        
-        /* 紙芝居の舞台（コンテナ） */
-        #stage { width: 100vw; height: 75vh; max-width: 800px; max-height: 600px; position: relative; background: #1a1a1a; border: 4px solid #333; border-radius: 8px; overflow: hidden; }
-        
-        /* 各ページ共通：絵を95%にするためのレイアウト */
-        .page { width: 100%; height: 100%; position: absolute; top: 0; left: 0; opacity: 0; display: flex; flex-direction: column; transition: opacity 0.4s ease; pointer-events: none; z-index: 1; }
-        .page.active { opacity: 1; pointer-events: auto; z-index: 2; }
-        
-        /* 95%を占めるビジュアル（絵）のエリア */
-        .canvas-area { width: 100%; height: 93%; position: relative; background: #222; overflow: hidden; }
-        
-        /* 5%未満の文字エリア（極限までシンプルに） */
-        .text-area { width: 100%; height: 7%; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; font-size: clamp(12px, 2vw, 16px); color: #ccc; border-top: 1px solid #444; text-align: center; padding: 0 10px; }
-        
-        /* 操作用コントローラー */
-        #controls { width: 100%; max-width: 800px; height: 8vh; display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #222; border-radius: 0 0 8px 8px; }
-        button { background: #444; color: white; border: none; padding: 10px 20px; font-size: 16px; cursor: pointer; border-radius: 4px; transition: background 0.2s; }
-        button:hover { background: #666; }
-        button:disabled { background: #222; color: #555; cursor: not-allowed; }
-        #page-num { font-size: 16px; font-weight: bold; }
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-main: #f8fafc;
+            --text-sub: #94a3b8;
+            --accent: #38bdf8;
+            --accent-glow: rgba(56, 189, 248, 0.4);
+        }
 
-        /* グラフィック用の共通パーツ（CSSで描画することで超軽量化） */
-        .space-line { position: absolute; bottom: 30%; left: 5%; width: 90%; height: 2px; background: #555; }
-        .space-label { position: absolute; bottom: 25%; font-size: 14px; color: #888; font-weight: bold; }
-        .clock { position: absolute; width: 60px; height: 60px; border-radius: 50%; border: 3px solid #fff; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; box-shadow: 0 0 10px rgba(255,255,255,0.2); }
-        .clock::after { content: ''; position: absolute; width: 2px; height: 20px; background: #ff4757; top: 10px; transform-origin: bottom center; }
-        
-        /* 静止系Sの時計（青） */
-        .clock.s-clock { background: #1e3799; border-color: #4a69bd; color: #fff; }
-        /* 移動系S'の時計（黄） */
-        .clock.s-prime-clock { background: #f6b93b; border-color: #fad390; color: #000; }
-        .clock.s-prime-clock::after { background: #000; }
+        body {
+            margin: 0;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
 
-        /* 特殊な針の回転アニメーションの定義 */
-        .t0::after { transform: rotate(0deg); }
-        .t4::after { transform: rotate(120deg); }
-        .t8::after { transform: rotate(240deg); }
-        .t3::after { transform: rotate(90deg); }
+        .container {
+            width: 90vw;
+            max-width: 800px;
+            height: 85vh;
+            max-height: 600px;
+            background: var(--card-bg);
+            border-radius: 16px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.4);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
 
-        /* イベントを示す光の輪 */
-        .flash { position: absolute; width: 80px; height: 80px; border-radius: 50%; border: 3px dashed #ff4757; animation: pulse 1.5s infinite; transform: translate(-10px, -10px); }
-        @keyframes pulse { 0% { transform: scale(0.8); opacity: 0.5; } 50% { transform: scale(1.2); opacity: 1; } 100% { transform: scale(0.8); opacity: 0.5; } }
-css        /* 各ページ独自のレイアウト配置 */
-        /* P1: 登場人物 */
-        .p1-title { text-align: center; margin-top: 15%; font-size: 24px; color: #fff; }
-        /* P2: イベント1 */
-        .arrow { position: absolute; border: solid #fff; border-width: 0 3px 3px 0; display: inline-block; padding: 5px; }
-        .arrow.right { transform: rotate(-45deg); }
-        /* P5: 不変間隔 */
-        .math-box { position: absolute; top: 15%; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.5); padding: 15px; border-radius: 8px; border: 1px solid #444; font-family: monospace; font-size: 18px; text-align: center; }
-        .highlight { color: #f6b93b; font-weight: bold; }
+        /* コピーボタン（外部用ではなく、この画面自体のUI用） */
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 24px;
+            background: rgba(0, 0, 0, 0.2);
+            border-top-left-radius: 16px;
+            border-top-right-radius: 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .title {
+            font-size: 1rem;
+            font-weight: bold;
+            letter-spacing: 0.05em;
+            color: var(--accent);
+        }
+
+        .counter {
+            font-size: 0.9rem;
+            color: var(--text-sub);
+            background: rgba(255, 255, 255, 0.08);
+            padding: 4px 12px;
+            border-radius: 20px;
+        }
+
+        /* 紙芝居メイン領域（95%が絵） */
+        .stage {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+            padding: 20px;
+        }
+
+        /* SVGグラフィックのスタイル */
+        svg {
+            width: 100%;
+            height: 100%;
+            max-height: 380px;
+            transition: all 0.5s ease;
+        }
+
+        /* 活字説明文（下部に控えめに配置） */
+        .caption-area {
+            padding: 16px 24px;
+            background: rgba(0, 0, 0, 0.3);
+            border-bottom-left-radius: 16px;
+            border-bottom-right-radius: 16px;
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .caption {
+            font-size: 1.05rem;
+            line-height: 1.5;
+            color: var(--text-main);
+            margin: 0;
+            font-weight: 500;
+        }
+
+        /* コントロールボタン */
+        .controls {
+            position: absolute;
+            top: 50%;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            transform: translateY(-50%);
+            pointer-events: none;
+            padding: 0 10px;
+            box-sizing: border-box;
+        }
+
+        .btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: rgba(30, 41, 59, 0.8);
+            border: 2px solid var(--accent);
+            color: var(--accent);
+            font-size: 1.5rem;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            pointer-events: auto;
+            transition: all 0.2s ease;
+            box-shadow: 0 0 15px var(--accent-glow);
+        }
+
+        .btn:hover {
+            background: var(--accent);
+            color: var(--bg-color);
+            box-shadow: 0 0 25px var(--accent);
+            transform: scale(1.1);
+        }
+
+        .btn:disabled {
+            border-color: #475569;
+            color: #475569;
+            background: rgba(30, 41, 59, 0.4);
+            box-shadow: none;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* 複製用クイックUIボタン */
+        .copy-embed-btn {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .copy-embed-btn:hover { background: #059669; }
     </style>
 </head>
 <body>
 
-    <div id="stage">
-        <!-- 1ページ目 -->
-        <div class="page active" id="p1">
-            <div class="canvas-area">
-                <div class="p1-title">⏳ 物理現象「時間の遅れ」を解き明かす</div>
-                <!-- S系の時計 W1, W2 -->
-                <div class="clock s-clock t0" style="left:20%; top:50%;">W1</div>
-                <div class="clock s-clock t0" style="left:70%; top:50%;">W2</div>
-                <!-- S'系の時計 W' -->
-                <div class="clock s-prime-clock t0" style="left:20%; top:30%;">W' ➔</div>
-                <div style="position:absolute; top:63%; left:45%; color:#888;">静止している空間 (S系)</div>
-            </div>
-            <div class="text-area">【1/7】舞台には、静止した2つの時計(W1, W2)と、右へ動く1つの時計(W')があります。</div>
-        </div>
-
-        <!-- 2ページ目 -->
-        <div class="page" id="p2">
-            <div class="canvas-area">
-                <div class="space-line"></div><div class="space-label" style="left:5%;">静止宇宙 S</div>
-                <div class="flash" style="left:20%; top:50%;"></div>
-                <div class="clock s-clock t0" style="left:20%; top:50%;">W1<br><small>0:00</small></div>
-                <div class="clock s-clock t0" style="left:70%; top:50%;">W2<br><small>0:00</small></div>
-                <div class="clock s-prime-clock t0" style="left:20%; top:42%;">W'<br><small>0:00</small></div>
-                <div style="position:absolute; top:25%; left:18%; color:#ff4757; font-weight:bold;">★ イベント①：W' が W1 を通過</div>
-            </div>
-            <div class="text-area">【2/7】イベント①：動く時計W'が、静止した時計W1の真上を通過。双方の記録は「0」です。</div>
-        </div>
-
-        <!-- 3ページ目 -->
-        <div class="page" id="p3">
-            <div class="canvas-area">
-                <div class="space-line"></div><div class="space-label" style="left:5%;">静止宇宙 S</div>
-                <div class="flash" style="left:70%; top:50%;"></div>
-                <div class="clock s-clock t8" style="left:20%; top:50%; opacity:0.5;">W1<br><small>0:00</small></div>
-                <div class="clock s-clock t8" style="left:70%; top:50%;">W2<br><small>8:00</small></div>
-                <div class="clock s-prime-clock t4" style="left:70%; top:42%;">W'<br><small>4:00</small></div>
-                <div style="position:absolute; top:25%; left:48%; color:#ff4757; font-weight:bold;">★ イベント②：W' が W2 を通過</div>
-                <!-- 距離dの矢印 -->
-                <div style="position:absolute; bottom:22%; left:25%; width:45%; height:2px; background:#fff;"></div>
-                <div style="position:absolute; bottom:20%; left:45%; color:#fff;">空間距離 d</div>
-            </div>
-            <div class="text-area">【3/7】イベント②：W'が進み、W2を通過。S系での時間差は大きく(8)、空間的にも「d」離れています。</div>
-        </div>
-
-        <!-- 4ページ目 -->
-         <div class="page" id="p4">
-            <div class="canvas-area">
-                <div class="space-line" style="background:#f6b93b;"></div><div class="space-label" style="left:5%; color:#f6b93b;">動くW'視点の宇宙 S'</div>
-                <div class="flash" style="left:45%; top:45%;"></div>
-                <div class="clock s-prime-clock t4" style="left:45%; top:45%;">W'<br><small>4:00</small></div>
-                <div style="position:absolute; top:20%; left:50%; transform:translateX(-50%); text-align:center; color:#fad390;">
-                    W'から見れば、自分はずっと同じ場所！<br>
-                    <strong>「空間の移動距離はゼロ (0)」</strong>
-                </div>
-            </div>
-            <div class="text-area">【4/7】一方、動くW'の視点(S'系)では、これら2つのイベントは「全く同じ場所」で起きています。</div>
-        </div>
-
-        <!-- 5ページ目 -->
-        <div class="page" id="p5">
-            <div class="canvas-area">
-                <div class="math-box">
-                    アインシュタインの不変規則：<br>
-                    <span style="color:#4a69bd;">(S系の時間)² - (S系の距離 d)²</span><br>
-                    ＝ <span style="color:#f6b93b;">(S'系の時間)² - (S'系の距離 0)²</span>
-                </div>
-                <div style="position:absolute; bottom:30%; width:100%; text-align:center; font-size:18px; padding:20px; line-height:1.6;">
-                    S系には <span style="color:#4a69bd; font-weight:bold;">引き算されるマイナス成分 (距離 d)</span> がある！<br>
-                    数式を等しく保つためには……？
-                </div>
-            </div>
-            <div class="text-area">【5/7】宇宙には「時間の二乗 − 距離の二乗」の計算結果が、どの視点でも一致するルールがあります。</div>
-        </div>
-
-        <!-- 6ページ目 -->
-        <div class="page" id="p6">
-            <div class="canvas-area">
-                <!-- 天秤の絵をCSSで簡易表現 -->
-                <div style="position:absolute; top:20%; left:50%; transform:translateX(-50%); font-size:22px; text-align:center;">
-                    <span style="color:#4a69bd;">S系の時間差 (大: 8)</span> ＞ <span style="color:#f6b93b;">S'系の時間差 (小: 4)</span>
-                </div>
-                <div style="position:absolute; top:45%; left:25%; font-size:50px;">⏳ 大</div>
-                <div style="position:absolute; top:55%; left:65%; font-size:35px;">⏳ 小</div>
-                <div style="position:absolute; top:65%; left:50%; transform:translateX(-50%); width:60%; height:4px; background:#fff; transform:rotate(15deg);"></div>
-            </div>
-            <div class="text-area">【6/7】したがって、空間を移動したS系の時間差より、移動ゼロのS'系の時間差の方が「必ず小さく」なります。</div>
-        </div>
-
-        <!-- 7ページ目 -->
-        <div class="page" id="p7">
-            <div class="canvas-area">
-                <div style="position:absolute; top:15%; width:100%; text-align:center; font-size:24px; color:#ff4757; font-weight:bold;">
-                    🎬 結論：動く時計はゆっくり進む
-                </div>
-                <div class="clock s-clock t8" style="left:25%; top:45%;">S系<br>8秒</div>
-                <div style="position:absolute; left:45%; top:50%; font-size:30px;">＞</div>
-                <div class="clock s-prime-clock t4" style="left:55%; top:45%;">S'系<br>4秒</div>
-                <div style="position:absolute; bottom:15%; width:100%; text-align:center; color:#ccc; font-size:16px; padding:10px;">
-                    同じ現象なのに、動いていた時計(W')のカウンターの方が<br>
-                    少ない時間を示した ➔ つまり<strong>「時計の進みが遅い」</strong>！
-                </div>
-            </div>
-            <div class="text-area">【7/7】これこそが、動いている時計W'の進み方が、静止系に比べて「遅くなる」理由です。おわり。</div>
-        </div>
+<div class="container">
+    <div class="top-bar">
+        <div class="title">相対性理論：動く時計の遅れモデル</div>
+        <button class="copy-embed-btn" onclick="copyCodeSnippet()">📋 コードをコピー</button>
+        <div class="counter" id="pageCounter">1 / 39</div>
     </div>
-    html    <!-- コントローラー部分 -->
-    <div id="controls">
-        <button id="prev-btn" onclick="changePage(-1)" disabled>◀ 前へ</button>
-        <span id="page-num">1 / 7</span>
-        <button id="next-btn" onclick="changePage(1)">次へ ▶</button>
+    
+    <div class="stage" id="stageCanvas">
+        <!-- SVG絵コンテがJavaScriptから動的に注入されます -->
     </div>
 
-    <script>
-        // 紙芝居のページめくり制御ロジック
-        let currentPage = 1;
-        const totalPages = 7;
+    <div class="controls">
+        <button class="btn" id="prevBtn" onclick="prevPage()" disabled>&lt;</button>
+        <button class="btn" id="nextBtn" onclick="nextPage()">&gt;</button>
+    </div>
 
-        function changePage(direction) {
-            // 現在のページを非表示にする
-            document.getElementById(`p${currentPage}`).classList.remove('active');
-            
-            // ページ番号を更新
-            currentPage += direction;
-            
-            // ガード処理
-            if (currentPage < 1) currentPage = 1;
-            if (currentPage > totalPages) currentPage = totalPages;
-            
-            // 新しいページを表示する
-            document.getElementById(`p${currentPage}`).classList.add('active');
-            
-            // ページ番号表示を更新
-            document.getElementById('page-num').innerText = `${currentPage} / ${totalPages}`;
-            
-            // ボタンの活性・非活性を制御
-            document.getElementById('prev-btn').disabled = (currentPage === 1);
-            document.getElementById('next-btn').disabled = (currentPage === totalPages);
-        }
-    </script>
-</body>
-</html>
+    <div class="caption-area">
+        <p class="caption" id="captionText">Loading...</p>
+    </div>
+</div>
+
+<script>
+// 全39ページのデータ定義（絵が95%主役のため、構造化データで図形を生成）
+const totalPages = 39;
+let currentPage = 1;
+
+// 共通パーツ
+const svgHeader = `<svg viewBox="0 0 800 400" xmlns="http://w3.org">
+    <!-- 宇宙空間背景 -->
+    <rect width="800" height="400" fill="#0b0f19"/>
+    <!-- 星屑 -->
+    <circle cx="100" cy="80" r="1" fill="#fff" opacity="0.5"/>
+    <circle cx="700" cy="120" r="1.5" fill="#fff" opacity="0.8"/>
+    <circle cx="400" cy="50" r="1" fill="#fff" opacity="0.3"/>
+    <circle cx="250" cy="300" r="1.2" fill="#fff" opacity="0.6"/>
+    <circle cx="550" cy="280" r="1" fill="#fff" opacity="0.4"/>`;
+const svgFooter = `</svg>`;
+
+// 各ページのグラフィック要素とセリフ（キャプション）
+const storyData = [
+    {
+        caption: "【第1章：二つの世界】静止した座標系S（地球側）と、速度vで動く座標系S'（ロケット側）があります。",
+        draw: () => `
+            <!-- 座標系S (下層) -->
+            <rect x="50" y="240" width="700" height="100" rx="10" fill="#1e293b" stroke="#475569" stroke-width="2"/>
+            <text x="70" y="275" fill="#38bdf8" font-size="24" font-weight="bold">静止系 S</text>
+            <!-- 座標系S' (上層) -->
+            <rect x="100" y="60" width="300" height="100" rx="10" fill="#2d3748" stroke="#38bdf8" stroke-width="2" opacity="0.9"/>
+            <text x="120" y="95" fill="#fbbf24" font-size="24" font-weight="bold">移動系 S' (速度 v ➔)</text>
+        `
+    },
+    {
+        caption: "系Sには、距離 d だけ離れて完全に同期した二つの時計 W1 と W2 が固定されています。",
+        draw: () => `
+            <rect x="50" y="240" width="700" height="100" rx="10" fill="#1e293b" stroke="#475569" stroke-width="2"/>
+            <!-- 時計W1 -->
+            <circle cx="200" cy="290" r="30" fill="#0f172a" stroke="#38bdf8" stroke-width="3"/>
+            <line x1="200" y1="290" x2="200" y2="270" stroke="#38bdf8" stroke-width="3"/>
+            <text x="190" y="340" fill="#38bdf8" font-size="14">時計W1</text>
+            <!-- 時計W2 -->
+            <circle cx="600" cy="290" r="30" fill="#0f172a" stroke="#38bdf8" stroke-width="3"/>
+            <line x1="600" y1="290" x2="600" y2="270" stroke="#38bdf8" stroke-width="3"/>
+            <text x="590" y="340" fill="#38bdf8" font-size="14">時計W2</text>
+            <!-- 距離d -->
+            <line x1="200" y1="245" x2="600" y2="245" stroke="#f43f5e" stroke-width="2" stroke-dasharray="5,5"/>
+            <text x="390" y="235" fill="#f43f5e" font-size="18" font-weight="bold">距離 d</text>
+        `
+    },
+    {
+        caption: "一方、動く系S'には、一個の時計 W' が乗ったロケットが左から右へと進んできます。",
+        draw: () => `
+            <!-- 静止系S -->
+            <rect x="50" y="240" width="700" height="100" rx="10" fill="#1e293b" stroke="#475569" stroke-width="2"/>
+            <!-- 移動ロケットS' -->
+            <g transform="translate(50, 0)">
+                <rect x="50" y="60" width="160" height="90" rx="15" fill="#1e293b" stroke="#fbbf24" stroke-width="3"/>
+                <polygon points="210,60 250,105 210,150" fill="#fbbf24"/>
+                <circle cx="120" cy="105" r="25" fill="#0f172a" stroke="#fbbf24" stroke-width="3"/>
+                <line x1="120" y1="105" x2="120" y2="85" stroke="#fbbf24" stroke-width="3"/>
+                <text x="105" y="150" fill="#fbbf24" font-size="14">時計W'</text>
+                <text x="265" y="110" fill="#fbbf24" font-size="18" font-weight="bold">➔ v</text>
+            </g>
+        `
+    },
+    {
+        caption: "【第2章：イベント1の発生】ロケットの時計W'が、まさにW1の真上をジャストで通過します！",
+        draw: () => `
+            <rect x="50" y="240" width="700" height="100" rx="10" fill="#1e293b" stroke="#475569" stroke-width="2"/>
+            <!-- W1 -->
+            <circle cx="200" cy="290" r="30" fill="#0f172a" stroke="#38bdf8" stroke-width="3"/>
+            <line x1="200" y1="290" x2="200" y2="270" stroke="#38bdf8" stroke-width="3"/>
+            <!-- ロケットがW1に重なる -->
+            <g transform="translate(100, 40)">
+                <rect x="50" y="60" width="160" height="90" rx="15" fill="#1e293b" stroke="#fbbf24" stroke-width="3"/>
+                <polygon points="210,60 250,105 210,150" fill="#fbbf24"/>
+                <circle cx="100" cy="105" r="25" fill="#0f172a" stroke="#fbbf24" stroke-width="3"/>
+                <line x1="100" y1="105" x2="100" y2="85" stroke="#fbbf24" stroke-width="3"/>
+            </g>
+            <!-- イベントフラッシュ -->
+            <circle cx="200" cy="170" r="15" fill="#fff" opacity="0.7"/>
+            <text x="230" y="175" fill="#fff" font-size="16" font-weight="bold">★ イベント1 (W'とW1が重なる)</text>
+        `
+    },
+    {
