@@ -69,61 +69,47 @@
             display: none;
             width: 100%;
         }
-        /* 画像ギャラリーカード */
+        /* 画像ギャラリーカード（余計な装飾を消し、写真単体を目立たせる） */
         .image-card {
             background: var(--card-bg);
             border-radius: 12px;
-            padding: 16px;
+            padding: 8px;
             margin-bottom: 20px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.2);
             box-sizing: border-box;
+            cursor: pointer; /* タップできることを示す */
+            transition: opacity 0.2s;
+        }
+        .image-card:active {
+            opacity: 0.6; /* スマホでタップした瞬間に一瞬薄くなる（フィードバック用） */
         }
         .image-card img {
             width: 100%;
             border-radius: 8px;
-            max-height: 300px;
+            max-height: 400px;
             object-fit: contain;
             background: #111;
-        }
-        .code-container {
-            position: relative;
-            margin-top: 12px;
-        }
-        .code-box {
-            background: #2d2d2d;
-            padding: 12px;
-            border-radius: 6px;
-            overflow-x: auto;
-            font-family: monospace;
-            font-size: 0.85rem;
-            white-space: pre-wrap;
-            word-break: break-all;
-            color: #a9ffb2;
-            border: 1px solid #444;
-        }
-        /* コピーボタン（コードボックスの外・下に配置） */
-        .copy-btn {
-            background: #333;
-            color: #fff;
-            border: 1px solid #555;
-            padding: 8px 16px;
-            border-radius: 4px;
-            font-size: 0.85rem;
-            cursor: pointer;
-            margin-top: 8px;
             display: block;
-            width: 100%;
-            box-sizing: border-box;
-            text-align: center;
-            font-weight: bold;
-        }
-        .copy-btn:active {
-            background: var(--accent-color);
         }
         .error-msg {
             color: #ff5555;
             font-size: 0.9rem;
             margin-top: 10px;
+        }
+        /* トースト通知（コピー成功時に画面下部に一瞬だけ出る黒い帯） */
+        #toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 173, 181, 0.9);
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            display: none;
+            z-index: 9999;
         }
     </style>
 </head>
@@ -140,11 +126,14 @@
         <div id="error-location" class="error-msg"></div>
     </div>
 
-    <!-- 2. 保存済み画像リスト画面 -->
+    <!-- 2. 保存済み画像リスト画面（写真のみ並ぶ） -->
     <div id="main-content">
         <div id="gallery-list"></div>
     </div>
 </div>
+
+<!-- コピー完了通知用（一瞬で消えます） -->
+<div id="toast">コードをコピーしました！</div>
 
 <script>
     // ★ここにあなただけの数字パスワードを設定してください（例: "1234"）
@@ -152,7 +141,7 @@
 
     // ★ここにIssueで生成した18枚の画像URLを入れてください
     const imagesData = [
-        "https://private-user-images.githubusercontent.com/307046148/625820246-c6beaa10-cf71-46b2-97bd-10c44a081b40.jpg?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3ODQ4MjMzNjgsIm5iZiI6MTc4NDgyMzA2OCwicGF0aCI6Ii8zMDcwNDYxNDgvNjI1ODIwMjQ2LWM2YmVhYTEwLWNmNzEtNDZiMi05N2JkLTEwYzQ0YTA4MWI0MC5qcGc_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjYwNzIzJTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI2MDcyM1QxNjExMDhaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT0zNDE2YTg1MWViMmVmNzQ3MjdhYjUzZDc0NTc5ODZkOGIzZDk5NzgwMDQzYzlmYzFkZTBhMGU2M2QxOGNlM2M5JlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCZyZXNwb25zZS1jb250ZW50LXR5cGU9aW1hZ2UlMkZqcGVnIn0.IIXeKDGgMPdQw70MMCz0FjZqGobhistlVic9HzsVfVo",
+        "★1枚目の画像URLをここに貼り付け",
         "★2枚目の画像URLをここに貼り付け",
         "★3枚目の画像URLをここに貼り付け",
         "★4枚目の画像URLをここに貼り付け",
@@ -191,7 +180,6 @@
         const listContainer = document.getElementById('gallery-list');
         
         imagesData.forEach((srcData, index) => {
-            // ダミーのテキストのままの場合はスキップ
             if(srcData.startsWith("★")) return;
 
             const card = document.createElement('div');
@@ -199,38 +187,31 @@
 
             const img = document.createElement('img');
             img.src = srcData;
+            card.appendChild(img);
 
-            const codeContainer = document.createElement('div');
-            codeContainer.className = 'code-container';
-
-            // コピーされるHTMLコードの形式
+            // コピーされる隠しHTMLコード
             const generatedCode = `<img src="${srcData}" alt="Image ${index + 1}">`;
 
-            const codeBox = document.createElement('div');
-            codeBox.className = 'code-box';
-            codeBox.textContent = generatedCode;
-
-            // コピーボタン（コードの外側に配置）
-            const copyBtn = document.createElement('button');
-            copyBtn.className = 'copy-btn';
-            copyBtn.textContent = `📋 ${index + 1}枚目のコードをコピー`;
-            copyBtn.onclick = function() {
+            // 写真（カード全体）をタップした時の処理
+            card.onclick = function() {
                 navigator.clipboard.writeText(generatedCode).then(() => {
-                    copyBtn.textContent = '✅ コピー完了！';
-                    setTimeout(() => { copyBtn.textContent = `📋 ${index + 1}枚目のコードをコピー`; }, 2000);
+                    showToast();
                 }).catch(err => {
                     alert('コピーに失敗しました');
                 });
             };
-
-            codeContainer.appendChild(codeBox);
-            codeContainer.appendChild(copyBtn);
-            
-            card.appendChild(img);
-            card.appendChild(codeContainer);
             
             listContainer.appendChild(card);
         });
+    }
+
+    // コピー完了通知を表示する関数
+    function showToast() {
+        const toast = document.getElementById('toast');
+        toast.style.display = 'block';
+        setTimeout(() => {
+            toast.style.display = 'none';
+        }, 1500); // 1.5秒後に自動で消える
     }
 </script>
 
