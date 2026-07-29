@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>周期表 元素Tier表作成ツール</title>
+    <title>周期表 元素Tier表作成ツール（自動保存版）</title>
     <style>
         :root {
             --bg-color: #1a1a1a;
@@ -23,10 +23,10 @@
             background-color: var(--bg-color);
             color: var(--text-color);
             margin: 0;
-            padding: 200px 20px 20px 20px; /* 固定ヘッダー分の余白 */
+            padding: 240px 20px 20px 20px;
         }
 
-        /* 固定ヘッダー（元素置き場） */
+        /* 固定ヘッダー */
         header {
             position: fixed;
             top: 0;
@@ -35,8 +35,8 @@
             background-color: #2a2a2a;
             padding: 15px;
             box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-            z-index: 100px;
-            max-height: 160px;
+            z-index: 100;
+            max-height: 200px;
             overflow-y: auto;
         }
 
@@ -46,7 +46,27 @@
             text-align: center;
         }
 
-        /* ティア表全体のコンテナ */
+        .controls {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .btn-reset {
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            padding: 6px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.85rem;
+        }
+
+        .btn-reset:hover {
+            background-color: #c0392b;
+        }
+
+        /* Tier表の構造 */
         .tier-container {
             display: flex;
             flex-direction: column;
@@ -58,14 +78,12 @@
             border-radius: 8px;
         }
 
-        /* 各ティアの行 */
         .tier-row {
             display: flex;
             background-color: #222;
             min-height: 70px;
         }
 
-        /* ティアのラベル部分（S, A, B...） */
         .tier-label {
             width: 80px;
             min-width: 80px;
@@ -78,7 +96,6 @@
             text-shadow: 1px 1px 0px rgba(255,255,255,0.5);
         }
 
-        /* ティアの色定義 */
         .label-s { background-color: var(--tier-s); }
         .label-a { background-color: var(--tier-a); }
         .label-b { background-color: var(--tier-b); }
@@ -88,7 +105,6 @@
         .label-f { background-color: var(--tier-f); }
         .label-g { background-color: var(--tier-g); }
 
-        /* 元素をドロップするエリア */
         .drop-zone {
             flex-grow: 1;
             display: flex;
@@ -96,9 +112,10 @@
             gap: 4px;
             padding: 8px;
             align-content: center;
+            min-height: 54px;
         }
 
-        /* 元素アイテムのスタイル */
+        /* 元素アイテム */
         .element-item {
             width: 45px;
             height: 45px;
@@ -111,7 +128,6 @@
             justify-content: center;
             cursor: grab;
             user-select: none;
-            transition: background-color 0.2s;
         }
 
         .element-item:active {
@@ -131,13 +147,14 @@
 </head>
 <body>
 
-    <!-- 未配置の元素一覧（上部に固定） -->
     <header>
         <h1>周期表 元素Tier表 (S〜G)</h1>
+        <div class="controls">
+            <button class="btn-reset" onclick="resetTierList()">表をリセット（初期化）</button>
+        </div>
         <div id="element-bank" class="drop-zone"></div>
     </header>
 
-    <!-- Tier表の土台 -->
     <div class="tier-container">
         <div class="tier-row"><div class="tier-label label-s">S</div><div class="drop-zone" id="tier-s"></div></div>
         <div class="tier-row"><div class="tier-label label-a">A</div><div class="drop-zone" id="tier-a"></div></div>
@@ -150,7 +167,6 @@
     </div>
 
     <script>
-        // 原子番号1から118までの元素記号リスト
         const elements = [
             "H", "He", "Li", "Be", "B", "C", "N", "O", "F", "Ne",
             "Na", "Mg", "Al", "Si", "P", "S", "Cl", "Ar", "K", "Ca",
@@ -166,48 +182,88 @@
             "Rg", "Cn", "Nh", "Fl", "Mc", "Lv", "Ts", "Og"
         ];
 
-        const bank = document.getElementById('element-bank');
-
-        // 1. 元素アイテムを動的に生成して「元素置き場」に追加
+        const elementNodes = {};
         elements.forEach((symbol, index) => {
             const atomNum = index + 1;
             const el = document.createElement('div');
             el.className = 'element-item';
             el.draggable = true;
             el.id = `elem-${atomNum}`;
-            
             el.innerHTML = `
                 <span class="element-number">${atomNum}</span>
                 <span class="element-symbol">${symbol}</span>
             `;
-
-            // ドラッグ開始時の処理
             el.addEventListener('dragstart', (e) => {
                 e.dataTransfer.setData('text/plain', el.id);
             });
-
-            bank.appendChild(el);
+            elementNodes[`elem-${atomNum}`] = el;
         });
 
-        // 2. ドロップゾーン（各ティアの行＆元の置き場）のイベント設定
+        const STORAGE_KEY = 'periodic_tier_list_v2';
+
+        // 状態をローカルストレージに保存
+        function saveCurrentState() {
+            const state = {};
+            document.querySelectorAll('.drop-zone').forEach(zone => {
+                state[zone.id] = Array.from(zone.children).map(child => child.id);
+            });
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        }
+
+        // 状態を読み込んで復元
+        function loadSavedState() {
+            const savedData = localStorage.getItem(STORAGE_KEY);
+            if (savedData) {
+                const state = JSON.parse(savedData);
+                Object.keys(state).forEach(zoneId => {
+                    const zone = document.getElementById(zoneId);
+                    if (zone) {
+                        state[zoneId].forEach(elemId => {
+                            if (elementNodes[elemId]) {
+                                zone.appendChild(elementNodes[elemId]);
+                            }
+                        });
+                    }
+                });
+            } else {
+                const bank = document.getElementById('element-bank');
+                Object.values(elementNodes).forEach(el => bank.appendChild(el));
+            }
+        }
+
+        // ドロップ時のイベント
         const dropZones = document.querySelectorAll('.drop-zone');
-        
         dropZones.forEach(zone => {
-            // ドラッグ中の要素が上に乗った時（デフォルト挙動を無効化してドロップ可能にする）
             zone.addEventListener('dragover', (e) => {
                 e.preventDefault();
             });
 
-            // ドロップされた時の処理
             zone.addEventListener('drop', (e) => {
                 e.preventDefault();
                 const id = e.dataTransfer.getData('text/plain');
                 const draggedElement = document.getElementById(id);
                 if (draggedElement) {
                     zone.appendChild(draggedElement);
+                    saveCurrentState(); // 配置が変わるたびに即時保存
                 }
             });
         });
+
+        // 初期化リセット機能
+        function resetTierList() {
+            if (confirm('現在のTier表をリセットして、すべての元素を元に戻しますか？')) {
+                localStorage.removeItem(STORAGE_KEY);
+                const bank = document.getElementById('element-bank');
+                Object.keys(elementNodes).sort((a, b) => {
+                    return parseInt(a.split('-')[1]) - parseInt(b.split('-')[1]);
+                }).forEach(elemId => {
+                    bank.appendChild(elementNodes[elemId]);
+                });
+            }
+        }
+
+        // ページ読み込み完了時に復元を実行
+        window.addEventListener('DOMContentLoaded', loadSavedState);
     </script>
 </body>
 </html>
