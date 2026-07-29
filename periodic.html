@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>周期表 元素Tier表作成ツール</title>
+    <style>
+        :root {
+            --bg-color: #1a1a1a;
+            --text-color: #ffffff;
+            --tier-s: #ff7f7f;
+            --tier-a: #ffbf7f;
+            --tier-b: #ffdf7f;
+            --tier-c: #ffff7f;
+            --tier-d: #bfff7f;
+            --tier-e: #7fff7f;
+            --tier-f: #7fffdf;
+            --tier-g: #7f9fff;
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 200px 20px 20px 20px; /* 固定ヘッダー分の余白 */
+        }
+
+        /* 固定ヘッダー（元素置き場） */
+        header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background-color: #2a2a2a;
+            padding: 15px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            z-index: 100px;
+            max-height: 160px;
+            overflow-y: auto;
+        }
+
+        h1 {
+            margin: 0 0 10px 0;
+            font-size: 1.2rem;
+            text-align: center;
+        }
+
+        /* ティア表全体のコンテナ */
+        .tier-container {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: #000;
+            padding: 5px;
+            border-radius: 8px;
+        }
+
+        /* 各ティアの行 */
+        .tier-row {
+            display: flex;
+            background-color: #222;
+            min-height: 70px;
+        }
+
+        /* ティアのラベル部分（S, A, B...） */
+        .tier-label {
+            width: 80px;
+            min-width: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.5rem;
+            color: #333;
+            text-shadow: 1px 1px 0px rgba(255,255,255,0.5);
+        }
+
+        /* ティアの色定義 */
+        .label-s { background-color: var(--tier-s); }
+        .label-a { background-color: var(--tier-a); }
+        .label-b { background-color: var(--tier-b); }
+        .label-c { background-color: var(--tier-c); }
+        .label-d { background-color: var(--tier-d); }
+        .label-e { background-color: var(--tier-e); }
+        .label-f { background-color: var(--tier-f); }
+        .label-g { background-color: var(--tier-g); }
+
+        /* 元素をドロップするエリア */
+        .drop-zone {
+            flex-grow: 1;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            padding: 8px;
+            align-content: center;
+        }
+
+        /* 元素アイテムのスタイル */
+        .element-item {
+            width: 45px;
+            height: 45px;
+            background-color: #3a3a3a;
+            border: 1px solid #555;
+            border-radius: 4px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: grab;
+            user-select: none;
+            transition: background-color 0.2s;
+        }
+
+        .element-item:active {
+            cursor: grabbing;
+        }
+
+        .element-symbol {
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .element-number {
+            font-size: 0.6rem;
+            color: #aaa;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 未配置の元素一覧（上部に固定） -->
+    <header>
+        <h1>周期表 元素Tier表 (S〜G)</h1>
+        <div id="element-bank" class="drop-zone"></div>
+    </header>
+
+    <!-- Tier表の土台 -->
+    <div class="tier-container">
+        <div class="tier-row"><div class="tier-label label-s">S</div><div class="drop-zone" id="tier-s"></div></div>
+        <div class="tier-row"><div class="tier-label label-a">A</div><div class="drop-zone" id="tier-a"></div></div>
+        <div class="tier-row"><div class="tier-label label-b">B</div><div class="drop-zone" id="tier-b"></div></div>
+        <div class="tier-row"><div class="tier-label label-c">C</div><div class="drop-zone" id="tier-c"></div></div>
+        <div class="tier-row"><div class="tier-label label-d">D</div><div class="drop-zone" id="tier-d"></div></div>
+        <div class="tier-row"><div class="tier-label label-e">E</div><div class="drop-zone" id="tier-e"></div></div>
+        <div class="tier-row"><div class="tier-label label-f">F</div><div class="drop-zone" id="tier-f"></div></div>
+        <div class="tier-row"><div class="tier-label label-g">G</div><div class="drop-zone" id="tier-g"></div></div>
+    </div>
+
+    <script>
+        // 原子番号1から118までの元素記号リスト
+        const elements = [
+            "H", "He", "Li", "Be", "B", "C", "N", "O", "F", "Ne",
+            "Na", "Mg", "Al", "Si", "P", "S", "Cl", "Ar", "K", "Ca",
+            "Sc", "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni", "Cu", "Zn",
+            "Ga", "Ge", "As", "Se", "Br", "Kr", "Rb", "Sr", "Y", "Zr",
+            "Nb", "Mo", "Tc", "Ru", "Rh", "Pd", "Ag", "Cd", "In", "Sn",
+            "Sb", "Te", "I", "Xe", "Cs", "Ba", "La", "Ce", "Pr", "Nd",
+            "Pm", "Sm", "Eu", "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb",
+            "Lu", "Hf", "Ta", "W", "Re", "Os", "Ir", "Pt", "Au", "Hg",
+            "Tl", "Pb", "Bi", "Po", "At", "Rn", "Fr", "Ra", "Ac", "Th",
+            "Pa", "U", "Np", "Pu", "Am", "Cm", "Bk", "Cf", "Es", "Fm",
+            "Md", "No", "Lr", "Rf", "Db", "Sg", "Bh", "Hs", "Mt", "Ds",
+            "Rg", "Cn", "Nh", "Fl", "Mc", "Lv", "Ts", "Og"
+        ];
+
+        const bank = document.getElementById('element-bank');
+
+        // 1. 元素アイテムを動的に生成して「元素置き場」に追加
+        elements.forEach((symbol, index) => {
+            const atomNum = index + 1;
+            const el = document.createElement('div');
+            el.className = 'element-item';
+            el.draggable = true;
+            el.id = `elem-${atomNum}`;
+            
+            el.innerHTML = `
+                <span class="element-number">${atomNum}</span>
+                <span class="element-symbol">${symbol}</span>
+            `;
+
+            // ドラッグ開始時の処理
+            el.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', el.id);
+            });
+
+            bank.appendChild(el);
+        });
+
+        // 2. ドロップゾーン（各ティアの行＆元の置き場）のイベント設定
+        const dropZones = document.querySelectorAll('.drop-zone');
+        
+        dropZones.forEach(zone => {
+            // ドラッグ中の要素が上に乗った時（デフォルト挙動を無効化してドロップ可能にする）
+            zone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+            });
+
+            // ドロップされた時の処理
+            zone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                const id = e.dataTransfer.getData('text/plain');
+                const draggedElement = document.getElementById(id);
+                if (draggedElement) {
+                    zone.appendChild(draggedElement);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
