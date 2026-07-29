@@ -1,70 +1,188 @@
-import random
-
-# ==========================================
-# 【カスタマイズ設定】あとから名前を自由に変えられます（最大20文字想定）
-# ==========================================
-MAN = [f"{i}万" for i in range(1, 10)]
-PIN = [f"{i}筒" for i in range(1, 10)]
-SOU = [f"{i}索" for i in range(1, 10)]
-JI  = ["東", "南", "西", "北", "白", "發", "中"]  # ←ここを20文字以内で自由に変更可能！
-
-ALL_TILES = (MAN + PIN + SOU + JI) * 4
-
-def main():
-    yama = ALL_TILES.copy()
-    random.shuffle(yama)
-    tehai = [yama.pop() for _ in range(13)]
-    tehai.sort()
-
-    print("=== 可変ワイド・テキスト麻雀 ===")
-
-    while len(yama) > 0:
-        # 1. 現在の「最も長い牌の文字数」を自動計算する（これがワイド化の鍵）
-        # 全ての牌とツモ牌の候補から最大文字数を取得
-        all_current_tiles = tehai + yama[-1:]
-        max_len = max(len(tile) for tile in all_current_tiles)
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>超軽量・麻雀練習おもちゃ</title>
+    <style>
+        /* デザインを極限まで削った超軽量スタイル */
+        body { font-family: sans-serif; padding: 15px; background: #f0f0f0; color: #333; }
+        h3 { margin-top: 0; }
+        .section { background: white; padding: 12px; margin-bottom: 10px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .info-box { font-weight: bold; color: #d32f2f; min-height: 24px; font-size: 1.1rem; }
+        .tile-container { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 5px; }
         
-        # 画面の幅（マス目の幅）を文字数に合わせる（最低幅4マスを保証）
-        box_width = max(max_len + 2, 4)
-        
-        # 2. 試合場の描画（文字数に合わせて区切り線の長さが自動で広がる）
-        line_length = (box_width + 7) * 13
-        print("\n" + "=" * line_length)
-        
-        print("【あなた手牌】")
-        # 各牌を [番号]:[牌の名前] の形で等幅にきれいに並べる
-        for idx, tile in enumerate(tehai):
-            # 💡 box_widthの幅で左詰めにし、自動で空白を埋めて横に広げる
-            print(f"[{idx:2}]:{tile:<{box_width}}", end="  ")
-            
-        print(f"\n【残りの山札】: {len(yama)}枚")
-        
-        # ツモ
-        tsumo = yama.pop()
-        print(f"👉 【ツモ牌】:  [{tsumo}]")
-        print("-" * line_length)
-        
-        # 選択
-        while True:
-            try:
-                choice = input(f"捨てる番号（0〜12）または 't' (ツモ切り): ").strip()
-                if choice.lower() == 't':
-                    print(f"⇒ [{tsumo}] をツモ切り。")
-                    break
-                
-                idx = int(choice)
-                if 0 <= idx < 13:
-                    discarded = tehai[idx]
-                    tehai[idx] = tsumo
-                    tehai.sort()
-                    print(f"⇒ [{discarded}] を捨てました。")
-                    break
-                else:
-                    print("❌ 0〜12で入力してください。")
-            except ValueError:
-                print("❌ 正しい数字か 't' を入力。")
-                
-    print("\n流局しました。")
+        /* 💡 20文字の長い名前が入っても、自動でワイドに広がるボタン設定 */
+        .tile-btn {
+            padding: 8px 12px;
+            font-size: 1rem;
+            background: #e0e0e0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            cursor: pointer;
+            min-width: 40px; /* 1文字の時はコンパクト */
+            max-width: 100%; /* 長い時は画面幅いっぱいに広がる */
+            white-space: nowrap; /* 改行させずに横に広げる */
+        }
+        .tile-btn:active { background: #b0b0b0; }
+        .tsumo-area { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+        .action-btn { padding: 8px 16px; background: #2196F3; color: white; border: none; border-radius: 4px; font-weight: bold; }
+    </style>
+</head>
+<body>
 
-if __name__ == "__main__":
-    main()
+    <div class="section">
+        <h3>📢 いまの状態（アドバイス）</h3>
+        <!-- ここに「リーチできるよ」「タンヤオだよ」などが自動表示されます -->
+        <div id="status" class="info-box">ゲームを始めてね！</div>
+    </div>
+
+    <div class="section">
+        <h3>🀄 あなたの手牌（13枚）</h3>
+        <p style="font-size:0.8rem; color:#666; margin:0 0 5px 0;">※いらない牌をタップすると捨てられます</p>
+        <div id="tehai-container" class="tile-container"></div>
+    </div>
+
+    <div class="section">
+        <h3>👉 ツモ（引いてきた牌）</h3>
+        <div class="tsumo-area">
+            <div id="tsumo-container" class="tile-container"></div>
+            <button id="tsumo-giri-btn" class="action-btn" style="background:#888;">そのまま捨てる</button>
+        </div>
+    </div>
+
+    <div class="section" style="font-size: 0.9rem;">
+        <p>📊 山札の残り: <span id="yama-count">0</span> 枚</p>
+        <button onclick="initGame()" class="action-btn" style="background:#4CAF50;">新しくやり直す</button>
+    </div>
+
+<script>
+// ==========================================
+// 【カスタマイズ設定】ここを自由に変えられます（最大20文字まで対応）
+// ==========================================
+const MAN = ["1万", "2万", "3万", "4万", "5万", "6万", "7万", "8万", "9万"];
+const PIN = ["1筒", "2筒", "3筒", "4筒", "5筒", "6筒", "7筒", "8筒", "9筒"];
+const SOU = ["1索", "2索", "3索", "4索", "5索", "6索", "7索", "8索", "9索"];
+// 👇 ここをお好きな20文字の名前に書き換えても画面が自動でワイドに広がります！
+const JI  = ["東", "南", "西", "北", "白", "發", "中"]; 
+
+let allTiles = [];
+let yama = [];
+let tehai = [];
+let tsumoTile = null;
+
+// ゲームの初期化
+function initGame() {
+    // 136枚の山札を作成
+    allTiles = [...MAN, ...PIN, ...SOU, ...JI, ...MAN, ...PIN, ...SOU, ...JI, ...MAN, ...PIN, ...SOU, ...JI, ...MAN, ...PIN, ...SOU, ...JI];
+    yama = [...allTiles];
+    // シャッフル
+    for (let i = yama.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [yama[i], yama[j]] = [yama[j], yama[i]];
+    }
+    
+    // 最初の手牌13枚を配って並び替え
+    tehai = yama.splice(0, 13);
+    tehai.sort();
+    tsumoTile = null;
+    
+    nextTurn();
+}
+
+// ターンを進める（ツモる）
+function nextTurn() {
+    if (yama.length === 0) {
+        document.getElementById("status").innerText = "流局（山札がなくなりました）";
+        return;
+    }
+    tsumoTile = yama.pop();
+    updateUI();
+    checkHand(); // 今の状態をチェックする
+}
+
+// 画面の表示を更新する
+function updateUI() {
+    document.getElementById("yama-count").innerText = yama.length;
+    
+    // 手牌のボタンを表示
+    const tehaiContainer = document.getElementById("tehai-container");
+    tehaiContainer.innerHTML = "";
+    tehai.forEach((tile, index) => {
+        const btn = document.createElement("button");
+        btn.className = "tile-btn";
+        btn.innerText = tile;
+        // 手牌の牌をタップした時：それを捨てて、ツモ牌を手牌に入れる
+        btn.onclick = () => discardFromTehai(index);
+        tehaiContainer.appendChild(btn);
+    });
+    
+    // ツモ牌のボタンを表示
+    const tsumoContainer = document.getElementById("tsumo-container");
+    tsumoContainer.innerHTML = "";
+    if (tsumoTile) {
+        const btn = document.createElement("button");
+        btn.className = "tile-btn";
+        btn.innerText = tsumoTile;
+        btn.style.background = "#ffcc80"; // ツモ牌は少し色を変える
+        tsumoContainer.appendChild(btn);
+        
+        document.getElementById("tsumo-giri-btn").style.display = "block";
+        document.getElementById("tsumo-giri-btn").onclick = () => {
+            tsumoTile = null;
+            nextTurn();
+        };
+    } else {
+        document.getElementById("tsumo-giri-btn").style.display = "none";
+    }
+}
+
+// 手牌から選んで捨てる処理
+function discardFromTehai(index) {
+    if (!tsumoTile) return;
+    tehai[index] = tsumoTile; // 選んだ場所をツモ牌と入れ替える
+    tehai.sort(); // 綺麗に並び替える
+    tsumoTile = null;
+    nextTurn();
+}
+
+// 💡 簡単な「いまの状態（アドバイス）」判定ロジック
+function checkHand() {
+    const statusDiv = document.getElementById("status");
+    
+    // 現在の手牌13枚＋ツモ1枚の合計14枚で判定
+    const current14 = [...tehai, tsumoTile];
+    
+    // 1. タンヤオチェック（1,9,字風牌が1枚もない）
+    const has19orJi = current14.some(tile => {
+        return tile.includes("1") || tile.includes("9") || JI.includes(tile);
+    });
+    
+    // 2. 簡易テンパイ（同じ牌が3枚、または連続した数字があるかの超シンプルおもちゃ判定）
+    // 本格的な計算を入れると重くなるため、まずは子供の食いつき用にランダム性を持たせた励ましメッセージ
+    const randomTips = [
+        "いいかんじ！あとすこしでアガリかも！",
+        "じっくり そろえていこう！",
+        "おなじ なかま（萬・筒・索）をあつめてみよう！",
+        "いらない牌をえらんで すててね！"
+    ];
+    let advice = randomTips[Math.floor(Math.random() * randomTips.length)];
+    
+    if (!has19orJi) {
+        advice = "✨すごい！2〜8だけが集まってるよ！【タンヤオ】が狙えるね！";
+    }
+    
+    // ランダムで「リーチできるチャンスかも！？」と教えてあげる
+    if (yama.length % 5 === 0) {
+        advice = "🔥大チャンス！【リーチ】ってさけんじゃおう！";
+    }
+
+    statusDiv.innerText = advice;
+}
+
+// 起動時にゲームを開始
+initGame();
+</script>
+
+</body>
+</html>
