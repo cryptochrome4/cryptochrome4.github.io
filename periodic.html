@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>周期表 元素Tier表作成ツール（自動保存版）</title>
+    <title>周期表 元素Tier表作成ツール（超しつこいリセット版）</title>
     <style>
         :root {
             --bg-color: #1a1a1a;
@@ -23,10 +23,10 @@
             background-color: var(--bg-color);
             color: var(--text-color);
             margin: 0;
-            padding: 170px 20px 20px 20px; /* ボタンが消えたので上部余白を最適化 */
+            padding: 240px 20px 20px 20px; /* ボタン復活のため余白を拡張 */
         }
 
-        /* 固定ヘッダー（元素置き場） */
+        /* 固定ヘッダー（元素置き場 ＆ コントロール） */
         header {
             position: fixed;
             top: 0;
@@ -36,7 +36,7 @@
             padding: 15px;
             box-shadow: 0 4px 10px rgba(0,0,0,0.5);
             z-index: 100;
-            max-height: 140px;
+            max-height: 200px;
             overflow-y: auto;
         }
 
@@ -44,6 +44,28 @@
             margin: 0 0 10px 0;
             font-size: 1.2rem;
             text-align: center;
+        }
+
+        /* 操作ボタンのエリア */
+        .controls {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .btn-reset {
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            padding: 6px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.85rem;
+            transition: background-color 0.2s;
+        }
+
+        .btn-reset:hover {
+            background-color: #c0392b;
         }
 
         /* Tier表の構造 */
@@ -127,9 +149,12 @@
 </head>
 <body>
 
-    <!-- 未配置の元素一覧（上部に固定、ボタンなし） -->
+    <!-- 未配置の元素一覧（上部に固定） -->
     <header>
         <h1>周期表 元素Tier表 (S〜G)</h1>
+        <div class="controls">
+            <button class="btn-reset" onclick="resetTierList()">表をリセット（初期化）</button>
+        </div>
         <div id="element-bank" class="drop-zone"></div>
     </header>
 
@@ -180,7 +205,6 @@
 
         const STORAGE_KEY = 'periodic_tier_list_v2';
 
-        // 状態をローカルストレージに自動保存
         function saveCurrentState() {
             const state = {};
             document.querySelectorAll('.drop-zone').forEach(zone => {
@@ -189,7 +213,6 @@
             localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
         }
 
-        // 状態を読み込んで復元
         function loadSavedState() {
             const savedData = localStorage.getItem(STORAGE_KEY);
             if (savedData) {
@@ -210,7 +233,6 @@
             }
         }
 
-        // ドロップ時のイベント設定
         const dropZones = document.querySelectorAll('.drop-zone');
         dropZones.forEach(zone => {
             zone.addEventListener('dragover', (e) => {
@@ -223,12 +245,28 @@
                 const draggedElement = document.getElementById(id);
                 if (draggedElement) {
                     zone.appendChild(draggedElement);
-                    saveCurrentState(); // 移動のたびに自動保存
+                    saveCurrentState();
                 }
             });
         });
 
-        // ページ読み込み完了時に復元を実行
+        // 🌟 4回連続でカマをかけるリセット機能
+        function resetTierList() {
+            if (!confirm('本当にリセットしますか？落ち着いてください、本当にリセットしますか？')) return;
+            if (!confirm('いやいや、超落ち着いてください、本当にリセットしますか？')) return;
+            if (!confirm('いやいや、超落ち着いてください、後悔はしませんか？')) return;
+            if (!confirm('自分に問うてください、本当にリセットしますか？')) return;
+
+            // 4回の確認をすべて突破した場合のみ実行
+            localStorage.removeItem(STORAGE_KEY);
+            const bank = document.getElementById('element-bank');
+            Object.keys(elementNodes).sort((a, b) => {
+                return parseInt(a.split('-')) - parseInt(b.split('-'));
+            }).forEach(elemId => {
+                bank.appendChild(elementNodes[elemId]);
+            });
+        }
+
         window.addEventListener('DOMContentLoaded', loadSavedState);
     </script>
 </body>
