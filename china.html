@@ -1,0 +1,70 @@
+import random
+
+# ==========================================
+# 【カスタマイズ設定】あとから名前を自由に変えられます（最大20文字想定）
+# ==========================================
+MAN = [f"{i}万" for i in range(1, 10)]
+PIN = [f"{i}筒" for i in range(1, 10)]
+SOU = [f"{i}索" for i in range(1, 10)]
+JI  = ["東", "南", "西", "北", "白", "發", "中"]  # ←ここを20文字以内で自由に変更可能！
+
+ALL_TILES = (MAN + PIN + SOU + JI) * 4
+
+def main():
+    yama = ALL_TILES.copy()
+    random.shuffle(yama)
+    tehai = [yama.pop() for _ in range(13)]
+    tehai.sort()
+
+    print("=== 可変ワイド・テキスト麻雀 ===")
+
+    while len(yama) > 0:
+        # 1. 現在の「最も長い牌の文字数」を自動計算する（これがワイド化の鍵）
+        # 全ての牌とツモ牌の候補から最大文字数を取得
+        all_current_tiles = tehai + yama[-1:]
+        max_len = max(len(tile) for tile in all_current_tiles)
+        
+        # 画面の幅（マス目の幅）を文字数に合わせる（最低幅4マスを保証）
+        box_width = max(max_len + 2, 4)
+        
+        # 2. 試合場の描画（文字数に合わせて区切り線の長さが自動で広がる）
+        line_length = (box_width + 7) * 13
+        print("\n" + "=" * line_length)
+        
+        print("【あなた手牌】")
+        # 各牌を [番号]:[牌の名前] の形で等幅にきれいに並べる
+        for idx, tile in enumerate(tehai):
+            # 💡 box_widthの幅で左詰めにし、自動で空白を埋めて横に広げる
+            print(f"[{idx:2}]:{tile:<{box_width}}", end="  ")
+            
+        print(f"\n【残りの山札】: {len(yama)}枚")
+        
+        # ツモ
+        tsumo = yama.pop()
+        print(f"👉 【ツモ牌】:  [{tsumo}]")
+        print("-" * line_length)
+        
+        # 選択
+        while True:
+            try:
+                choice = input(f"捨てる番号（0〜12）または 't' (ツモ切り): ").strip()
+                if choice.lower() == 't':
+                    print(f"⇒ [{tsumo}] をツモ切り。")
+                    break
+                
+                idx = int(choice)
+                if 0 <= idx < 13:
+                    discarded = tehai[idx]
+                    tehai[idx] = tsumo
+                    tehai.sort()
+                    print(f"⇒ [{discarded}] を捨てました。")
+                    break
+                else:
+                    print("❌ 0〜12で入力してください。")
+            except ValueError:
+                print("❌ 正しい数字か 't' を入力。")
+                
+    print("\n流局しました。")
+
+if __name__ == "__main__":
+    main()
