@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>周期表サッカーポジション配置（横移動並べ替え）</title>
+    <title>周期表サッカーポジション配置（保存＆4連リセット機能付き）</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -23,6 +23,25 @@
             margin-top: 0;
             font-size: 16px;
             text-align: center;
+            margin-bottom: 5px;
+        }
+        .btn-container {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        .reset-btn {
+            background-color: #ff4d4d;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            font-size: 14px;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .reset-btn:hover {
+            background-color: #e03333;
         }
         .row {
             display: flex;
@@ -89,12 +108,15 @@
 
 <div class="container">
     <h3>周期表 118元素 サッカーポジション配置 (順位並べ替え)</h3>
+    <div class="btn-container">
+        <button class="reset-btn" onclick="handleReset()">ポジション表をリセットする</button>
+    </div>
     <div id="board"></div>
 </div>
 
 <script>
-// 画像通りの初期配置データ
-const initialData = [
+// 画像通りの初期デフォルト配置データ
+const defaultData = [
     { pos: "CF",  className: "cf",  elements: ["O", "F", "Na", "Se", "Rb", "Sr", "Ir", "Au", "Th", "Fm", "Rf"] },
     { pos: "ST",  className: "st",  elements: ["F", "Ne", "Cl", "Ar", "Ag", "Xe", "Lu", "Os", "Tl", "U", "Hs", "Nh", "Ts"] },
     { pos: "LWG", className: "lwg", elements: ["Li", "Kr", "Tc", "La", "Eu", "Bi", "Fr", "Np"] },
@@ -111,13 +133,25 @@ const initialData = [
 ];
 
 const maxRank = 30;
+const STORAGE_KEY = "soccer_periodic_table_order";
+
+// ローカルストレージからデータを読み込む（無ければ初期データを使用）
+let currentData = JSON.parse(localStorage.getItem(STORAGE_KEY));
+if (!currentData) {
+    currentData = JSON.parse(JSON.stringify(defaultData));
+}
+
+// データをローカルストレージに保存する関数
+function saveToStorage() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(currentData));
+}
 
 // ボードの描画関数
 function renderBoard() {
     const board = document.getElementById("board");
     board.innerHTML = "";
 
-    initialData.forEach((row, rowIndex) => {
+    currentData.forEach((row, rowIndex) => {
         const rowDiv = document.createElement("div");
         rowDiv.className = "row";
 
@@ -146,7 +180,6 @@ function renderBoard() {
                 const opt = document.createElement("option");
                 opt.value = i;
                 opt.innerText = i;
-                // 現在の並び順（1から始まるインデックス）を初期選択にする
                 if (i === elIndex + 1) {
                     opt.selected = true;
                 }
@@ -160,11 +193,11 @@ function renderBoard() {
                 // 配列から現在の要素を削除
                 const [movedElement] = row.elements.splice(elIndex, 1);
                 
-                // 指定された位置（最大30番目まで）に挿入
-                // 配列の長さより大きい数字が選ばれた場合は、一番後ろに配置されます
+                // 指定された位置に挿入
                 row.elements.splice(targetRank, 0, movedElement);
                 
-                // 再描画して位置と数値を更新
+                // ストレージに保存して再描画
+                saveToStorage();
                 renderBoard();
             });
 
@@ -175,6 +208,23 @@ function renderBoard() {
         rowDiv.appendChild(elementsContainer);
         board.appendChild(rowDiv);
     });
+}
+
+// しつこい4連確認つきリセット処理
+function handleReset() {
+    if (confirm("【確認 1/4】本当にリセットしますか？せっかく並び替えたデータが消えてしまいます。")) {
+        if (confirm("【確認 2/4】本当の本当にリセットしてもよろしいですか？後悔しませんね？")) {
+            if (confirm("【確認 3/4】これが3回目の確認です。本当に初期配置（元の画像の状態）に戻しますか？")) {
+                if (confirm("【確認 4/4】最終確認です。本当にリセットを実行しますよ？よろしいですか？")) {
+                    // デフォルトデータをディープコピーして復元
+                    currentData = JSON.parse(JSON.stringify(defaultData));
+                    saveToStorage();
+                    renderBoard();
+                    alert("ポジション表を初期状態にリセットしました。");
+                }
+            }
+        }
+    }
 }
 
 // 初期実行
