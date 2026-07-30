@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>周期表サッカーポジション配置（横移動並べ替え）</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 10px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h3 {
+            margin-top: 0;
+            font-size: 16px;
+            text-align: center;
+        }
+        .row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .label {
+            width: 80px;
+            padding: 15px 10px;
+            text-align: center;
+            font-weight: bold;
+            color: #fff;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+        .elements-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            padding: 8px;
+            align-items: center;
+        }
+        .element-box {
+            display: flex;
+            align-items: center;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 4px 6px;
+            background: #fafafa;
+            font-size: 13px;
+        }
+        .symbol {
+            font-weight: bold;
+            width: 25px;
+            text-align: center;
+            margin-right: 4px;
+        }
+        select {
+            font-size: 12px;
+            padding: 2px;
+            cursor: pointer;
+        }
+        /* 各ポジションのカラー設定 */
+        .cf  { background-color: #ff4d4d; }
+        .st  { background-color: #ffb3b3; color: #333; }
+        .lwg { background-color: #ff9933; }
+        .omf { background-color: #a6a6a6; }
+        .rwg { background-color: #9933ff; }
+        .lmf { background-color: #99ff33; color: #333; }
+        .cmf { background-color: #33cc33; }
+        .rmf { background-color: #804000; }
+        .dmf { background-color: #1a1a1a; }
+        .lsb { background-color: #33ccff; color: #333; }
+        .cb  { background-color: #ffffff; color: #333; border-right: 1px solid #ddd; }
+        .rsb { background-color: #3333ff; }
+        .gk  { background-color: #ffff33; color: #333; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h3>周期表 118元素 サッカーポジション配置 (順位並べ替え)</h3>
+    <div id="board"></div>
+</div>
+
+<script>
+// 画像通りの初期配置データ
+const initialData = [
+    { pos: "CF",  className: "cf",  elements: ["O", "F", "Na", "Se", "Rb", "Sr", "Ir", "Au", "Th", "Fm", "Rf"] },
+    { pos: "ST",  className: "st",  elements: ["F", "Ne", "Cl", "Ar", "Ag", "Xe", "Lu", "Os", "Tl", "U", "Hs", "Nh", "Ts"] },
+    { pos: "LWG", className: "lwg", elements: ["Li", "Kr", "Tc", "La", "Eu", "Bi", "Fr", "Np"] },
+    { pos: "OMF", className: "omf", elements: ["C", "V", "Ga", "Ge", "Y", "Te", "Ac", "No", "Mt", "Mc"] },
+    { pos: "RWG", className: "rwg", elements: ["Fe", "Rh", "Ce", "Pm", "Yb", "Hg", "Ra", "Pu", "Es"] },
+    { pos: "LMF", className: "lmf", elements: ["B", "Al", "Tb", "Tm", "Ta", "Pa", "Lr"] },
+    { pos: "CMF", className: "cmf", elements: ["Sc", "Co", "Cu", "Ru", "In", "Cs", "Pr", "Dy", "Ho", "Er", "Pt", "Bk", "Cf", "Bh", "Cn"] },
+    { pos: "RMF", className: "rmf", elements: ["P", "Cr", "Br", "Gd", "Am", "Md"] },
+    { pos: "DMF", className: "dmf", elements: ["Mg", "Ti", "Ni", "As", "Nb", "Mo", "Cd", "I", "Sm", "Hf", "Sg"] },
+    { pos: "LSB", className: "lsb", elements: ["Be", "S", "K", "At", "Ds"] },
+    { pos: "CB",  className: "cb",  elements: ["Si", "Ca", "Zn", "Sn", "Sb", "Ba", "Nd", "W", "Cm", "Fl", "Lv"] },
+    { pos: "RSB", className: "rsb", elements: ["Mn", "Zr", "Pd", "Re", "Pb", "Po", "Db", "Rg"] },
+    { pos: "GK",  className: "gk",  elements: ["H", "He", "N", "Rn", "Og"] }
+];
+
+const maxRank = 30;
+
+// ボードの描画関数
+function renderBoard() {
+    const board = document.getElementById("board");
+    board.innerHTML = "";
+
+    initialData.forEach((row, rowIndex) => {
+        const rowDiv = document.createElement("div");
+        rowDiv.className = "row";
+
+        // ポジションラベル
+        const labelDiv = document.createElement("div");
+        labelDiv.className = `label ${row.className}`;
+        labelDiv.innerText = row.pos;
+        rowDiv.appendChild(labelDiv);
+
+        // 元素たちのコンテナ
+        const elementsContainer = document.createElement("div");
+        elementsContainer.className = "elements-container";
+
+        row.elements.forEach((symbol, elIndex) => {
+            const elBox = document.createElement("div");
+            elBox.className = "element-box";
+
+            const symbolSpan = document.createElement("span");
+            symbolSpan.className = "symbol";
+            symbolSpan.innerText = symbol;
+            elBox.appendChild(symbolSpan);
+
+            // 1〜30のセレクトボックスを作成
+            const select = document.createElement("select");
+            for (let i = 1; i <= maxRank; i++) {
+                const opt = document.createElement("option");
+                opt.value = i;
+                opt.innerText = i;
+                // 現在の並び順（1から始まるインデックス）を初期選択にする
+                if (i === elIndex + 1) {
+                    opt.selected = true;
+                }
+                select.appendChild(opt);
+            }
+
+            // 値が変更された時の処理
+            select.addEventListener("change", (e) => {
+                const targetRank = parseInt(e.target.value) - 1; // 0ベースに変換
+                
+                // 配列から現在の要素を削除
+                const [movedElement] = row.elements.splice(elIndex, 1);
+                
+                // 指定された位置（最大30番目まで）に挿入
+                // 配列の長さより大きい数字が選ばれた場合は、一番後ろに配置されます
+                row.elements.splice(targetRank, 0, movedElement);
+                
+                // 再描画して位置と数値を更新
+                renderBoard();
+            });
+
+            elBox.appendChild(select);
+            elementsContainer.appendChild(elBox);
+        });
+
+        rowDiv.appendChild(elementsContainer);
+        board.appendChild(rowDiv);
+    });
+}
+
+// 初期実行
+renderBoard();
+</script>
+
+</body>
+</html>
