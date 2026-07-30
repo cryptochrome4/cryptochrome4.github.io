@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>118元素 サッカーポジション編成シミュレーター</title>
+    <style>
+        :root {
+            --bg-color: #05140b;
+            --pitch-bg: #0f2e1a;
+            --card-bg: #164225;
+            --text-color: #f1f5f9;
+            --accent-color: #4ade80;
+            --pool-color: #475569;
+            
+            /* ポジション別のカラー（FW系=赤・橙、MF系=黄・緑、DF・GK系=青・紫） */
+            --color-cf: #ef4444;
+            --color-st: #f97316;
+            --color-lwg: #f59e0b;
+            --color-rwg: #eab308;
+            --color-omf: #84cc16;
+            --color-lmf: #10b981;
+            --color-cmf: #06b6d4;
+            --color-rmf: #3b82f6;
+            --color-dmf: #6366f1;
+            --color-lsb: #8b5cf6;
+            --color-cb: #a855f7;
+            --color-rsb: #d946ef;
+            --color-gk: #ec4899;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Impact', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            font-size: 2.2rem;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--accent-color);
+            text-shadow: 0 0 15px rgba(74, 222, 128, 0.4);
+            text-align: center;
+        }
+
+        .subtitle {
+            font-size: 0.95rem;
+            color: #a7f3d0;
+            margin-bottom: 25px;
+            font-family: sans-serif;
+            text-align: center;
+        }
+
+        .header-controls {
+            margin-bottom: 30px;
+        }
+
+        .btn-reset {
+            background: linear-gradient(135deg, #dc2626, #991b1b);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-weight: bold;
+            font-size: 0.95rem;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            transition: all 0.2s ease;
+            font-family: sans-serif;
+        }
+
+        .btn-reset:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(220, 38, 38, 0.4);
+            background: linear-gradient(135deg, #ef4444, #b91c1c);
+        }
+
+        .pitch-container {
+            width: 100%;
+            max-width: 1300px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 40px;
+            background-color: var(--pitch-bg);
+            padding: 20px;
+            border-radius: 16px;
+            border: 2px solid #1e5330;
+            box-shadow: inset 0 0 40px rgba(0,0,0,0.6);
+        }
+
+        .position-row {
+            display: flex;
+            background-color: rgba(22, 66, 37, 0.6);
+            border-radius: 8px;
+            border-left: 6px solid var(--accent-color);
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            min-height: 95px;
+            transition: background-color 0.2s;
+        }
+
+        .position-row:hover {
+            background-color: rgba(22, 66, 37, 0.9);
+        }
+
+        .position-label {
+            width: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: 900;
+            color: #ffffff;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.6);
+            flex-shrink: 0;
+            border-right: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .position-content {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            padding: 12px;
+            align-items: center;
+            flex-grow: 1;
+        }
+
+        /* 各ポジションの左端カラーと背景の微調整 */
+        .pos-cf { border-left-color: var(--color-cf); } .pos-cf .position-label { background: linear-gradient(90deg, var(--color-cf), transparent); }
+        .pos-st { border-left-color: var(--color-st); } .pos-st .position-label { background: linear-gradient(90deg, var(--color-st), transparent); }
+        .pos-lwg { border-left-color: var(--color-lwg); } .pos-lwg .position-label { background: linear-gradient(90deg, var(--color-lwg), transparent); }
+        .pos-omf { border-left-color: var(--color-omf); } .pos-omf .position-label { background: linear-gradient(90deg, var(--color-omf), transparent); }
+        .pos-rwg { border-left-color: var(--color-rwg); } .pos-rwg .position-label { background: linear-gradient(90deg, var(--color-rwg), transparent); }
+        .pos-lmf { border-left-color: var(--color-lmf); } .pos-lmf .position-label { background: linear-gradient(90deg, var(--color-lmf), transparent); }
+        .pos-cmf { border-left-color: var(--color-cmf); } .pos-cmf .position-label { background: linear-gradient(90deg, var(--color-cmf), transparent); }
+        .pos-rmf { border-left-color: var(--color-rmf); } .pos-rmf .position-label { background: linear-gradient(90deg, var(--color-rmf), transparent); }
+        .pos-dmf { border-left-color: var(--color-dmf); } .pos-dmf .position-label { background: linear-gradient(90deg, var(--color-dmf), transparent); }
+        .pos-lsb { border-left-color: var(--color-lsb); } .pos-lsb .position-label { background: linear-gradient(90deg, var(--color-lsb), transparent); }
+        .pos-cb { border-left-color: var(--color-cb); } .pos-cb .position-label { background: linear-gradient(90deg, var(--color-cb), transparent); }
+        .pos-rsb { border-left-color: var(--color-rsb); } .pos-rsb .position-label { background: linear-gradient(90deg, var(--color-rsb), transparent); }
+        .pos-gk { border-left-color: var(--color-gk); } .pos-gk .position-label { background: linear-gradient(90deg, var(--color-gk), transparent); }
+        .pos-p { border-left-color: var(--pool-color); } .pos-p .position-label { background: linear-gradient(90deg, var(--pool-color), transparent); font-size: 1.1rem; }
+
+        /* Element Card */
+        .element-card {
+            background-color: #0b1f12;
+            border: 1px solid #2e7d46;
+            border-radius: 8px;
+            padding: 8px 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            font-family: sans-serif;
+        }
+
+        .element-info {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 45px;
+        }
+
+        .element-symbol {
+            font-size: 1.3rem;
+            font-weight: bold;
+            color: #ffffff;
+            letter-spacing: -0.5px;
+        }
+
+        .element-number {
+            font-size: 0.7rem;
+            color: var(--accent-color);
+            font-weight: bold;
+        }
+
+        /* Position Selector Buttons Grid */
+        .pos-selectors {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 3px;
+        }
+
+        .btn-select {
+            border: none;
+            font-size: 0.65rem;
+            font-weight: bold;
+            padding: 4px 6px;
+            border-radius: 4px;
+            cursor: pointer;
+            color: #ffffff;
+            text-align: center;
+            text-shadow: 1px 1px 1px rgba(0,0,0,0.5);
+            transition: transform 0.1s, opacity 0.2s;
+        }
+
+        .btn-select:hover {
+            opacity: 0.85;
+            transform: scale(1.05);
+        }
+
+        /* ボタンごとの専用カラー */
+        .bs-cf { background-color: var(--color-cf); }
+        .bs-st { background-color: var(--color-st); }
+        .bs-lwg { background-color: var(--color-lwg); }
+        .bs-rwg { background-color: var(--color-rwg); }
+        .bs-omf { background-color: var(--color-omf); }
+        .bs-lmf { background-color: var(--color-lmf); }
+        .bs-cmf { background-color: var(--color-cmf); }
+        .bs-rmf { background-color: var(--color-rmf); }
+        .bs-dmf { background-color: var(--color-dmf); }
+        .bs-lsb { background-color: var(--color-lsb); }
+        .bs-cb { background-color: var(--color-cb); }
+        .bs-rsb { background-color: var(--color-rsb); }
+        .bs-gk { background-color: var(--color-gk); }
+        .bs-p { background-color: var(--pool-color); }
+    </style>
+</head>
+<body>
+
+    <h1>118 Elements Soccer Position Board</h1>
+    <div class="subtitle">全118元素をサッカーの13ポジションに極秘アサイン</div>
+
+    <div class="header-controls">
+        <button class="btn-reset" onclick="resetPositionsWithWarnings()">チーム編成を完全リセットする</button>
+    </div>
+
+    <div class="pitch-container">
+        <!-- サッカーの各ポジションの行（上から順） -->
+        <div class="position-row pos-cf" id="row-CF"><div class="position-label">CF</div><div class="position-content" id="content-CF"></div></div>
+        <div class="position-row pos-st" id="row-ST"><div class="position-label">ST</div><div class="position-content" id="content-ST"></div></div>
+        <div class="position-row pos-lwg" id="row-LWG"><div class="position-label">LWG</div><div class="position-content" id="content-LWG"></div></div>
+        <div class="position-row pos-omf" id="row-OMF"><div class="position-label">OMF</div><div class="position-content" id="content-OMF"></div></div>
+        <div class="position-row pos-rwg" id="row-RWG"><div class="position-label">RWG</div><div class="position-content" id="content-RWG"></div></div>
+        <div class="position-row pos-lmf" id="row-LMF"><div class="position-label">LMF</div><div class="position-content" id="content-LMF"></div></div>
+        <div class="position-row pos-cmf" id="row-CMF"><div class="position-label">CMF</div><div class="position-content" id="content-CMF"></div></div>
