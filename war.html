@@ -46,9 +46,9 @@
         .pool-box, .group-box {
             background: white;
             border: 1px solid #ccc;
-            border-radius: 5px;
+            border-radius: 0 0 5px 5px;
             padding: 15px;
-            min-height: 80px;
+            min-height: 100px;
             display: flex;
             flex-wrap: wrap;
             gap: 10px;
@@ -131,10 +131,10 @@
 </div>
 
 <script>
-// ポジションカラー定義
+// カラーマップ
 const COLORS = {
     CF: '#ff4d4d',   // 赤
-    ST: '#ffb3ba',   // ピンク (Fはここを採用)
+    ST: '#ffb3ba',   // ピンク
     LWG: '#ff944d',  // オレンジ
     OMF: '#9b9b9b',  // グレー
     RWG: '#b366ff',  // 紫
@@ -143,12 +143,12 @@ const COLORS = {
     RMF: '#804000',  // 茶
     DMF: '#1a1a1a',  // 黒
     LSB: '#33ccff',  // 水色
-    CB: '#ffffff',   // 白 (文字色調整用)
+    CB: '#ffffff',   // 白
     RSB: '#3333ff',  // 青
     GK: '#ffff33'    // 黄
 };
 
-// 118元素と対応ポジションの定義
+// 118元素 完全版データ
 const elementsData = [
     { name: 'O', pos: 'CF' }, { name: 'Au', pos: 'CF' }, { name: 'Ir', pos: 'CF' }, { name: 'Fm', pos: 'CF' }, { name: 'Th', pos: 'CF' }, { name: 'Rb', pos: 'CF' }, { name: 'Rf', pos: 'CF' }, { name: 'Se', pos: 'CF' }, { name: 'Sr', pos: 'CF' }, { name: 'Na', pos: 'CF' },
     { name: 'U', pos: 'ST' }, { name: 'Xe', pos: 'ST' }, { name: 'Nh', pos: 'ST' }, { name: 'Ag', pos: 'ST' }, { name: 'Tl', pos: 'ST' }, { name: 'Lu', pos: 'ST' }, { name: 'Ne', pos: 'ST' }, { name: 'Ar', pos: 'ST' }, { name: 'Ts', pos: 'ST' }, { name: 'F', pos: 'ST' }, { name: 'Cl', pos: 'ST' }, { name: 'Hs', pos: 'ST' }, { name: 'Os', pos: 'ST' },
@@ -175,38 +175,42 @@ const groupNames = {
     'cyber': 'サイバー'
 };
 
-// 状態管理
 let elementsState = {};
 
-// 初期化関数
 function init() {
-    const savedState = localStorage.getItem('elementsSoccerState');
+    // 既存のエラー状態のキャッシュを回避するため、まずは初期データをセット
+    elementsData.forEach(el => {
+        elementsState[el.name] = 'pool';
+    });
+
+    const savedState = localStorage.getItem('elementsSoccerState2');
     if (savedState) {
-        elementsState = JSON.parse(savedState);
-    } else {
-        elementsData.forEach(el => {
-            elementsState[el.name] = 'pool';
-        });
-        saveState();
+        try {
+            const parsed = JSON.parse(savedState);
+            // 壊れたデータが入っていないかキーの存在をチェック
+            if (Object.keys(parsed).length === elementsData.length) {
+                elementsState = parsed;
+            }
+        } catch(e) {
+            console.error("キャッシュデータの読み込みに失敗しました。リセットします。");
+        }
     }
+    saveState();
     render();
 }
 
 function saveState() {
-    localStorage.setItem('elementsSoccerState', JSON.stringify(elementsState));
+    localStorage.setItem('elementsSoccerState2', JSON.stringify(elementsState));
 }
 
-// 描画処理
 function render() {
-    // コンテナのクリーンアップ
+    // 枠の中身を一度空にする
     document.getElementById('pool').innerHTML = '';
-    document.getElementById('group-nanto').innerHTML = '';
-    document.getElementById('group-kyoryu').innerHTML = '';
-    document.getElementById('group-taiyo').innerHTML = '';
-    document.getElementById('group-suisei').innerHTML = '';
-    document.getElementById('group-jiba').innerHTML = '';
-    document.getElementById('group-cyber').innerHTML = '';
+    ['nanto', 'kyoryu', 'taiyo', 'suisei', 'jiba', 'cyber'].forEach(g => {
+        document.getElementById(`group-${g}`).innerHTML = '';
+    });
 
+    // 元素を配置していく
     elementsData.forEach(el => {
         const currentGroup = elementsState[el.name] || 'pool';
         const targetContainerId = currentGroup === 'pool' ? 'pool' : `group-${currentGroup}`;
@@ -217,7 +221,6 @@ function render() {
             badge.className = 'element-badge';
             badge.style.backgroundColor = COLORS[el.pos];
             
-            // 白背景(CB)のみ文字の視認性のために影とテキスト色を調整
             if (el.pos === 'CB') {
                 badge.style.color = '#333';
                 badge.style.textShadow = 'none';
@@ -229,11 +232,9 @@ function render() {
             nameSpan.innerText = el.name;
             badge.appendChild(nameSpan);
 
-            // 切り替え用セレクトボックスボタン
             const select = document.createElement('select');
             select.className = 'btn-move';
             
-            // デフォルトの初期選択肢
             const defaultOpt = document.createElement('option');
             defaultOpt.text = '移動';
             defaultOpt.value = '';
@@ -242,3 +243,4 @@ function render() {
             Object.keys(groupNames).forEach(gKey => {
                 if (gKey !== currentGroup) {
                     const opt = document.createElement('option');
+                    opt.value = gKey;
