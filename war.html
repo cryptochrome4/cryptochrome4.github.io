@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>元素グループ仕分け</title>
+    <title>元素グループ仕分け - 完全版</title>
     <style>
         body {
             font-family: 'Helvetica Neue', Arial, sans-serif;
@@ -11,6 +11,7 @@
             margin: 0;
             padding: 20px;
             color: #333;
+            user-select: none;
         }
         h1 {
             text-align: center;
@@ -19,23 +20,25 @@
         }
         .btn-reset {
             display: block;
-            width: 200px;
-            margin: 0 auto 20px auto;
-            padding: 10px;
+            width: 220px;
+            margin: 0 auto 25px auto;
+            padding: 12px;
             background-color: #ff3b30;
             color: white;
             border: none;
             border-radius: 8px;
             font-weight: bold;
+            font-size: 0.95rem;
             cursor: pointer;
-            text-align: center;
+            box-shadow: 0 2px 4px rgba(255,59,48,0.3);
+            transition: background 0.2s;
         }
         .btn-reset:hover {
             background-color: #e03228;
         }
         .container {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
             gap: 20px;
             margin-bottom: 30px;
         }
@@ -43,57 +46,101 @@
             background: white;
             border-radius: 12px;
             padding: 15px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            min-height: 150px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+            min-height: 120px;
+            border: 1px solid #e5e5e5;
         }
         .group-title {
             font-weight: bold;
             font-size: 1.1rem;
-            margin-bottom: 10px;
-            border-bottom: 2px solid #ddd;
+            margin-bottom: 12px;
+            border-bottom: 3px solid #007aff;
             padding-bottom: 5px;
+            color: #1d1d1f;
         }
         #pool {
             grid-column: 1 / -1;
             background: #eef2f3;
+            border: 2px dashed #b0bec5;
+        }
+        #pool .group-title {
+            border-bottom-color: #8e8e93;
         }
         .elements-list {
             display: flex;
             flex-wrap: wrap;
-            gap: 8px;
+            gap: 10px;
         }
         .element-item {
+            position: relative;
             display: inline-flex;
             align-items: center;
             background: #fff;
-            padding: 4px 8px;
-            border-radius: 6px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            padding: 6px 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.08);
             font-weight: bold;
-            font-size: 0.95rem;
+            font-size: 1.1rem;
+            border: 1px solid #efeef4;
         }
-        .element-select {
-            margin-left: 5px;
-            font-size: 0.75rem;
-            padding: 2px;
+        .btn-move-trigger {
+            margin-left: 6px;
+            background: #f0f0f5;
+            border: none;
             border-radius: 4px;
-            border: 1px solid #ccc;
+            font-size: 0.75rem;
+            cursor: pointer;
+            padding: 2px 5px;
+            color: #666;
+        }
+        .btn-move-trigger:hover {
+            background: #e5e5ea;
         }
         
-        /* ポジションごとの文字色定義 */
-        .color-cf { color: #ff3b30; }       /* 赤 */
-        .color-st { color: #ff2d55; }       /* ピンク (Fはこちらのみ) */
-        .color-lwg { color: #ff9500; }      /* オレンジ */
-        .color-omf { color: #8e8e93; }      /* グレー */
-        .color-rwg { color: #af52de; }      /* 紫 */
-        .color-lmf { color: #4cd964; }      /* 黄緑 */
-        .color-cmf { color: #34c759; }      /* 緑 */
-        .color-rmf { color: #a25114; }      /* 茶色 */
-        .color-dmf { color: #000000; }      /* 黒 */
-        .color-lsb { color: #5ac8fa; }      /* 水色 */
-        .color-cb { color: #555555; text-shadow: 0 0 1px #ccc; } /* 濃いグレー(白背景用) */
-        .color-rsb { color: #007aff; }      /* 青 */
-        .color-gk { color: #ffcc00; text-shadow: 0 0 1px #888; } /* 黄色 */
+        /* ポップアップメニュー */
+        .move-menu {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            z-index: 100;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            border: 1px solid #ddd;
+            padding: 5px;
+            width: 140px;
+        }
+        .move-menu button {
+            display: block;
+            width: 100%;
+            padding: 6px;
+            text-align: left;
+            background: none;
+            border: none;
+            font-size: 0.85rem;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .move-menu button:hover {
+            background: #f5f5f7;
+            color: #007aff;
+        }
+
+        /* ポジションごとの文字色（白背景で見えやすいよう影や輝度を調整） */
+        .color-cf { color: #e63946; } /* 赤 */
+        .color-st { color: #d63384; } /* ピンク */
+        .color-lwg { color: #fd7e14; } /* オレンジ */
+        .color-omf { color: #6c757d; } /* グレー */
+        .color-rwg { color: #6f42c1; } /* 紫 */
+        .color-lmf { color: #198754; } /* 黄緑(視認性のため少し濃いめ) */
+        .color-cmf { color: #20c997; } /* 緑 */
+        .color-rmf { color: #795548; } /* 茶色 */
+        .color-dmf { color: #212529; } /* 黒 */
+        .color-lsb { color: #0dcaf0; text-shadow: 0px 0px 1px #00000033; } /* 水色 */
+        .color-cb { color: #495057; }  /* 濃いグレー */
+        .color-rsb { color: #0d6efd; } /* 青 */
+        .color-gk { color: #ffc107; text-shadow: 0px 0px 1px #00000055; } /* 黄色 */
     </style>
 </head>
 <body>
@@ -102,7 +149,7 @@
     <button class="btn-reset" onclick="handleReset()">ポジション表をリセットする</button>
 
     <div class="container">
-        <!-- 6つのグループ -->
+        <!-- 6つの仕分けグループ -->
         <div class="group-box" id="group-nantes"><div class="group-title">ナント</div><div class="elements-list" id="list-nantes"></div></div>
         <div class="group-box" id="group-dino"><div class="group-title">恐竜</div><div class="elements-list" id="list-dino"></div></div>
         <div class="group-box" id="group-sun"><div class="group-title">太陽</div><div class="elements-list" id="list-sun"></div></div>
@@ -118,82 +165,25 @@
     </div>
 
     <script>
-        // 118元素のデータ（Fは重複を排除し、ピンクのSTのみに所属）
+        // 118元素データ (FはSTピンクのみ)
         const elementsData = [
-            // CF (赤) - Fを除外した10個
-            { symbol: "O", color: "cf" }, { symbol: "Au", color: "cf" }, { symbol: "Ir", color: "cf" }, { symbol: "Fm", color: "cf" }, { symbol: "Th", color: "cf" },
-            { symbol: "Rb", color: "cf" }, { symbol: "Rf", color: "cf" }, { symbol: "Se", color: "cf" }, { symbol: "Sr", color: "cf" }, { symbol: "Na", color: "cf" },
-            // ST (ピンク) - Fを含む13個
-            { symbol: "U", color: "st" }, { symbol: "Xe", color: "st" }, { symbol: "Nh", color: "st" }, { symbol: "Ag", color: "st" }, { symbol: "Tl", color: "st" },
-            { symbol: "Lu", color: "st" }, { symbol: "Ne", color: "st" }, { symbol: "Ar", color: "st" }, { symbol: "Ts", color: "st" }, { symbol: "F", color: "st" },
-            { symbol: "Cl", color: "st" }, { symbol: "Hs", color: "st" }, { symbol: "Os", color: "st" },
-            // LWG (オレンジ)
-            { symbol: "Kr", color: "lwg" }, { symbol: "Eu", color: "lwg" }, { symbol: "Bi", color: "lwg" }, { symbol: "La", color: "lwg" }, { symbol: "Tc", color: "lwg" },
-            { symbol: "Li", color: "lwg" }, { symbol: "Fr", color: "lwg" }, { symbol: "Np", color: "lwg" },
-            // OMF (グレー)
-            { symbol: "C", color: "omf" }, { symbol: "No", color: "omf" }, { symbol: "Ac", color: "omf" }, { symbol: "Ge", color: "omf" }, { symbol: "Mt", color: "omf" },
-            { symbol: "Mc", color: "omf" }, { symbol: "Te", color: "omf" }, { symbol: "Y", color: "omf" }, { symbol: "V", color: "omf" }, { symbol: "Ga", color: "omf" },
-            // RWG (紫)
-            { symbol: "Fe", color: "rwg" }, { symbol: "Pu", color: "rwg" }, { symbol: "Es", color: "rwg" }, { symbol: "Rh", color: "rwg" }, { symbol: "Ra", color: "rwg" },
-            { symbol: "Hg", color: "rwg" }, { symbol: "Pm", color: "rwg" }, { symbol: "Yb", color: "rwg" }, { symbol: "Ce", color: "rwg" },
-            // LMF (黄緑)
-            { symbol: "Tm", color: "lmf" }, { symbol: "Ta", color: "lmf" }, { symbol: "Al", color: "lmf" }, { symbol: "Lr", color: "lmf" }, { symbol: "Pa", color: "lmf" },
-            { symbol: "Tb", color: "lmf" }, { symbol: "B", color: "lmf" },
-            // CMF (緑)
-            { symbol: "Pr", color: "cmf" }, { symbol: "Co", color: "cmf" }, { symbol: "Cs", color: "cmf" }, { symbol: "Ho", color: "cmf" }, { symbol: "Bk", color: "cmf" },
-            { symbol: "Bh", color: "cmf" }, { symbol: "In", color: "cmf" }, { symbol: "Cf", color: "cmf" }, { symbol: "Sc", color: "cmf" }, { symbol: "Er", color: "cmf" },
-            { symbol: "Pt", color: "cmf" }, { symbol: "Cu", color: "cmf" }, { symbol: "Ru", color: "cmf" }, { symbol: "Cn", color: "cmf" }, { symbol: "Dy", color: "cmf" },
-            // RMF (茶色)
-            { symbol: "Cr", color: "rmf" }, { symbol: "Am", color: "rmf" }, { symbol: "Md", color: "rmf" }, { symbol: "Br", color: "rmf" }, { symbol: "P", color: "rmf" },
-            { symbol: "Gd", color: "rmf" },
-            // DMF (黒)
-            { symbol: "Sg", color: "dmf" }, { symbol: "Mo", color: "dmf" }, { symbol: "I", color: "dmf" }, { symbol: "Ti", color: "dmf" }, { symbol: "As", color: "dmf" },
-            { symbol: "Cd", color: "dmf" }, { symbol: "Nb", color: "dmf" }, { symbol: "Sm", color: "dmf" }, { symbol: "Ni", color: "dmf" }, { symbol: "Mg", color: "dmf" },
-            { symbol: "Hf", color: "dmf" },
-            // LSB (水色)
+            { symbol: "O", color: "cf" }, { symbol: "Au", color: "cf" }, { symbol: "Ir", color: "cf" }, { symbol: "Fm", color: "cf" }, { symbol: "Th", color: "cf" }, { symbol: "Rb", color: "cf" }, { symbol: "Rf", color: "cf" }, { symbol: "Se", color: "cf" }, { symbol: "Sr", color: "cf" }, { symbol: "Na", color: "cf" },
+            { symbol: "U", color: "st" }, { symbol: "Xe", color: "st" }, { symbol: "Nh", color: "st" }, { symbol: "Ag", color: "st" }, { symbol: "Tl", color: "st" }, { symbol: "Lu", color: "st" }, { symbol: "Ne", color: "st" }, { symbol: "Ar", color: "st" }, { symbol: "Ts", color: "st" }, { symbol: "F", color: "st" }, { symbol: "Cl", color: "st" }, { symbol: "Hs", color: "st" }, { symbol: "Os", color: "st" },
+            { symbol: "Kr", color: "lwg" }, { symbol: "Eu", color: "lwg" }, { symbol: "Bi", color: "lwg" }, { symbol: "La", color: "lwg" }, { symbol: "Tc", color: "lwg" }, { symbol: "Li", color: "lwg" }, { symbol: "Fr", color: "lwg" }, { symbol: "Np", color: "lwg" },
+            { symbol: "C", color: "omf" }, { symbol: "No", color: "omf" }, { symbol: "Ac", color: "omf" }, { symbol: "Ge", color: "omf" }, { symbol: "Mt", color: "omf" }, { symbol: "Mc", color: "omf" }, { symbol: "Te", color: "omf" }, { symbol: "Y", color: "omf" }, { symbol: "V", color: "omf" }, { symbol: "Ga", color: "omf" },
+            { symbol: "Fe", color: "rwg" }, { symbol: "Pu", color: "rwg" }, { symbol: "Es", color: "rwg" }, { symbol: "Rh", color: "rwg" }, { symbol: "Ra", color: "rwg" }, { symbol: "Hg", color: "rwg" }, { symbol: "Pm", color: "rwg" }, { symbol: "Yb", color: "rwg" }, { symbol: "Ce", color: "rwg" },
+            { symbol: "Tm", color: "lmf" }, { symbol: "Ta", color: "lmf" }, { symbol: "Al", color: "lmf" }, { symbol: "Lr", color: "lmf" }, { symbol: "Pa", color: "lmf" }, { symbol: "Tb", color: "lmf" }, { symbol: "B", color: "lmf" },
+            { symbol: "Pr", color: "cmf" }, { symbol: "Co", color: "cmf" }, { symbol: "Cs", color: "cmf" }, { symbol: "Ho", color: "cmf" }, { symbol: "Bk", color: "cmf" }, { symbol: "Bh", color: "cmf" }, { symbol: "In", color: "cmf" }, { symbol: "Cf", color: "cmf" }, { symbol: "Sc", color: "cmf" }, { symbol: "Er", color: "cmf" }, { symbol: "Pt", color: "cmf" }, { symbol: "Cu", color: "cmf" }, { symbol: "Ru", color: "cmf" }, { symbol: "Cn", color: "cmf" }, { symbol: "Dy", color: "cmf" },
+            { symbol: "Cr", color: "rmf" }, { symbol: "Am", color: "rmf" }, { symbol: "Md", color: "rmf" }, { symbol: "Br", color: "rmf" }, { symbol: "P", color: "rmf" }, { symbol: "Gd", color: "rmf" },
+            { symbol: "Sg", color: "dmf" }, { symbol: "Mo", color: "dmf" }, { symbol: "I", color: "dmf" }, { symbol: "Ti", color: "dmf" }, { symbol: "As", color: "dmf" }, { symbol: "Cd", color: "dmf" }, { symbol: "Nb", color: "dmf" }, { symbol: "Sm", color: "dmf" }, { symbol: "Ni", color: "dmf" }, { symbol: "Mg", color: "dmf" }, { symbol: "Hf", color: "dmf" },
             { symbol: "Ds", color: "lsb" }, { symbol: "S", color: "lsb" }, { symbol: "At", color: "lsb" }, { symbol: "K", color: "lsb" }, { symbol: "Be", color: "lsb" },
-            // CB (白/グレー)
-            { symbol: "Sn", color: "cb" }, { symbol: "W", color: "cb" }, { symbol: "Ba", color: "cb" }, { symbol: "Cm", color: "cb" }, { symbol: "Ca", color: "cb" },
-            { symbol: "Nd", color: "cb" }, { symbol: "Fl", color: "cb" }, { symbol: "Zn", color: "cb" }, { symbol: "Lv", color: "cb" }, { symbol: "Si", color: "cb" },
-            { symbol: "Sb", color: "cb" },
-            // RSB (青)
-            { symbol: "Zr", color: "rsb" }, { symbol: "Db", color: "rsb" }, { symbol: "Mn", color: "rsb" }, { symbol: "Re", color: "rsb" }, { symbol: "Po", color: "rsb" },
-            { symbol: "Pb", color: "rsb" }, { symbol: "Pd", color: "rsb" }, { symbol: "Rg", color: "rsb" },
-            // GK (黄色)
+            { symbol: "Sn", color: "cb" }, { symbol: "W", color: "cb" }, { symbol: "Ba", color: "cb" }, { symbol: "Cm", color: "cb" }, { symbol: "Ca", color: "cb" }, { symbol: "Nd", color: "cb" }, { symbol: "Fl", color: "cb" }, { symbol: "Zn", color: "cb" }, { symbol: "Lv", color: "cb" }, { symbol: "Si", color: "cb" }, { symbol: "Sb", color: "cb" },
+            { symbol: "Zr", color: "rsb" }, { symbol: "Db", color: "rsb" }, { symbol: "Mn", color: "rsb" }, { symbol: "Re", color: "rsb" }, { symbol: "Po", color: "rsb" }, { symbol: "Pb", color: "rsb" }, { symbol: "Pd", color: "rsb" }, { symbol: "Rg", color: "rsb" },
             { symbol: "Og", color: "gk" }, { symbol: "He", color: "gk" }, { symbol: "Rn", color: "gk" }, { symbol: "N", color: "gk" }, { symbol: "H", color: "gk" }
         ];
 
-        // 各グループの定義
-        const groups = {
-            'pool': 'list-pool',
-            'nantes': 'list-nantes',
-            'dino': 'list-dino',
-            'sun': 'list-sun',
-            'mercury': 'list-mercury',
-            'magnetic': 'list-magnetic',
-            'cyber': 'list-cyber'
-        };
-
-        // ローカルストレージから状態を読み込むか初期化
+        const groups = { 'pool': 'list-pool', 'nantes': 'list-nantes', 'dino': 'list-dino', 'sun': 'list-sun', 'mercury': 'list-mercury', 'magnetic': 'list-magnetic', 'cyber': 'list-cyber' };
         let currentPlacement = JSON.parse(localStorage.getItem('elementPlacement')) || {};
+        let activeMenu = null;
 
-        // 初期描画関数
         function renderElements() {
-            // 各リストを一度空にする
-            Object.values(groups).forEach(id => {
-                document.getElementById(id).innerHTML = '';
-            });
-
-            // 元素を配置
-            elementsData.forEach(elem => {
-                const savedGroup = currentPlacement[elem.symbol] || 'pool';
-                const targetListId = groups[savedGroup];
-
-                // 元素アイテムの作成
-                const item = document.createElement('div');
-                item.className = `element-item color-${elem.color}`;
-                item.innerText = elem.symbol;
-
-                // セレクトボタンの作成
-                const select = document.createElement('select');
-                select.className = 'element-select';
