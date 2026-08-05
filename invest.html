@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XRP 数量計算ツール</title>
+    <style>
+        /* --- 全体デザイン設定 --- */
+        :root {
+            --primary-color: #2354e6;     /* XRPをイメージしたモダンなブルー */
+            --bg-color: #f4f7fc;          /* 清潔感のある薄いグレーの背景 */
+            --card-bg: #ffffff;           /* カードの背景（白） */
+            --text-color: #333333;        /* メイン文字色 */
+            --border-color: #e2e8f0;      /* 線の色 */
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        /* --- メインカード --- */
+        .calculator-card {
+            background-color: var(--card-bg);
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+            padding: 30px;
+            width: 100%;
+            max-width: 600px;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            text-align: center;
+            margin-bottom: 24px;
+            color: var(--primary-color);
+            font-weight: 700;
+        }
+
+        /* --- 入力エリア --- */
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #4a5568;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 1rem;
+            box-sizing: border-box;
+            transition: border-color 0.2s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        /* --- テーブル（表）のデザイン --- */
+        .table-container {
+            overflow-x: auto;
+            margin-top: 25px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: right;
+            font-size: 0.95rem;
+        }
+
+        th, td {
+            padding: 12px 16px;
+        }
+
+        th {
+            background-color: #f8fafc;
+            color: #64748b;
+            font-weight: 600;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        td {
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        /* 取引価格の列を左寄せ・太字にして見やすく */
+        th:first-child, td:first-child {
+            text-align: left;
+            font-weight: bold;
+            color: #1e293b;
+        }
+
+        /* 行のホバーエフェクト */
+        tr:hover {
+            background-color: #f8fafc;
+        }
+
+        /* スマホ対応の調整 */
+        @media (max-width: 480px) {
+            .calculator-card {
+                padding: 20px;
+            }
+            h1 {
+                font-size: 1.25rem;
+            }
+            th, td {
+                padding: 10px 8px;
+                font-size: 0.85rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="calculator-card">
+    <h1>XRP 数量シミュレーター</h1>
+    
+    <!-- ユーザーが金額を自由に変更できる入力欄 -->
+    <div class="input-group">
+        <label for="amount1">投資金額 1 (円)</label>
+        <input type="number" id="amount1" value="3000" oninput="calculateXRP()">
+    </div>
+    
+    <div class="input-group">
+        <label for="amount2">投資金額 2 (円)</label>
+        <input type="number" id="amount2" value="310000" oninput="calculateXRP()">
+    </div>
+
+    <!-- 結果を表示するテーブル -->
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>取引価格</th>
+                    <th id="label-amount1">3,000円分</th>
+                    <th id="label-amount2">310,000円分</th>
+                </tr>
+            </thead>
+            <tbody id="result-table-body">
+                <!-- ここにJavaScriptで計算結果が自動挿入されます -->
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    // ご指定いただいた価格のリスト
+    const prices = [
+        50, 100, 165, 166, 167, 168, 169, 170, 
+        180, 184, 185, 186, 187, 188, 189, 190, 
+        200, 300, 500, 1000
+    ];
+
+    function calculateXRP() {
+        // 入力された金額を取得（空なら0にする）
+        const amt1 = parseFloat(document.getElementById('amount1').value) || 0;
+        const amt2 = parseFloat(document.getElementById('amount2').value) || 0;
+
+        // 表の見出し部分の金額表記をリアルタイム更新
+        document.getElementById('label-amount1').innerText = amt1.toLocaleString() + '円分';
+        document.getElementById('label-amount2').innerText = amt2.toLocaleString() + '円分';
+
+        const tbody = document.getElementById('result-table-body');
+        tbody.innerHTML = ''; // 一度テーブルをクリア
+
+        // 各価格ごとに数量を計算して行を追加
+        prices.forEach(price => {
+            const qty1 = (amt1 / price).toFixed(2);
+            const qty2 = (amt2 / price).toFixed(2);
+
+            const row = `
+                <tr>
+                    <td>${price.toLocaleString()} 円</td>
+                    <td>${parseFloat(qty1).toLocaleString()} XRP</td>
+                    <td>${parseFloat(qty2).toLocaleString()} XRP</td>
+                </tr>
+            `;
+            tbody.insertAdjacentHTML('beforeend', row);
+        });
+    }
+
+    // ページを読み込んだときに最初の計算を実行
+    window.onload = calculateXRP;
+</script>
+
+</body>
+</html>
