@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>画像の線形</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            background-color: #f8f9fa;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #111;
+            font-size: 28px;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+        }
+        h2 {
+            font-size: 20px;
+            color: #2c3e50;
+            margin-top: 40px;
+            border-left: 4px solid #34495e;
+            padding-left: 10px;
+        }
+        pre {
+            background-color: #2d3748;
+            color: #f7fafc;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 14px;
+        }
+        .problem-box {
+            background-color: #edf2f7;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 6px;
+            border-left: 4px solid #cbd5e0;
+        }
+        .math-block {
+            font-family: 'Times New Roman', Times, serif;
+            font-style: italic;
+            font-size: 16px;
+            margin: 10px 0;
+        }
+        .btn-toggle {
+            background-color: #4a5568;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+        .btn-toggle:hover {
+            background-color: #2d3748;
+        }
+        .answer-block {
+            display: none;
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #e2e8f0;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>画像の線形</h1>
+
+    <!-- ==========================================
+         前編
+         ========================================== -->
+    <h2>前編</h2>
+    <pre>
+# LP Model Definition
+import pulp
+
+prob = pulp.LpProblem("LP_Model", pulp.LpMaximize)
+
+x1 = pulp.LpVariable('x1', lowBound=0, cat='Continuous')
+x2 = pulp.LpVariable('x2', lowBound=0, cat='Continuous')
+x3 = pulp.LpVariable('x3', lowBound=0, cat='Continuous')
+g = pulp.LpVariable('g', lowBound=0, cat='Continuous')
+v = pulp.LpVariable('v', lowBound=0, cat='Continuous')
+
+H = 1.0  
+P_new = 250000
+P_past = 260000
+
+prob += (135000 + 20000 + 80000 + 6000 + 18000 + 6000 + 3000 + 21000 + 3000 + 3000 + 3000) * H + (350000 * 1.1) + 20000 + (1.15 * x1) + (1.20 * x2)
+
+prob += x1 + x2 + x3 <= 110000
+prob += x1 == 20000
+prob += g + v == 10000
+prob += g == 10000
+
+status = prob.solve(pulp.PULP_CBC_CMD(msg=False))
+
+print(f"x1 = {pulp.value(x1)}")
+print(f"x2 = {pulp.value(x2)}")
+print(f"x3 = {pulp.value(x3)}")
+print(f"g = {pulp.value(g)}")
+print(f"v = {pulp.value(v)}")
+    </pre>
+
+    <!-- ==========================================
+         中編
+         ========================================== -->
+    <h2>中編</h2>
+    <pre>
+【Variables】
+x1, x2, x3, g, v >= 0
+
+【Constraints】
+x1 + x2 + x3 <= 110000
+x1 = 20000
+P_new = 250000
+P_past = 260000
+P_new < P_past
+g + v = 10000
+g = 10000
+
+【Objective Function】
+Maximize R = 299000 * H + 385000 + 20000 + f(x1) + f(x2)
+
+【Procedures】
+1. 10000 + v = 10000 => v = 0
+2. 20000 + x2 + x3 <= 110000 => x2 + x3 <= 90000
+3. x3 = 0 => x2 = 90000 (under P_new = 250000)
+
+【Optimal Solution】
+x1 = 20000, x2 = 90000, x3 = 0, g = 10000, v = 0
+    </pre>
+
+    <!-- ==========================================
+         後編
+         ========================================== -->
+    <h2>後編</h2>
+    <div class="problem-box">
+        <div>Q1</div>
+        <div class="math-block">
+            Maximize: R = 1.1*x1 + 1.2*x2<br>
+            Subject to:<br>
+            x1 + x2 + x3 <= 150000<br>
+            x1 = 30000<br>
+            g + v = 15000<br>
+            g = 15000
+        </div>
+        <button class="btn-toggle" onclick="toggleAnswer('ans1')">回答を確認する</button>
+        <div id="ans1" class="answer-block">
+            x1 = 30000, x2 = 120000, x3 = 0, g = 15000, v = 0
+        </div>
+    </div>
+
+    <div class="problem-box">
+        <div>Q2</div>
+        <div class="math-block">
+            Maximize: R = 1.05*x1 + 1.15*x2<br>
+            Subject to:<br>
+            x1 + x2 + x3 <= 80000<br>
+            x1 = 15000<br>
+            g + v = 8000<br>
+            g = 8000
+        </div>
+        <button class="btn-toggle" onclick="toggleAnswer('ans2')">回答を確認する</button>
+        <div id="ans2" class="answer-block">
+            x1 = 15000, x2 = 65000, x3 = 0, g = 8000, v = 0
+        </div>
+    </div>
+
+    <!-- ==========================================
+         後編2
+         ========================================== -->
+    <h2>後編2</h2>
+    <div class="problem-box">
+        <div>Q3</div>
+        <div class="math-block">
+            Maximize: R = 1.2*x1 + 1.25*x2<br>
+            Subject to:<br>
+            x1 + x2 + x3 <= 200000<br>
+            x1 = 50000<br>
+            g + v = 20000<br>
+            g = 20000
+        </div>
+        <button class="btn-toggle" onclick="toggleAnswer('ans3')">回答を確認する</button>
+        <div id="ans3" class="answer-block">
+            x1 = 50000, x2 = 150000, x3 = 0, g = 20000, v = 0
+        </div>
+    </div>
+
+    <div class="problem-box">
+        <div>Q4</div>
+        <div class="math-block">
+            Maximize: R = 1.1*x1 + 1.3*x2<br>
+            Subject to:<br>
+            x1 + x2 + x3 <= 120000<br>
+            x1 = 25000<br>
+            g + v = 12000<br>
+            g = 12000
+        </div>
+        <button class="btn-toggle" onclick="toggleAnswer('ans4')">回答を確認する</button>
+        <div id="ans4" class="answer-block">
+            x1 = 25000, x2 = 95000, x3 = 0, g = 12000, v = 0
+        </div>
+    </div>
+
+    <!-- ==========================================
+         後編3
+         ========================================== -->
+    <h2>後編3</h2>
+    <div class="problem-box">
+        <div>Q5</div>
+        <div class="math-block">
+            Maximize: R = 1.15*x1 + 1.1 *x2<br>
+            Subject to:<br>
+            x1 + x2 + x3 <= 60000<br>
+            x1 = 10000<br>
+            g + v = 5000<br>
+            g = 5000
+        </div>
+        <button class="btn-toggle" onclick="toggleAnswer('ans5')">回答を確認する</button>
+        <div id="ans5" class="answer-block">
+            x1 = 10000, x2 = 50000, x3 = 0, g = 5000, v = 0
+        </div>
+    </div>
+
+    <div class="problem-box">
+        <div>Q6</div>
+        <div class="math-block">
+            Maximize: R = 1.2*x1 + 1.4*x2<br>
+            Subject to:<br>
+            x1 + x2 + x3 <= 180000<br>
+            x1 = 40000<br>
+            g + v = 18000<br>
+            g = 18000
+        </div>
+        <button class="btn-toggle" onclick="toggleAnswer('ans6')">回答を確認する</button>
+        <div id="ans6" class="answer-block">
+            x1 = 40000, x2 = 140000, x3 = 0, g = 18000, v = 0
+        </div>
+    </div>
+
+    <!-- ==========================================
+         後編4
+         ========================================== -->
+    <h2>後編4</h2>
+    <div class="problem-box">
+        <div>Q7</div>
+        <div class="math-block">
+            Maximize: R = 1.1*x1 + 1.2*x2<br>
+            Subject to:<br>
+            x1 + x2 + x3 <= 100000<br>
+            x1 = 20000<br>
+            g + v = 10000<br>
+            g = 10000
+        </div>
+        <button class="btn-toggle" onclick="toggleAnswer('ans7')">回答を確認する</button>
+        <div id="ans7" class="answer-block">
+            x1 = 20000, x2 = 80000, x3 = 0, g = 10000, v = 0
+        </div>
+    </div>
+
+    <div class="problem-box">
+        <div>Q8</div>
+        <div class="math-block">
+            Maximize: R = 1.3*x1 + 1.1*x2<br>
+            Subject to:<br>
+            x1 + x2 + x3 <= 90000<br>
+            x1 = 30000<br>
+            g + v = 7000<br>
+            g = 7000
+        </div>
+        <button class="btn-toggle" onclick="toggleAnswer('ans8')">回答を確認する</button>
+        <div id="ans8" class="answer-block">
+            x1 = 30000, x2 = 60000, x3 = 0, g = 7000, v = 0
+        </div>
+    </div>
+
+    <div class="problem-box">
+        <div>Q9</div>
+        <div class="math-block">
+            Maximize: R = 1.05*x1 + 1.25*x2<br>
+            Subject to:<br>
+            x1 + x2 + x3 <= 130000<br>
+            x1 = 35000<br>
+            g + v = 11000<br>
+            g = 11000
+        </div>
+        <button class="btn-toggle" onclick="toggleAnswer('ans9')">回答を確認する</button>
+        <div id="ans9" class="answer-block">
+            x1 = 35000, x2 = 95000, x3 = 0, g = 11000, v = 0
+        </div>
+    </div>
+
+    <div class="problem-box">
+        <div>Q10</div>
+        <div class="math-block">
+            Maximize: R = 1.2*x1 + 1.15*x2<br>
+            Subject to:<br>
+            x1 + x2 + x3 <= 70000<br>
+            x1 = 15000<br>
+            g + v = 6000<br>
+            g = 6000
+        </div>
+        <button class="btn-toggle" onclick="toggleAnswer('ans10')">回答を確認する</button>
+        <div id="ans10" class="answer-block">
+            x1 = 15000, x2 = 55000, x3 = 0, g = 6000, v = 0
+        </div>
+    </div>
+
+</div>
+
+<script>
+    function toggleAnswer(id) {
+        var x = document.getElementById(id);
+        if (x.style.display === "block") {
+            x.style.display = "none";
+        } else {
+            x.style.display = "block";
+        }
+    }
+</script>
+
+</body>
+</html>
