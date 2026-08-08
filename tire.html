@@ -19,3 +19,71 @@ const tierList = [
     items: []
   }
 ];
+// =================================================================
+// 中編：中身を動かす「移動（move）」と「並び替え（reorder）」の単語解説
+// =================================================================
+
+// 1. moveItem（ムーブ・アイテム）：キャラを別のランク（例えばSからA）へ引っ越しさせる処理
+// └ characterId（キャラクター・アイディー）：動かしたいキャラを特定する「識別番号・名前」
+// └ fromTierName（フロム・ティア・ネーム）：キャラが元々いた「移動前のランク名」
+// └ toTierName（トゥー・ティア・ネーム）：キャラを新しく置きたい「移動後のランク名」
+function moveItem(characterId, fromTierName, toTierName) {
+  
+  // movedCharacter（ムーブド・キャラクター）：移動させるために元の行から一時的に「引き抜いてキープするキャラデータ」
+  let movedCharacter = null; 
+  
+  const sourceTier = tierList.find(t => t.tierName === fromTierName);
+  if (sourceTier) {
+    const index = sourceTier.items.findIndex(item => item.id === characterId);
+    if (index !== -1) {
+      [movedCharacter] = sourceTier.items.splice(index, 1);
+    }
+  }
+
+  const targetTier = tierList.find(t => t.tierName === toTierName);
+  if (targetTier && movedCharacter) {
+    targetTier.items.push(movedCharacter);
+  }
+}
+
+// 2. reorderItemInTier（リオーダー・アイテム・イン・ティア）：同じ行の中で「強い順（左右）」を入れ替える処理
+// └ tierName（ティア・ネーム）：並び替えを行いたい「対象のランク名」
+// └ fromIndex（フロム・インデックス）：そのキャラが元々いた「元の位置（何番目か）」を表す数字
+// └ toIndex（トゥー・インデックス）：そのキャラを移動させたい「新しい位置（何番目か）」を表す数字
+function reorderItemInTier(tierName, fromIndex, toIndex) {
+  const targetTier = tierList.find(t => t.tierName === tierName);
+  if (targetTier) {
+    const items = targetTier.items;
+    const [removed] = items.splice(fromIndex, 1);
+    items.splice(toIndex, 0, removed);
+  }
+}
+// =================================================================
+// 後編：画面の操作「ドラッグ＆ドロップ」と「画像ダウンロード」の単語解説
+// =================================================================
+
+// 1. onDragStart（オン・ドラッグ・スタート）：マウスで画像を「掴んで動かし始めた瞬間」に発動する処理
+function onDragStart(event) {
+  event.dataTransfer.setData("text/plain", event.target.id);
+}
+
+// 2. onDrop（オン・ドロップ）：掴んでいた画像を目的の行の上で「パッと離した瞬間」に発動する処理
+function onDrop(event) {
+  event.preventDefault();
+  const id = event.dataTransfer.getData("text/plain");
+  moveItem(id, "S", "A"); // 中編で作ったmoveItem処理を引き金として呼び出す
+}
+
+// 3. downloadTierImage（ダウンロード・ティア・イメージ）：完成した表を「1枚の画像（写真）」として保存する処理
+function downloadTierImage() {
+  // html2canvas（エイチティーエムエル・ツー・キャンバス）：画面の見た目を一瞬で「写真データ」に変換してくれる外部機能
+  html2canvas(document.getElementById("tier-table-wrapper")).then(canvas => {
+    const link = document.createElement("a");
+    
+    // link.download（リンク・ダウンロード）：保存される画像ファイルの「名前（マイTier表.pngなど）」を決める命令
+    link.download = "my-tier-list.png"; 
+    
+    link.href = canvas.toDataURL();
+    link.click();
+  });
+}
