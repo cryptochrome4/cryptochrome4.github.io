@@ -1,9 +1,17 @@
-// 【前編の学習コード】これがTier表専用の基本データ構造です
+// =================================================================
+// 前編：Tier表の「枠組み（土台）」を作るデータ構造の単語解説
+// =================================================================
+
 const tierList = [
   {
-    tierName: "S",         // 1. 各行の左端に表示する「名前」データ
-    tierColor: "#ff4b4b",  // 2. 各行の「背景色」を指定するデータ
-    items: []              // 3. その行の中に、今どの画像があるかを管理する配列
+    // tierName（ティア・ネーム）：各行の左端に表示される「ランクの名前（SやAなど）」
+    tierName: "S",
+    
+    // tierColor（ティア・カラー）：各ランクの行の「背景の色（赤や黄など）」を決めるカラーコード
+    tierColor: "#ff4b4b",
+    
+    // items（アイテムズ）：その行の中に今どのキャラクター画像が入っているかを記録する「配列（置き場）」
+    items: [] 
   },
   {
     tierName: "A",
@@ -11,67 +19,3 @@ const tierList = [
     items: []
   }
 ];
-// キャラを別のTierに移動させる専用の処理関数
-function moveItem(characterId, fromTierName, toTierName) {
-  
-  // 移動させるキャラクターのデータを一時保存する変数
-  let movedCharacter = null;
-  
-  // ① 元の行（例：S行）を「tierName」を頼りに探す
-  const sourceTier = tierList.find(t => t.tierName === fromTierName);
-  if (sourceTier) {
-    // その行の「items」配列から、該当するキャラの位置（インデックス）を探す
-    const index = sourceTier.items.findIndex(item => item.id === characterId);
-    if (index !== -1) {
-      // items配列からそのキャラを1件「削除（抽出）」する
-      [movedCharacter] = sourceTier.items.splice(index, 1);
-    }
-  }
-
-  // ② 移動先の行（例：A行）を「tierName」を頼りに探す
-  const targetTier = tierList.find(t => t.tierName === toTierName);
-  if (targetTier && movedCharacter) {
-    // 移動先の「items」配列の末尾に、抽出したキャラデータを「追加」する
-    targetTier.items.push(movedCharacter);
-  }
-}
-// 同じTier内でキャラの順番を入れ替える関数
-function reorderItemInTier(tierName, fromIndex, toIndex) {
-  // 対象の行をデータから探す
-  const targetTier = tierList.find(t => t.tierName === tierName);
-  
-  if (targetTier) {
-    // その行の「items」配列を直接操作する
-    const items = targetTier.items;
-    
-    // 移動させるキャラを元の位置（fromIndex）から取り出す
-    const [removed] = items.splice(fromIndex, 1);
-    
-    // 取り出したキャラを、新しい位置（toIndex）に挿入する
-    items.splice(toIndex, 0, removed);
-  }
-}
-// 【汎用コード】画像を掴んだ瞬間に発動する（Tier表専用ではない）
-function onDragStart(event) {
-  // 掴んだ要素のIDを記録する（これはどんなドラッグアプリでも共通の処理）
-  event.dataTransfer.setData("text/plain", event.target.id);
-}
-
-// 【汎用コード】画像を目的地に離した瞬間に発動する
-function onDrop(event) {
-  event.preventDefault();
-  const id = event.dataTransfer.getData("text/plain");
-  
-  // ここで、中編で勉強した「Tier表専用コード（moveItem）」を呼び出してデータを書き換える
-  // つまり、汎用コードが「引き金」になり、専用コードが「中身」を動かす仕組み！
-}
-// 【汎用コード】特定のエリアを画像化してダウンロードする
-function downloadTierImage() {
-  // html2canvasという汎用ライブラリを使って、表の見た目をそのまま画像に変換
-  html2canvas(document.getElementById("tier-table-wrapper")).then(canvas => {
-    const link = document.createElement("a");
-    link.download = "my-tier-list.png"; // 保存するファイル名
-    link.href = canvas.toDataURL();     // 画像データに変換
-    link.click();                       // 自動でダウンロードを実行
-  });
-}
