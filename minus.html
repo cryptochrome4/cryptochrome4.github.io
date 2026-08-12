@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>倍率計算ツール</title>
+    <title>損切り・利確レート計算</title>
     <style>
         body {
             font-family: 'Helvetica Neue', Arial, sans-serif;
@@ -74,10 +74,9 @@
         -1.2, -1.3, -1.4
     ];
     
-    // システムに絶対に省略させない方法で165〜175の数値を指定しました
+    // 165〜175を自動生成
     const baseValues = Array.from({length: 11}, (_, i) => 165 + i);
 
-    // 各倍率ごとにカードを動的に生成
     multipliers.forEach(m => {
         const card = document.createElement('div');
         card.className = 'card';
@@ -108,8 +107,37 @@
             const right = document.createElement('div');
             right.className = 'val-right';
             
-            // 計算結果を小数点以下最大2桁に丸める
-            let result = v * m;
+            let result;
+            if (m >= 0) {
+                // プラスと0の時はそのまま掛け算
+                // 0倍の時は価格が消えないよう、100%（変化なし）として扱いたい場合は「result = v;」にする
+                result = m === 0 ? v : v * m;
+            } else {
+                // マイナスの時は「そのパーセンテージ分だけ減少（損切り）」した値を計算
+                // 例: -1.01倍 → 1.01%減少 (元本 × (1 - 0.0101))
+                // 例: -1.3倍  → 30%減少 (元本 × (1 - 0.30))
+                let percentDecrease = Math.abs(m);
+                
+                // -1.0台の表記（-1.01など）は「1.01%減少」として扱う
+                if (percentDecrease >= 1.0 && percentDecrease < 2.0) {
+                    // 1.00の場合は100%減少（0）になってしまうため、投資の「-10%」などの意図であれば調整
+                    // ここでは表記通り「-1.01」を「1.01%減少」として計算します
+                    // もし「-1.1 = 10%減少」の意図なら、(percentDecrease - 1) で計算
+                    if (percentDecrease === 1.0) {
+                        result = v * 0.90; // -1.0倍を10%減少と仮定（違っていれば教えてください）
+                    } else {
+                        let actualPercent = (percentDecrease - 1); // 1.01 -> 0.01 (1%)
+                        result = v * (1 - actualPercent);
+                    }
+                } else if (percentDecrease >= 2.0) {
+                    // -2.0倍などの場合
+                    result = v * (1 - (percentDecrease - 1));
+                } else {
+                    // -0.5倍などの場合
+                    result = v * (1 - percentDecrease);
+                }
+            }
+            
             right.textContent = Number(result.toFixed(2));
             
             row.appendChild(left);
