@@ -225,3 +225,89 @@ const scenarioData = [
 ];
 
 // ※ シナリオデータの箱はここまでです。次の後編コードに続きます。
+// ==========================================
+// 2. ゲームの進行・表示・画像を管理するシステム
+// ==========================================
+let currentIndex = 0; // 現在表示しているページのインデックス（0が1ページ目）
+
+// 画面のテキスト・カウンター・画像を最新の状態に更新する関数
+function updateScreen() {
+    const currentScenario = scenarioData[currentIndex];
+    
+    // 1. 画面右上のページ番号を更新 (例: 1 / 13)
+    document.getElementById("current-page").innerText = currentScenario.page;
+    
+    // 2. 話し手の名前（キャラクター名）を更新
+    document.getElementById("speaker-name").innerText = currentScenario.speaker;
+    
+    // 3. 本文を更新（黄色の英単語タグをそのまま画面に反映させるためinnerHTMLを使用）
+    document.getElementById("story-text").innerHTML = currentScenario.text;
+    
+    // 4. ページに対応した背景・キャラクター画像を自動切り替え
+    const imageArea = document.getElementById("image-area");
+    if (currentScenario.image) {
+        imageArea.style.backgroundImage = "url('" + currentScenario.image + "')";
+    }
+
+    // 5. ボタンの文字を調整（最終13ページ目の時は「最初から読む」に切り替える）
+    const nextBtn = document.getElementById("next-button");
+    if (currentIndex === scenarioData.length - 1) {
+        nextBtn.innerText = "Restart";
+    } else {
+        nextBtn.innerText = "Next";
+    }
+
+    // 長文が入ってスクロールしていた場合、ページ移動時に一番上まで自動リセットする（バグ防止）
+    document.getElementById("story-text-container").scrollTop = 0;
+
+    // 新しいページに配置された英単語に対して、クリックイベントを仕込み直す
+    setupVocabClicks();
+}
+
+// 「Next（次へ）」ボタンがクリックされたときに実行される関数
+function handleNext() {
+    if (currentIndex < scenarioData.length - 1) {
+        // まだ最後のページでなければ、次のページへ進む
+        currentIndex++;
+        updateScreen();
+    } else {
+        // 13ページ目でボタンが押されたら、ゲームを最初（1ページ目）にループさせる
+        currentIndex = 0;
+        updateScreen();
+    }
+}
+
+// 英単語をクリックしたときに翻訳を表示・非表示（トグル）させる関数
+function setupVocabClicks() {
+    // 画面内にある「.vocab-word」というクラスがついた英単語をすべて探す
+    const words = document.querySelectorAll('.vocab-word');
+    
+    words.forEach(word => {
+        word.addEventListener('click', (e) => {
+            // クリックイベントが後ろの背景（document）に突き抜けるのを防ぐ
+            e.stopPropagation(); 
+            
+            // 別の単語の翻訳がすでに開いている場合、そちらを一度すべて非表示にする
+            words.forEach(w => {
+                if (w !== word) w.classList.remove('show');
+            });
+            
+            // クリックされたこの単語に「show」クラスをつけ外しする（表示と非表示のトグル切り替え）
+            word.classList.toggle('show');
+        });
+    });
+}
+
+// 画面のどこでもいいので英単語以外の場所をクリックしたら、開いている翻訳を一斉に非表示にする
+document.addEventListener('click', () => {
+    const words = document.querySelectorAll('.vocab-word');
+    words.forEach(word => word.classList.remove('show'));
+});
+
+// ブラウザがこのHTMLファイルを読み込み終わった瞬間に、自動で最初の1ページ目を表示させる
+window.onload = function() {
+    updateScreen();
+};
+</script>
+</body>
+</html>
