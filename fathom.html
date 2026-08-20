@@ -1,265 +1,160 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>CoinPost Title Hub for PS4</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CoinPost Title Hub</title>
     <style>
-        /* PS4ブラウザが絶対に誤解しない、古典的かつ堅牢なカラーと基本設定 */
+        /* スマホでもテレビでも見やすく、バグが最も起きにくい基本デザイン */
+        :root {
+            --bg-color: #121214;
+            --card-bg: #1e1e24;
+            --text-color: #e2e8f0;
+            --accent-color: #3b82f6;
+            --danger-color: #ef4444;
+            --border-color: #334155;
+        }
+
         body {
-            background-color: #121214;
-            color: #e2e8f0;
             font-family: sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
             margin: 0;
             padding: 15px;
-            font-size: 14px;
+            box-sizing: border-box;
         }
 
-        /* 上部のシステムヘッダー */
-        #ps4-header {
-            background-color: #1e1e24;
-            padding: 15px;
-            border-bottom: 2px solid #334155;
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 15px;
             margin-bottom: 15px;
-        }
-        #ps4-title {
-            float: left;
-            font-size: 20px;
-            font-weight: bold;
-            color: #ffffff;
-            margin: 0;
-            line-height: 36px;
-        }
-        .system-controls {
-            float: right;
+            flex-wrap: wrap;
+            gap: 10px;
         }
 
-        /* コントローラーのカーソルで絶対に押しやすい、大きめの操作ボタン */
+        h1 { margin: 0; font-size: 20px; color: #ffffff; }
+
+        .system-controls { display: flex; gap: 10px; }
+
         button {
-            background-color: #3b82f6;
-            color: #ffffff;
-            border: 1px solid #2563eb;
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
             padding: 8px 14px;
-            font-weight: bold;
+            border-radius: 6px;
             cursor: pointer;
-            margin-left: 8px;
-        }
-        button.btn-danger {
-            background-color: #ef4444;
-            border: 1px solid #dc2626;
+            font-weight: bold;
         }
 
-        /* float（浮動配置）のつまづきを防ぐ確実な回り込み解除 */
-        .clear {
-            clear: both;
+        button.btn-danger { background-color: var(--danger-color); }
+
+        /* 【王道レイアウト】スマホでは縦並び、広い画面（PC/PS4）では左右2分割 */
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
         }
 
-        /* 【PS4専用設計】Gridを使わず、左右2分割を絶対に維持するテーブル構造 */
-        .main-wrapper {
-            display: table;
-            width: 100%;
-            table-layout: fixed;
-        }
-        .main-row {
-            display: table-row;
+        @media (min-width: 768px) {
+            .app-container {
+                display: grid;
+                grid-template-columns: 320px 1fr;
+                align-items: start;
+            }
         }
 
-        /* 左側：新着ニュースが入るPOOL cell (横幅を全体の25%に固定) */
-        .pool-cell {
-            display: table-cell;
-            width: 25%;
-            background-color: #1e1e24;
-            border: 1px solid #334155;
-            vertical-align: top;
+        /* 左側: POOLエリア */
+        .pool-sidebar {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
             padding: 15px;
-        }
-
-        /* 右側：30個のジャンル箱を並べるベース cell */
-        .genre-cell {
-            display: table-cell;
-            width: 75%;
-            vertical-align: top;
-            padding-left: 15px;
         }
 
         .pool-header {
             font-size: 16px;
             font-weight: bold;
-            border-bottom: 1px solid #334155;
-            padding-bottom: 10px;
             margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
         }
 
-        /* 30ジャンルをPS4の画面上で横3列にガチッと等間隔で並べる設定 */
-        .genre-box-wrapper {
-            float: left;
-            width: 33.3%;
-            box-sizing: border-box;
-            padding: 0 5px 15px 5px;
+        /* 右側: 30のジャンルボックスが並ぶエリア */
+        .genre-main {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 15px;
         }
+
         .genre-box {
-            background-color: #1e1e24;
-            border: 1px solid #334155;
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
             padding: 12px;
-            height: 280px; /* 高さを揃えてガタつきを完全に防止 */
-            overflow-y: auto; /* 記事が増えたら箱の中で個別にスクロール */
+            min-height: 200px;
         }
+
         .genre-title {
-            font-size: 13px;
+            font-size: 14px;
             font-weight: bold;
             color: #94a3b8;
-            border-bottom: 1px solid #334155;
-            padding-bottom: 5px;
             margin-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 5px;
         }
 
-        /* ニュースリスト共通 */
         .news-list {
             list-style: none;
             padding: 0;
             margin: 0;
         }
-                /* 【中編追加】テレビ画面で見やすく、カーソルを合わせやすい特大ニュースカード */
-        .news-card {
-            background-color: #2a2a35;
-            border: 2px solid #475569; /* 枠線を太くして存在感を強調 */
-            padding: 14px;
-            margin-bottom: 14px;
-            box-sizing: border-box;
-            border-radius: 4px;
-        }
-
-        .news-title-text {
-            font-size: 14px; /* PS4の解像度でもハッキリ読めるサイズ */
-            line-height: 1.6;
-            margin-bottom: 12px;
-            word-break: break-all;
-            color: #ffffff;
-            font-weight: bold;
-        }
-
-        /* 操作パネルの背景を一段暗くしてメリハリをつける */
-        .card-controls {
-            margin-bottom: 12px;
-            background-color: #1a1a20;
-            padding: 8px;
-            border-radius: 4px;
-        }
-
-        /* 日付入力の文字をより大きく、ハッキリと */
-        .date-input-field {
-            background-color: #2e2e38;
-            color: #00ff66; /* 入力中の数字を鮮やかなグリーンにして視認性アップ */
-            border: 1px solid #64748b;
-            padding: 8px;
-            font-size: 15px;
-            width: 110px;
-            font-family: monospace;
-            box-sizing: border-box;
-            vertical-align: middle;
-            text-align: center;
-        }
-
-        /* 日付確定ボタン（コントローラーのカーソルが吸い付きやすい大きめサイズ） */
-        .btn-save-date {
-            background-color: #10b981;
-            border: 1px solid #059669;
-            color: white;
-            font-size: 14px;
-            padding: 8px 16px;
-            font-weight: bold;
-            cursor: pointer;
-            vertical-align: middle;
-            margin-left: 6px;
-            border-radius: 4px;
-        }
-
-        /* 分配用セレクトボックス（PS4で最も選択ミスが起きない高さと余白） */
-        .move-select {
-            width: 100%;
-            background-color: #0f172a;
-            color: #cbd5e1;
-            border: 2px solid #475569;
-            padding: 10px;
-            font-size: 14px;
-            cursor: pointer;
-            box-sizing: border-box;
-            border-radius: 4px;
-        }
-
-        /* 画面から離れても絶対に日付が読み取れる高コントラストなオレンジバッジ */
-        .badge-date {
-            display: inline-block;
-            background-color: #ff9900; /* ビットコイン・暗号資産をイメージしたオレンジ */
-            color: #000000;
-            font-size: 12px;
-            font-weight: bold;
-            padding: 4px 10px;
-            margin-bottom: 10px;
-            font-family: monospace;
-            border-radius: 3px;
-        }
-
     </style>
 </head>
 <body>
 
-    <!-- ヘッダー構造 -->
-    <div id="ps4-header">
-        <div id="ps4-title">CoinPost ニュースタイトル・ハブ (PS4完全最適化版)</div>
+    <header>
+        <h1>CoinPost ニュースタイトル・ハブ</h1>
         <div class="system-controls">
             <button id="import-btn">GitHubからデータ投入 (仮)</button>
             <button id="reset-btn" class="btn-danger">全データ安全リセット</button>
         </div>
-        <div class="clear"></div>
-    </div>
+    </header>
 
-    <!-- 左右2分割メインレイアウト -->
-    <div class="main-wrapper">
-        <div class="main-row">
-            
-            <!-- 左カラム：ニュースプール -->
-            <div class="pool-cell">
-                <div class="pool-header">
-                    <span>📰 ニュース POOL</span>
-                    <span id="pool-count" style="float: right; font-size: 12px; color: #94a3b8;">0 件</span>
-                    <div class="clear"></div>
-                </div>
-                <!-- PS4で確実に個別スクロールさせるための独立エリア -->
-                <div style="height: 600px; overflow-y: auto;">
-                    <ul id="news-pool" class="news-list"></ul>
-                </div>
+    <div class="app-container">
+        <!-- 左カラム: POOL -->
+        <aside class="pool-sidebar">
+            <div class="pool-header">
+                <span>📰 ニュース POOL</span>
+                <span id="pool-count" style="color: #94a3b8;">0 件</span>
             </div>
+            <ul id="news-pool" class="news-list"></ul>
+        </aside>
 
-            <!-- 右カラム：30ジャンルエリア -->
-            <div class="genre-cell">
-                <div id="genre-container">
-                    <!-- ここにJavaScriptで30枚のボックスを自動で並べます -->
-                </div>
-                <div class="clear"></div>
-            </div>
-
-        </div>
+        <!-- 右カラム: 30ジャンル -->
+        <main class="genre-main" id="genre-container"></main>
     </div>
 
     <script>
-        // --- 1. IndexedDB 永続保存システム (PS4完全互換版) ---
-        var DB_NAME = 'CoinPostHubDB_PS4_Perfect';
-        var DB_VERSION = 1;
-        var db;
+        // --- 1. IndexedDBによる絶対消えない保存の土台 ---
+        const DB_NAME = 'CoinPostHubDB_Modern';
+        const DB_VERSION = 1;
+        let db;
 
-        // 最新のasync/awaitを徹底排除し、古いブラウザが絶対にエラーを出さない記述
         function initDB() {
-            return new Promise(function(resolve, reject) {
-                var request = indexedDB.open(DB_NAME, DB_VERSION);
-                
-                request.onerror = function() { reject('DB起動失敗'); };
-                request.onsuccess = function(e) {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+                request.onerror = () => reject('DB起動失敗');
+                request.onsuccess = (e) => {
                     db = e.target.result;
                     resolve(db);
                 };
-
-                request.onupgradeneeded = function(e) {
-                    var database = e.target.result;
+                request.onupgradeneeded = (e) => {
+                    const database = e.target.result;
                     if (!database.objectStoreNames.contains('articles')) {
                         database.createObjectStore('articles', { keyPath: 'id', autoIncrement: true });
                     }
@@ -267,8 +162,8 @@
             });
         }
 
-        // --- 2. 30個のジャンル定義 ---
-        var defaultGenres = [
+        // --- 2. 定義された30個のジャンルエリア ---
+        const defaultGenres = [
             "SEC関連", "CFTC関連", "トランプ大統領発言", "リップル(XRP)公式", "予測市場・マクロ",
             "ジャンル6", "ジャンル7", "ジャンル8", "ジャンル9", "ジャンル10",
             "ジャンル11", "ジャンル12", "ジャンル13", "ジャンル14", "ジャンル15",
@@ -277,315 +172,16 @@
             "ジャンル26", "ジャンル27", "ジャンル28", "ジャンル29", "ジャンル30"
         ];
 
-        // 画面に30個のジャンルボックスの骨組みを流し込む関数
         function createGenreBoxes() {
-            var container = document.getElementById('genre-container');
+            const container = document.getElementById('genre-container');
             container.innerHTML = '';
-            
-            for (var i = 0; i < defaultGenres.length; i++) {
-                var wrapper = document.createElement('div');
-                wrapper.className = 'genre-box-wrapper';
-                
-                wrapper.innerHTML = 
-                    '<div class="genre-box" data-genre-id="' + i + '">' +
-                        '<div class="genre-title">' + (i + 1) + '. ' + defaultGenres[i] + '</div>' +
-                        '<ul class="news-list" id="genre-list-' + i + '"></ul>' +
-                    '</div>';
-                
-                container.appendChild(wrapper);
-            }
-        }
-        // --- 2. 30個のジャンルボックスの骨組みを生成する関数 ---
-        function createGenreBoxes() {
-            var container = document.getElementById('genre-container');
-            container.innerHTML = '';
-            
-            for (var i = 0; i < defaultGenres.length; i++) {
-                var wrapper = document.createElement('div');
-                wrapper.className = 'genre-box-wrapper';
-                
-                // プラス記号で確実に文字列を結合し、PS4互換の箱を組み立て
-                wrapper.innerHTML = 
-                    '<div class="genre-box" data-genre-id="' + i + '">' +
-                        '<div class="genre-title">' + (i + 1) + '. ' + defaultGenres[i] + '</div>' +
-                        '<ul class="news-list" id="genre-list-' + i + '"></ul>' +
-                    '</div>';
-                
-                container.appendChild(wrapper);
-            }
-        }
-
-        // --- 3. 4回連続の「かまかけ確認」付きデータ物理削除システム ---
-        function secureReset() {
-            var warnings = [
-                "【確認 1/4】本当にすべてのニュースデータ、および分類ログを初期化しますか？",
-                "【確認 2/4】クッキー削除でも消えないデータベース内のデータが完全に削除されます。本当によろしいですか？",
-                "【確認 3/4】ジャンル分けした仕込みの記憶もリセットされます。後悔しませんか？",
-                "【最終確認 4/4】これが最後の警告です。本当にすべて消去して初期状態に戻しますか？"
-            ];
-
-            // 4連続の確認ダイアログを出撃させ、1回でもキャンセルされたらデータを守る
-            for (var i = 0; i < warnings.length; i++) {
-                if (!confirm(warnings[i])) {
-                    alert("リセットをキャンセルしました。大切なデータは保護されました。");
-                    return;
-                }
-            }
-
-            // 4回の確認を全て突破した場合のみ、IndexedDBのデータを物理消去
-            var transaction = db.transaction(['articles'], 'readwrite');
-            var store = transaction.objectStore(['articles']);
-            var clearRequest = store.clear();
-
-            clearRequest.onsuccess = function() {
-                alert("すべてのデータを完全にリセットしました。画面を初期化します。");
-                location.reload();
-            };
-        }
-
-        // --- 4. システム全体の統括・自動起動シーケンス ---
-        document.addEventListener('DOMContentLoaded', function() {
-            initDB().then(function() {
-                // 30ジャンルのボックスの骨組みを生成
-                createGenreBoxes();
-                // リセットボタンに4回かまかけイベントを完全紐付け
-                document.getElementById('reset-btn').onclick = secureReset;
-            }).catch(function(err) {
-                alert("システム起動エラー: " + err);
+            defaultGenres.forEach((genreName, index) => {
+                const box = document.createElement('div');
+                box.className = 'genre-box';
+                box.innerHTML = `
+                    <div class="genre-title">${index + 1}. ${genreName}</div>
+                    <ul class="news-list" id="genre-list-${index}"></ul>
+                `;
+                container.appendChild(box);
             });
-        });
-                // --- 3. ニュースカードの部品を組み立てる（PS4互換・超丁寧ビルド） ---
-        function createNewsCardHTML(article) {
-            var dateBadge = '';
-            if (article.date) {
-                // 日付がすでに保存されている場合は、目立つバッジを最上部に表示
-                dateBadge = '<span class="badge-date">📅 固定日: ' + article.date + '</span><br>';
-            }
-            
-            // 30個の選択肢を、PS4がパースエラーを起こさない安全なループで生成
-            var genreOptions = '<option value="pool">📄 POOL（未分類）に戻す</option>';
-            for (var i = 0; i < defaultGenres.length; i++) {
-                var selected = '';
-                if (article.genre === String(i)) {
-                    selected = 'selected';
-                }
-                genreOptions += '<option value="' + i + '" ' + selected + '>' + (i + 1) + '番: ' + defaultGenres[i] + '</option>';
-            }
-
-            // 最新のバッククォート(テンプレートリテラル)を一切使わず、古いブラウザに100%優しい文字列結合
-            var html = '';
-            html += '<li class="news-card" data-id="' + article.id + '">';
-            html += dateBadge;
-            html += '<div class="news-title-text">' + article.title + '</div>';
-            html += '<div class="card-controls">';
-            html += '<input type="text" class="date-input-field" placeholder="20260810" value="' + (article.date || '') + '" maxlength="8">';
-            html += '<button class="btn-save-date" onclick="updateArticleDate(' + article.id + ', this)">日付をロック</button>';
-            html += '</div>';
-            html += '<select class="move-select" onchange="moveArticleGenre(' + article.id + ', this.value)">';
-            html += '<option value="" disabled selected>📦 この情報をどのジャンルに仕込む？</option>';
-            html += genreOptions;
-            html += '</select>';
-            html += '</li>';
-
-            return html;
         }
-
-        // --- 4. 日付データの保存・バリデーション処理（PS4専用・非同期エラー対策版） ---
-        function updateArticleDate(id, buttonEl) {
-            var inputEl = buttonEl.previousElementSibling;
-            var dateValue = inputEl.value.trim();
-
-            // ユーザーの入力ミス（全角文字や文字数の間違い、適当なテキスト）を未然に防ぐ丁寧なバリデーション
-            if (dateValue !== "") {
-                if (!/^\d{8}$/.test(dateValue)) {
-                    alert("【入力エラー】\n日付は「20260810」のように、8桁の半角数字だけで正確に入力してください。");
-                    return;
-                }
-                
-                // 入力された年の範囲チェック（2013年〜2050年以外は弾く）
-                var inputYear = parseInt(dateValue.substring(0, 4), 10);
-                if (inputYear < 2013 || inputYear > 2050) {
-                    alert("【設定エラー】\n日付設定は2013年から2050年までが対象です。\n入力された年：" + inputYear + "年は対象外です。");
-                    return;
-                }
-            }
-
-            // 安全な書き込みトランザクションを開始して、IndexedDBのデータを精密に書き換え
-            var transaction = db.transaction(['articles'], 'readwrite');
-            var store = transaction.objectStore(['articles']);
-            
-            store.get(id).onsuccess = function(event) {
-                var article = event.target.result;
-                if (article) {
-                    article.date = dateValue; // 入力された8桁の数字を上書き
-                    
-                    var updateRequest = store.put(article);
-                    updateRequest.onsuccess = function() {
-                        // 後編で実装する、画面全体の超高速再描画（レンダリング）処理をキック
-                        renderAllArticles();
-                    };
-                }
-            };
-        }
-
-        // --- 5. 指定したジャンル枠への引っ越し・配分処理 ---
-        function moveArticleGenre(id, targetGenre) {
-            var transaction = db.transaction(['articles'], 'readwrite');
-            var store = transaction.objectStore(['articles']);
-
-            store.get(id).onsuccess = function(event) {
-                var article = event.target.result;
-                if (article) {
-                    article.genre = targetGenre; // 新しい引っ越し先のジャンルID（0〜29、またはpool）
-                    
-                    var updateRequest = store.put(article);
-                    updateRequest.onsuccess = function() {
-                        // 引っ越しが完了したら即座に画面を最新状態に更新
-                        renderAllArticles();
-                    };
-                }
-            };
-        }
-
-                // --- 6. データベースから全記事を精密に読み込んで各ジャンルに分配・描画する処理 ---
-        function renderAllArticles() {
-            // まずPOOLとすべてのジャンルリストの画面表示を完全にクリアする
-            document.getElementById('news-pool').innerHTML = '';
-            for (var i = 0; i < 30; i++) {
-                var listEl = document.getElementById('genre-list-' + i);
-                if (listEl) {
-                    listEl.innerHTML = '';
-                }
-            }
-
-            var poolCount = 0;
-            var transaction = db.transaction(['articles'], 'readonly');
-            var store = transaction.objectStore(['articles']);
-            
-            // PS4の古いブラウザ環境で最もスタック（フリーズ）を起こしにくい高速カーソルループを採用
-            store.openCursor().onsuccess = function(event) {
-                var cursor = event.target.result;
-                if (cursor) {
-                    var article = cursor.value;
-                    var cardHTML = createNewsCardHTML(article);
-
-                    // 保存されているジャンル情報に応じて適切な箱へ流し込む
-                    if (!article.genre || article.genre === 'pool') {
-                        // POOL（未分類）への追加
-                        document.getElementById('news-pool').innerHTML += cardHTML;
-                        poolCount++;
-                    } else {
-                        // 30の指定ジャンルへの分配
-                        var targetList = document.getElementById('genre-list-' + article.genre);
-                        if (targetList) {
-                            targetList.innerHTML += cardHTML;
-                        }
-                    }
-                    cursor.continue(); // 次のニュースレコードへ進む
-                } else {
-                    // データベース内の全スキャンが完了したら、プールの最新件数を画面にバインド
-                    document.getElementById('pool-count').textContent = poolCount + ' 件';
-                }
-            };
-        }
-
-        // --- 7. GitHubから最新ニュースをPOOLへ一括投入するシミュレーター ---
-        // 将来的にGitHubに最新タイトルをJSON保存し、Actions等で自動同期できるように拡張可能です
-        document.getElementById('import-btn').onclick = function() {
-            // お送りいただいたスクリーンショット（CoinPost）の実際の重要ニュースをプリセット
-            var mockGitHubData = [
-                {
-                    title: "トランプ大統領、来週の仮想通貨・予測市場会合に出席見込み＝報道",
-                    genre: "pool",
-                    date: ""
-                },
-                {
-                    title: "リップル子会社が優先無担保債発行、436億円調達",
-                    genre: "pool",
-                    date: ""
-                },
-                {
-                    title: "トランプ大統領、政府によるビットコイン購入検討を表明 BTCは6月以来の高値",
-                    genre: "pool",
-                    date: ""
-                }
-            ];
-
-            var transaction = db.transaction(['articles'], 'readwrite');
-            var store = transaction.objectStore(['articles']);
-            var addedCount = 0;
-            
-            // 既にプールやジャンル内に存在するニュースとの重複を防ぐ精密チェック
-            store.getAll().onsuccess = function(e) {
-                var currentArticles = e.target.result;
-                var currentTitles = [];
-                for (var i = 0; i < currentArticles.length; i++) {
-                    currentTitles.push(currentArticles[i].title);
-                }
-
-                // 未読・新着のニュースだけを選別してIndexedDBへ流し込む
-                for (var j = 0; j < mockGitHubData.length; j++) {
-                    var item = mockGitHubData[j];
-                    if (currentTitles.indexOf(item.title) === -1) {
-                        store.add(item);
-                        addedCount++;
-                    }
-                }
-
-                // データベースのトランザクションがすべて無事に完了した時の最終処理
-                transaction.oncomplete = function() {
-                    if (addedCount > 0) {
-                        alert("【GitHub同期完了】\n新着の重要ニュースを " + addedCount + " 件、POOLに読み込みました！");
-                        renderAllArticles(); // 画面をリフレッシュして最新化
-                    } else {
-                        alert("【同期確認】\n新着ニュースはありません（すべて読込済みです）。");
-                    }
-                };
-            };
-        };
-
-        // --- 8. 4回連続の「かまかけ確認」付きデータ物理削除システム ---
-        function secureReset() {
-            var warnings = [
-                "【確認 1/4】本当にすべてのニュースデータ、および分類ログを初期化しますか？",
-                "【確認 2/4】クッキー削除でも消えないデータベース（IndexedDB）内のデータが完全に削除されます。本当によろしいですか？",
-                "【確認 3/4】ジャンル分けした仕込みの記憶もリセットされます。後悔しませんか？",
-                "【最終確認 4/4】これが最後の警告です。本当にすべて消去して初期状態に戻しますか？"
-            ];
-
-            // 4連続の確認ダイアログを出撃させ、1回でも弱気になったら即座に守る
-            for (var i = 0; i < warnings.length; i++) {
-                if (!confirm(warnings[i])) {
-                    alert("リセットをキャンセルしました。大切な仕込みデータは完全に保護されました。");
-                    return; // 処理を完全中断
-                }
-            }
-
-            // 4回の確認を全て突破した場合のみ、IndexedDBのデータを物理消去
-            var transaction = db.transaction(['articles'], 'readwrite');
-            var store = transaction.objectStore(['articles']);
-            var clearRequest = store.clear();
-
-            clearRequest.onsuccess = function() {
-                alert("すべてのデータを完全にリセットしました。画面を初期化します。");
-                location.reload();
-            };
-        }
-
-        // --- 9. システム全体の統括・自動起動シーケンス ---
-        document.addEventListener('DOMContentLoaded', function() {
-            initDB().then(function() {
-                // 30ジャンルのボックスの骨組みを生成
-                createGenreBoxes();
-                // データベース内の既存データを画面に高速マッピング
-                renderAllArticles();
-                // リセットボタンに4回かまかけイベントを完全紐付け
-                document.getElementById('reset-btn').onclick = secureReset;
-            }).catch(function(err) {
-                alert("システム起動エラー: " + err);
-            });
-        });
-    
-    </script>
-</body>
-</html>
