@@ -296,3 +296,142 @@
             { id: 15, title: "15番目のニュースタイトル", detail: "15番目の詳しい本文です。", img: "https://placeholder.com5" },
             { id: 16, title: "16番目のニュースタイトル", detail: "16番目の詳しい本文です。", img: "https://placeholder.com6" },
             { id: 17, title: "17番目のニュースタイトル", detail: "17番目の詳しい本文です。", img: "https://placeholder.com7" },
+            { id: 18, title: "18番目のニュースタイトル", detail: "18番目の詳しい本文です。", img: "https://placeholder.com" },
+            { id: 19, title: "19番目のニュースタイトル", detail: "19番目の詳しい本文です。", img: "https://placeholder.com" },
+            { id: 20, title: "20番目のニュースタイトル", detail: "20番目の詳しい本文です。", img: "https://placeholder.com" },
+            { id: 21, title: "21番目のニュースタイトル", detail: "21番目の詳しい本文です。", img: "https://placeholder.com" },
+            { id: 22, title: "22番目のニュースタイトル", detail: "22番目の詳しい本文です。", img: "https://placeholder.com" },
+            { id: 23, title: "23番目のニュースタイトル", detail: "23番目の詳しい本文です。", img: "https://placeholder.com" },
+            { id: 24, title: "24番目のニュースタイトル", detail: "24番目の詳しい本文です。", img: "https://placeholder.com" },
+            { id: 25, title: "25番目のニュースタイトル", detail: "25番目の詳しい本文です。", img: "https://placeholder.com" },
+            { id: 26, title: "26番目のニュースタイトル", detail: "26番目の詳しい本文です。", img: "https://placeholder.com" },
+            { id: 27, title: "27番目のニュースタイトル", detail: "27番目の詳しい本文です。", img: "https://placeholder.com" },
+            { id: 28, title: "28番目のニュースタイトル", detail: "28番目の詳しい本文です。", img: "https://placeholder.com" },
+            { id: 29, title: "29番目のニュースタイトル", detail: "29番目の詳しい本文です。", img: "https://placeholder.com" },
+            { id: 30, title: "30番目のニュースタイトル", detail: "30番目の詳しい本文です。これで30個目です。", img: "https://placeholder.com" }
+        ];
+
+        // 実際に画面を動かすための現在のデータ配列
+        let currentNewsData = [];
+
+        // --- 保存機能（ローカルストレージ）から読み込み、無ければ初期データをセット ---
+        function loadData() {
+            const savedData = localStorage.getItem('news_rank_data');
+            if (savedData) {
+                currentNewsData = JSON.parse(savedData);
+            } else {
+                currentNewsData = [...defaultNewsData];
+            }
+        }
+
+        // --- 現在の順番をブラウザ（自動保存領域）に保存 ---
+        function saveData() {
+            localStorage.setItem('news_rank_data', JSON.stringify(currentNewsData));
+        }
+
+        // --- 画面表示リフレッシュシステム ---
+        function drawPage() {
+            const managerList = document.getElementById('managerList');
+            const tickerLive = document.getElementById('tickerLive');
+
+            // 1. 下部の縦並びリストを現在の順序通りに生成
+            managerList.innerHTML = '';
+            currentNewsData.forEach((item, index) => {
+                const row = document.createElement('div');
+                row.className = 'news-row';
+
+                // 最初（1番上）の要素は▲ボタンを無効に、最後（30番目）は▼ボタンを無効にする
+                const isFirst = index === 0;
+                const isLast = index === currentNewsData.length - 1;
+
+                row.innerHTML = `
+                    <div class="order-control-box">
+                        <button class="arrow-btn" ${isFirst ? 'disabled' : ''} onclick="moveItem(${index}, -1)">▲</button>
+                        <button class="arrow-btn" ${isLast ? 'disabled' : ''} onclick="moveItem(${index}, 1)">▼</button>
+                    </div>
+                    
+                    <button class="news-content-btn" onclick="displayOnTop('${escapeHtml(item.title)}', '${escapeHtml(item.detail)}')">
+                        <img src="${item.img}" class="row-img" alt="news-icon">
+                        <div class="row-title">${index + 1}位：${item.title}</div>
+                    </button>
+                `;
+                managerList.appendChild(row);
+            });
+
+            // 2. 中部の流れるニュースティッカーも現在の並び順通りに同期
+            tickerLive.innerHTML = '';
+            currentNewsData.forEach((item, index) => {
+                const span = document.createElement('span');
+                span.className = 'ticker-item';
+                span.onclick = () => displayOnTop(item.title, item.detail);
+                span.innerHTML = `
+                    <img src="${item.img}" class="ticker-img" alt="icon">
+                    <span class="ticker-text">【第${index + 1}位】${item.title}</span>
+                `;
+                tickerLive.appendChild(span);
+            });
+        }
+
+        // --- ニュースアイテムの順序を1つ上下に入れ替える処理 ---
+        function moveItem(currentIndex, direction) {
+            const targetIndex = currentIndex + direction;
+            
+            // 範囲外なら何もしない安全策
+            if (targetIndex < 0 || targetIndex >= currentNewsData.length) return;
+
+            // 配列の要素を入れ替える
+            const temp = currentNewsData[currentIndex];
+            currentNewsData[currentIndex] = currentNewsData[targetIndex];
+            currentNewsData[targetIndex] = temp;
+
+            // 保存して画面を書き換える
+            saveData();
+            drawPage();
+        }
+
+        // --- ピンク枠を押した時、一番上だけに内容を出す処理 ---
+        function displayOnTop(title, detail) {
+            const displayArea = document.getElementById('detailDisplay');
+            displayArea.innerHTML = `
+                <h3>${title}</h3>
+                <p>${detail}</p>
+            `;
+        }
+
+        // --- 【超厳重】4回連続で鎌をかけるリセット確認システム ---
+        function triggerStrictReset() {
+            // 1回目の確認
+            if (confirm("【確認 1/4】本当に順番を初期状態にリセットしますか？")) {
+                // 2回目の確認
+                if (confirm("【確認 2/4】リセットすると、あなたが並び替えた現在の順番は完全に消去されます。本当によろしいですか？")) {
+                    // 3回目の確認
+                    if (confirm("【確認 3/4】クッキーやキャッシュを消しても戻りません。後悔しませんね？")) {
+                        // 4回目の確認
+                        if (confirm("【最終確認 4/4】これが最後の警告です。本当に、本当にリセットを実行してもよろしいですか？")) {
+                            
+                            // ローカルストレージを削除し、データを初期化
+                            localStorage.removeItem('news_rank_data');
+                            currentNewsData = [...defaultNewsData];
+                            
+                            // 画面をリフレッシュして完了通知
+                            drawPage();
+                            alert("順番を最初の状態にリセットしました。");
+                        }
+                    }
+                }
+            }
+        }
+
+        // 安全対策用エスケープ関数
+        function escapeHtml(str) {
+            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+        }
+
+        // 起動時にデータを読み込んで画面を描画
+        window.onload = function() {
+            loadData();
+            drawPage();
+        };
+    </script>
+</body>
+</html>
