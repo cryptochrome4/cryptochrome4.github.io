@@ -474,6 +474,64 @@
                 };
             };
         };
+        // --- 6. GitHubからニュースタイトルを取得・投入するシミュレーター（完結版） ---
+        document.getElementById('import-btn').onclick = function() {
+            // CoinPostの実際の重要ニュースデータをプリセット
+            const mockGitHubData = [
+                {
+                    title: "トランプ大統領、来週の仮想通貨・予測市場会合に出似込み＝報道",
+                    genre: "pool",
+                    date: ""
+                },
+                {
+                    title: "リップル子会社が優先無担保債発行、436億円調達",
+                    genre: "pool",
+                    date: ""
+                },
+                {
+                    title: "トランプ大統領、政府によるビットコイン購入検討を表明 BTCは6月以来の高値",
+                    genre: "pool",
+                    date: ""
+                }
+            ];
+
+            const transaction = db.transaction(['articles'], 'readwrite');
+            const store = transaction.objectStore(['articles']);
+            let addedCount = 0;
+            
+            // 重複投入を防ぐため、現在の全タイトルを取得してチェック
+            store.getAll().onsuccess = (e) => {
+                const currentArticles = e.target.result;
+                const currentTitles = currentArticles.map(a => a.title);
+
+                mockGitHubData.forEach(item => {
+                    if (!currentTitles.includes(item.title)) {
+                        store.add(item);
+                        addedCount++;
+                    }
+                });
+
+                transaction.oncomplete = () => {
+                    if (addedCount > 0) {
+                        alert(`【GitHub同期完了】\n新着ニュースを ${addedCount} 件プールに読み込みました！`);
+                        renderAllArticles(); // 画面を更新
+                    } else {
+                        alert("【同期確認】\n新着ニュースはありません（すべて読込済みです）。");
+                    }
+                };
+            };
+        };
+
+        // --- 7. システム自動起動シーケンス ---
+        document.addEventListener('DOMContentLoaded', async () => {
+            await initDB();
+            createGenreBoxes();
+            renderAllArticles(); // 画面に保存データを分配描画
+            document.getElementById('reset-btn').addEventListener('click', secureReset);
+        });
+    </script>
+</body>
+</html>
 
     </script>
 </body>
