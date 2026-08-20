@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>News Ticker & Tier Manager</title>
+    <style>
+        /* --- 全体の基本デザイン（bitFlyer風のクリーンな配色） --- */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+        }
+
+        body {
+            background-color: #f4f6f9;
+            color: #111111;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+            background-color: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+            padding: 20px;
+            overflow: hidden;
+        }
+
+        /* --- 1. 上部：シンプルな詳細文章表示エリア --- */
+        .detail-display-area {
+            width: 100%;
+            min-height: 120px;
+            background-color: #fafafa;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 20px;
+            font-size: 15px;
+            line-height: 1.6;
+            color: #333333;
+            transition: all 0.3s ease;
+        }
+
+        .detail-display-area h3 {
+            font-size: 16px;
+            color: #00469b;
+            margin-bottom: 8px;
+            border-bottom: 1px solid #e0e0e0;
+            padding-bottom: 4px;
+        }
+
+        /* --- 2. 中部：流れるニュースティッカーエリア --- */
+        .ticker-container {
+            width: 100%;
+            background-color: #eef3fb;
+            border-radius: 8px;
+            padding: 10px;
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            align-items: center;
+            margin-bottom: 24px;
+            border-left: 4px solid #0052cc;
+        }
+
+        .ticker-wrap {
+            width: 100%;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+
+        /* アニメーションで左から右（または右から左）へループ */
+        .ticker-move {
+            display: inline-block;
+            animation: ticker-anim 25s linear infinite;
+            padding-right: 100%;
+        }
+
+        .ticker-move:hover {
+            animation-play-state: paused; /* ホバーで一時停止して読みやすく */
+        }
+
+        @keyframes ticker-anim {
+            0% { transform: translate3d(0, 0, 0); }
+            100% { transform: translate3d(-100%, 0, 0); }
+        }
+
+        /* ティッカー内の一つのニュースアイテム */
+        .ticker-item {
+            display: inline-flex;
+            align-items: center;
+            margin-right: 50px;
+            cursor: pointer;
+        }
+
+        .ticker-img {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            background-color: #ff6b6b;
+            margin-right: 8px;
+            display: inline-block;
+            flex-shrink: 0;
+        }
+
+        .ticker-text {
+            font-size: 14px;
+            font-weight: bold;
+            color: #0052cc;
+        }
+
+        /* --- 3. 下部：Tier順序入れ替え・管理リストエリア --- */
+        .list-title {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 12px;
+            color: #555555;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .news-manager-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 400px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        /* 1つのニュース管理行 */
+        .news-row {
+            display: flex;
+            align-items: center;
+            background: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 8px 12px;
+            gap: 12px;
+            transition: background-color 0.2s;
+        }
+
+        /* Tier順序を変えるセレクトボックス/ボタンエリア (青枠のイメージ) */
+        .tier-control-box {
+            border: 2px solid #0052cc;
+            border-radius: 6px;
+            padding: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #fff;
+        }
+
+        .tier-select {
+            border: none;
+            outline: none;
+            font-size: 14px;
+            font-weight: bold;
+            color: #0052cc;
+            cursor: pointer;
+            background: transparent;
+        }
+
+        /* クリックして上に詳細を出すメインボタンエリア (ピンク枠のイメージ) */
+        .news-content-btn {
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            background: none;
+            border: none;
+            text-align: left;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .news-content-btn:hover {
+            background-color: #f0f5ff;
+        }
+
+        .row-img {
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            background-color: #ddd;
+            margin-right: 12px;
+            flex-shrink: 0;
+        }
+
+        .row-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* スクロールバーのカスタム */
+        .news-manager-list::-webkit-scrollbar {
+            width: 6px;
+        }
+        .news-manager-list::-webkit-scrollbar-thumb {
+            background-color: #ccc;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <!-- 1. 上部：詳細表示エリア -->
+        <div class="detail-display-area" id="detailDisplay">
+            <h3>詳細表示エリア</h3>
+            <p>下のニュース（Tier変更用パーツ以外の部分）をクリックすると、ここに詳しい文章が即座に表示されます。</p>
+        </div>
+
+        <!-- 2. 中部：流れるニュース（ティッカー） -->
+        <div class="ticker-container">
+            <div class="ticker-wrap">
+                <div class="ticker-move" id="tickerLive">
+                    <!-- ここに並び順がリアルタイムに反映されたニュースが流れます -->
+                    <span class="ticker-item"><span class="ticker-img"></span><span class="ticker-text">【読込中】ニュースを準備しています...</span></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. 下部：Tier順序管理リスト（30個配置用） -->
+        <div class="list-title">
+            <span>ニュース一覧（Tier順に変更可能）</span>
+            <span style="font-size: 12px; color:#888;">※上ほど優先度高</span>
+        </div>
+        
+        <div class="news-manager-list" id="managerList">
+            <!-- 中編のJavaScriptによって、ここに30個のデータ行が自動生成されます -->
+        </div>
+    </div>
+
+</body>
+</html>
