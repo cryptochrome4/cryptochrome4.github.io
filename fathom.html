@@ -311,6 +311,85 @@
             createGenreBoxes();
             document.getElementById('reset-btn').addEventListener('click', secureReset);
         });
+                // --- 中編機能 1: ニュースカードのHTMLを動的に組み立てる関数 ---
+        function createNewsCardHTML(article) {
+            // 日付が保存されていれば、最上部に綺麗な青いバッジを表示
+            const dateBadge = article.date ? `<span class="badge-date">📅 固定日: ${article.date}</span><br>` : '';
+            
+            // 30個の仕分け用選択肢を自動生成
+            let genreOptions = '<option value="pool">📄 POOL（未分類）に戻す</option>';
+            defaultGenres.forEach((name, idx) => {
+                const selected = article.genre === String(idx) ? 'selected' : '';
+                genreOptions += `<option value="${idx}" ${selected}>${idx + 1}: ${name}</option>`;
+            });
+
+            return `
+                <li class="news-card" data-id="${article.id}">
+                    ${dateBadge}
+                    <div class="news-title-text">${article.title}</div>
+                    <div class="card-controls">
+                        <input type="text" class="date-input-field" placeholder="20260810" value="${article.date || ''}" maxlength="8">
+                        <button class="btn-save-date" onclick="updateArticleDate(${article.id}, this)">日付ロック</button>
+                    </div>
+                    <select class="move-select" onchange="moveArticleGenre(${article.id}, this.value)">
+                        <option value="" disabled selected>📦 どのジャンルに配分する？</option>
+                        ${genreOptions}
+                    </select>
+                </li>
+            `;
+        }
+
+        // --- 中編機能 2: 日付データのバリデーションと永続保存処理 ---
+        function updateArticleDate(id, buttonEl) {
+            const inputEl = buttonEl.previousElementSibling;
+            const dateValue = inputEl.value.trim();
+
+            // 8桁の半角数字以外の入力を弾くチェック
+            if (dateValue !== "") {
+                if (!/^\d{8}$/.test(dateValue)) {
+                    alert("【入力エラー】\n日付は「20260810」のように、8桁の半角数字だけで入力してください。");
+                    return;
+                }
+                
+                // 2013年〜2050年の範囲外を完全に弾くガード
+                const inputYear = parseInt(dateValue.substring(0, 4), 10);
+                if (inputYear < 2013 || inputYear > 2050) {
+                    alert(`【範囲エラー】\n対象の年は2013年から2050年までです。\n入力された「${inputYear}年」は設定できません。`);
+                    return;
+                }
+            }
+
+            const transaction = db.transaction(['articles'], 'readwrite');
+            const store = transaction.objectStore(['articles']);
+            
+            store.get(id).onsuccess = (e) => {
+                const article = e.target.result;
+                if (article) {
+                    article.date = dateValue;
+                    store.put(article).onsuccess = () => {
+                        // 後編で合流する全体描画処理を呼び出し
+                        renderAllArticles();
+                    };
+                }
+            };
+        }
+
+        // --- 中編機能 3: ジャンルの仕分け移動処理 ---
+        function moveArticleGenre(id, targetGenre) {
+            const transaction = db.transaction(['articles'], 'readwrite');
+            const store = transaction.objectStore(['articles']);
+
+            store.get(id).onsuccess = (e) => {
+                const article = e.target.result;
+                if (article) {
+                    article.genre = targetGenre;
+                    store.put(article).onsuccess = () => {
+                        renderAllArticles();
+                    };
+                }
+            };
+        }
+
     </script>
 </body>
 </html>
