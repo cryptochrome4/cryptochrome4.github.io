@@ -390,13 +390,90 @@
             };
         }
 
-                // --- 4. システム自動起動シーケンス ---
-        document.addEventListener('DOMContentLoaded', async () => {
-            await initDB();
-            createGenreBoxes();
-            renderAllArticles(); // 👈【重要】後編を入れたら、この1行をここに追加してください！
-            document.getElementById('reset-btn').addEventListener('click', secureReset);
-        });
+                        // --- 後編機能 1: データベースから全記事を読み込んで画面に分配描画 ---
+        function renderAllArticles() {
+            // まずPOOLとすべてのジャンルリストの画面表示をクリア
+            document.getElementById('news-pool').innerHTML = '';
+            for (let i = 0; i < 30; i++) {
+                const listEl = document.getElementById(`genre-list-${i}`);
+                if (listEl) listEl.innerHTML = '';
+            }
+
+            let poolCount = 0;
+            const transaction = db.transaction(['articles'], 'readonly');
+            const store = transaction.objectStore(['articles']);
+            
+            store.openCursor().onsuccess = (event) => {
+                const cursor = event.target.result;
+                if (cursor) {
+                    const article = cursor.value;
+                    const cardHTML = createNewsCardHTML(article);
+
+                    // ジャンル情報（未分類か30の指定枠か）に応じて割り振る
+                    if (!article.genre || article.genre === 'pool') {
+                        document.getElementById('news-pool').insertAdjacentHTML('beforeend', cardHTML);
+                        poolCount++;
+                    } else {
+                        const targetList = document.getElementById(`genre-list-${article.genre}`);
+                        if (targetList) {
+                            targetList.insertAdjacentHTML('beforeend', cardHTML);
+                        }
+                    }
+                    cursor.continue(); // 次の記事へ進む
+                } else {
+                    // 全件スキャン完了後にプール最新件数を更新
+                    document.getElementById('pool-count').textContent = `${poolCount} 件`;
+                }
+            };
+        }
+
+        // --- 後編機能 2: GitHubからニュースタイトルを取得・投入するシミュレーター ---
+        document.getElementById('import-btn').onclick = function() {
+            // お送りいただいたスクリーンショット（CoinPost）の実際のニュースデータをプリセット
+            const mockGitHubData = [
+                {
+                    title: "トランプ大統領、来週の仮想通貨・予測市場会合に出席見込み＝報道",
+                    genre: "pool",
+                    date: ""
+                },
+                {
+                    title: "リップル子会社が優先無担保債発行、436億円調達",
+                    genre: "pool",
+                    date: ""
+                },
+                {
+                    title: "トランプ大統領、政府によるビットコイン購入検討を表明 BTCは6月以来の高値",
+                    genre: "pool",
+                    date: ""
+                }
+            ];
+
+            const transaction = db.transaction(['articles'], 'readwrite');
+            const store = transaction.objectStore(['articles']);
+            let addedCount = 0;
+            
+            // 重複投入を防ぐため、現在の全タイトルを取得してチェック
+            store.getAll().onsuccess = (e) => {
+                const currentArticles = e.target.result;
+                const currentTitles = currentArticles.map(a => a.title);
+
+                mockGitHubData.forEach(item => {
+                    if (!currentTitles.includes(item.title)) {
+                        store.add(item);
+                        addedCount++;
+                    }
+                });
+
+                transaction.oncomplete = () => {
+                    if (addedCount > 0) {
+                        alert(`【GitHub同期完了】\n新着ニュースを ${addedCount} 件プールに読み込みました！`);
+                        renderAllArticles(); // 画面を更新
+                    } else {
+                        alert("【同期確認】\n新着ニュースはありません（すべて読込済みです）。");
+                    }
+                };
+            };
+        };
 
     </script>
 </body>
