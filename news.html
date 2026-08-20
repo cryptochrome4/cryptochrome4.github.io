@@ -246,3 +246,284 @@
 
 </body>
 </html>
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>News Ticker & Tier Manager</title>
+    <style>
+        /* --- 全体の基本デザイン（bitFlyer風のクリーンな配色） --- */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+        }
+
+        body {
+            background-color: #f4f6f9;
+            color: #111111;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+            background-color: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+            padding: 20px;
+            overflow: hidden;
+        }
+
+        /* --- 1. 上部：シンプルな詳細文章表示エリア --- */
+        .detail-display-area {
+            width: 100%;
+            min-height: 120px;
+            background-color: #fafafa;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 20px;
+            font-size: 15px;
+            line-height: 1.6;
+            color: #333333;
+            transition: all 0.3s ease;
+        }
+
+        .detail-display-area h3 {
+            font-size: 16px;
+            color: #00469b;
+            margin-bottom: 8px;
+            border-bottom: 1px solid #e0e0e0;
+            padding-bottom: 4px;
+        }
+
+        /* --- 2. 中部：流れるニュースティッカーエリア --- */
+        .ticker-container {
+            width: 100%;
+            background-color: #eef3fb;
+            border-radius: 8px;
+            padding: 10px;
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            align-items: center;
+            margin-bottom: 24px;
+            border-left: 4px solid #0052cc;
+        }
+
+        .ticker-wrap {
+            width: 100%;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+
+        /* アニメーションで左へループ */
+        .ticker-move {
+            display: inline-block;
+            animation: ticker-anim 40s linear infinite; /* 30個流すために少し時間を長めに調整 */
+            padding-right: 100%;
+        }
+
+        .ticker-move:hover {
+            animation-play-state: paused; /* ホバーで一時停止して読みやすく */
+        }
+
+        @keyframes ticker-anim {
+            0% { transform: translate3d(0, 0, 0); }
+            100% { transform: translate3d(-100%, 0, 0); }
+        }
+
+        /* ティッカー内の一つのニュースアイテム */
+        .ticker-item {
+            display: inline-flex;
+            align-items: center;
+            margin-right: 50px;
+            cursor: pointer;
+        }
+
+        .ticker-img {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            background-color: #ff6b6b;
+            margin-right: 8px;
+            display: inline-block;
+            flex-shrink: 0;
+        }
+
+        .ticker-text {
+            font-size: 14px;
+            font-weight: bold;
+            color: #0052cc;
+        }
+
+        /* --- 3. 下部：Tier順序入れ替え・管理リストエリア --- */
+        .list-title {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 12px;
+            color: #555555;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .news-manager-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 400px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        /* 1つのニュース管理行 */
+        .news-row {
+            display: flex;
+            align-items: center;
+            background: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 8px 12px;
+            gap: 12px;
+            transition: background-color 0.2s;
+        }
+
+        /* Tier順序を変えるセレクトボックス/ボタンエリア (画像内の青枠に対応) */
+        .tier-control-box {
+            border: 2px solid #0052cc;
+            border-radius: 6px;
+            padding: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #fff;
+            min-width: 50px;
+        }
+
+        .tier-select {
+            border: none;
+            outline: none;
+            font-size: 14px;
+            font-weight: bold;
+            color: #0052cc;
+            cursor: pointer;
+            background: transparent;
+            width: 100%;
+            text-align: center;
+        }
+
+        /* クリックして上に詳細を出すメインボタンエリア (画像内のピンク枠に対応) */
+        .news-content-btn {
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            background: none;
+            border: none;
+            text-align: left;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .news-content-btn:hover {
+            background-color: #f0f5ff;
+        }
+
+        .row-img {
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            margin-right: 12px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .row-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* スクロールバーのカスタム */
+        .news-manager-list::-webkit-scrollbar {
+            width: 6px;
+        }
+        .news-manager-list::-webkit-scrollbar-thumb {
+            background-color: #ccc;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <!-- 1. 上部：詳細表示エリア -->
+        <div class="detail-display-area" id="detailDisplay">
+            <h3>詳細表示エリア</h3>
+            <p id="detailText">ニュースのタイトル部分をクリックすると、ここに詳しい文章が即座に表示されます。</p>
+        </div>
+
+        <!-- 2. 中部：流れるニュース（ティッカー） -->
+        <div class="ticker-container">
+            <div class="ticker-wrap">
+                <div class="ticker-move" id="tickerLive">
+                    <!-- JavaScriptでここに流れるテキストが生成されます -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. 下部：Tier順序管理リスト -->
+        <div class="list-title">
+            <span>ニュース一覧（Tier選択で自動並び替え）</span>
+            <span style="font-size: 12px; color:#888;">※Tier 1が最優先</span>
+        </div>
+        
+        <div class="news-manager-list" id="managerList">
+            <!-- JavaScriptによって、ここに30個のデータ行が自動生成されます -->
+        </div>
+    </div>
+
+    <script>
+        // --- ニュースのデータプール（とりあえず30個用意しました） ---
+        // あとからこの「{ id: ... }」の塊をコピー＆ペーストすれば、何個でも増やすことができます。
+        const newsData = [
+            { id: 1, tier: 1, title: "ビットコイン急騰、年初来最大利確を記録", detail: "仮想通貨市場が活況を呈しており、短期保有者が利益を確定させています。今後のサポートラインに注目です。", color: "#ff6b6b" },
+            { id: 2, tier: 2, title: "イーサリアムの大型アップデートがまもなく実施", detail: "次世代のアップグレードにより、ガス代の削減と処理速度の向上が期待されており、開発者の注目が集まっています。", color: "#4dadf7" },
+            { id: 3, tier: 3, title: "リップル(XRP)が主要取引所で出来高1位に", detail: "国際送金ネットワークの拡大に伴い、アジア圏を中心にXRPの取引量が爆発的に増加しています。", color: "#333333" },
+            { id: 4, tier: 2, title: "ソラナエコシステム、新規DeFiプロジェクトが急成長", detail: "高速なトランザクションを武器に、新しい分散型金融アプリがユーザー数を順調に伸ばしています。", color: "#20c997" },
+            { id: 5, tier: 1, title: "主要テック企業、独自のWeb3ウォレット開発を発表", detail: "誰もが簡単に仮想通貨やNFTを管理できる統合型ウォレットが、来期スマートフォンに標準搭載される見込みです。", color: "#f783ac" },
+            // コピペ用サンプル（6〜30個目）
+            { id: 6, tier: 3, title: "ニュースNo.6のタイトルです", detail: "ニュースNo.6の詳しい本文がここに表示されます。追加のテキストも問題なく読めます。", color: "#748ffc" },
+            { id: 7, tier: 3, title: "ニュースNo.7のタイトルです", detail: "ニュースNo.7の詳しい本文がここに表示されます。追加のテキストも問題なく読めます。", color: "#9775fa" },
+            { id: 8, tier: 3, title: "ニュースNo.8のタイトルです", detail: "ニュースNo.8の詳しい本文がここに表示されます。追加のテキストも問題なく読めます。", color: "#fcc419" },
+            { id: 9, tier: 3, title: "ニュースNo.9のタイトルです", detail: "ニュースNo.9の詳しい本文がここに表示されます。追加のテキストも問題なく読めます。", color: "#ffa94d" },
+            { id: 10, tier: 3, title: "ニュースNo.10のタイトルです", detail: "ニュースNo.10の詳しい本文がここに表示されます。", color: "#63e6be" },
+            { id: 11, tier: 3, title: "ニュースNo.11のタイトルです", detail: "ニュースNo.11の詳しい本文がここに表示されます。", color: "#a9e34b" },
+            { id: 12, tier: 3, title: "ニュースNo.12のタイトルです", detail: "ニュースNo.12の詳しい本文がここに表示されます。", color: "#ff8787" },
+            { id: 13, tier: 3, title: "ニュースNo.13のタイトルです", detail: "ニュースNo.13の詳しい本文がここに表示されます。", color: "#91a7ff" },
+            { id: 14, tier: 3, title: "ニュースNo.14のタイトルです", detail: "ニュースNo.14の詳しい本文がここに表示されます。", color: "#e599f7" },
+            { id: 15, tier: 3, title: "ニュースNo.15のタイトルです", detail: "ニュースNo.15の詳しい本文がここに表示されます。", color: "#f06595" },
+            { id: 16, tier: 3, title: "ニュースNo.16のタイトルです", detail: "ニュースNo.16の詳しい本文がここに表示されます。", color: "#38d9a9" },
+            { id: 17, tier: 3, title: "ニュースNo.17のタイトルです", detail: "ニュースNo.17の詳しい本文がここに表示されます。", color: "#495057" },
+            { id: 18, tier: 3, title: "ニュースNo.18のタイトルです", detail: "ニュースNo.18の詳しい本文がここに表示されます。", color: "#15aabf" },
+            { id: 19, tier: 3, title: "ニュースNo.19のタイトルです", detail: "ニュースNo.19の詳しい本文がここに表示されます。", color: "#5c7cfa" },
+            { id: 20, tier: 3, title: "ニュースNo.20のタイトルです", detail: "ニュースNo.20の詳しい本文がここに表示されます。", color: "#ae3ec9" },
+            { id: 21, tier: 3, title: "ニュースNo.21のタイトルです", detail: "ニュースNo.21の詳しい本文がここに表示されます。", color: "#d6336c" },
+            { id: 22, tier: 3, title: "ニュースNo.22のタイトルです", detail: "ニュースNo.22の詳しい本文がここに表示されます。", color: "#37b24d" },
+            { id: 23, tier: 3, title: "ニュースNo.23のタイトルです", detail: "ニュースNo.23の詳しい本文がここに表示されます。", color: "#f76707" },
