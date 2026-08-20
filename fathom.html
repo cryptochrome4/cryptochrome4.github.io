@@ -354,6 +354,99 @@
                 alert("システム起動エラー: " + err);
             });
         });
+                // --- 3. ニュースカードの部品を組み立てる（PS4互換・超丁寧ビルド） ---
+        function createNewsCardHTML(article) {
+            var dateBadge = '';
+            if (article.date) {
+                // 日付がすでに保存されている場合は、目立つバッジを最上部に表示
+                dateBadge = '<span class="badge-date">📅 固定日: ' + article.date + '</span><br>';
+            }
+            
+            // 30個の選択肢を、PS4がパースエラーを起こさない安全なループで生成
+            var genreOptions = '<option value="pool">📄 POOL（未分類）に戻す</option>';
+            for (var i = 0; i < defaultGenres.length; i++) {
+                var selected = '';
+                if (article.genre === String(i)) {
+                    selected = 'selected';
+                }
+                genreOptions += '<option value="' + i + '" ' + selected + '>' + (i + 1) + '番: ' + defaultGenres[i] + '</option>';
+            }
+
+            // 最新のバッククォート(テンプレートリテラル)を一切使わず、古いブラウザに100%優しい文字列結合
+            var html = '';
+            html += '<li class="news-card" data-id="' + article.id + '">';
+            html += dateBadge;
+            html += '<div class="news-title-text">' + article.title + '</div>';
+            html += '<div class="card-controls">';
+            html += '<input type="text" class="date-input-field" placeholder="20260810" value="' + (article.date || '') + '" maxlength="8">';
+            html += '<button class="btn-save-date" onclick="updateArticleDate(' + article.id + ', this)">日付をロック</button>';
+            html += '</div>';
+            html += '<select class="move-select" onchange="moveArticleGenre(' + article.id + ', this.value)">';
+            html += '<option value="" disabled selected>📦 この情報をどのジャンルに仕込む？</option>';
+            html += genreOptions;
+            html += '</select>';
+            html += '</li>';
+
+            return html;
+        }
+
+        // --- 4. 日付データの保存・バリデーション処理（PS4専用・非同期エラー対策版） ---
+        function updateArticleDate(id, buttonEl) {
+            var inputEl = buttonEl.previousElementSibling;
+            var dateValue = inputEl.value.trim();
+
+            // ユーザーの入力ミス（全角文字や文字数の間違い、適当なテキスト）を未然に防ぐ丁寧なバリデーション
+            if (dateValue !== "") {
+                if (!/^\d{8}$/.test(dateValue)) {
+                    alert("【入力エラー】\n日付は「20260810」のように、8桁の半角数字だけで正確に入力してください。");
+                    return;
+                }
+                
+                // 入力された年の範囲チェック（2013年〜2050年以外は弾く）
+                var inputYear = parseInt(dateValue.substring(0, 4), 10);
+                if (inputYear < 2013 || inputYear > 2050) {
+                    alert("【設定エラー】\n日付設定は2013年から2050年までが対象です。\n入力された年：" + inputYear + "年は対象外です。");
+                    return;
+                }
+            }
+
+            // 安全な書き込みトランザクションを開始して、IndexedDBのデータを精密に書き換え
+            var transaction = db.transaction(['articles'], 'readwrite');
+            var store = transaction.objectStore(['articles']);
+            
+            store.get(id).onsuccess = function(event) {
+                var article = event.target.result;
+                if (article) {
+                    article.date = dateValue; // 入力された8桁の数字を上書き
+                    
+                    var updateRequest = store.put(article);
+                    updateRequest.onsuccess = function() {
+                        // 後編で実装する、画面全体の超高速再描画（レンダリング）処理をキック
+                        renderAllArticles();
+                    };
+                }
+            };
+        }
+
+        // --- 5. 指定したジャンル枠への引っ越し・配分処理 ---
+        function moveArticleGenre(id, targetGenre) {
+            var transaction = db.transaction(['articles'], 'readwrite');
+            var store = transaction.objectStore(['articles']);
+
+            store.get(id).onsuccess = function(event) {
+                var article = event.target.result;
+                if (article) {
+                    article.genre = targetGenre; // 新しい引っ越し先のジャンルID（0〜29、またはpool）
+                    
+                    var updateRequest = store.put(article);
+                    updateRequest.onsuccess = function() {
+                        // 引っ越しが完了したら即座に画面を最新状態に更新
+                        renderAllArticles();
+                    };
+                }
+            };
+        }
+
     </script>
 </body>
 </html>
