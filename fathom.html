@@ -295,3 +295,65 @@
                 container.appendChild(wrapper);
             }
         }
+        // --- 2. 30個のジャンルボックスの骨組みを生成する関数 ---
+        function createGenreBoxes() {
+            var container = document.getElementById('genre-container');
+            container.innerHTML = '';
+            
+            for (var i = 0; i < defaultGenres.length; i++) {
+                var wrapper = document.createElement('div');
+                wrapper.className = 'genre-box-wrapper';
+                
+                // プラス記号で確実に文字列を結合し、PS4互換の箱を組み立て
+                wrapper.innerHTML = 
+                    '<div class="genre-box" data-genre-id="' + i + '">' +
+                        '<div class="genre-title">' + (i + 1) + '. ' + defaultGenres[i] + '</div>' +
+                        '<ul class="news-list" id="genre-list-' + i + '"></ul>' +
+                    '</div>';
+                
+                container.appendChild(wrapper);
+            }
+        }
+
+        // --- 3. 4回連続の「かまかけ確認」付きデータ物理削除システム ---
+        function secureReset() {
+            var warnings = [
+                "【確認 1/4】本当にすべてのニュースデータ、および分類ログを初期化しますか？",
+                "【確認 2/4】クッキー削除でも消えないデータベース内のデータが完全に削除されます。本当によろしいですか？",
+                "【確認 3/4】ジャンル分けした仕込みの記憶もリセットされます。後悔しませんか？",
+                "【最終確認 4/4】これが最後の警告です。本当にすべて消去して初期状態に戻しますか？"
+            ];
+
+            // 4連続の確認ダイアログを出撃させ、1回でもキャンセルされたらデータを守る
+            for (var i = 0; i < warnings.length; i++) {
+                if (!confirm(warnings[i])) {
+                    alert("リセットをキャンセルしました。大切なデータは保護されました。");
+                    return;
+                }
+            }
+
+            // 4回の確認を全て突破した場合のみ、IndexedDBのデータを物理消去
+            var transaction = db.transaction(['articles'], 'readwrite');
+            var store = transaction.objectStore(['articles']);
+            var clearRequest = store.clear();
+
+            clearRequest.onsuccess = function() {
+                alert("すべてのデータを完全にリセットしました。画面を初期化します。");
+                location.reload();
+            };
+        }
+
+        // --- 4. システム全体の統括・自動起動シーケンス ---
+        document.addEventListener('DOMContentLoaded', function() {
+            initDB().then(function() {
+                // 30ジャンルのボックスの骨組みを生成
+                createGenreBoxes();
+                // リセットボタンに4回かまかけイベントを完全紐付け
+                document.getElementById('reset-btn').onclick = secureReset;
+            }).catch(function(err) {
+                alert("システム起動エラー: " + err);
+            });
+        });
+    </script>
+</body>
+</html>
