@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>News Ticker & Rank Manager</title>
+    <style>
+        /* --- 全体の基本デザイン（bitFlyer風） --- */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+        }
+
+        body {
+            background-color: #f4f6f9;
+            color: #111111;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+            background-color: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+            padding: 16px;
+        }
+
+        /* --- 1. 最上部：シンプルな詳細文章表示エリア --- */
+        .detail-display-area {
+            width: 100%;
+            min-height: 100px;
+            background-color: #fafafa;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 14px;
+            margin-bottom: 16px;
+            font-size: 14px;
+            line-height: 1.6;
+            color: #333333;
+        }
+
+        .detail-display-area h3 {
+            font-size: 15px;
+            color: #00469b;
+            margin-bottom: 6px;
+            border-bottom: 1px solid #e0e0e0;
+            padding-bottom: 4px;
+        }
+
+        /* --- 2. 中部：流れるニュースティッカーエリア --- */
+        .ticker-container {
+            width: 100%;
+            background-color: #eef3fb;
+            border-radius: 8px;
+            padding: 10px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+            border-left: 4px solid #0052cc;
+        }
+
+        .ticker-wrap {
+            width: 100%;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+
+        .ticker-move {
+            display: inline-block;
+            animation: ticker-anim 35s linear infinite;
+            padding-right: 100%;
+        }
+
+        .ticker-move:hover {
+            animation-play-state: paused;
+        }
+
+        @keyframes ticker-anim {
+            0% { transform: translate3d(0, 0, 0); }
+            100% { transform: translate3d(-100%, 0, 0); }
+        }
+
+        .ticker-item {
+            display: inline-flex;
+            align-items: center;
+            margin-right: 40px;
+            cursor: pointer;
+        }
+
+        .ticker-img {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            margin-right: 6px;
+            object-fit: cover;
+            flex-shrink: 0;
+            background-color: #ddd;
+        }
+
+        .ticker-text {
+            font-size: 13px;
+            font-weight: bold;
+            color: #0052cc;
+        }
+
+        /* --- 3. 下部：ニュースの縦並び一覧（手描き枠の再現） --- */
+        .list-title {
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #555555;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .news-manager-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 24px;
+        }
+
+        /* 1つのニュース行 */
+        .news-row {
+            display: flex;
+            align-items: center;
+            background: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 8px;
+            gap: 10px;
+        }
+
+        /* 【青枠】上下の矢印ボタンで順番を自由に入れ替えるパーツ */
+        .order-control-box {
+            border: 2px solid #0052cc;
+            border-radius: 6px;
+            padding: 2px;
+            background-color: #fff;
+            min-width: 65px;
+            display: flex;
+            justify-content: space-between;
+            gap: 4px;
+        }
+
+        .arrow-btn {
+            flex: 1;
+            background-color: #eef3fb;
+            border: 1px solid #0052cc;
+            color: #0052cc;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            padding: 4px 0;
+            text-align: center;
+        }
+
+        .arrow-btn:hover {
+            background-color: #0052cc;
+            color: #fff;
+        }
+
+        .arrow-btn:disabled {
+            background-color: #eee;
+            border-color: #ccc;
+            color: #aaa;
+            cursor: not-allowed;
+        }
+
+        /* 【ピンク枠】内容非表示・タイトルボタン */
+        .news-content-btn {
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            background: none;
+            border: 2px solid #ff007f;
+            border-radius: 6px;
+            text-align: left;
+            cursor: pointer;
+            padding: 6px;
+            overflow: hidden;
+            transition: background-color 0.2s;
+        }
+
+        .news-content-btn:hover {
+            background-color: #fff0f5;
+        }
+
+        /* 赤い部分：画像を入れるところ */
+        .row-img {
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            margin-right: 10px;
+            flex-shrink: 0;
+            object-fit: cover;
+            border: 1px solid #ddd;
+            background-color: #eee;
+        }
+
+        .row-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #222;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* --- 4. 最下部：4回警告付きリセットボタン --- */
+        .reset-btn-container {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            margin-top: 16px;
+        }
+
+        .reset-button {
+            width: 100%;
+            background-color: #ff3b30;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 12px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(255, 59, 48, 0.2);
+            transition: background-color 0.2s;
+        }
+
+        .reset-button:hover {
+            background-color: #d62218;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <!-- 1. 最上部：詳細表示エリア -->
+        <div class="detail-display-area" id="detailDisplay">
+            <h3>詳細表示エリア</h3>
+            <p id="detailText">下のピンク枠のタイトルボタンを押すと、ここに詳しい内容が表示されます。</p>
+        </div>
+
+        <!-- 2. 中部：流れるニュースティッカー -->
+        <div class="ticker-container">
+            <div class="ticker-wrap">
+                <div class="ticker-move" id="tickerLive">
+                    <!-- JavaScriptで流れるテキストが生成されます -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. 下部：縦並びリストエリア -->
+        <div class="list-title">
+            <span>ニュース一覧（▲▼で順番を入れ替え）</span>
+            <span style="font-size: 11px; color:#888;">上ほど優先度高</span>
+        </div>
+        
+        <div class="news-manager-list" id="managerList">
+            <!-- 30個の行が自動で縦に並びます -->
+        </div>
+
+        <!-- 4. 4回確認を挟むリセットボタン -->
+        <div class="reset-btn-container">
+            <button class="reset-button" onclick="triggerStrictReset()">順番を初期状態にリセットする</button>
+        </div>
+    </div>
+
+    <script>
+        // デフォルトの初期データ（ここから30番までの並び替えロジックは中編へ続きます）
+        const defaultNewsData = [
+            { id: 1, title: "1番目のニュース：ビットコイン急騰、短期保有者が利確", detail: "【詳細】ビットコイン市場が活況を呈しており、短期保有者が利益を確定させています。", img: "https://placeholder.com" },
+            { id: 2, title: "2番目のニュース：イーサリアムの大型アップデート実施へ", detail: "【詳細】次世代のアップグレードにより、ガス代の削減と処理速度の向上が期待されています。", img: "https://placeholder.com" },
+            { id: 3, title: "3番目のニュース：リップル(XRP)が主要取引所で出来高1位", detail: "【詳細】国際送金ネットワークの拡大に伴い、XRPの取引量が爆発的に増加しています。", img: "https://placeholder.com" },
+            { id: 4, title: "4番目のニュース：ソラナエコシステム、新規DeFiが急成長", detail: "【詳細】高速なトランザクションを武器に、新しい分散型金融アプリが伸びています。", img: "https://placeholder.com" },
+            { id: 5, title: "5番目のニュース：主要テック企業、独自のウォレット発表", detail: "【詳細】誰もが簡単に暗号資産を管理できるウォレットが標準搭載される見込みです。", img: "https://placeholder.com" },
+            { id: 6, title: "6番目のニュースタイトル", detail: "6番目の詳しい本文です。", img: "https://placeholder.com" },
+            { id: 7, title: "7番目のニュースタイトル", detail: "7番目の詳しい本文です。", img: "https://placeholder.com" },
+            { id: 8, title: "8番目のニュースタイトル", detail: "8番目の詳しい本文です。", img: "https://placeholder.com" },
+            { id: 9, title: "9番目のニュースタイトル", detail: "9番目の詳しい本文です。", img: "https://placeholder.com" },
+            { id: 10, title: "10番目のニュースタイトル", detail: "10番目の詳しい本文です。", img: "https://placeholder.com0" },
+            { id: 11, title: "11番目のニュースタイトル", detail: "11番目の詳しい本文です。", img: "https://placeholder.com1" },
+            { id: 12, title: "12番目のニュースタイトル", detail: "12番目の詳しい本文です。", img: "https://placeholder.com2" },
+            { id: 13, title: "13番目のニュースタイトル", detail: "13番目の詳しい本文です。", img: "https://placeholder.com3" },
+            { id: 14, title: "14番目のニュースタイトル", detail: "14番目の詳しい本文です。", img: "https://placeholder.com4" },
+            { id: 15, title: "15番目のニュースタイトル", detail: "15番目の詳しい本文です。", img: "https://placeholder.com5" },
+            { id: 16, title: "16番目のニュースタイトル", detail: "16番目の詳しい本文です。", img: "https://placeholder.com6" },
+            { id: 17, title: "17番目のニュースタイトル", detail: "17番目の詳しい本文です。", img: "https://placeholder.com7" },
+            { id: 18, title: "18番目のニュースタイトル", detail: "18番目の詳しい本文です。", img: "https://placeholder.com" },
+            { id: 19, title: "19番目のニュースタイトル", detail: "19番目の詳しい本文です。", img: "https://placeholder.com" },
+            { id: 20, title: "20番目のニュースタイトル", detail: "20番目の詳しい本文です。", img: "https://placeholder.com" },
+            { id: 21, title: "21番目のニュースタイトル", detail: "21番目の詳しい本文です。", img: "https://placeholder.com" },
+            { id: 22, title: "22番目のニュースタイトル", detail: "22番目の詳しい本文です。", img: "https://placeholder.com" },
+            { id: 23, title: "23番目のニュースタイトル", detail: "23番目の詳しい本文です。", img: "https://placeholder.com" },
+            { id: 24, title: "24番目のニュースタイトル", detail: "24番目の詳しい本文です。", img: "https://placeholder.com" },
+            { id: 25, title: "25番目のニュースタイトル", detail: "25番目の詳しい本文です。", img: "https://placeholder.com" },
+            { id: 26, title: "26番目のニュースタイトル", detail: "26番目の詳しい本文です。", img: "https://placeholder.com" },
+            { id: 27, title: "27番目のニュースタイトル", detail: "27番目の詳しい本文です。", img: "https://placeholder.com" },
+            { id: 28, title: "28番目のニュースタイトル", detail: "28番目の詳しい本文です。", img: "https://placeholder.com" },
+            { id: 29, title: "29番目のニュースタイトル", detail: "29番目の詳しい本文です。", img: "https://placeholder.com" },
+            { id: 30, title: "30番目のニュースタイトル", detail: "30番目の詳しい本文です。これで30個目です。", img: "https://placeholder.com" }
+        ];
+
+        // 実際に画面を動かすための現在のデータ配列
+        let currentNewsData = [];
+
+        // --- 保存機能（ローカルストレージ）から読み込み、無ければ初期データをセット ---
+        function loadData() {
+            const savedData = localStorage.getItem('news_rank_data');
+            if (savedData) {
+                currentNewsData = JSON.parse(savedData);
+            } else {
+                currentNewsData = [...defaultNewsData];
+            }
+        }
+
+        // --- 現在の順番をブラウザ（自動保存領域）に保存 ---
+        function saveData() {
+            localStorage.setItem('news_rank_data', JSON.stringify(currentNewsData));
+        }
+
+        // --- 画面表示リフレッシュシステム ---
+        function drawPage() {
+            const managerList = document.getElementById('managerList');
+            const tickerLive = document.getElementById('tickerLive');
+
+            // 1. 下部の縦並びリストを現在の順序通りに生成
+            managerList.innerHTML = '';
+            currentNewsData.forEach((item, index) => {
+                const row = document.createElement('div');
+                row.className = 'news-row';
+
+                // 最初（1番上）の要素は▲ボタンを無効に、最後（30番目）は▼ボタンを無効にする
+                const isFirst = index === 0;
+                const isLast = index === currentNewsData.length - 1;
+
+                row.innerHTML = `
+                    <div class="order-control-box">
+                        <button class="arrow-btn" ${isFirst ? 'disabled' : ''} onclick="moveItem(${index}, -1)">▲</button>
+                        <button class="arrow-btn" ${isLast ? 'disabled' : ''} onclick="moveItem(${index}, 1)">▼</button>
+                    </div>
+                    
+                    <button class="news-content-btn" onclick="displayOnTop('${escapeHtml(item.title)}', '${escapeHtml(item.detail)}')">
+                        <img src="${item.img}" class="row-img" alt="news-icon">
+                        <div class="row-title">${index + 1}位：${item.title}</div>
+                    </button>
+                `;
+                managerList.appendChild(row);
+            });
+
+            // 2. 中部の流れるニュースティッカーも現在の並び順通りに同期
+            tickerLive.innerHTML = '';
+            currentNewsData.forEach((item, index) => {
+                const span = document.createElement('span');
+                span.className = 'ticker-item';
+                span.onclick = () => displayOnTop(item.title, item.detail);
+                span.innerHTML = `
+                    <img src="${item.img}" class="ticker-img" alt="icon">
+                    <span class="ticker-text">【第${index + 1}位】${item.title}</span>
+                `;
+                tickerLive.appendChild(span);
+            });
+        }
+
+        // --- ニュースアイテムの順序を1つ上下に入れ替える処理 ---
+        function moveItem(currentIndex, direction) {
+            const targetIndex = currentIndex + direction;
+            
+            // 範囲外なら何もしない安全策
+            if (targetIndex < 0 || targetIndex >= currentNewsData.length) return;
+
+            // 配列の要素を入れ替える
+            const temp = currentNewsData[currentIndex];
+            currentNewsData[currentIndex] = currentNewsData[targetIndex];
+            currentNewsData[targetIndex] = temp;
+
+            // 保存して画面を書き換える
+            saveData();
+            drawPage();
+        }
+
+        // --- ピンク枠を押した時、一番上だけに内容を出す処理 ---
+        function displayOnTop(title, detail) {
+            const displayArea = document.getElementById('detailDisplay');
+            displayArea.innerHTML = `
+                <h3>${title}</h3>
+                <p>${detail}</p>
+            `;
+        }
+
+        // --- 【超厳重】4回連続で鎌をかけるリセット確認システム ---
+        function triggerStrictReset() {
+            // 1回目の確認
+            if (confirm("【確認 1/4】本当に順番を初期状態にリセットしますか？")) {
+                // 2回目の確認
+                if (confirm("【確認 2/4】リセットすると、あなたが並び替えた現在の順番は完全に消去されます。本当によろしいですか？")) {
+                    // 3回目の確認
+                    if (confirm("【確認 3/4】クッキーやキャッシュを消しても戻りません。後悔しませんね？")) {
+                        // 4回目の確認
+                        if (confirm("【最終確認 4/4】これが最後の警告です。本当に、本当にリセットを実行してもよろしいですか？")) {
+                            
+                            // ローカルストレージを削除し、データを初期化
+                            localStorage.removeItem('news_rank_data');
+                            currentNewsData = [...defaultNewsData];
+                            
+                            // 画面をリフレッシュして完了通知
+                            drawPage();
+                            alert("順番を最初の状態にリセットしました。");
+                        }
+                    }
+                }
+            }
+        }
+
+        // 安全対策用エスケープ関数
+        function escapeHtml(str) {
+            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+        }
+
+        // 起動時にデータを読み込んで画面を描画
+        window.onload = function() {
+            loadData();
+            drawPage();
+        };
+    </script>
+</body>
+</html>
