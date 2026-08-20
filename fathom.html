@@ -261,6 +261,113 @@ function loadAndSyncData() {
 }
 
 // ここから後編（ジャンル移動処理、4回かまをかけるリセット等）につづく
+    // ----------------------------------------------------
+// 2013年レトロ互換仕様 JavaScript（後編：操作ロジック・4重警告 完結版）
+// ----------------------------------------------------
+
+// 8. ニュースのジャンルを移動・記憶する
+function moveGenre(newsIndex, targetGenreId) {
+    targetGenreId = parseInt(targetGenreId, 10);
+    newsIndex = parseInt(newsIndex, 10);
+    
+    // 対象のニュースデータを取得
+    var item = appData.newsList[newsIndex];
+    if (!item) return;
+    
+    // メモリ上のジャンルIDを更新
+    item.genreId = targetGenreId;
+    
+    // 保存用の連想配列（Map）にタイトルをキーにして移動先を記録
+    // POOL（-1）に戻した場合は記憶から削除してスリム化
+    if (targetGenreId === -1) {
+        delete savedMap[item.title];
+    } else {
+        savedMap[item.title] = targetGenreId;
+    }
+    
+    // 保存と再描画
+    saveData();
+    renderBoard();
+}
+
+// 9. 画面の再描画（レンダリング）処理
+function renderBoard() {
+    // まずPOOLとすべてのジャンル表示エリアを一旦空にする
+    document.getElementById("pool_list").innerHTML = "";
+    for (var g = 0; g < GENRE_NAMES.length; g++) {
+        document.getElementById("genre_list_" + g).innerHTML = "";
+    }
+    
+    // ニュースリストをループして、それぞれの場所にHTMLを流し込む
+    for (var i = 0; i < appData.newsList.length; i++) {
+        var item = appData.newsList[i];
+        
+        // 移動用セレクトボックスのHTMLを生成
+        var selectHtml = '<select onchange="moveGenre(' + i + ', this.value)">';
+        selectHtml += '<option value="-1"' + (item.genreId === -1 ? ' selected' : '') + '>📥 POOLへ戻す</option>';
+        for (var j = 0; j < GENRE_NAMES.length; j++) {
+            selectHtml += '<option value="' + j + '"' + (item.genreId === j ? ' selected' : '') + '>📂 [' + (j+1) + '] ' + GENRE_NAMES[j] + '</option>';
+        }
+        selectHtml += '</select>';
+        
+        // ニュースアイテム自体の枠HTML
+        var itemHtml = '<div class="news-item">';
+        itemHtml += '<div class="news-title">' + escapeHtml(item.title) + '</div>';
+        itemHtml += '<div class="news-actions">' + selectHtml + '</div>';
+        itemHtml += '</div>';
+        
+        // 所属するジャンルIDに応じて流し込み先を分岐
+        if (item.genreId === -1) {
+            document.getElementById("pool_list").innerHTML += itemHtml;
+        } else if (item.genreId >= 0 && item.genreId < GENRE_NAMES.length) {
+            document.getElementById("genre_list_" + item.genreId).innerHTML += itemHtml;
+        }
+    }
+}
+
+// 10. XSS対策としてのエスケープ関数
+function escapeHtml(str) {
+    if (!str) return "";
+    return str.replace(/&/g, "&amp;")
+              .replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;")
+              .replace(/"/g, "&quot;")
+              .replace(/'/g, "&#039;");
+}
+
+// 11. 4回かまをかける仕分け位置リセット（4重セキュリティダイアログ）
+function tripleCheckReset(stage) {
+    if (stage === 1) {
+        if (confirm("【警告 1/4】\nすべてのニュースの「仕分け位置（フォルダ分け）」の記憶が消去され、全てPOOLに戻ります。本当によろしいですか？\n※コードに書いたニュース自体は消えません。")) {
+            tripleCheckReset(2);
+        }
+    } else if (stage === 2) {
+        if (confirm("【警告 2/4】\nブラウザに保存されているフォルダの位置情報が完全に消去されます。よろしいですか？")) {
+            tripleCheckReset(3);
+        }
+    } else if (stage === 3) {
+        if (confirm("【警告 3/4】\n今まで整理した位置がすべてリセットされます。後悔しませんか？本当に実行しますか？")) {
+            tripleCheckReset(4);
+        }
+    } else if (stage === 4) {
+        if (confirm("【最終警告 4/4】\nこれが最後の確認です。すべてのニュースをPOOLに戻して初期状態にしますか？")) {
+            // 4回の試練を突破した場合、ブラウザ保存のマップデータを完全消去
+            savedMap = {};
+            if (window.localStorage) {
+                window.localStorage.removeItem("coinpost_direct_map");
+            }
+            
+            // 表示データ側のジャンルIDもすべてPOOL（-1）に戻す
+            for (var i = 0; i < appData.newsList.length; i++) {
+                appData.newsList[i].genreId = -1;
+            }
+            
+            renderBoard();
+            alert("すべての仕分け位置情報が削除され、ニュースがPOOLへ戻りました。");
+        }
+    }
+}
+
 </script>
 </body>
 </html>
