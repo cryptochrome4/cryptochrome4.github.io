@@ -1,584 +1,379 @@
-<!DOCTYPE html>
-<html lang="ja">
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://w3.org">
+<html xmlns="http://w3.org" lang="ja" xml:lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CoinPost Title Hub & Classifier</title>
-    <style>
-        :root {
-            --bg-color: #121214;
-            --card-bg: #1e1e24;
-            --text-color: #e2e8f0;
-            --accent-color: #3b82f6;
-            --danger-color: #ef4444;
-            --border-color: #334155;
-        }
-
-        body {
-            font-family: 'Helvetica Neue', Arial, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            margin: 0;
-            padding: 20px;
-        }
-
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 2px solid var(--border-color);
-            padding-bottom: 15px;
-            margin-bottom: 20px;
-        }
-
-        h1 { margin: 0; font-size: 24px; color: #f8fafc; }
-
-        .system-controls {
-            display: flex;
-            gap: 10px;
-        }
-
-        button {
-            background-color: var(--accent-color);
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: opacity 0.2s;
-        }
-
-        button:hover { opacity: 0.9; }
-
-        button.btn-danger { background-color: var(--danger-color); }
-
-        /* メインレイアウト */
-        .app-container {
-            display: grid;
-            grid-template-columns: 350px 1fr;
-            gap: 20px;
-            height: calc(100vh - 100px);
-        }
-
-        /* 左側: POOLエリア */
-        .pool-sidebar {
-            background-color: var(--card-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 15px;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .pool-header {
-            font-size: 18px;
-            font-weight: bold;
-            margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid var(--border-color);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        /* 右側: ジャンルエリア（30分割対応用グリッド） */
-        .genre-main {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 15px;
-            overflow-y: auto;
-            padding-right: 5px;
-        }
-
-        .genre-box {
-            background-color: var(--card-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 12px;
-            display: flex;
-            flex-direction: column;
-            min-height: 200px;
-            max-height: 350px;
-        }
-
-        .genre-title {
-            font-size: 14px;
-            font-weight: bold;
-            color: #94a3b8;
-            margin-bottom: 10px;
-            border-bottom: 1px solid #334155;
-            padding-bottom: 5px;
-        }
-
-        /* 共通のリストスタイル */
-        .news-list {
-            flex-grow: 1;
-            overflow-y: auto;
-            list-style: none;
-            padding: 0;
-            margin: 0;
-            min-height: 50px;
-        }
-    </style>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<title>CoinPost ニュース仕分けボード (2013 Retro Edition)</title>
+<style type="text/css">
+/* 2013年のブラウザ互換性を重視したレトロCSS */
+body {
+    font-family: "ヒラギノ角ゴ Pro W3", "Hiragino Kaku Gothic Pro", "メイリオ", Meiryo, Osaka, "ＭＳ Ｐゴシック", sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #333333;
+    background-color: #f4f4f4;
+    margin: 0;
+    padding: 20px;
+}
+h1 {
+    font-size: 24px;
+    color: #003366;
+    margin-bottom: 5px;
+}
+p.description {
+    font-size: 12px;
+    color: #666666;
+    margin-top: 0;
+    margin-bottom: 20px;
+}
+.btn {
+    padding: 6px 20px;
+    font-size: 14px;
+    background-color: #0055aa;
+    color: #ffffff;
+    border: 1px solid #003366;
+    cursor: pointer;
+    font-weight: bold;
+}
+.btn:hover {
+    background-color: #003366;
+}
+.btn-danger {
+    background-color: #cc0000;
+    border: 1px solid #990000;
+}
+.btn-danger:hover {
+    background-color: #990000;
+}
+/* メインレイアウト */
+.board-container {
+    width: 100%;
+    overflow: hidden; /* floatクリア用 */
+}
+/* POOL（左側） */
+.pool-box {
+    float: left;
+    width: 30%;
+    background-color: #e6f2ff;
+    border: 2px solid #0055aa;
+    padding: 10px;
+    min-height: 650px;
+}
+/* ジャンルエリア（右側） */
+.genres-box {
+    float: right;
+    width: 66%;
+    background-color: #ffffff;
+    border: 1px solid #cccccc;
+    padding: 10px;
+    min-height: 650px;
+}
+.pool-box h2, .genres-box h2 {
+    font-size: 18px;
+    margin-top: 0;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #cccccc;
+}
+/* ジャンルごとの格子レイアウト（30枠） */
+.genre-card {
+    float: left;
+    width: 46%;
+    margin: 1%;
+    background-color: #f9f9f9;
+    border: 1px solid #dddddd;
+    padding: 8px;
+    min-height: 120px;
+}
+.genre-card h3 {
+    font-size: 14px;
+    margin: 0 0 8px 0;
+    background-color: #003366;
+    color: #ffffff;
+    padding: 3px 5px;
+}
+/* ニュースアイテムのスタイル */
+.news-item {
+    background-color: #ffffff;
+    border: 1px solid #bbbbbb;
+    padding: 8px;
+    margin-bottom: 8px;
+    font-size: 13px;
+    line-height: 1.4;
+}
+.news-title {
+    word-break: break-all;
+    font-weight: bold;
+}
+.news-actions {
+    margin-top: 8px;
+    font-size: 11px;
+    text-align: right;
+}
+.news-actions select {
+    font-size: 11px;
+    padding: 2px;
+}
+/* システムコントロール */
+.sys-control {
+    margin-top: 30px;
+    padding-top: 15px;
+    border-top: 1px dashed #cccccc;
+    text-align: right;
+}
+</style>
 </head>
 <body>
 
-    <header>
-        <h1>CoinPost ニュースタイトル・ハブ</h1>
-        <div class="system-controls">
-            <button id="import-btn">GitHubからデータ投入 (仮)</button>
-            <button id="reset-btn" class="btn-danger">全データ安全リセット</button>
+<h1>CoinPost ニュース仕分けボード</h1>
+<p class="description">コードに直接書き込んだ日付入りのタイトルを、SEC・CFTC・トランプ大統領などのジャンルに分類して握力を鍛える専用ボードです。</p>
+
+<!-- メインボード -->
+<div class="board-container">
+    
+    <!-- 左側：未分類プール -->
+    <div class="pool-box">
+        <h2>📥 ニュース POOL</h2>
+        <div id="pool_list">
+            <!-- ここにJavaScriptでニュースが入ります -->
         </div>
-    </header>
-
-    <div class="app-container">
-        <!-- 左側: ニュースプール -->
-        <aside class="pool-sidebar">
-            <div class="pool-header">
-                <span>📰 ニュース POOL</span>
-                <span id="pool-count" style="font-size: 12px; color: #94a3b8;">0 件</span>
-            </div>
-            <ul id="news-pool" class="news-list">
-                <!-- ここにGitHub等から読み込んだタイトルが並びます -->
-            </ul>
-        </aside>
-
-        <!-- 右側: 分類ジャンル（全30ジャンル） -->
-        <main class="genre-main" id="genre-container">
-            <!-- JavaScriptで30個のジャンルボックスを自動生成します -->
-        </main>
+    </div>
+    
+    <!-- 右側：30個のジャンル振り分け先 -->
+    <div class="genres-box">
+        <h2>📂 ジャンル別分類 (30ジャンル枠)</h2>
+        <div id="genres_container">
+            <!-- ここにJavaScriptで30個のフォルダカードが生成されます -->
+        </div>
     </div>
 
-    <script>
-        // --- 1. IndexedDBによる絶対消えないデータ保存基盤 ---
-        const DB_NAME = 'CoinPostHubDB';
-        const DB_VERSION = 1;
-        let db;
+</div>
 
-        function initDB() {
-            return new Promise((resolve, reject) => {
-                const request = indexedDB.open(DB_NAME, DB_VERSION);
-                
-                request.onerror = (e) => reject('DB起動失敗');
-                request.onsuccess = (e) => {
-                    db = e.target.result;
-                    resolve(db);
-                };
+<!-- システム管理（振り分け位置の4回かまをかけるリセット） -->
+<div class="sys-control">
+    <input type="button" value="⚡ 振り分け位置をリセット（ニュースは消えません）" class="btn btn-danger" onclick="tripleCheckReset(1)" />
+</div>
 
-                request.onupgradeneeded = (e) => {
-                    const database = e.target.result;
-                    // ニュースデータを保存するストア（主キーは自動インクリメント）
-                    if (!database.objectStoreNames.contains('articles')) {
-                        database.createObjectStore('articles', { keyPath: 'id', autoIncrement: true });
-                    }
-                };
-            });
-        }
+<!-- ここから中編のJavaScriptにつづく -->
+<script type="text/javascript">
+// ----------------------------------------------------
+// 2013年レトロ互換仕様 JavaScript（中編：データ定義と初期化）
+// ----------------------------------------------------
 
-        // --- 2. 4回連続のかまかけ（確認）付きリセット機能 ---
-        async function secureReset() {
-            const warnings = [
-                "【確認 1/4】本当にすべてのニュースデータ、および分類ログを初期化しますか？",
-                "【確認 2/4】クッキー削除でも消えないIndexedDB内のデータが完全に削除されます。本当によろしいですか？",
-                "【確認 3/4】ジャンル分けした仕込みの記憶もリセットされます。後悔しませんか？",
-                "【最終確認 4/4】これが最後の警告です。本当にすべて消去して初期状態に戻しますか？"
-            ];
+// 1. 【ニュース手動追加エリア】
+// ★ここにニュースタイトル（日付入り）をご自身で直接書き足してください！
+// 古いニュースを下、新しいニュースを上（先頭）に並べていくと、POOL内でも上に表示されます。
+var INITIAL_NEWS = [
+    "20260820XRPとトランプが強気の方針というニュースタイトル",
+    "20260817午前7時51分10年以上未移動のビットコイン、供給量の約18％に　紛失の可能性も",
+"20260818午後2時29分リップル、全北銀行と提携　韓国地銀初のRipple Payments導入",
+"20260819午後2時51分ビットコイン小口投資家の需要、2年ぶり高水準に接近＝アナリスト",
+"20260820午前8時45分仮想通貨投資家の3つの誤解、ビットワイズ幹部が指摘",
+"20260821午前5時50分米CFTC委員長、クラリティー法案未成立でも仮想通貨規制整備へ"
 
-            for (let i = 0; i < warnings.length; i++) {
-                if (!confirm(warnings[i])) {
-                    alert("リセットをキャンセルしました。データは安全です。");
-                    return; // 途中で「キャンセル」を押したら即座に復帰
-                }
+    // ,"20260821 次のニュースタイトルを足すときは、このようにカンマを入れて追加します"
+    // ,"20260822 さらにニュースを足すときはこのように並べていきます"
+];
+
+// 2. ジャンル定義（30ジャンル枠を配列で確保）
+var GENRE_NAMES = [
+    "トランプ大統領 / 政権",
+    "SEC（証券取引委員会）",
+    "CFTC（商品先物取引委員会）",
+    "リップル（XRP） / Ripple社",
+    "ビットコイン（BTC）",
+    "イーサリアム（ETH）",
+    "ステーブルコイン（USDC/USDT）",
+    "仮想通貨・予測市場会合",
+    "クラリティー法案 / 規制動向",
+    "KBRA / 格付・機関投資家",
+    "金融業界 / 伝統金融",
+    "ホワイトハウス動向",
+    "CoinPost 主要ニュース",
+    "ジャンル14（未設定）", "ジャンル15（未設定）",
+    "ジャンル16（未設定）", "ジャンル17（未設定）", "ジャンル18（未設定）",
+    "ジャンル19（未設定）", "ジャンル20（未設定）", "ジャンル21（未設定）",
+    "ジャンル22（未設定）", "ジャンル23（未設定）", "ジャンル24（未設定）",
+    "ジャンル25（未設定）", "ジャンル26（未設定）", "ジャンル27（未設定）",
+    "ジャンル28（未設定）", "ジャンル29（未設定）", "ジャンル30（未設定）"
+];
+
+// 3. グローバルデータ構造（ブラウザには「ニュースのタイトルと仕分け先IDのペア」だけを保持します）
+var savedMap = {}; // タイトル文字列 を キー、 ジャンルID を 値 にする連想配列
+var appData = {
+    newsList: []
+};
+
+// 4. 画面初期化処理
+window.onload = function() {
+    initGenreCards();      // 右側の30ジャンル枠のHTML生成
+    loadAndSyncData();     // コード内の配列とブラウザ記憶の同期
+    renderBoard();         // 画面へのニュース描画
+};
+
+// 5. 右側の30ジャンルコンテナのHTML構築
+function initGenreCards() {
+    var container = document.getElementById("genres_container");
+    var htmlBuffer = "";
+    
+    for (var i = 0; i < GENRE_NAMES.length; i++) {
+        htmlBuffer += '<div class="genre-card">';
+        htmlBuffer += '<h3>[' + (i + 1) + '] ' + GENRE_NAMES[i] + '</h3>';
+        htmlBuffer += '<div id="genre_list_' + i + '"></div>';
+        htmlBuffer += '</div>';
+    }
+    
+    container.innerHTML = htmlBuffer;
+}
+
+// 6. データのローカル保存
+function saveData() {
+    if (window.localStorage) {
+        window.localStorage.setItem("coinpost_direct_map", JSON.stringify(savedMap));
+    }
+}
+
+// 7. データの読み込み ＆ コード内配列（INITIAL_NEWS）との同期
+// これにより、新しくコードに足したニュースは自動でPOOLに並び、
+// すでに仕分け済みのニュースはブラウザの記憶（localStorage）から仕分け先のフォルダに正しく配置されます。
+function loadAndSyncData() {
+    savedMap = {};
+    if (window.localStorage) {
+        var rawData = window.localStorage.getItem("coinpost_direct_map");
+        if (rawData) {
+            try {
+                savedMap = JSON.parse(rawData);
+            } catch(e) {
+                savedMap = {};
             }
-
-            // 4回の確認をすべてパスした場合のみ実行
-            const transaction = db.transaction(['articles'], 'readwrite');
-            const store = transaction.objectStore(['articles']);
-            const clearRequest = store.clear();
-
-            clearRequest.onsuccess = () => {
-                alert("すべてのデータを完全にリセットしました。ページをリロードします。");
-                location.reload();
-            };
         }
-
-        // --- 3. 30個のジャンル枠の自動生成 ---
-        const defaultGenres = [
-            "SEC関連", "CFTC関連", "トランプ大統領発言", "リップル(XRP)公式", "予測市場・マクロ",
-            "ジャンル6", "ジャンル7", "ジャンル8", "ジャンル9", "ジャンル10",
-            "ジャンル11", "ジャンル12", "ジャンル13", "ジャンル14", "ジャンル15",
-            "ジャンル16", "ジャンル17", "ジャンル18", "ジャンル19", "ジャンル20",
-            "ジャンル21", "ジャンル22", "ジャンル23", "ジャンル24", "ジャンル25",
-            "ジャンル26", "ジャンル27", "ジャンル28", "ジャンル29", "ジャンル30"
-        ];
-
-        function createGenreBoxes() {
-            const container = document.getElementById('genre-container');
-            defaultGenres.forEach((genreName, index) => {
-                const box = document.createElement('div');
-                box.className = 'genre-box';
-                box.dataset.genreId = index;
-                
-                box.innerHTML = `
-                    <div class="genre-title">${genreName}</div>
-                    <ul class="news-list" id="genre-list-${index}"></ul>
-                `;
-                container.appendChild(box);
-            });
+    }
+    
+    // コード内の INITIAL_NEWS をベースに表示用リストを再構築
+    appData.newsList = [];
+    for (var i = 0; i < INITIAL_NEWS.length; i++) {
+        var titleText = INITIAL_NEWS[i];
+        
+        // 過去に仕分けデータが保存されているかチェック、なければ -1 (POOL)
+        var currentGenreId = -1;
+        if (typeof savedMap[titleText] !== "undefined") {
+            currentGenreId = parseInt(savedMap[titleText], 10);
         }
-
-        // 初期化実行
-        document.addEventListener('DOMContentLoaded', async () => {
-            await initDB();
-            createGenreBoxes();
-            document.getElementById('reset-btn').addEventListener('click', secureReset);
+        
+        appData.newsList.push({
+            id: i, // ループ内の簡易ID
+            title: titleText,
+            genreId: currentGenreId
         });
-    </script>
-</body>
-</html>
-<!-- 前編のスタイル（CSS）の直後に追加するスタイル定義 -->
-    <style>
-        /* 中編で追加するニュースカードと操作UIのスタイル */
-        .news-card {
-            background-color: #2a2a35;
-            border: 1px solid #475569;
-            border-radius: 6px;
-            padding: 10px;
-            margin-bottom: 10px;
-            cursor: pointer;
-            transition: transform 0.1s, border-color 0.2s;
+    }
+}
+
+// ここから後編（ジャンル移動処理、4回かまをかけるリセット等）につづく
+    // ----------------------------------------------------
+// 2013年レトロ互換仕様 JavaScript（後編：操作ロジック・4重警告 完結版）
+// ----------------------------------------------------
+
+// 8. ニュースのジャンルを移動・記憶する
+function moveGenre(newsIndex, targetGenreId) {
+    targetGenreId = parseInt(targetGenreId, 10);
+    newsIndex = parseInt(newsIndex, 10);
+    
+    // 対象のニュースデータを取得
+    var item = appData.newsList[newsIndex];
+    if (!item) return;
+    
+    // メモリ上のジャンルIDを更新
+    item.genreId = targetGenreId;
+    
+    // 保存用の連想配列（Map）にタイトルをキーにして移動先を記録
+    // POOL（-1）に戻した場合は記憶から削除してスリム化
+    if (targetGenreId === -1) {
+        delete savedMap[item.title];
+    } else {
+        savedMap[item.title] = targetGenreId;
+    }
+    
+    // 保存と再描画
+    saveData();
+    renderBoard();
+}
+
+// 9. 画面の再描画（レンダリング）処理
+function renderBoard() {
+    // まずPOOLとすべてのジャンル表示エリアを一旦空にする
+    document.getElementById("pool_list").innerHTML = "";
+    for (var g = 0; g < GENRE_NAMES.length; g++) {
+        document.getElementById("genre_list_" + g).innerHTML = "";
+    }
+    
+    // ニュースリストをループして、それぞれの場所にHTMLを流し込む
+    for (var i = 0; i < appData.newsList.length; i++) {
+        var item = appData.newsList[i];
+        
+        // 移動用セレクトボックスのHTMLを生成
+        var selectHtml = '<select onchange="moveGenre(' + i + ', this.value)">';
+        selectHtml += '<option value="-1"' + (item.genreId === -1 ? ' selected' : '') + '>📥 POOLへ戻す</option>';
+        for (var j = 0; j < GENRE_NAMES.length; j++) {
+            selectHtml += '<option value="' + j + '"' + (item.genreId === j ? ' selected' : '') + '>📂 [' + (j+1) + '] ' + GENRE_NAMES[j] + '</option>';
         }
-
-        .news-card:hover {
-            border-color: var(--accent-color);
-            transform: translateY(-2px);
+        selectHtml += '</select>';
+        
+        // ニュースアイテム自体の枠HTML
+        var itemHtml = '<div class="news-item">';
+        itemHtml += '<div class="news-title">' + escapeHtml(item.title) + '</div>';
+        itemHtml += '<div class="news-actions">' + selectHtml + '</div>';
+        itemHtml += '</div>';
+        
+        // 所属するジャンルIDに応じて流し込み先を分岐
+        if (item.genreId === -1) {
+            document.getElementById("pool_list").innerHTML += itemHtml;
+        } else if (item.genreId >= 0 && item.genreId < GENRE_NAMES.length) {
+            document.getElementById("genre_list_" + item.genreId).innerHTML += itemHtml;
         }
+    }
+}
 
-        .news-title-text {
-            font-size: 13px;
-            line-height: 1.4;
-            margin-bottom: 8px;
-            word-break: break-all;
+// 10. XSS対策としてのエスケープ関数
+function escapeHtml(str) {
+    if (!str) return "";
+    return str.replace(/&/g, "&amp;")
+              .replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;")
+              .replace(/"/g, "&quot;")
+              .replace(/'/g, "&#039;");
+}
+
+// 11. 4回かまをかける仕分け位置リセット（4重セキュリティダイアログ）
+function tripleCheckReset(stage) {
+    if (stage === 1) {
+        if (confirm("【警告 1/4】\nすべてのニュースの「仕分け位置（フォルダ分け）」の記憶が消去され、全てPOOLに戻ります。本当によろしいですか？\n※コードに書いたニュース自体は消えません。")) {
+            tripleCheckReset(2);
         }
-
-        /* 日付設定エリアのレイアウト */
-        .card-controls {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            margin-bottom: 8px;
+    } else if (stage === 2) {
+        if (confirm("【警告 2/4】\nブラウザに保存されているフォルダの位置情報が完全に消去されます。よろしいですか？")) {
+            tripleCheckReset(3);
         }
-
-        .date-select {
-            background-color: #1e1e24;
-            color: #f1f5f9;
-            border: 1px solid #475569;
-            border-radius: 4px;
-            padding: 2px 4px;
-            font-size: 11px;
-            font-family: monospace;
+    } else if (stage === 3) {
+        if (confirm("【警告 3/4】\n今まで整理した位置がすべてリセットされます。後悔しませんか？本当に実行しますか？")) {
+            tripleCheckReset(4);
         }
-
-        .btn-save-date {
-            background-color: #10b981;
-            font-size: 11px;
-            padding: 2px 6px;
-            border-radius: 4px;
-        }
-
-        /* ジャンル移動用のセレクトボックス */
-        .move-select {
-            width: 100%;
-            background-color: #0f172a;
-            color: #94a3b8;
-            border: 1px solid #334155;
-            border-radius: 4px;
-            padding: 4px;
-            font-size: 12px;
-        }
-
-        .badge-date {
-            display: inline-block;
-            background-color: #334155;
-            color: #cbd5e1;
-            font-size: 11px;
-            padding: 1px 5px;
-            border-radius: 3px;
-            font-family: monospace;
-            margin-bottom: 5px;
-        }
-    </style>
-</head>
-<body>
-
-    <!-- [前編のHTML構造をそのまま維持] -->
-    <header>
-        <h1>CoinPost ニュースタイトル・ハブ</h1>
-        <div class="system-controls">
-            <button id="import-btn">GitHubからデータ投入 (仮)</button>
-            <button id="reset-btn" class="btn-danger">全データ安全リセット</button>
-        </div>
-    </header>
-
-    <div class="app-container">
-        <aside class="pool-sidebar">
-            <div class="pool-header">
-                <span>📰 ニュース POOL</span>
-                <span id="pool-count" style="font-size: 12px; color: #94a3b8;">0 件</span>
-            </div>
-            <ul id="news-pool" class="news-list"></ul>
-        </aside>
-
-        <main class="genre-main" id="genre-container"></main>
-    </div>
-
-    <script>
-        // --- [前編のIndexedDB、リセット、ジャンル枠生成ロジックを保持] ---
-        const DB_NAME = 'CoinPostHubDB';
-        const DB_VERSION = 1;
-        let db;
-
-        function initDB() {
-            return new Promise((resolve, reject) => {
-                const request = indexedDB.open(DB_NAME, DB_VERSION);
-                request.onerror = (e) => reject('DB起動失敗');
-                request.onsuccess = (e) => { db = e.target.result; resolve(db); };
-                request.onupgradeneeded = (e) => {
-                    const database = e.target.result;
-                    if (!database.objectStoreNames.contains('articles')) {
-                        database.createObjectStore('articles', { keyPath: 'id', autoIncrement: true });
-                    }
-                };
-            });
-        }
-
-        const defaultGenres = [
-            "SEC関連", "CFTC関連", "トランプ大統領発言", "リップル(XRP)公式", "予測市場・マクロ",
-            "ジャンル6", "ジャンル7", "ジャンル8", "ジャンル9", "ジャンル10",
-            "ジャンル11", "ジャンル12", "ジャンル13", "ジャンル14", "ジャンル15",
-            "ジャンル16", "ジャンル17", "ジャンル18", "ジャンル19", "ジャンル20",
-            "ジャンル21", "ジャンル22", "ジャンル23", "ジャンル24", "ジャンル25",
-            "ジャンル26", "ジャンル27", "ジャンル28", "ジャンル29", "ジャンル30"
-        ];
-
-        function createGenreBoxes() {
-            const container = document.getElementById('genre-container');
-            container.innerHTML = ''; // 初期化
-            defaultGenres.forEach((genreName, index) => {
-                const box = document.createElement('div');
-                box.className = 'genre-box';
-                box.dataset.genreId = index;
-                box.innerHTML = `
-                    <div class="genre-title">${genreName}</div>
-                    <ul class="news-list" id="genre-list-${index}"></ul>
-                `;
-                container.appendChild(box);
-            });
-        }
-
-        // --- 中編の核心: ニュースカードHTMLの動的生成機能 ---
-        function createNewsCardHTML(article) {
-            // 2013年から2050年までのドロップダウンオプションを生成
-            let dateOptions = `<option value="">-- 日付記録 --</option>`;
-            // ループ用の年・月・日を定義して2013〜2050年をカバー可能にするための基礎
-            // ユーザーが手動でサクッと入力・確定しやすいよう、まずは動的なプルダウンのベースを用意します
-            
-            // 現在保存されている日付があればバッジとして表示
-            const dateBadge = article.date ? `<span class="badge-date">📅 ${article.date}</span>` : '';
-            
-            // ジャンル移動用のセレクトボックスの選択肢
-            let genreOptions = `<option value="pool">📄 POOLに戻す</option>`;
-            defaultGenres.forEach((name, idx) => {
-                const selected = article.genre === String(idx) ? 'selected' : '';
-                genreOptions += `<option value="${idx}" ${selected}>${idx + 1}: ${name}</option>`;
-            });
-
-            return `
-                <li class="news-card" data-id="${article.id}">
-                    ${dateBadge}
-                    <div class="news-title-text">${article.title}</div>
-                    
-                    <div class="card-controls">
-                        <!-- 日付入力欄 (2013-2050対応) -->
-                        <input type="text" class="date-select" placeholder="20260810" value="${article.date || ''}" maxlength="8" style="width: 80px;">
-                        <button class="btn-save-date" onclick="updateArticleDate(${article.id}, this)">記録</button>
-                    </div>
-
-                    <select class="move-select" onchange="moveArticleGenre(${article.id}, this.value)">
-                        <option value="" disabled selected>📦 ジャンルへ配分...</option>
-                        ${genreOptions}
-                    </select>
-                </li>
-            `;
-        }
-
-        // --- 中編の核心: データの更新処理（日付の記録） ---
-        async function updateArticleDate(id, buttonEl) {
-            const inputEl = buttonEl.previousElementSibling;
-            const dateValue = inputEl.value.trim();
-
-            // 簡易バリデーション (8桁の数字か空欄)
-            if (dateValue !== "" && !/^\d{8}$/.test(dateValue)) {
-                alert("日付は「20260810」のように8桁の半角数字で入力してください。");
-                return;
+    } else if (stage === 4) {
+        if (confirm("【最終警告 4/4】\nこれが最後の確認です。すべてのニュースをPOOLに戻して初期状態にしますか？")) {
+            // 4回の試練を突破した場合、ブラウザ保存のマップデータを完全消去
+            savedMap = {};
+            if (window.localStorage) {
+                window.localStorage.removeItem("coinpost_direct_map");
             }
-
-            const transaction = db.transaction(['articles'], 'readwrite');
-            const store = transaction.objectStore(['articles']);
             
-            store.get(id).onsuccess = (e) => {
-                const article = e.target.result;
-                if (article) {
-                    article.date = dateValue;
-                    store.put(article).onsuccess = () => {
-                        // 再描画して反映
-                        renderAllArticles();
-                    };
-                }
-            };
-        }
-
-        // --- 中編の核心: ジャンルの移動処理 ---
-        async function moveArticleGenre(id, targetGenre) {
-            const transaction = db.transaction(['articles'], 'readwrite');
-            const store = transaction.objectStore(['articles']);
-
-            store.get(id).onsuccess = (e) => {
-                const article = e.target.result;
-                if (article) {
-                    article.genre = targetGenre; // "pool" または "0"〜"29"
-                    store.put(article).onsuccess = () => {
-                        renderAllArticles();
-                    };
-                }
-            };
-        }
-        // --- 後編の核心: データベースから全記事を読み込んで画面に分配描画 ---
-        function renderAllArticles() {
-            // まずPOOLとすべてのジャンルリストの画面表示をクリア
-            document.getElementById('news-pool').innerHTML = '';
-            for (let i = 0; i < 30; i++) {
-                const listEl = document.getElementById(`genre-list-${i}`);
-                if (listEl) listEl.innerHTML = '';
+            // 表示データ側のジャンルIDもすべてPOOL（-1）に戻す
+            for (var i = 0; i < appData.newsList.length; i++) {
+                appData.newsList[i].genreId = -1;
             }
-
-            let poolCount = 0;
-            const transaction = db.transaction(['articles'], 'readonly');
-            const store = transaction.objectStore(['articles']);
             
-            // カーソルを使って全データを1件ずつスキャン
-            store.openCursor().onsuccess = (event) => {
-                const cursor = event.target.result;
-                if (cursor) {
-                    const article = cursor.value;
-                    const cardHTML = createNewsCardHTML(article);
-
-                    // ジャンルに応じて割り振る
-                    if (!article.genre || article.genre === 'pool') {
-                        document.getElementById('news-pool').insertAdjacentHTML('beforeend', cardHTML);
-                        poolCount++;
-                    } else {
-                        const targetList = document.getElementById(`genre-list-${article.genre}`);
-                        if (targetList) {
-                            targetList.insertAdjacentHTML('beforeend', cardHTML);
-                        }
-                    }
-                    cursor.continue(); // 次の記事へ
-                } else {
-                    // 全件スキャン完了後にプール件数を更新
-                    document.getElementById('pool-count').textContent = `${poolCount} 件`;
-                }
-            };
+            renderBoard();
+            alert("すべての仕分け位置情報が削除され、ニュースがPOOLへ戻りました。");
         }
+    }
+}
 
-        // --- 後編の核心: GitHubからデータを取得・投入するシミュレーター ---
-        // 将来的に毎日GitHub Actions等で更新したJSONファイルをここからfetch()できるように設計しています
-        document.getElementById('import-btn').addEventListener('click', async () => {
-            // お送りいただいた画像（CoinPost）の実際のニュースデータを初期プリセットとして投入
-            const mockGitHubData = [
-                {
-                    title: "トランプ大統領、来週の仮想通貨・予測市場会合に出席見込み＝報道",
-                    genre: "pool",
-                    date: ""
-                },
-                {
-                    title: "リップル子会社が優先無担保債発行、436億円調達",
-                    genre: "pool",
-                    date: ""
-                },
-                {
-                    title: "トランプ大統領、政府によるビットコイン購入検討を表明 BTCは6月以来の高値",
-                    genre: "pool",
-                    date: ""
-                }
-            ];
-
-            const transaction = db.transaction(['articles'], 'readwrite');
-            const store = transaction.objectStore(['articles']);
-
-            let addedCount = 0;
-            
-            // 重複投入を防ぐため、現在の全タイトルを取得してチェック
-            store.getAll().onsuccess = (e) => {
-                const currentArticles = e.target.result;
-                const currentTitles = currentArticles.map(a => a.title);
-
-                mockGitHubData.forEach(item => {
-                    if (!currentTitles.includes(item.title)) {
-                        store.add(item);
-                        addedCount++;
-                    }
-                });
-
-                transaction.oncomplete = () => {
-                    if (addedCount > 0) {
-                        alert(`GitHub（シミュレート）から新着ニュースを ${addedCount} 件プールに読み込みました！`);
-                        renderAllArticles();
-                    } else {
-                        alert("新着ニュースはありません（すべて投入済みです）。");
-                    }
-                };
-            };
-        });
-
-        // --- 4. 4回連続のかまかけ（確認）付きリセット機能 ---
-        async function secureReset() {
-            const warnings = [
-                "【確認 1/4】本当にすべてのニュースデータ、および分類ログを初期化しますか？",
-                "【確認 2/4】クッキー削除でも消えないIndexedDB内のデータが完全に削除されます。本当によろしいですか？",
-                "【確認 3/4】ジャンル分けした仕込みの記憶もリセットされます。後悔しませんか？",
-                "【最終確認 4/4】これが最後の警告です。本当にすべて消去して初期状態に戻しますか？"
-            ];
-
-            for (let i = 0; i < warnings.length; i++) {
-                if (!confirm(warnings[i])) {
-                    alert("リセットをキャンセルしました。データは安全です。");
-                    return;
-                }
-            }
-
-            const transaction = db.transaction(['articles'], 'readwrite');
-            const store = transaction.objectStore(['articles']);
-            const clearRequest = store.clear();
-
-            clearRequest.onsuccess = () => {
-                alert("すべてのデータを完全にリセットしました。");
-                location.reload();
-            };
-        }
-
-        // --- システム全体の起動初期化 ---
-        document.addEventListener('DOMContentLoaded', async () => {
-            // 1. データベースの接続を確立
-            await initDB();
-            // 2. 画面に30個のジャンルボックスの骨組みを生成
-            createGenreBoxes();
-            // 3. データベースに保存されている既存データを画面に描画
-            renderAllArticles();
-            // 4. リセットボタンのイベントを結びつけ
-            document.getElementById('reset-btn').addEventListener('click', secureReset);
-        });
-    </script>
+</script>
 </body>
 </html>
