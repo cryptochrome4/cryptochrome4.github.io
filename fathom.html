@@ -194,3 +194,134 @@ p.description {
 </div>
 
 <!-- ここから中編のJavaScriptにつづく -->
+<script type="text/javascript">
+// ----------------------------------------------------
+// 2013年レトロ互換仕様 JavaScript（中編：データ定義と初期化）
+// ----------------------------------------------------
+
+// 1. ジャンル定義（ご要望の「30ジャンル」をあらかじめ配列で確保）
+// 主要な重要ワードを先頭に配置し、残りは拡張可能な空きスロットとして30個定義
+var GENRE_NAMES = [
+    "トランプ大統領 / 政権",
+    "SEC（証券取引委員会）",
+    "CFTC（商品先物取引委員会）",
+    "リップル（XRP） / Ripple社",
+    "ビットコイン（BTC）",
+    "イーサリアム（ETH）",
+    "ステーブルコイン（USDC/USDT）",
+    "仮想通貨・予測市場会合",
+    "クラリティー法案 / 規制動向",
+    "KBRA / 格付・機関投資家",
+    "金融業界 / 伝統金融",
+    "ホワイトハウス動向",
+    "CoinPost 主要ニュース",
+    "ジャンル14（未設定）", "ジャンル15（未設定）",
+    "ジャンル16（未設定）", "ジャンル17（未設定）", "ジャンル18（未設定）",
+    "ジャンル19（未設定）", "ジャンル20（未設定）", "ジャンル21（未設定）",
+    "ジャンル22（未設定）", "ジャンル23（未設定）", "ジャンル24（未設定）",
+    "ジャンル25（未設定）", "ジャンル26（未設定）", "ジャンル27（未設定）",
+    "ジャンル28（未設定）", "ジャンル29（未設定）", "ジャンル30（未設定）"
+];
+
+// 2. グローバルデータ構造（localStorageに保存するデータ）
+// ニュース一つ一つは { id:タイムスタンプ, date:"20260810", title:"タイトル", genreId:-1(POOL)か0〜29 } というオブジェクト
+var appData = {
+    newsList: []
+};
+
+// 3. 画面初期化処理（ページが読み込まれたときに実行）
+window.onload = function() {
+    initDateSelects();     // 日付選択プルダウンの生成 (2013〜2050年)
+    initGenreCards();      // 右側の30ジャンル枠のHTML生成
+    loadData();            // localStorageからのデータ読み込み
+    renderBoard();         // 画面へのニュース描画
+};
+
+// 4. 日付選択プルダウン（2013年〜2050年）の自動生成
+function initDateSelects() {
+    var yearSelect = document.getElementById("input_year");
+    var monthSelect = document.getElementById("input_month");
+    var daySelect = document.getElementById("input_day");
+    
+    // 現在の年月日を初期値として取得（今日からの記事用）
+    var today = new Date();
+    var currentYear = today.getFullYear();
+    var currentMonth = today.getMonth() + 1;
+    var currentDay = today.getDate();
+    
+    // 年: 2013年〜2050年
+    for (var y = 2013; y <= 2050; y++) {
+        var opt = document.createElement("option");
+        opt.value = y;
+        opt.innerHTML = y + "年";
+        if (y === currentYear) opt.selected = true;
+        yearSelect.appendChild(opt);
+    }
+    
+    // 月: 1月〜12月
+    for (var m = 1; m <= 12; m++) {
+        var opt = document.createElement("option");
+        var mStr = m < 10 ? "0" + m : "" + m;
+        opt.value = mStr;
+        opt.innerHTML = m + "月";
+        if (m === currentMonth) opt.selected = true;
+        monthSelect.appendChild(opt);
+    }
+    
+    // 日: 1日〜31日
+    for (var d = 1; d <= 31; d++) {
+        var opt = document.createElement("option");
+        var dStr = d < 10 ? "0" + d : "" + d;
+        opt.value = dStr;
+        opt.innerHTML = d + "日";
+        if (d === currentDay) opt.selected = true;
+        daySelect.appendChild(opt);
+    }
+}
+
+// 5. 右側の30ジャンルコンテナのHTML構築
+function initGenreCards() {
+    var container = document.getElementById("genres_container");
+    var htmlBuffer = "";
+    
+    // 2013年当時は文字列結合によるHTML構築が最速かつ安全
+    for (var i = 0; i < GENRE_NAMES.length; i++) {
+        htmlBuffer += '<div class="genre-card">';
+        htmlBuffer += '<h3>[' + (i + 1) + '] ' + GENRE_NAMES[i] + '</h3>';
+        htmlBuffer += '<div id="genre_list_' + i + '"></div>';
+        htmlBuffer += '</div>';
+    }
+    
+    container.innerHTML = htmlBuffer;
+}
+
+// 6. データのローカル保存と読み込み（localStorageを使用）
+// ※クッキー削除やブラウザ再起動を行っても、同一PC・同一ブラウザであればデータは残ります
+function saveData() {
+    if (window.localStorage) {
+        // 2013年互換のため、JSON文字列に変換して保存
+        window.localStorage.setItem("coinpost_board_data", JSON.stringify(appData));
+    }
+}
+
+function loadData() {
+    if (window.localStorage) {
+        var rawData = window.localStorage.getItem("coinpost_board_data");
+        if (rawData) {
+            try {
+                appData = JSON.parse(rawData);
+                // データ構造が古い、または壊れていた場合のフォールバック
+                if (!appData.newsList) {
+                    appData.newsList = [];
+                }
+            } catch(e) {
+                appData = { newsList: [] };
+            }
+        }
+    }
+}
+
+// ここから後編（ニュースの追加、ジャンル移動、4回かまをかけるリセット等）につづく
+</script>
+</body>
+</html>
