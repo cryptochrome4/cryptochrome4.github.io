@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>News Ticker & Tier Manager</title>
+    <title>News Ticker & Rank Manager</title>
     <style>
         /* --- 全体の基本デザイン（bitFlyer風） --- */
         * {
@@ -31,7 +31,7 @@
             padding: 16px;
         }
 
-        /* --- 1. 最上部：シンプルな詳細文章表示エリア（ここだけに内容が出る） --- */
+        /* --- 1. 最上部：シンプルな詳細文章表示エリア --- */
         .detail-display-area {
             width: 100%;
             min-height: 100px;
@@ -101,6 +101,7 @@
             margin-right: 6px;
             object-fit: cover;
             flex-shrink: 0;
+            background-color: #ddd;
         }
 
         .ticker-text {
@@ -109,7 +110,7 @@
             color: #0052cc;
         }
 
-        /* --- 3. 下部：ニュースの縦並び一覧（Tier管理） --- */
+        /* --- 3. 下部：ニュースの縦並び一覧（手描き枠の再現） --- */
         .list-title {
             font-size: 14px;
             font-weight: bold;
@@ -123,9 +124,10 @@
             display: flex;
             flex-direction: column;
             gap: 8px;
+            margin-bottom: 24px;
         }
 
-        /* 1つのニュース行（縦並び） */
+        /* 1つのニュース行 */
         .news-row {
             display: flex;
             align-items: center;
@@ -136,37 +138,50 @@
             gap: 10px;
         }
 
-        /* 【青枠】Tier順序を変えるパーツ */
-        .tier-control-box {
-            border: 2px solid #0052cc; /* 手描きの青枠を再現 */
+        /* 【青枠】上下の矢印ボタンで順番を自由に入れ替えるパーツ */
+        .order-control-box {
+            border: 2px solid #0052cc;
             border-radius: 6px;
-            padding: 4px;
+            padding: 2px;
             background-color: #fff;
-            min-width: 60px;
+            min-width: 65px;
             display: flex;
-            align-items: center;
-            justify-content: center;
+            justify-content: space-between;
+            gap: 4px;
         }
 
-        .tier-select {
-            border: none;
-            outline: none;
-            font-size: 13px;
-            font-weight: bold;
+        .arrow-btn {
+            flex: 1;
+            background-color: #eef3fb;
+            border: 1px solid #0052cc;
             color: #0052cc;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
             cursor: pointer;
-            background: transparent;
-            width: 100%;
+            padding: 4px 0;
             text-align: center;
         }
 
-        /* 【ピンク枠】クリックして上に詳細を出すメインボタン（内容は非表示でタイトルのみ） */
+        .arrow-btn:hover {
+            background-color: #0052cc;
+            color: #fff;
+        }
+
+        .arrow-btn:disabled {
+            background-color: #eee;
+            border-color: #ccc;
+            color: #aaa;
+            cursor: not-allowed;
+        }
+
+        /* 【ピンク枠】内容非表示・タイトルボタン */
         .news-content-btn {
             flex-grow: 1;
             display: flex;
             align-items: center;
             background: none;
-            border: 2px solid #ff007f; /* 手描きのピンク枠を再現 */
+            border: 2px solid #ff007f;
             border-radius: 6px;
             text-align: left;
             cursor: pointer;
@@ -188,6 +203,7 @@
             flex-shrink: 0;
             object-fit: cover;
             border: 1px solid #ddd;
+            background-color: #eee;
         }
 
         .row-title {
@@ -198,12 +214,38 @@
             overflow: hidden;
             text-overflow: ellipsis;
         }
+
+        /* --- 4. 最下部：4回警告付きリセットボタン --- */
+        .reset-btn-container {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            margin-top: 16px;
+        }
+
+        .reset-button {
+            width: 100%;
+            background-color: #ff3b30;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 12px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(255, 59, 48, 0.2);
+            transition: background-color 0.2s;
+        }
+
+        .reset-button:hover {
+            background-color: #d62218;
+        }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <!-- 1. 最上部：詳細表示エリア（ここだけに内容が出ます） -->
+        <!-- 1. 最上部：詳細表示エリア -->
         <div class="detail-display-area" id="detailDisplay">
             <h3>詳細表示エリア</h3>
             <p id="detailText">下のピンク枠のタイトルボタンを押すと、ここに詳しい内容が表示されます。</p>
@@ -213,134 +255,44 @@
         <div class="ticker-container">
             <div class="ticker-wrap">
                 <div class="ticker-move" id="tickerLive">
-                    <!-- ここに流れるテキストが自動生成されます -->
+                    <!-- JavaScriptで流れるテキストが生成されます -->
                 </div>
             </div>
         </div>
 
         <!-- 3. 下部：縦並びリストエリア -->
         <div class="list-title">
-            <span>ニュース一覧（縦並び・順序変更可能）</span>
-            <span style="font-size: 11px; color:#888;">Tier 1が上になります</span>
+            <span>ニュース一覧（▲▼で順番を入れ替え）</span>
+            <span style="font-size: 11px; color:#888;">上ほど優先度高</span>
         </div>
         
         <div class="news-manager-list" id="managerList">
-            <!-- ここに30個の行が自動でズラリと縦に並びます -->
+            <!-- 30個の行が自動で縦に並びます -->
+        </div>
+
+        <!-- 4. 4回確認を挟むリセットボタン -->
+        <div class="reset-btn-container">
+            <button class="reset-button" onclick="triggerStrictReset()">順番を初期状態にリセットする</button>
         </div>
     </div>
 
     <script>
-        // --- ニュースデータプール（30個） ---
-        // 「img」のところに実際の画像URL（例: "https://example.com" など）を入れれば画像に変わります。
-        // 今は分かりやすいように、ダミーの画像生成URL（縦横32pxのグレーの画像）を入れています。
-        const newsData = [
-            { id: 1, tier: 1, title: "1番目のニュース：ビットコイン急騰、短期保有者が利確", detail: "【詳細】ビットコイン市場が活況を呈しており、短期保有者が利益を確定させています。今後のサポートラインに注目です。", img: "https://placeholder.com" },
-            { id: 2, tier: 1, title: "2番目のニュース：イーサリアムの大型アップデート実施へ", detail: "【詳細】次世代のアップグレードにより、ガス代の削減と処理速度の向上が期待されており、開発者の注目が集まっています。", img: "https://placeholder.com" },
-            { id: 3, tier: 2, title: "3番目のニュース：リップル(XRP)が主要取引所で出来高1位", detail: "【詳細】国際送金ネットワークの拡大に伴い、アジア圏を中心にXRPの取引量が爆バツ的に増加しています。", img: "https://placeholder.com" },
-            { id: 4, tier: 2, title: "4番目のニュース：ソラナエコシステム、新規DeFiが急成長", detail: "【詳細】高速なトランザクションを武器に、新しい分散型金融アプリがユーザー数を順調に伸ばしています。", img: "https://placeholder.com" },
-            { id: 5, tier: 3, title: "5番目のニュース：主要テック企業、独自のウォレット発表", detail: "【詳細】誰もが簡単に仮想通貨やNFTを管理できる統合型ウォレットが、来期スマートフォンに標準搭載される見込みです。", img: "https://placeholder.com" },
-            // 6〜30個目のループ用ダミーデータ（ここをコピーして自由に増やせます）
-            { id: 6, tier: 3, title: "6番目のニュースタイトル", detail: "6番目の詳しい本文です。", img: "https://placeholder.com" },
-            { id: 7, tier: 3, title: "7番目のニュースタイトル", detail: "7番目の詳しい本文です。", img: "https://placeholder.com" },
-            { id: 8, tier: 3, title: "8番目のニュースタイトル", detail: "8番目の詳しい本文です。", img: "https://placeholder.com" },
-            { id: 9, tier: 3, title: "9番目のニュースタイトル", detail: "9番目の詳しい本文です。", img: "https://placeholder.com" },
-            { id: 10, tier: 3, title: "10番目のニュースタイトル", detail: "10番目の詳しい本文です。", img: "https://placeholder.com0" },
-            { id: 11, tier: 3, title: "11番目のニュースタイトル", detail: "11番目の詳しい本文です。", img: "https://placeholder.com1" },
-            { id: 12, tier: 3, title: "12番目のニュースタイトル", detail: "12番目の詳しい本文です。", img: "https://placeholder.com2" },
-            { id: 13, tier: 3, title: "13番目のニュースタイトル", detail: "13番目の詳しい本文です。", img: "https://placeholder.com3" },
-            { id: 14, tier: 3, title: "14番目のニュースタイトル", detail: "14番目の詳しい本文です。", img: "https://placeholder.com4" },
-            { id: 15, tier: 3, title: "15番目のニュースタイトル", detail: "15番目の詳しい本文です。", img: "https://placeholder.com5" },
-            { id: 16, tier: 3, title: "16番目のニュースタイトル", detail: "16番目の詳しい本文です。", img: "https://placeholder.com6" },
-            { id: 17, tier: 3, title: "17番目のニュースタイトル", detail: "17番目の詳しい本文です。", img: "https://placeholder.com7" },
-            { id: 18, tier: 3, title: "18番目のニュースタイトル", detail: "18番目の詳しい本文です。", img: "https://placeholder.com8" },
-            { id: 19, tier: 3, title: "19番目のニュースタイトル", detail: "19番目の詳しい本文です。", img: "https://placeholder.com9" },
-            { id: 20, tier: 3, title: "20番目のニュースタイトル", detail: "20番目の詳しい本文です。", img: "https://placeholder.com0" },
-            { id: 21, tier: 3, title: "21番目のニュースタイトル", detail: "21番目の詳しい本文です。", img: "https://placeholder.com1" },
-            { id: 22, tier: 3, title: "22番目のニュースタイトル", detail: "22番目の詳しい本文です。", img: "https://placeholder.com2" },
-            { id: 23, tier: 3, title: "23番目のニュースタイトル", detail: "23番目の詳しい本文です。", img: "https://placeholder.com3" },
-            { id: 24, tier: 3, title: "24番目のニュースタイトル", detail: "24番目の詳しい本文です。", img: "https://placeholder.com" },
-            { id: 25, tier: 3, title: "25番目のニュースタイトル", detail: "25番目の詳しい本文です。", img: "https://placeholder.com" },
-            { id: 26, tier: 3, title: "26番目のニュースタイトル", detail: "26番目の詳しい本文です。", img: "https://placeholder.com" },
-            { id: 27, tier: 3, title: "27番目のニュースタイトル", detail: "27番目の詳しい本文です。", img: "https://placeholder.com" },
-            { id: 28, tier: 3, title: "28番目のニュースタイトル", detail: "28番目の詳しい本文です。", img: "https://placeholder.com" },
-            { id: 29, tier: 3, title: "29番目のニュースタイトル", detail: "29番目の詳しい本文です。", img: "https://placeholder.com" },
-            { id: 30, tier: 3, title: "30番目のニュースタイトル", detail: "30番目の詳しい本文です。これで30個目です。", img: "https://placeholder.com" }
-        ];
-
-        // --- 画面表示リフレッシュシステム ---
-        function drawPage() {
-            const managerList = document.getElementById('managerList');
-            const tickerLive = document.getElementById('tickerLive');
-
-            // 1. データをTier(1が最優先)の数字順に並び替える
-            const sortedData = [...newsData].sort((a, b) => {
-                if (a.tier !== b.tier) return a.tier - b.tier;
-                return a.id - b.id;
-            });
-
-            // 2. 下部の縦並びリストを生成
-            managerList.innerHTML = '';
-            sortedData.forEach(item => {
-                const row = document.createElement('div');
-                row.className = 'news-row';
-
-                row.innerHTML = `
-                    <div class="tier-control-box">
-                        <select class="tier-select" onchange="updateTier(${item.id}, this.value)">
-                            <option value="1" ${item.tier === 1 ? 'selected' : ''}>Tier 1</option>
-                            <option value="2" ${item.tier === 2 ? 'selected' : ''}>Tier 2</option>
-                            <option value="3" ${item.tier === 3 ? 'selected' : ''}>Tier 3</option>
-                        </select>
-                    </div>
-                    
-                    <button class="news-content-btn" onclick="displayOnTop('${escapeHtml(item.title)}', '${escapeHtml(item.detail)}')">
-                        <img src="${item.img}" class="row-img" alt="news-icon">
-                        <div class="row-title">${item.title}</div>
-                    </button>
-                `;
-                managerList.appendChild(row);
-            });
-
-            // 3. 流れるニュースティッカーも並び順通りに同期
-            tickerLive.innerHTML = '';
-            sortedData.forEach(item => {
-                const span = document.createElement('span');
-                span.className = 'ticker-item';
-                span.onclick = () => displayOnTop(item.title, item.detail);
-                span.innerHTML = `
-                    <img src="${item.img}" class="ticker-img" alt="icon">
-                    <span class="ticker-text">【T${item.tier}】${item.title}</span>
-                `;
-                tickerLive.appendChild(span);
-            });
-        }
-
-        // --- 順序(Tier)が変えられた時の処理 ---
-        // セレクトボックスを変えた瞬間にここが走り、自動で上に並び替わります
-        function updateTier(id, newTierValue) {
-            const targetItem = newsData.find(d => d.id === id);
-            if (targetItem) {
-                targetItem.tier = parseInt(newTierValue, 10);
-                drawPage(); // 順番を並び替えて再出力
-            }
-        }
-
-        // --- ピンク枠を押した時、一番上だけに内容を出す処理 ---
-        function displayOnTop(title, detail) {
-            const displayArea = document.getElementById('detailDisplay');
-            displayArea.innerHTML = `
-                <h3>${title}</h3>
-                <p>${detail}</p>
-            `;
-        }
-
-        // エスケープ処理（安全対策）
-        function escapeHtml(str) {
-            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
-        }
-
-        // ページを開いた瞬間に実行
-        window.onload = drawPage;
-    </script>
-</body>
-</html>
+        // デフォルトの初期データ（ここから30番までの並び替えロジックは中編へ続きます）
+        const defaultNewsData = [
+            { id: 1, title: "1番目のニュース：ビットコイン急騰、短期保有者が利確", detail: "【詳細】ビットコイン市場が活況を呈しており、短期保有者が利益を確定させています。", img: "https://placeholder.com" },
+            { id: 2, title: "2番目のニュース：イーサリアムの大型アップデート実施へ", detail: "【詳細】次世代のアップグレードにより、ガス代の削減と処理速度の向上が期待されています。", img: "https://placeholder.com" },
+            { id: 3, title: "3番目のニュース：リップル(XRP)が主要取引所で出来高1位", detail: "【詳細】国際送金ネットワークの拡大に伴い、XRPの取引量が爆発的に増加しています。", img: "https://placeholder.com" },
+            { id: 4, title: "4番目のニュース：ソラナエコシステム、新規DeFiが急成長", detail: "【詳細】高速なトランザクションを武器に、新しい分散型金融アプリが伸びています。", img: "https://placeholder.com" },
+            { id: 5, title: "5番目のニュース：主要テック企業、独自のウォレット発表", detail: "【詳細】誰もが簡単に暗号資産を管理できるウォレットが標準搭載される見込みです。", img: "https://placeholder.com" },
+            { id: 6, title: "6番目のニュースタイトル", detail: "6番目の詳しい本文です。", img: "https://placeholder.com" },
+            { id: 7, title: "7番目のニュースタイトル", detail: "7番目の詳しい本文です。", img: "https://placeholder.com" },
+            { id: 8, title: "8番目のニュースタイトル", detail: "8番目の詳しい本文です。", img: "https://placeholder.com" },
+            { id: 9, title: "9番目のニュースタイトル", detail: "9番目の詳しい本文です。", img: "https://placeholder.com" },
+            { id: 10, title: "10番目のニュースタイトル", detail: "10番目の詳しい本文です。", img: "https://placeholder.com0" },
+            { id: 11, title: "11番目のニュースタイトル", detail: "11番目の詳しい本文です。", img: "https://placeholder.com1" },
+            { id: 12, title: "12番目のニュースタイトル", detail: "12番目の詳しい本文です。", img: "https://placeholder.com2" },
+            { id: 13, title: "13番目のニュースタイトル", detail: "13番目の詳しい本文です。", img: "https://placeholder.com3" },
+            { id: 14, title: "14番目のニュースタイトル", detail: "14番目の詳しい本文です。", img: "https://placeholder.com4" },
+            { id: 15, title: "15番目のニュースタイトル", detail: "15番目の詳しい本文です。", img: "https://placeholder.com5" },
+            { id: 16, title: "16番目のニュースタイトル", detail: "16番目の詳しい本文です。", img: "https://placeholder.com6" },
+            { id: 17, title: "17番目のニュースタイトル", detail: "17番目の詳しい本文です。", img: "https://placeholder.com7" },
