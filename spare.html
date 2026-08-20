@@ -1,0 +1,379 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://w3.org">
+<html xmlns="http://w3.org" lang="ja" xml:lang="ja">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<title>CoinPost ニュース仕分けボード (2013 Retro Edition)</title>
+<style type="text/css">
+/* 2013年のブラウザ互換性を重視したレトロCSS */
+body {
+    font-family: "ヒラギノ角ゴ Pro W3", "Hiragino Kaku Gothic Pro", "メイリオ", Meiryo, Osaka, "ＭＳ Ｐゴシック", sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #333333;
+    background-color: #f4f4f4;
+    margin: 0;
+    padding: 20px;
+}
+h1 {
+    font-size: 24px;
+    color: #003366;
+    margin-bottom: 5px;
+}
+p.description {
+    font-size: 12px;
+    color: #666666;
+    margin-top: 0;
+    margin-bottom: 20px;
+}
+.btn {
+    padding: 6px 20px;
+    font-size: 14px;
+    background-color: #0055aa;
+    color: #ffffff;
+    border: 1px solid #003366;
+    cursor: pointer;
+    font-weight: bold;
+}
+.btn:hover {
+    background-color: #003366;
+}
+.btn-danger {
+    background-color: #cc0000;
+    border: 1px solid #990000;
+}
+.btn-danger:hover {
+    background-color: #990000;
+}
+/* メインレイアウト */
+.board-container {
+    width: 100%;
+    overflow: hidden; /* floatクリア用 */
+}
+/* POOL（左側） */
+.pool-box {
+    float: left;
+    width: 30%;
+    background-color: #e6f2ff;
+    border: 2px solid #0055aa;
+    padding: 10px;
+    min-height: 650px;
+}
+/* ジャンルエリア（右側） */
+.genres-box {
+    float: right;
+    width: 66%;
+    background-color: #ffffff;
+    border: 1px solid #cccccc;
+    padding: 10px;
+    min-height: 650px;
+}
+.pool-box h2, .genres-box h2 {
+    font-size: 18px;
+    margin-top: 0;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #cccccc;
+}
+/* ジャンルごとの格子レイアウト（30枠） */
+.genre-card {
+    float: left;
+    width: 46%;
+    margin: 1%;
+    background-color: #f9f9f9;
+    border: 1px solid #dddddd;
+    padding: 8px;
+    min-height: 120px;
+}
+.genre-card h3 {
+    font-size: 14px;
+    margin: 0 0 8px 0;
+    background-color: #003366;
+    color: #ffffff;
+    padding: 3px 5px;
+}
+/* ニュースアイテムのスタイル */
+.news-item {
+    background-color: #ffffff;
+    border: 1px solid #bbbbbb;
+    padding: 8px;
+    margin-bottom: 8px;
+    font-size: 13px;
+    line-height: 1.4;
+}
+.news-title {
+    word-break: break-all;
+    font-weight: bold;
+}
+.news-actions {
+    margin-top: 8px;
+    font-size: 11px;
+    text-align: right;
+}
+.news-actions select {
+    font-size: 11px;
+    padding: 2px;
+}
+/* システムコントロール */
+.sys-control {
+    margin-top: 30px;
+    padding-top: 15px;
+    border-top: 1px dashed #cccccc;
+    text-align: right;
+}
+</style>
+</head>
+<body>
+
+<h1>CoinPost ニュース仕分けボード</h1>
+<p class="description">コードに直接書き込んだ日付入りのタイトルを、SEC・CFTC・トランプ大統領などのジャンルに分類して握力を鍛える専用ボードです。</p>
+
+<!-- メインボード -->
+<div class="board-container">
+    
+    <!-- 左側：未分類プール -->
+    <div class="pool-box">
+        <h2>📥 ニュース POOL</h2>
+        <div id="pool_list">
+            <!-- ここにJavaScriptでニュースが入ります -->
+        </div>
+    </div>
+    
+    <!-- 右側：30個のジャンル振り分け先 -->
+    <div class="genres-box">
+        <h2>📂 ジャンル別分類 (30ジャンル枠)</h2>
+        <div id="genres_container">
+            <!-- ここにJavaScriptで30個のフォルダカードが生成されます -->
+        </div>
+    </div>
+
+</div>
+
+<!-- システム管理（振り分け位置の4回かまをかけるリセット） -->
+<div class="sys-control">
+    <input type="button" value="⚡ 振り分け位置をリセット（ニュースは消えません）" class="btn btn-danger" onclick="tripleCheckReset(1)" />
+</div>
+
+<!-- ここから中編のJavaScriptにつづく -->
+<script type="text/javascript">
+// ----------------------------------------------------
+// 2013年レトロ互換仕様 JavaScript（中編：データ定義と初期化）
+// ----------------------------------------------------
+
+// 1. 【ニュース手動追加エリア】
+// ★ここにニュースタイトル（日付入り）をご自身で直接書き足してください！
+// 古いニュースを下、新しいニュースを上（先頭）に並べていくと、POOL内でも上に表示されます。
+var INITIAL_NEWS = [
+    "20260820XRPとトランプが強気の方針というニュースタイトル",
+    "20260817午前7時51分10年以上未移動のビットコイン、供給量の約18％に　紛失の可能性も",
+"20260818午後2時29分リップル、全北銀行と提携　韓国地銀初のRipple Payments導入",
+"20260819午後2時51分ビットコイン小口投資家の需要、2年ぶり高水準に接近＝アナリスト",
+"20260820午前8時45分仮想通貨投資家の3つの誤解、ビットワイズ幹部が指摘",
+"20260821午前5時50分米CFTC委員長、クラリティー法案未成立でも仮想通貨規制整備へ"
+
+    // ,"20260821 次のニュースタイトルを足すときは、このようにカンマを入れて追加します"
+    // ,"20260822 さらにニュースを足すときはこのように並べていきます"
+];
+
+// 2. ジャンル定義（30ジャンル枠を配列で確保）
+var GENRE_NAMES = [
+    "トランプ大統領 / 政権",
+    "SEC（証券取引委員会）",
+    "CFTC（商品先物取引委員会）",
+    "リップル（XRP） / Ripple社",
+    "ビットコイン（BTC）",
+    "イーサリアム（ETH）",
+    "ステーブルコイン（USDC/USDT）",
+    "仮想通貨・予測市場会合",
+    "クラリティー法案 / 規制動向",
+    "KBRA / 格付・機関投資家",
+    "金融業界 / 伝統金融",
+    "ホワイトハウス動向",
+    "CoinPost 主要ニュース",
+    "ジャンル14（未設定）", "ジャンル15（未設定）",
+    "ジャンル16（未設定）", "ジャンル17（未設定）", "ジャンル18（未設定）",
+    "ジャンル19（未設定）", "ジャンル20（未設定）", "ジャンル21（未設定）",
+    "ジャンル22（未設定）", "ジャンル23（未設定）", "ジャンル24（未設定）",
+    "ジャンル25（未設定）", "ジャンル26（未設定）", "ジャンル27（未設定）",
+    "ジャンル28（未設定）", "ジャンル29（未設定）", "ジャンル30（未設定）"
+];
+
+// 3. グローバルデータ構造（ブラウザには「ニュースのタイトルと仕分け先IDのペア」だけを保持します）
+var savedMap = {}; // タイトル文字列 を キー、 ジャンルID を 値 にする連想配列
+var appData = {
+    newsList: []
+};
+
+// 4. 画面初期化処理
+window.onload = function() {
+    initGenreCards();      // 右側の30ジャンル枠のHTML生成
+    loadAndSyncData();     // コード内の配列とブラウザ記憶の同期
+    renderBoard();         // 画面へのニュース描画
+};
+
+// 5. 右側の30ジャンルコンテナのHTML構築
+function initGenreCards() {
+    var container = document.getElementById("genres_container");
+    var htmlBuffer = "";
+    
+    for (var i = 0; i < GENRE_NAMES.length; i++) {
+        htmlBuffer += '<div class="genre-card">';
+        htmlBuffer += '<h3>[' + (i + 1) + '] ' + GENRE_NAMES[i] + '</h3>';
+        htmlBuffer += '<div id="genre_list_' + i + '"></div>';
+        htmlBuffer += '</div>';
+    }
+    
+    container.innerHTML = htmlBuffer;
+}
+
+// 6. データのローカル保存
+function saveData() {
+    if (window.localStorage) {
+        window.localStorage.setItem("coinpost_direct_map", JSON.stringify(savedMap));
+    }
+}
+
+// 7. データの読み込み ＆ コード内配列（INITIAL_NEWS）との同期
+// これにより、新しくコードに足したニュースは自動でPOOLに並び、
+// すでに仕分け済みのニュースはブラウザの記憶（localStorage）から仕分け先のフォルダに正しく配置されます。
+function loadAndSyncData() {
+    savedMap = {};
+    if (window.localStorage) {
+        var rawData = window.localStorage.getItem("coinpost_direct_map");
+        if (rawData) {
+            try {
+                savedMap = JSON.parse(rawData);
+            } catch(e) {
+                savedMap = {};
+            }
+        }
+    }
+    
+    // コード内の INITIAL_NEWS をベースに表示用リストを再構築
+    appData.newsList = [];
+    for (var i = 0; i < INITIAL_NEWS.length; i++) {
+        var titleText = INITIAL_NEWS[i];
+        
+        // 過去に仕分けデータが保存されているかチェック、なければ -1 (POOL)
+        var currentGenreId = -1;
+        if (typeof savedMap[titleText] !== "undefined") {
+            currentGenreId = parseInt(savedMap[titleText], 10);
+        }
+        
+        appData.newsList.push({
+            id: i, // ループ内の簡易ID
+            title: titleText,
+            genreId: currentGenreId
+        });
+    }
+}
+
+// ここから後編（ジャンル移動処理、4回かまをかけるリセット等）につづく
+    // ----------------------------------------------------
+// 2013年レトロ互換仕様 JavaScript（後編：操作ロジック・4重警告 完結版）
+// ----------------------------------------------------
+
+// 8. ニュースのジャンルを移動・記憶する
+function moveGenre(newsIndex, targetGenreId) {
+    targetGenreId = parseInt(targetGenreId, 10);
+    newsIndex = parseInt(newsIndex, 10);
+    
+    // 対象のニュースデータを取得
+    var item = appData.newsList[newsIndex];
+    if (!item) return;
+    
+    // メモリ上のジャンルIDを更新
+    item.genreId = targetGenreId;
+    
+    // 保存用の連想配列（Map）にタイトルをキーにして移動先を記録
+    // POOL（-1）に戻した場合は記憶から削除してスリム化
+    if (targetGenreId === -1) {
+        delete savedMap[item.title];
+    } else {
+        savedMap[item.title] = targetGenreId;
+    }
+    
+    // 保存と再描画
+    saveData();
+    renderBoard();
+}
+
+// 9. 画面の再描画（レンダリング）処理
+function renderBoard() {
+    // まずPOOLとすべてのジャンル表示エリアを一旦空にする
+    document.getElementById("pool_list").innerHTML = "";
+    for (var g = 0; g < GENRE_NAMES.length; g++) {
+        document.getElementById("genre_list_" + g).innerHTML = "";
+    }
+    
+    // ニュースリストをループして、それぞれの場所にHTMLを流し込む
+    for (var i = 0; i < appData.newsList.length; i++) {
+        var item = appData.newsList[i];
+        
+        // 移動用セレクトボックスのHTMLを生成
+        var selectHtml = '<select onchange="moveGenre(' + i + ', this.value)">';
+        selectHtml += '<option value="-1"' + (item.genreId === -1 ? ' selected' : '') + '>📥 POOLへ戻す</option>';
+        for (var j = 0; j < GENRE_NAMES.length; j++) {
+            selectHtml += '<option value="' + j + '"' + (item.genreId === j ? ' selected' : '') + '>📂 [' + (j+1) + '] ' + GENRE_NAMES[j] + '</option>';
+        }
+        selectHtml += '</select>';
+        
+        // ニュースアイテム自体の枠HTML
+        var itemHtml = '<div class="news-item">';
+        itemHtml += '<div class="news-title">' + escapeHtml(item.title) + '</div>';
+        itemHtml += '<div class="news-actions">' + selectHtml + '</div>';
+        itemHtml += '</div>';
+        
+        // 所属するジャンルIDに応じて流し込み先を分岐
+        if (item.genreId === -1) {
+            document.getElementById("pool_list").innerHTML += itemHtml;
+        } else if (item.genreId >= 0 && item.genreId < GENRE_NAMES.length) {
+            document.getElementById("genre_list_" + item.genreId).innerHTML += itemHtml;
+        }
+    }
+}
+
+// 10. XSS対策としてのエスケープ関数
+function escapeHtml(str) {
+    if (!str) return "";
+    return str.replace(/&/g, "&amp;")
+              .replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;")
+              .replace(/"/g, "&quot;")
+              .replace(/'/g, "&#039;");
+}
+
+// 11. 4回かまをかける仕分け位置リセット（4重セキュリティダイアログ）
+function tripleCheckReset(stage) {
+    if (stage === 1) {
+        if (confirm("【警告 1/4】\nすべてのニュースの「仕分け位置（フォルダ分け）」の記憶が消去され、全てPOOLに戻ります。本当によろしいですか？\n※コードに書いたニュース自体は消えません。")) {
+            tripleCheckReset(2);
+        }
+    } else if (stage === 2) {
+        if (confirm("【警告 2/4】\nブラウザに保存されているフォルダの位置情報が完全に消去されます。よろしいですか？")) {
+            tripleCheckReset(3);
+        }
+    } else if (stage === 3) {
+        if (confirm("【警告 3/4】\n今まで整理した位置がすべてリセットされます。後悔しませんか？本当に実行しますか？")) {
+            tripleCheckReset(4);
+        }
+    } else if (stage === 4) {
+        if (confirm("【最終警告 4/4】\nこれが最後の確認です。すべてのニュースをPOOLに戻して初期状態にしますか？")) {
+            // 4回の試練を突破した場合、ブラウザ保存のマップデータを完全消去
+            savedMap = {};
+            if (window.localStorage) {
+                window.localStorage.removeItem("coinpost_direct_map");
+            }
+            
+            // 表示データ側のジャンルIDもすべてPOOL（-1）に戻す
+            for (var i = 0; i < appData.newsList.length; i++) {
+                appData.newsList[i].genreId = -1;
+            }
+            
+            renderBoard();
+            alert("すべての仕分け位置情報が削除され、ニュースがPOOLへ戻りました。");
+        }
+    }
+}
+
+</script>
+</body>
+</html>
