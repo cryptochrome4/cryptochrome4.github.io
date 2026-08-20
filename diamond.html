@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CoinPost Title Hub & Classifier</title>
+    <style>
+        :root {
+            --bg-color: #121214;
+            --card-bg: #1e1e24;
+            --text-color: #e2e8f0;
+            --accent-color: #3b82f6;
+            --danger-color: #ef4444;
+            --border-color: #334155;
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+
+        h1 { margin: 0; font-size: 24px; color: #f8fafc; }
+
+        .system-controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: opacity 0.2s;
+        }
+
+        button:hover { opacity: 0.9; }
+
+        button.btn-danger { background-color: var(--danger-color); }
+
+        /* メインレイアウト */
+        .app-container {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+            height: calc(100vh - 100px);
+        }
+
+        /* 左側: POOLエリア */
+        .pool-sidebar {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .pool-header {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* 右側: ジャンルエリア（30分割対応用グリッド） */
+        .genre-main {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 15px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        .genre-box {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            min-height: 200px;
+            max-height: 350px;
+        }
+
+        .genre-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #94a3b8;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #334155;
+            padding-bottom: 5px;
+        }
+
+        /* 共通のリストスタイル */
+        .news-list {
+            flex-grow: 1;
+            overflow-y: auto;
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            min-height: 50px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>CoinPost ニュースタイトル・ハブ</h1>
+        <div class="system-controls">
+            <button id="import-btn">GitHubからデータ投入 (仮)</button>
+            <button id="reset-btn" class="btn-danger">全データ安全リセット</button>
+        </div>
+    </header>
+
+    <div class="app-container">
+        <!-- 左側: ニュースプール -->
+        <aside class="pool-sidebar">
+            <div class="pool-header">
+                <span>📰 ニュース POOL</span>
+                <span id="pool-count" style="font-size: 12px; color: #94a3b8;">0 件</span>
+            </div>
+            <ul id="news-pool" class="news-list">
+                <!-- ここにGitHub等から読み込んだタイトルが並びます -->
+            </ul>
+        </aside>
+
+        <!-- 右側: 分類ジャンル（全30ジャンル） -->
+        <main class="genre-main" id="genre-container">
+            <!-- JavaScriptで30個のジャンルボックスを自動生成します -->
+        </main>
+    </div>
+
+    <script>
+        // --- 1. IndexedDBによる絶対消えないデータ保存基盤 ---
+        const DB_NAME = 'CoinPostHubDB';
+        const DB_VERSION = 1;
+        let db;
+
+        function initDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+                
+                request.onerror = (e) => reject('DB起動失敗');
+                request.onsuccess = (e) => {
+                    db = e.target.result;
+                    resolve(db);
+                };
+
+                request.onupgradeneeded = (e) => {
+                    const database = e.target.result;
+                    // ニュースデータを保存するストア（主キーは自動インクリメント）
+                    if (!database.objectStoreNames.contains('articles')) {
+                        database.createObjectStore('articles', { keyPath: 'id', autoIncrement: true });
+                    }
+                };
+            });
+        }
+
+        // --- 2. 4回連続のかまかけ（確認）付きリセット機能 ---
+        async function secureReset() {
+            const warnings = [
+                "【確認 1/4】本当にすべてのニュースデータ、および分類ログを初期化しますか？",
+                "【確認 2/4】クッキー削除でも消えないIndexedDB内のデータが完全に削除されます。本当によろしいですか？",
+                "【確認 3/4】ジャンル分けした仕込みの記憶もリセットされます。後悔しませんか？",
+                "【最終確認 4/4】これが最後の警告です。本当にすべて消去して初期状態に戻しますか？"
+            ];
+
+            for (let i = 0; i < warnings.length; i++) {
+                if (!confirm(warnings[i])) {
+                    alert("リセットをキャンセルしました。データは安全です。");
+                    return; // 途中で「キャンセル」を押したら即座に復帰
+                }
+            }
+
+            // 4回の確認をすべてパスした場合のみ実行
+            const transaction = db.transaction(['articles'], 'readwrite');
+            const store = transaction.objectStore(['articles']);
+            const clearRequest = store.clear();
+
+            clearRequest.onsuccess = () => {
+                alert("すべてのデータを完全にリセットしました。ページをリロードします。");
+                location.reload();
+            };
+        }
+
+        // --- 3. 30個のジャンル枠の自動生成 ---
+        const defaultGenres = [
+            "SEC関連", "CFTC関連", "トランプ大統領発言", "リップル(XRP)公式", "予測市場・マクロ",
+            "ジャンル6", "ジャンル7", "ジャンル8", "ジャンル9", "ジャンル10",
+            "ジャンル11", "ジャンル12", "ジャンル13", "ジャンル14", "ジャンル15",
+            "ジャンル16", "ジャンル17", "ジャンル18", "ジャンル19", "ジャンル20",
+            "ジャンル21", "ジャンル22", "ジャンル23", "ジャンル24", "ジャンル25",
+            "ジャンル26", "ジャンル27", "ジャンル28", "ジャンル29", "ジャンル30"
+        ];
+
+        function createGenreBoxes() {
+            const container = document.getElementById('genre-container');
+            defaultGenres.forEach((genreName, index) => {
+                const box = document.createElement('div');
+                box.className = 'genre-box';
+                box.dataset.genreId = index;
+                
+                box.innerHTML = `
+                    <div class="genre-title">${genreName}</div>
+                    <ul class="news-list" id="genre-list-${index}"></ul>
+                `;
+                container.appendChild(box);
+            });
+        }
+
+        // 初期化実行
+        document.addEventListener('DOMContentLoaded', async () => {
+            await initDB();
+            createGenreBoxes();
+            document.getElementById('reset-btn').addEventListener('click', secureReset);
+        });
+    </script>
+</body>
+</html>
