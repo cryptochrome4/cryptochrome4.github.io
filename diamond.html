@@ -237,3 +237,220 @@
     </script>
 </body>
 </html>
+<!-- 前編のスタイル（CSS）の直後に追加するスタイル定義 -->
+    <style>
+        /* 中編で追加するニュースカードと操作UIのスタイル */
+        .news-card {
+            background-color: #2a2a35;
+            border: 1px solid #475569;
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: transform 0.1s, border-color 0.2s;
+        }
+
+        .news-card:hover {
+            border-color: var(--accent-color);
+            transform: translateY(-2px);
+        }
+
+        .news-title-text {
+            font-size: 13px;
+            line-height: 1.4;
+            margin-bottom: 8px;
+            word-break: break-all;
+        }
+
+        /* 日付設定エリアのレイアウト */
+        .card-controls {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            margin-bottom: 8px;
+        }
+
+        .date-select {
+            background-color: #1e1e24;
+            color: #f1f5f9;
+            border: 1px solid #475569;
+            border-radius: 4px;
+            padding: 2px 4px;
+            font-size: 11px;
+            font-family: monospace;
+        }
+
+        .btn-save-date {
+            background-color: #10b981;
+            font-size: 11px;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        /* ジャンル移動用のセレクトボックス */
+        .move-select {
+            width: 100%;
+            background-color: #0f172a;
+            color: #94a3b8;
+            border: 1px solid #334155;
+            border-radius: 4px;
+            padding: 4px;
+            font-size: 12px;
+        }
+
+        .badge-date {
+            display: inline-block;
+            background-color: #334155;
+            color: #cbd5e1;
+            font-size: 11px;
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-family: monospace;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- [前編のHTML構造をそのまま維持] -->
+    <header>
+        <h1>CoinPost ニュースタイトル・ハブ</h1>
+        <div class="system-controls">
+            <button id="import-btn">GitHubからデータ投入 (仮)</button>
+            <button id="reset-btn" class="btn-danger">全データ安全リセット</button>
+        </div>
+    </header>
+
+    <div class="app-container">
+        <aside class="pool-sidebar">
+            <div class="pool-header">
+                <span>📰 ニュース POOL</span>
+                <span id="pool-count" style="font-size: 12px; color: #94a3b8;">0 件</span>
+            </div>
+            <ul id="news-pool" class="news-list"></ul>
+        </aside>
+
+        <main class="genre-main" id="genre-container"></main>
+    </div>
+
+    <script>
+        // --- [前編のIndexedDB、リセット、ジャンル枠生成ロジックを保持] ---
+        const DB_NAME = 'CoinPostHubDB';
+        const DB_VERSION = 1;
+        let db;
+
+        function initDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+                request.onerror = (e) => reject('DB起動失敗');
+                request.onsuccess = (e) => { db = e.target.result; resolve(db); };
+                request.onupgradeneeded = (e) => {
+                    const database = e.target.result;
+                    if (!database.objectStoreNames.contains('articles')) {
+                        database.createObjectStore('articles', { keyPath: 'id', autoIncrement: true });
+                    }
+                };
+            });
+        }
+
+        const defaultGenres = [
+            "SEC関連", "CFTC関連", "トランプ大統領発言", "リップル(XRP)公式", "予測市場・マクロ",
+            "ジャンル6", "ジャンル7", "ジャンル8", "ジャンル9", "ジャンル10",
+            "ジャンル11", "ジャンル12", "ジャンル13", "ジャンル14", "ジャンル15",
+            "ジャンル16", "ジャンル17", "ジャンル18", "ジャンル19", "ジャンル20",
+            "ジャンル21", "ジャンル22", "ジャンル23", "ジャンル24", "ジャンル25",
+            "ジャンル26", "ジャンル27", "ジャンル28", "ジャンル29", "ジャンル30"
+        ];
+
+        function createGenreBoxes() {
+            const container = document.getElementById('genre-container');
+            container.innerHTML = ''; // 初期化
+            defaultGenres.forEach((genreName, index) => {
+                const box = document.createElement('div');
+                box.className = 'genre-box';
+                box.dataset.genreId = index;
+                box.innerHTML = `
+                    <div class="genre-title">${genreName}</div>
+                    <ul class="news-list" id="genre-list-${index}"></ul>
+                `;
+                container.appendChild(box);
+            });
+        }
+
+        // --- 中編の核心: ニュースカードHTMLの動的生成機能 ---
+        function createNewsCardHTML(article) {
+            // 2013年から2050年までのドロップダウンオプションを生成
+            let dateOptions = `<option value="">-- 日付記録 --</option>`;
+            // ループ用の年・月・日を定義して2013〜2050年をカバー可能にするための基礎
+            // ユーザーが手動でサクッと入力・確定しやすいよう、まずは動的なプルダウンのベースを用意します
+            
+            // 現在保存されている日付があればバッジとして表示
+            const dateBadge = article.date ? `<span class="badge-date">📅 ${article.date}</span>` : '';
+            
+            // ジャンル移動用のセレクトボックスの選択肢
+            let genreOptions = `<option value="pool">📄 POOLに戻す</option>`;
+            defaultGenres.forEach((name, idx) => {
+                const selected = article.genre === String(idx) ? 'selected' : '';
+                genreOptions += `<option value="${idx}" ${selected}>${idx + 1}: ${name}</option>`;
+            });
+
+            return `
+                <li class="news-card" data-id="${article.id}">
+                    ${dateBadge}
+                    <div class="news-title-text">${article.title}</div>
+                    
+                    <div class="card-controls">
+                        <!-- 日付入力欄 (2013-2050対応) -->
+                        <input type="text" class="date-select" placeholder="20260810" value="${article.date || ''}" maxlength="8" style="width: 80px;">
+                        <button class="btn-save-date" onclick="updateArticleDate(${article.id}, this)">記録</button>
+                    </div>
+
+                    <select class="move-select" onchange="moveArticleGenre(${article.id}, this.value)">
+                        <option value="" disabled selected>📦 ジャンルへ配分...</option>
+                        ${genreOptions}
+                    </select>
+                </li>
+            `;
+        }
+
+        // --- 中編の核心: データの更新処理（日付の記録） ---
+        async function updateArticleDate(id, buttonEl) {
+            const inputEl = buttonEl.previousElementSibling;
+            const dateValue = inputEl.value.trim();
+
+            // 簡易バリデーション (8桁の数字か空欄)
+            if (dateValue !== "" && !/^\d{8}$/.test(dateValue)) {
+                alert("日付は「20260810」のように8桁の半角数字で入力してください。");
+                return;
+            }
+
+            const transaction = db.transaction(['articles'], 'readwrite');
+            const store = transaction.objectStore(['articles']);
+            
+            store.get(id).onsuccess = (e) => {
+                const article = e.target.result;
+                if (article) {
+                    article.date = dateValue;
+                    store.put(article).onsuccess = () => {
+                        // 再描画して反映
+                        renderAllArticles();
+                    };
+                }
+            };
+        }
+
+        // --- 中編の核心: ジャンルの移動処理 ---
+        async function moveArticleGenre(id, targetGenre) {
+            const transaction = db.transaction(['articles'], 'readwrite');
+            const store = transaction.objectStore(['articles']);
+
+            store.get(id).onsuccess = (e) => {
+                const article = e.target.result;
+                if (article) {
+                    article.genre = targetGenre; // "pool" または "0"〜"29"
+                    store.put(article).onsuccess = () => {
+                        renderAllArticles();
+                    };
+                }
+            };
+        }
