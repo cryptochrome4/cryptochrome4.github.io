@@ -365,6 +365,146 @@
             };
         }
 
+                // --- 【後編追加】データベースから全記事を読み込んで画面に分配・描画する処理 ---
+        function renderAllArticles() {
+            // まずPOOLとすべてのジャンルリストの画面表示をクリア
+            document.getElementById('news-pool').innerHTML = '';
+            for (var i = 0; i < 30; i++) {
+                var listEl = document.getElementById('genre-list-' + i);
+                if (listEl) {
+                    listEl.innerHTML = '';
+                }
+            }
+
+            var poolCount = 0;
+            var transaction = db.transaction(['articles'], 'readonly');
+            var store = transaction.objectStore(['articles']);
+            
+            // PS4の古いブラウザ環境で最も安定して動作するカーソルループを採用
+            store.openCursor().onsuccess = function(event) {
+                var cursor = event.target.result;
+                if (cursor) {
+                    var article = cursor.value;
+                    var cardHTML = createNewsCardHTML(article);
+
+                    // 保存されているジャンルIDに応じて画面の適切な場所に振り分け
+                    if (!article.genre || article.genre === 'pool') {
+                        // PS4の古いDOM操作でも絶対にバグらないように innerHTML を安全に結合
+                        document.getElementById('news-pool').innerHTML += cardHTML;
+                        poolCount++;
+                    } else {
+                        var targetList = document.getElementById('genre-list-' + article.genre);
+                        if (targetList) {
+                            targetList.innerHTML += cardHTML;
+                        }
+                    }
+                    cursor.continue(); // 次の記事へ進む
+                } else {
+                    // 全件の読み込みが完全に終わったら、プールの件数を画面に反映
+                    document.getElementById('pool-count').textContent = poolCount + ' 件';
+                }
+            };
+        }
+
+        // --- 【後編追加】GitHubから最新ニュースをプールへ同期するシミュレーター ---
+        // 将来的にGitHubにJSONファイルを置いてここから読み込める（fetchできる）ように拡張可能です
+        document.getElementById('import-btn').onclick = function() {
+            // お送りいただいたスクリーンショット（CoinPost）の実際のニュースデータを初期プリセット
+            var mockGitHubData = [
+                {
+                    title: "トランプ大統領、来週の仮想通貨・予測市場会合に出席見込み＝報道",
+                    genre: "pool",
+                    date: ""
+                },
+                {
+                    title: "リップル子会社が優先無担保債発行、436億円調達",
+                    genre: "pool",
+                    date: ""
+                },
+                {
+                    title: "トランプ大統領、政府によるビットコイン購入検討を表明 BTCは6月以来の高値",
+                    genre: "pool",
+                    date: ""
+                }
+            ];
+
+            var transaction = db.transaction(['articles'], 'readwrite');
+            var store = transaction.objectStore(['articles']);
+
+            var addedCount = 0;
+            
+            // 二重で同じタイトルがプールに入らないように既存チェックをかける
+            store.getAll().onsuccess = function(e) {
+                var currentArticles = e.target.result;
+                var currentTitles = [];
+                for (var i = 0; i < currentArticles.length; i++) {
+                    currentTitles.push(currentArticles[i].title);
+                }
+
+                // 新着ニュースのみを厳選してIndexedDBに追加
+                for (var j = 0; j < mockGitHubData.length; j++) {
+                    var item = mockGitHubData[j];
+                    if (currentTitles.indexOf(item.title) === -1) {
+                        store.add(item);
+                        addedCount++;
+                    }
+                }
+
+                // データベースへの書き込みがすべて成功・完了した時の処理
+                transaction.oncomplete = function() {
+                    if (addedCount > 0) {
+                        alert("GitHub（シミュレート）から新着ニュースを " + addedCount + " 件プールに読み込みました！");
+                        renderAllArticles(); // 画面をリフレッシュ
+                    } else {
+                        alert("新着ニュースはありません（すべて読込済みです）。");
+                    }
+                };
+            };
+        };
+
+        // --- 【後編追加】4回連続のかまかけ（確認）付き絶対リセット機能 ---
+        function secureReset() {
+            var warnings = [
+                "【確認 1/4】本当にすべてのニュースデータ、および分類ログを初期化しますか？",
+                "【確認 2/4】クッキー削除でも消えないデータベース（IndexedDB）内のデータが完全に削除されます。本当によろしいですか？",
+                "【確認 3/4】ジャンル分けした仕込みの記憶もリセットされます。後悔しませんか？",
+                "【最終確認 4/4】これが最後の警告です。本当にすべて消去して初期状態に戻しますか？"
+            ];
+
+            // 4回の確認ダイアログを順番に出撃させる
+            for (var i = 0; i < warnings.length; i++) {
+                if (!confirm(warnings[i])) {
+                    alert("リセットをキャンセルしました。大切なデータは守られました。");
+                    return; // 1回でもキャンセルが押されたら即座に処理を中断
+                }
+            }
+
+            // 4回ともすべて「OK」を突き進んだ場合のみ全データを物理削除
+            var transaction = db.transaction(['articles'], 'readwrite');
+            var store = transaction.objectStore(['articles']);
+            var clearRequest = store.clear();
+
+            clearRequest.onsuccess = function() {
+                alert("すべてのデータを完全にリセットしました。画面を初期化します。");
+                location.reload();
+            };
+        }
+
+        // --- システム全体の起動初期化処理（前編のフックをここで完全に結合） ---
+        document.addEventListener('DOMContentLoaded', async function() {
+            // 1. データベースに接続
+            await initDB();
+            // 2. 30ジャンルのテーブル骨組みを作成
+            createGenreBoxes();
+            // 3. すでに保存されているデータを画面に綺麗に分配
+            renderAllArticles();
+            // 4. 安全リセットボタンに4回かまかけイベントを紐付け
+            document.getElementById('reset-btn').onclick = secureReset;
+        });
+    </script>
+</body>
+</html>
+
     </script>
 </body>
 </html>
