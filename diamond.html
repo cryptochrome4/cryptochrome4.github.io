@@ -454,3 +454,131 @@
                 }
             };
         }
+        // --- 後編の核心: データベースから全記事を読み込んで画面に分配描画 ---
+        function renderAllArticles() {
+            // まずPOOLとすべてのジャンルリストの画面表示をクリア
+            document.getElementById('news-pool').innerHTML = '';
+            for (let i = 0; i < 30; i++) {
+                const listEl = document.getElementById(`genre-list-${i}`);
+                if (listEl) listEl.innerHTML = '';
+            }
+
+            let poolCount = 0;
+            const transaction = db.transaction(['articles'], 'readonly');
+            const store = transaction.objectStore(['articles']);
+            
+            // カーソルを使って全データを1件ずつスキャン
+            store.openCursor().onsuccess = (event) => {
+                const cursor = event.target.result;
+                if (cursor) {
+                    const article = cursor.value;
+                    const cardHTML = createNewsCardHTML(article);
+
+                    // ジャンルに応じて割り振る
+                    if (!article.genre || article.genre === 'pool') {
+                        document.getElementById('news-pool').insertAdjacentHTML('beforeend', cardHTML);
+                        poolCount++;
+                    } else {
+                        const targetList = document.getElementById(`genre-list-${article.genre}`);
+                        if (targetList) {
+                            targetList.insertAdjacentHTML('beforeend', cardHTML);
+                        }
+                    }
+                    cursor.continue(); // 次の記事へ
+                } else {
+                    // 全件スキャン完了後にプール件数を更新
+                    document.getElementById('pool-count').textContent = `${poolCount} 件`;
+                }
+            };
+        }
+
+        // --- 後編の核心: GitHubからデータを取得・投入するシミュレーター ---
+        // 将来的に毎日GitHub Actions等で更新したJSONファイルをここからfetch()できるように設計しています
+        document.getElementById('import-btn').addEventListener('click', async () => {
+            // お送りいただいた画像（CoinPost）の実際のニュースデータを初期プリセットとして投入
+            const mockGitHubData = [
+                {
+                    title: "トランプ大統領、来週の仮想通貨・予測市場会合に出席見込み＝報道",
+                    genre: "pool",
+                    date: ""
+                },
+                {
+                    title: "リップル子会社が優先無担保債発行、436億円調達",
+                    genre: "pool",
+                    date: ""
+                },
+                {
+                    title: "トランプ大統領、政府によるビットコイン購入検討を表明 BTCは6月以来の高値",
+                    genre: "pool",
+                    date: ""
+                }
+            ];
+
+            const transaction = db.transaction(['articles'], 'readwrite');
+            const store = transaction.objectStore(['articles']);
+
+            let addedCount = 0;
+            
+            // 重複投入を防ぐため、現在の全タイトルを取得してチェック
+            store.getAll().onsuccess = (e) => {
+                const currentArticles = e.target.result;
+                const currentTitles = currentArticles.map(a => a.title);
+
+                mockGitHubData.forEach(item => {
+                    if (!currentTitles.includes(item.title)) {
+                        store.add(item);
+                        addedCount++;
+                    }
+                });
+
+                transaction.oncomplete = () => {
+                    if (addedCount > 0) {
+                        alert(`GitHub（シミュレート）から新着ニュースを ${addedCount} 件プールに読み込みました！`);
+                        renderAllArticles();
+                    } else {
+                        alert("新着ニュースはありません（すべて投入済みです）。");
+                    }
+                };
+            };
+        });
+
+        // --- 4. 4回連続のかまかけ（確認）付きリセット機能 ---
+        async function secureReset() {
+            const warnings = [
+                "【確認 1/4】本当にすべてのニュースデータ、および分類ログを初期化しますか？",
+                "【確認 2/4】クッキー削除でも消えないIndexedDB内のデータが完全に削除されます。本当によろしいですか？",
+                "【確認 3/4】ジャンル分けした仕込みの記憶もリセットされます。後悔しませんか？",
+                "【最終確認 4/4】これが最後の警告です。本当にすべて消去して初期状態に戻しますか？"
+            ];
+
+            for (let i = 0; i < warnings.length; i++) {
+                if (!confirm(warnings[i])) {
+                    alert("リセットをキャンセルしました。データは安全です。");
+                    return;
+                }
+            }
+
+            const transaction = db.transaction(['articles'], 'readwrite');
+            const store = transaction.objectStore(['articles']);
+            const clearRequest = store.clear();
+
+            clearRequest.onsuccess = () => {
+                alert("すべてのデータを完全にリセットしました。");
+                location.reload();
+            };
+        }
+
+        // --- システム全体の起動初期化 ---
+        document.addEventListener('DOMContentLoaded', async () => {
+            // 1. データベースの接続を確立
+            await initDB();
+            // 2. 画面に30個のジャンルボックスの骨組みを生成
+            createGenreBoxes();
+            // 3. データベースに保存されている既存データを画面に描画
+            renderAllArticles();
+            // 4. リセットボタンのイベントを結びつけ
+            document.getElementById('reset-btn').addEventListener('click', secureReset);
+        });
+    </script>
+</body>
+</html>
