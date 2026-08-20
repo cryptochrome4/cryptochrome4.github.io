@@ -277,6 +277,140 @@ function loadData() {
 }
 
 // ここから後編（ニュースの追加、ジャンル移動、4回かまをかけるリセット等）につづく
+    // ----------------------------------------------------
+// 2013年レトロ互換仕様 JavaScript（後編：操作ロジック・4重警告 完結版）
+// ----------------------------------------------------
+
+// 7. ニュース（日付入りタイトル）をPOOL（未分類）に追加する
+function addNewsToPool() {
+    var titleVal = document.getElementById("input_title").value;
+    
+    // 空白やスペースのみの入力をチェック
+    if (!titleVal || titleVal.replace(/^\s+|\s+$/g, "") === "") {
+        alert("ニュースタイトル（日付入り）を入力してください。");
+        return;
+    }
+    
+    // 2013年ブラウザ対応のため一意のIDとしてタイムスタンプを使用
+    var uniqueId = new Date().getTime();
+    
+    // 新しいニュースオブジェクト（初期ジャンルIDは -1 = POOL）
+    var newNews = {
+        id: uniqueId,
+        title: titleVal,
+        genreId: -1
+    };
+    
+    // 配列の先頭に追加（新しいニュースが上に来るようにする）
+    appData.newsList.unshift(newNews);
+    
+    // 保存と再描画
+    saveData();
+    renderBoard();
+    
+    // 入力欄をクリア
+    document.getElementById("input_title").value = "";
+}
+
+// 8. ニュースのジャンルを移動する
+function moveGenre(newsId, targetGenreId) {
+    targetGenreId = parseInt(targetGenreId, 10);
+    
+    // 該当するニュースを探してジャンルIDを更新
+    for (var i = 0; i < appData.newsList.length; i++) {
+        if (appData.newsList[i].id === newsId) {
+            appData.newsList[i].genreId = targetGenreId;
+            break;
+        }
+    }
+    
+    // 保存と再描画
+    saveData();
+    renderBoard();
+}
+
+// 9. 画面の再描画（レンダリング）処理
+function renderBoard() {
+    // まずPOOLとすべてのジャンル表示エリアを一旦空にする
+    document.getElementById("pool_list").innerHTML = "";
+    for (var g = 0; g < GENRE_NAMES.length; g++) {
+        document.getElementById("genre_list_" + g).innerHTML = "";
+    }
+    
+    // ニュースリストをループして、それぞれの場所にHTMLを流し込む
+    for (var i = 0; i < appData.newsList.length; i++) {
+        var item = appData.newsList[i];
+        
+        // 移動用セレクトボックスのHTMLを生成
+        var selectHtml = '<select onchange="moveGenre(' + item.id + ', this.value)">';
+        selectHtml += '<option value="-1"' + (item.genreId === -1 ? ' selected' : '') + '>📥 POOLへ戻す</option>';
+        for (var j = 0; j < GENRE_NAMES.length; j++) {
+            selectHtml += '<option value="' + j + '"' + (item.genreId === j ? ' selected' : '') + '>📂 [' + (j+1) + '] ' + GENRE_NAMES[j] + '</option>';
+        }
+        selectHtml += '</select>';
+        
+        // ニュースアイテム自体の枠HTML
+        var itemHtml = '<div class="news-item">';
+        itemHtml += '<span class="news-title">' + escapeHtml(item.title) + '</span>';
+        itemHtml += '<div class="news-actions">' + selectHtml + '</div>';
+        itemHtml += '</div>';
+        
+        // 所属するIDに応じて流し込み先を分岐
+        if (item.genreId === -1) {
+            document.getElementById("pool_list").innerHTML += itemHtml;
+        } else if (item.genreId >= 0 && item.genreId < GENRE_NAMES.length) {
+            document.getElementById("genre_list_" + item.genreId).innerHTML += itemHtml;
+        }
+    }
+}
+
+// 10. XSS対策としてのエスケープ関数
+function escapeHtml(str) {
+    if (!str) return "";
+    return str.replace(/&/g, "&amp;")
+              .replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;")
+              .replace(/"/g, "&quot;")
+              .replace(/'/g, "&#039;");
+}
+
+// 11. 4回かまをかける完全リセット（4重セキュリティダイアログ）
+function tripleCheckReset(stage) {
+    if (stage === 1) {
+        if (confirm("【警告 1/4】\n保存されているすべてのニュースデータが完全に消去されます。本当によろしいですか？")) {
+            tripleCheckReset(2);
+        }
+    } else if (stage === 2) {
+        if (confirm("【警告 2/4】\nクッキー削除をしても消えないデータですが、この操作をすると本当に復元できなくなります。よろしいですか？")) {
+            tripleCheckReset(3);
+        }
+    } else if (stage === 3) {
+        if (confirm("【警告 3/4】\n大事な仕分けデータが含まれている可能性があります。後悔しませんか？本当に実行しますか？")) {
+            tripleCheckReset(4);
+        }
+    } else if (stage === 4) {
+        if (confirm("【最終警告 4/4】\nこれが最後の確認です。本当にリセットして初期状態に戻しますか？")) {
+            // 4回の試練を突破した場合、データをクリアした上で【指定の初期ニュース】だけを再セットします
+            appData = {
+                newsList: [
+                    {
+                        id: 1,
+                        title: "20260820XRPとトランプが強気の方針というニュースタイトル",
+                        genreId: -1
+                    }
+                ]
+            };
+            
+            if (window.localStorage) {
+                window.localStorage.setItem("coinpost_simple_board", JSON.stringify(appData));
+            }
+            
+            renderBoard();
+            alert("データが初期化され、指定の初期ニュースのみの状態に戻りました。");
+        }
+    }
+}
+
 </script>
 </body>
 </html>
