@@ -38,18 +38,19 @@ p.description {
 .input-area td {
     padding: 5px;
 }
-.input-area input[type="text"], .input-area select {
-    width: 95%;
-    padding: 5px;
+.input-area input[type="text"] {
+    width: 98%;
+    padding: 6px;
     font-size: 14px;
 }
 .btn {
-    padding: 5px 15px;
+    padding: 6px 20px;
     font-size: 14px;
     background-color: #0055aa;
     color: #ffffff;
     border: 1px solid #003366;
     cursor: pointer;
+    font-weight: bold;
 }
 .btn:hover {
     background-color: #003366;
@@ -90,7 +91,7 @@ p.description {
     padding-bottom: 5px;
     border-bottom: 1px solid #cccccc;
 }
-/* ジャンルごとの格子レイアウト */
+/* ジャンルごとの格子レイアウト（30枠） */
 .genre-card {
     float: left;
     width: 46%;
@@ -111,26 +112,23 @@ p.description {
 .news-item {
     background-color: #ffffff;
     border: 1px solid #bbbbbb;
-    padding: 5px;
+    padding: 8px;
     margin-bottom: 8px;
     font-size: 13px;
-}
-.news-date {
-    font-weight: bold;
-    color: #666666;
-    font-family: monospace;
-    margin-right: 5px;
+    line-height: 1.4;
 }
 .news-title {
     word-break: break-all;
+    font-weight: bold;
 }
 .news-actions {
-    margin-top: 5px;
+    margin-top: 8px;
     font-size: 11px;
     text-align: right;
 }
 .news-actions select {
     font-size: 11px;
+    padding: 2px;
 }
 /* システムコントロール */
 .sys-control {
@@ -144,25 +142,18 @@ p.description {
 <body>
 
 <h1>CoinPost ニュース仕分けボード</h1>
-<p class="description">毎日タイトルを登録し、SEC・CFTC・トランプ大統領などのジャンルに分類して握力を鍛えるボードです。</p>
+<p class="description">自分で追加した日付入りのタイトルを、SEC・CFTC・トランプ大統領などのジャンルに分類して握力を鍛えるボードです。</p>
 
-<!-- ニュース手動追加エリア -->
+<!-- ニュース手動追加エリア（日付選択を廃止しシンプル化） -->
 <div class="input-area">
     <table>
         <tr>
-            <td width="15%"><strong>記事の日付:</strong></td>
-            <td width="20%">
-                <select id="input_year"></select>
-                <select id="input_month"></select>
-                <select id="input_day"></select>
-            </td>
-            <td width="50%"><strong>ニュースタイトル:</strong></td>
-            <td width="15%">&nbsp;</td>
+            <td width="80%"><strong>ニュースタイトル（日付も一緒に入力してください）:</strong></td>
+            <td width="20%">&nbsp;</td>
         </tr>
         <tr>
-            <td colspan="2" style="font-size:11px; color:#666666;">※本日からの記事を想定（2013-2050年選択可）</td>
-            <td><input type="text" id="input_title" placeholder="トランプ大統領、来週の仮想通貨・予測市場会合に出席見込み＝報道" /></td>
-            <td><input type="button" value="POOLに追加" class="btn" onclick="addNewsToPool()" /></td>
+            <td><input type="text" id="input_title" placeholder="例：20260820 リップル子会社が優先無担保債券発行、436億円調達" /></td>
+            <td align="right"><input type="button" value="POOLに追加" class="btn" onclick="addNewsToPool()" /></td>
         </tr>
     </table>
 </div>
@@ -194,266 +185,3 @@ p.description {
 </div>
 
 <!-- ここから中編のJavaScriptにつづく -->
-<script type="text/javascript">
-// ----------------------------------------------------
-// 2013年レトロ互換仕様 JavaScript（中編：データ定義と初期化）
-// ----------------------------------------------------
-
-// 1. ジャンル定義（ご要望の「30ジャンル」をあらかじめ配列で確保）
-// 主要な重要ワードを先頭に配置し、残りは拡張可能な空きスロットとして30個定義
-var GENRE_NAMES = [
-    "トランプ大統領 / 政権",
-    "SEC（証券取引委員会）",
-    "CFTC（商品先物取引委員会）",
-    "リップル（XRP） / Ripple社",
-    "ビットコイン（BTC）",
-    "イーサリアム（ETH）",
-    "ステーブルコイン（USDC/USDT）",
-    "仮想通貨・予測市場会合",
-    "クラリティー法案 / 規制動向",
-    "KBRA / 格付・機関投資家",
-    "金融業界 / 伝統金融",
-    "ホワイトハウス動向",
-    "CoinPost 主要ニュース",
-    "ジャンル14（未設定）", "ジャンル15（未設定）",
-    "ジャンル16（未設定）", "ジャンル17（未設定）", "ジャンル18（未設定）",
-    "ジャンル19（未設定）", "ジャンル20（未設定）", "ジャンル21（未設定）",
-    "ジャンル22（未設定）", "ジャンル23（未設定）", "ジャンル24（未設定）",
-    "ジャンル25（未設定）", "ジャンル26（未設定）", "ジャンル27（未設定）",
-    "ジャンル28（未設定）", "ジャンル29（未設定）", "ジャンル30（未設定）"
-];
-
-// 2. グローバルデータ構造（localStorageに保存するデータ）
-// ニュース一つ一つは { id:タイムスタンプ, date:"20260810", title:"タイトル", genreId:-1(POOL)か0〜29 } というオブジェクト
-var appData = {
-    newsList: []
-};
-
-// 3. 画面初期化処理（ページが読み込まれたときに実行）
-window.onload = function() {
-    initDateSelects();     // 日付選択プルダウンの生成 (2013〜2050年)
-    initGenreCards();      // 右側の30ジャンル枠のHTML生成
-    loadData();            // localStorageからのデータ読み込み
-    renderBoard();         // 画面へのニュース描画
-};
-
-// 4. 日付選択プルダウン（2013年〜2050年）の自動生成
-function initDateSelects() {
-    var yearSelect = document.getElementById("input_year");
-    var monthSelect = document.getElementById("input_month");
-    var daySelect = document.getElementById("input_day");
-    
-    // 現在の年月日を初期値として取得（今日からの記事用）
-    var today = new Date();
-    var currentYear = today.getFullYear();
-    var currentMonth = today.getMonth() + 1;
-    var currentDay = today.getDate();
-    
-    // 年: 2013年〜2050年
-    for (var y = 2013; y <= 2050; y++) {
-        var opt = document.createElement("option");
-        opt.value = y;
-        opt.innerHTML = y + "年";
-        if (y === currentYear) opt.selected = true;
-        yearSelect.appendChild(opt);
-    }
-    
-    // 月: 1月〜12月
-    for (var m = 1; m <= 12; m++) {
-        var opt = document.createElement("option");
-        var mStr = m < 10 ? "0" + m : "" + m;
-        opt.value = mStr;
-        opt.innerHTML = m + "月";
-        if (m === currentMonth) opt.selected = true;
-        monthSelect.appendChild(opt);
-    }
-    
-    // 日: 1日〜31日
-    for (var d = 1; d <= 31; d++) {
-        var opt = document.createElement("option");
-        var dStr = d < 10 ? "0" + d : "" + d;
-        opt.value = dStr;
-        opt.innerHTML = d + "日";
-        if (d === currentDay) opt.selected = true;
-        daySelect.appendChild(opt);
-    }
-}
-
-// 5. 右側の30ジャンルコンテナのHTML構築
-function initGenreCards() {
-    var container = document.getElementById("genres_container");
-    var htmlBuffer = "";
-    
-    // 2013年当時は文字列結合によるHTML構築が最速かつ安全
-    for (var i = 0; i < GENRE_NAMES.length; i++) {
-        htmlBuffer += '<div class="genre-card">';
-        htmlBuffer += '<h3>[' + (i + 1) + '] ' + GENRE_NAMES[i] + '</h3>';
-        htmlBuffer += '<div id="genre_list_' + i + '"></div>';
-        htmlBuffer += '</div>';
-    }
-    
-    container.innerHTML = htmlBuffer;
-}
-
-// 6. データのローカル保存と読み込み（localStorageを使用）
-// ※クッキー削除やブラウザ再起動を行っても、同一PC・同一ブラウザであればデータは残ります
-function saveData() {
-    if (window.localStorage) {
-        // 2013年互換のため、JSON文字列に変換して保存
-        window.localStorage.setItem("coinpost_board_data", JSON.stringify(appData));
-    }
-}
-
-function loadData() {
-    if (window.localStorage) {
-        var rawData = window.localStorage.getItem("coinpost_board_data");
-        if (rawData) {
-            try {
-                appData = JSON.parse(rawData);
-                // データ構造が古い、または壊れていた場合のフォールバック
-                if (!appData.newsList) {
-                    appData.newsList = [];
-                }
-            } catch(e) {
-                appData = { newsList: [] };
-            }
-        }
-    }
-}
-
-// ここから後編（ニュースの追加、ジャンル移動、4回かまをかけるリセット等）につづく
-    // ----------------------------------------------------
-// 2013年レトロ互換仕様 JavaScript（後編：操作ロジック・4重警告）
-// ----------------------------------------------------
-
-// 7. ニュースをPOOL（未分類）に追加する
-function addNewsToPool() {
-    var yearVal = document.getElementById("input_year").value;
-    var monthVal = document.getElementById("input_month").value;
-    var dayVal = document.getElementById("input_day").value;
-    var titleVal = document.getElementById("input_title").value;
-    
-    // タイトルの空チェック
-    if (!titleVal || titleVal.replace(/^\s+|\s+$/g, "") === "") {
-        alert("ニュースタイトルを入力してください。");
-        return;
-    }
-    
-    // 日付フォーマット（例: 20260810）
-    var dateString = yearVal + monthVal + dayVal;
-    
-    // 一意のIDとしてタイムスタンプを使用（過去データと重複を防ぐ）
-    var uniqueId = new Date().getTime();
-    
-    // 新しいニュースオブジェクト（初期ジャンルIDは -1 = POOL）
-    var newNews = {
-        id: uniqueId,
-        date: dateString,
-        title: titleVal,
-        genreId: -1
-    };
-    
-    // 配列の先頭に追加（新しいニュースが上に来るようにする）
-    appData.newsList.unshift(newNews);
-    
-    // 保存と再描画
-    saveData();
-    renderBoard();
-    
-    // 入力欄をクリア
-    document.getElementById("input_title").value = "";
-}
-
-// 8. ニュースのジャンルを移動する
-function moveGenre(newsId, targetGenreId) {
-    targetGenreId = parseInt(targetGenreId, 10);
-    
-    // 該当するニュースを探してジャンルIDを更新
-    for (var i = 0; i < appData.newsList.length; i++) {
-        if (appData.newsList[i].id === newsId) {
-            appData.newsList[i].genreId = targetGenreId;
-            break;
-        }
-    }
-    
-    // 保存と再描画
-    saveData();
-    renderBoard();
-}
-
-// 9. 画面の再描画（レンダリング）処理
-function renderBoard() {
-    // まずPOOLとすべてのジャンル表示エリアを一旦空にする
-    document.getElementById("pool_list").innerHTML = "";
-    for (var g = 0; g < GENRE_NAMES.length; g++) {
-        document.getElementById("genre_list_" + g).innerHTML = "";
-    }
-    
-    // ニュースリストをループして、それぞれの場所にHTMLを流し込む
-    for (var i = 0; i < appData.newsList.length; i++) {
-        var item = appData.newsList[i];
-        
-        // 移動用セレクトボックスのHTMLを生成
-        var selectHtml = '<select onchange="moveGenre(' + item.id + ', this.value)">';
-        selectHtml += '<option value="-1"' + (item.genreId === -1 ? ' selected' : '') + '>📥 POOLへ戻す</option>';
-        for (var j = 0; j < GENRE_NAMES.length; j++) {
-            selectHtml += '<option value="' + j + '"' + (item.genreId === j ? ' selected' : '') + '>📂 [' + (j+1) + '] ' + GENRE_NAMES[j] + '</option>';
-        }
-        selectHtml += '</select>';
-        
-        // ニュースアイテム自体の枠HTML
-        var itemHtml = '<div class="news-item">';
-        itemHtml += '<span class="news-date">[' + item.date + ']</span>';
-        itemHtml += '<span class="news-title">' + escapeHtml(item.title) + '</span>';
-        itemHtml += '<div class="news-actions">' + selectHtml + '</div>';
-        itemHtml += '</div>';
-        
-        // 所属するIDに応じて流し込み先を分岐
-        if (item.genreId === -1) {
-            document.getElementById("pool_list").innerHTML += itemHtml;
-        } else if (item.genreId >= 0 && item.genreId < GENRE_NAMES.length) {
-            document.getElementById("genre_list_" + item.genreId).innerHTML += itemHtml;
-        }
-    }
-}
-
-// 10. XSS対策としてのエスケープ関数（2013年標準的な手法）
-function escapeHtml(str) {
-    if (!str) return "";
-    return str.replace(/&/g, "&amp;")
-              .replace(/</g, "&lt;")
-              .replace(/>/g, "&gt;")
-              .replace(/"/g, "&quot;")
-              .replace(/'/g, "&#039;");
-}
-
-// 11. 4回かまをかける完全リセット（4重セキュリティダイアログ）
-function tripleCheckReset(stage) {
-    if (stage === 1) {
-        if (confirm("【警告 1/4】\n保存されているすべてのニュースデータが完全に消去されます。本当によろしいですか？")) {
-            tripleCheckReset(2);
-        }
-    } else if (stage === 2) {
-        if (confirm("【警告 2/4】\nクッキー削除をしても消えないデータですが、この操作をすると本当に復元できなくなります。よろしいですか？")) {
-            tripleCheckReset(3);
-        }
-    } else if (stage === 3) {
-        if (confirm("【警告 3/4】\n大事な仕分けデータが含まれている可能性があります。後悔しませんか？本当に実行しますか？")) {
-            tripleCheckReset(4);
-        }
-    } else if (stage === 4) {
-        if (confirm("【最終警告 4/4】\nこれが最後の確認です。本当にリセットして初期状態に戻しますか？")) {
-            // 4回の試練を突破した場合のみ、データを初期化してlocalStorageを消去
-            appData = { newsList: [] };
-            if (window.localStorage) {
-                window.localStorage.removeItem("coinpost_board_data");
-            }
-            renderBoard();
-            alert("すべてのデータが完全に削除され、初期状態に戻りました。");
-        }
-    }
-}
-
-</script>
-</body>
-</html>
