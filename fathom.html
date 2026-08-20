@@ -153,3 +153,114 @@ p.description {
 </div>
 
 <!-- ここから中編のJavaScriptにつづく -->
+<script type="text/javascript">
+// ----------------------------------------------------
+// 2013年レトロ互換仕様 JavaScript（中編：データ定義と初期化）
+// ----------------------------------------------------
+
+// 1. 【ニュース手動追加エリア】
+// ★ここにニュースタイトル（日付入り）をご自身で直接書き足してください！
+// 古いニュースを下、新しいニュースを上（先頭）に並べていくと、POOL内でも上に表示されます。
+var INITIAL_NEWS = [
+    "20260820XRPとトランプが強気の方針というニュースタイトル"
+    // ,"20260821 次のニュースタイトルを足すときは、このようにカンマを入れて追加します"
+    // ,"20260822 さらにニュースを足すときはこのように並べていきます"
+];
+
+// 2. ジャンル定義（30ジャンル枠を配列で確保）
+var GENRE_NAMES = [
+    "トランプ大統領 / 政権",
+    "SEC（証券取引委員会）",
+    "CFTC（商品先物取引委員会）",
+    "リップル（XRP） / Ripple社",
+    "ビットコイン（BTC）",
+    "イーサリアム（ETH）",
+    "ステーブルコイン（USDC/USDT）",
+    "仮想通貨・予測市場会合",
+    "クラリティー法案 / 規制動向",
+    "KBRA / 格付・機関投資家",
+    "金融業界 / 伝統金融",
+    "ホワイトハウス動向",
+    "CoinPost 主要ニュース",
+    "ジャンル14（未設定）", "ジャンル15（未設定）",
+    "ジャンル16（未設定）", "ジャンル17（未設定）", "ジャンル18（未設定）",
+    "ジャンル19（未設定）", "ジャンル20（未設定）", "ジャンル21（未設定）",
+    "ジャンル22（未設定）", "ジャンル23（未設定）", "ジャンル24（未設定）",
+    "ジャンル25（未設定）", "ジャンル26（未設定）", "ジャンル27（未設定）",
+    "ジャンル28（未設定）", "ジャンル29（未設定）", "ジャンル30（未設定）"
+];
+
+// 3. グローバルデータ構造（ブラウザには「ニュースのタイトルと仕分け先IDのペア」だけを保持します）
+var savedMap = {}; // タイトル文字列 を キー、 ジャンルID を 値 にする連想配列
+var appData = {
+    newsList: []
+};
+
+// 4. 画面初期化処理
+window.onload = function() {
+    initGenreCards();      // 右側の30ジャンル枠のHTML生成
+    loadAndSyncData();     // コード内の配列とブラウザ記憶の同期
+    renderBoard();         // 画面へのニュース描画
+};
+
+// 5. 右側の30ジャンルコンテナのHTML構築
+function initGenreCards() {
+    var container = document.getElementById("genres_container");
+    var htmlBuffer = "";
+    
+    for (var i = 0; i < GENRE_NAMES.length; i++) {
+        htmlBuffer += '<div class="genre-card">';
+        htmlBuffer += '<h3>[' + (i + 1) + '] ' + GENRE_NAMES[i] + '</h3>';
+        htmlBuffer += '<div id="genre_list_' + i + '"></div>';
+        htmlBuffer += '</div>';
+    }
+    
+    container.innerHTML = htmlBuffer;
+}
+
+// 6. データのローカル保存
+function saveData() {
+    if (window.localStorage) {
+        window.localStorage.setItem("coinpost_direct_map", JSON.stringify(savedMap));
+    }
+}
+
+// 7. データの読み込み ＆ コード内配列（INITIAL_NEWS）との同期
+// これにより、新しくコードに足したニュースは自動でPOOLに並び、
+// すでに仕分け済みのニュースはブラウザの記憶（localStorage）から仕分け先のフォルダに正しく配置されます。
+function loadAndSyncData() {
+    savedMap = {};
+    if (window.localStorage) {
+        var rawData = window.localStorage.getItem("coinpost_direct_map");
+        if (rawData) {
+            try {
+                savedMap = JSON.parse(rawData);
+            } catch(e) {
+                savedMap = {};
+            }
+        }
+    }
+    
+    // コード内の INITIAL_NEWS をベースに表示用リストを再構築
+    appData.newsList = [];
+    for (var i = 0; i < INITIAL_NEWS.length; i++) {
+        var titleText = INITIAL_NEWS[i];
+        
+        // 過去に仕分けデータが保存されているかチェック、なければ -1 (POOL)
+        var currentGenreId = -1;
+        if (typeof savedMap[titleText] !== "undefined") {
+            currentGenreId = parseInt(savedMap[titleText], 10);
+        }
+        
+        appData.newsList.push({
+            id: i, // ループ内の簡易ID
+            title: titleText,
+            genreId: currentGenreId
+        });
+    }
+}
+
+// ここから後編（ジャンル移動処理、4回かまをかけるリセット等）につづく
+</script>
+</body>
+</html>
