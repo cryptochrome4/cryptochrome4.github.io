@@ -25,24 +25,6 @@ p.description {
     margin-top: 0;
     margin-bottom: 20px;
 }
-/* 入力エリア */
-.input-area {
-    background-color: #ffffff;
-    border: 1px solid #cccccc;
-    padding: 15px;
-    margin-bottom: 20px;
-}
-.input-area table {
-    width: 100%;
-}
-.input-area td {
-    padding: 5px;
-}
-.input-area input[type="text"] {
-    width: 98%;
-    padding: 6px;
-    font-size: 14px;
-}
 .btn {
     padding: 6px 20px;
     font-size: 14px;
@@ -74,7 +56,7 @@ p.description {
     background-color: #e6f2ff;
     border: 2px solid #0055aa;
     padding: 10px;
-    min-height: 600px;
+    min-height: 650px;
 }
 /* ジャンルエリア（右側） */
 .genres-box {
@@ -83,7 +65,7 @@ p.description {
     background-color: #ffffff;
     border: 1px solid #cccccc;
     padding: 10px;
-    min-height: 600px;
+    min-height: 650px;
 }
 .pool-box h2, .genres-box h2 {
     font-size: 18px;
@@ -142,21 +124,7 @@ p.description {
 <body>
 
 <h1>CoinPost ニュース仕分けボード</h1>
-<p class="description">自分で追加した日付入りのタイトルを、SEC・CFTC・トランプ大統領などのジャンルに分類して握力を鍛えるボードです。</p>
-
-<!-- ニュース手動追加エリア（日付選択を廃止しシンプル化） -->
-<div class="input-area">
-    <table>
-        <tr>
-            <td width="80%"><strong>ニュースタイトル（日付も一緒に入力してください）:</strong></td>
-            <td width="20%">&nbsp;</td>
-        </tr>
-        <tr>
-            <td><input type="text" id="input_title" placeholder="例：20260820 リップル子会社が優先無担保債券発行、436億円調達" /></td>
-            <td align="right"><input type="button" value="POOLに追加" class="btn" onclick="addNewsToPool()" /></td>
-        </tr>
-    </table>
-</div>
+<p class="description">コードに直接書き込んだ日付入りのタイトルを、SEC・CFTC・トランプ大統領などのジャンルに分類して握力を鍛える専用ボードです。</p>
 
 <!-- メインボード -->
 <div class="board-container">
@@ -165,7 +133,7 @@ p.description {
     <div class="pool-box">
         <h2>📥 ニュース POOL</h2>
         <div id="pool_list">
-            <!-- ここにJavaScriptで未分類ニュースが入ります -->
+            <!-- ここにJavaScriptでニュースが入ります -->
         </div>
     </div>
     
@@ -179,238 +147,9 @@ p.description {
 
 </div>
 
-<!-- システム管理（4回かまをかけるリセット） -->
+<!-- システム管理（振り分け位置の4回かまをかけるリセット） -->
 <div class="sys-control">
-    <input type="button" value="⚡ データを完全リセット" class="btn btn-danger" onclick="tripleCheckReset(1)" />
+    <input type="button" value="⚡ 振り分け位置をリセット（ニュースは消えません）" class="btn btn-danger" onclick="tripleCheckReset(1)" />
 </div>
 
 <!-- ここから中編のJavaScriptにつづく -->
-<script type="text/javascript">
-// ----------------------------------------------------
-// 2013年レトロ互換仕様 JavaScript（中編：データ定義と初期化）
-// ----------------------------------------------------
-
-// 1. ジャンル定義（30ジャンル枠を配列で確保）
-var GENRE_NAMES = [
-    "トランプ大統領 / 政権",
-    "SEC（証券取引委員会）",
-    "CFTC（商品先物取引委員会）",
-    "リップル（XRP） / Ripple社",
-    "ビットコイン（BTC）",
-    "イーサリアム（ETH）",
-    "ステーブルコイン（USDC/USDT）",
-    "仮想通貨・予測市場会合",
-    "クラリティー法案 / 規制動向",
-    "KBRA / 格付・機関投資家",
-    "金融業界 / 伝統金融",
-    "ホワイトハウス動向",
-    "CoinPost 主要ニュース",
-    "ジャンル14（未設定）", "ジャンル15（未設定）",
-    "ジャンル16（未設定）", "ジャンル17（未設定）", "ジャンル18（未設定）",
-    "ジャンル19（未設定）", "ジャンル20（未設定）", "ジャンル21（未設定）",
-    "ジャンル22（未設定）", "ジャンル23（未設定）", "ジャンル24（未設定）",
-    "ジャンル25（未設定）", "ジャンル26（未設定）", "ジャンル27（未設定）",
-    "ジャンル28（未設定）", "ジャンル29（未設定）", "ジャンル30（未設定）"
-];
-
-// 2. グローバルデータ構造（localStorageに保存するデータ）
-var appData = {
-    newsList: []
-};
-
-// 3. 画面初期化処理（ページが読み込まれたときに実行）
-window.onload = function() {
-    initGenreCards();      // 右側の30ジャンル枠のHTML生成
-    loadData();            // localStorageからのデータ読み込み（初回は自動初期値）
-    renderBoard();         // 画面へのニュース描画
-};
-
-// 4. 右側の30ジャンルコンテナのHTML構築（2013年ブラウザ互換）
-function initGenreCards() {
-    var container = document.getElementById("genres_container");
-    var htmlBuffer = "";
-    
-    for (var i = 0; i < GENRE_NAMES.length; i++) {
-        htmlBuffer += '<div class="genre-card">';
-        htmlBuffer += '<h3>[' + (i + 1) + '] ' + GENRE_NAMES[i] + '</h3>';
-        htmlBuffer += '<div id="genre_list_' + i + '"></div>';
-        htmlBuffer += '</div>';
-    }
-    
-    container.innerHTML = htmlBuffer;
-}
-
-// 5. データのローカル保存
-function saveData() {
-    if (window.localStorage) {
-        window.localStorage.setItem("coinpost_simple_board", JSON.stringify(appData));
-    }
-}
-
-// 6. データの読み込み ＆ 【初回起動時の指定タイトルPOOL挿入】
-function loadData() {
-    if (window.localStorage) {
-        var rawData = window.localStorage.getItem("coinpost_simple_board");
-        if (rawData) {
-            try {
-                appData = JSON.parse(rawData);
-                if (!appData.newsList) {
-                    appData.newsList = [];
-                }
-            } catch(e) {
-                appData = { newsList: [] };
-            }
-        } else {
-            // 初回起動時（またはリセット後）、localStorageにデータが存在しない場合
-            // ご指定の初期ニュースタイトルをPOOL（genreId: -1）に自動的にセットします
-            appData.newsList = [
-                {
-                    id: 1, // 固定ID
-                    title: "20260820XRPとトランプが強気の方針というニュースタイトル",
-                    genreId: -1
-                }
-            ];
-            // 初回の状態を一度保存します
-            saveData();
-        }
-    }
-}
-
-// ここから後編（ニュースの追加、ジャンル移動、4回かまをかけるリセット等）につづく
-    // ----------------------------------------------------
-// 2013年レトロ互換仕様 JavaScript（後編：操作ロジック・4重警告 完結版）
-// ----------------------------------------------------
-
-// 7. ニュース（日付入りタイトル）をPOOL（未分類）に追加する
-function addNewsToPool() {
-    var titleVal = document.getElementById("input_title").value;
-    
-    // 空白やスペースのみの入力をチェック
-    if (!titleVal || titleVal.replace(/^\s+|\s+$/g, "") === "") {
-        alert("ニュースタイトル（日付入り）を入力してください。");
-        return;
-    }
-    
-    // 2013年ブラウザ対応のため一意のIDとしてタイムスタンプを使用
-    var uniqueId = new Date().getTime();
-    
-    // 新しいニュースオブジェクト（初期ジャンルIDは -1 = POOL）
-    var newNews = {
-        id: uniqueId,
-        title: titleVal,
-        genreId: -1
-    };
-    
-    // 配列の先頭に追加（新しいニュースが上に来るようにする）
-    appData.newsList.unshift(newNews);
-    
-    // 保存と再描画
-    saveData();
-    renderBoard();
-    
-    // 入力欄をクリア
-    document.getElementById("input_title").value = "";
-}
-
-// 8. ニュースのジャンルを移動する
-function moveGenre(newsId, targetGenreId) {
-    targetGenreId = parseInt(targetGenreId, 10);
-    
-    // 該当するニュースを探してジャンルIDを更新
-    for (var i = 0; i < appData.newsList.length; i++) {
-        if (appData.newsList[i].id === newsId) {
-            appData.newsList[i].genreId = targetGenreId;
-            break;
-        }
-    }
-    
-    // 保存と再描画
-    saveData();
-    renderBoard();
-}
-
-// 9. 画面の再描画（レンダリング）処理
-function renderBoard() {
-    // まずPOOLとすべてのジャンル表示エリアを一旦空にする
-    document.getElementById("pool_list").innerHTML = "";
-    for (var g = 0; g < GENRE_NAMES.length; g++) {
-        document.getElementById("genre_list_" + g).innerHTML = "";
-    }
-    
-    // ニュースリストをループして、それぞれの場所にHTMLを流し込む
-    for (var i = 0; i < appData.newsList.length; i++) {
-        var item = appData.newsList[i];
-        
-        // 移動用セレクトボックスのHTMLを生成
-        var selectHtml = '<select onchange="moveGenre(' + item.id + ', this.value)">';
-        selectHtml += '<option value="-1"' + (item.genreId === -1 ? ' selected' : '') + '>📥 POOLへ戻す</option>';
-        for (var j = 0; j < GENRE_NAMES.length; j++) {
-            selectHtml += '<option value="' + j + '"' + (item.genreId === j ? ' selected' : '') + '>📂 [' + (j+1) + '] ' + GENRE_NAMES[j] + '</option>';
-        }
-        selectHtml += '</select>';
-        
-        // ニュースアイテム自体の枠HTML
-        var itemHtml = '<div class="news-item">';
-        itemHtml += '<span class="news-title">' + escapeHtml(item.title) + '</span>';
-        itemHtml += '<div class="news-actions">' + selectHtml + '</div>';
-        itemHtml += '</div>';
-        
-        // 所属するIDに応じて流し込み先を分岐
-        if (item.genreId === -1) {
-            document.getElementById("pool_list").innerHTML += itemHtml;
-        } else if (item.genreId >= 0 && item.genreId < GENRE_NAMES.length) {
-            document.getElementById("genre_list_" + item.genreId).innerHTML += itemHtml;
-        }
-    }
-}
-
-// 10. XSS対策としてのエスケープ関数
-function escapeHtml(str) {
-    if (!str) return "";
-    return str.replace(/&/g, "&amp;")
-              .replace(/</g, "&lt;")
-              .replace(/>/g, "&gt;")
-              .replace(/"/g, "&quot;")
-              .replace(/'/g, "&#039;");
-}
-
-// 11. 4回かまをかける完全リセット（4重セキュリティダイアログ）
-function tripleCheckReset(stage) {
-    if (stage === 1) {
-        if (confirm("【警告 1/4】\n保存されているすべてのニュースデータが完全に消去されます。本当によろしいですか？")) {
-            tripleCheckReset(2);
-        }
-    } else if (stage === 2) {
-        if (confirm("【警告 2/4】\nクッキー削除をしても消えないデータですが、この操作をすると本当に復元できなくなります。よろしいですか？")) {
-            tripleCheckReset(3);
-        }
-    } else if (stage === 3) {
-        if (confirm("【警告 3/4】\n大事な仕分けデータが含まれている可能性があります。後悔しませんか？本当に実行しますか？")) {
-            tripleCheckReset(4);
-        }
-    } else if (stage === 4) {
-        if (confirm("【最終警告 4/4】\nこれが最後の確認です。本当にリセットして初期状態に戻しますか？")) {
-            // 4回の試練を突破した場合、データをクリアした上で【指定の初期ニュース】だけを再セットします
-            appData = {
-                newsList: [
-                    {
-                        id: 1,
-                        title: "20260820XRPとトランプが強気の方針というニュースタイトル",
-                        genreId: -1
-                    }
-                ]
-            };
-            
-            if (window.localStorage) {
-                window.localStorage.setItem("coinpost_simple_board", JSON.stringify(appData));
-            }
-            
-            renderBoard();
-            alert("データが初期化され、指定の初期ニュースのみの状態に戻りました。");
-        }
-    }
-}
-
-</script>
-</body>
-</html>
