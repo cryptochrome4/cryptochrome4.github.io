@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>マイ電子本棚コミックビューア</title>
+    <style>
+        /* ==========================================================================
+           2013年基準：リセット & 基本スタイル（古いWebkitブラウザやIE9+対応）
+           ========================================================================== */
+        * {
+            margin: 0;
+            padding: 0;
+            -webkit-box-sizing: border-box;
+               -moz-box-sizing: border-box;
+                    box-sizing: border-box;
+        }
+        body {
+            background-color: #2c1d11; /* 木目調に合うダーク背景 */
+            font-family: "Helvetica Neue", Helvetica, Arial, "Hiragino Kaku Gothic ProN", "ヒラギノ角ゴ ProN W3", Meiryo, メイリオ, sans-serif;
+            color: #ffffff;
+            padding: 20px 10px;
+            text-align: center;
+        }
+
+        /* タイトル・ヘッダーエリア */
+        header {
+            margin-bottom: 20px;
+        }
+        header h1 {
+            font-size: 24px;
+            color: #f3e5ab;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.6);
+            margin-bottom: 10px;
+        }
+
+        /* コントロールボタン（並び替え・リセット用） */
+        .control-panel {
+            margin-bottom: 20px;
+        }
+        .btn {
+            display: inline-block;
+            padding: 8px 16px;
+            font-size: 14px;
+            font-weight: bold;
+            background-color: #c94c4c;
+            color: #ffffff;
+            border: 1px solid #963535;
+            border-radius: 4px;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+            -webkit-transition: background-color 0.2s;
+            transition: background-color 0.2s;
+        }
+        .btn:hover {
+            background-color: #b13c3c;
+        }
+        .btn:active {
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.6);
+        }
+
+        /* ==========================================================================
+           本棚（ローカル環境・2013年低スペック端末でも超軽量な3段構造）
+           ========================================================================== */
+        #bookshelf-view {
+            max-width: 960px;
+            margin: 0 auto;
+            background: #4a3319; /* 本棚の奥の影色 */
+            padding: 15px 10px 5px 10px;
+            border: 6px solid #22140a;
+            border-radius: 8px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.7);
+        }
+
+        /* 本棚の「段（3階建て構造）」 */
+        .shelf-row {
+            position: relative;
+            margin-bottom: 35px;
+            padding-bottom: 15px;
+            text-align: left;
+            /* 1段につき最大10冊、3段で計30冊が綺麗に並ぶ配置 */
+            min-height: 190px; 
+        }
+
+        /* 木目の棚板（CSSシャドウで立体感を表現、画像不使用で軽量化） */
+        .shelf-row:after {
+            content: "";
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 16px;
+            background: #835627; /* 棚板の上面色 */
+            border-bottom: 6px solid #5a3916; /* 棚板の厚み・影 */
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+            border-radius: 2px;
+            z-index: 1;
+        }
+
+        /* 本（表紙＋ボタン）のコンテナ */
+        .book-item {
+            display: inline-block;
+            width: 80px; /* 2013年のスマホ・タブレットでも収まりが良いサイズ */
+            margin: 0 6px;
+            text-align: center;
+            vertical-align: bottom;
+            position: relative;
+            z-index: 2; /* 棚板より前に出す */
+            cursor: pointer;
+        }
+
+        /* 表紙画像（2013年ハードのメモリに優しい単純な影効果） */
+        .book-cover {
+            width: 100%;
+            height: 115px;
+            background-color: #666; /* 画像がない場合の仮色 */
+            border: 1px solid #111;
+            box-shadow: 3px 3px 5px rgba(0,0,0,0.5);
+            display: block;
+            object-fit: cover;
+        }
+
+        /* 表紙の下の「読む」ボタン */
+        .read-btn {
+            display: block;
+            width: 100%;
+            margin-top: 6px;
+            padding: 3px 0;
+            font-size: 11px;
+            background-color: #4caf50;
+            color: white;
+            border: none;
+            border-radius: 2px;
+            cursor: pointer;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+        }
+        .read-btn:hover {
+            background-color: #43a047;
+        }
+
+        /* 並び替え時の移動用コントロール（2013年仕様：左右ボタンで確実に位置変更） */
+        .sort-controls {
+            margin-top: 4px;
+            display: block;
+        }
+        .sort-arrow {
+            display: inline-block;
+            width: 45%;
+            padding: 1px 0;
+            font-size: 10px;
+            background: #dfdfdf;
+            color: #333;
+            border: 1px solid #bbb;
+            border-radius: 2px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .sort-arrow:hover {
+            background: #ccc;
+        }
+
+        /* ==========================================================================
+           漫画ビューア画面（初期状態は隠す、縦スクロール専用）
+           ========================================================================== */
+        #comic-viewer-view {
+            display: none; /* 最初は非表示 */
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: #111111;
+            padding: 10px;
+            box-shadow: 0 0 30px rgba(0,0,0,0.9);
+        }
+
+        /* ビューア上部の固定・操作バー */
+        .viewer-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background-color: rgba(0, 0, 0, 0.85);
+            padding: 12px;
+            z-index: 9999;
+            text-align: left;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        }
+        .back-btn {
+            background-color: #555555;
+            border: 1px solid #777777;
+            padding: 6px 14px;
+            color: #fff;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .back-btn:hover {
+            background-color: #666666;
+        }
+
+        /* 縦スクロール漫画画像エリア */
+        .comic-images-container {
+            margin-top: 60px; /* 操作バーの分の余白 */
+            text-align: center;
+        }
+        /* 縦に並ぶ漫画画像（古いブラウザでもはみ出さない100%幅設定） */
+        .comic-page {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 0 auto 10px auto; /* ページ間の隙間 */
+            background-color: #222; /* 読み込み中の背景色 */
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 本棚画面 -->
+    <div id="bookshelf-section">
+        <header>
+            <h1>My Comic Bookshelf</h1>
+        </header>
+
+        <div class="control-panel">
+            <button class="btn" id="reset-storage-btn">本棚の並びを初期化</button>
+        </div>
+
+        <!-- 3階建ての本棚（JSでここに30冊の要素を流し込みます） -->
+        <div id="bookshelf-view">
+            <!-- 1段目 (1〜10冊目) -->
+            <div class="shelf-row" id="shelf-row-1"></div>
+            <!-- 2段目 (11〜20冊目) -->
+            <div class="shelf-row" id="shelf-row-2"></div>
+            <!-- 3段目 (21〜30冊目) -->
+            <div class="shelf-row" id="shelf-row-3"></div>
+        </div>
+    </div>
+
+    <!-- 漫画ビューア画面（本棚を隠してここを表示） -->
+    <div id="comic-viewer-view">
+        <div class="viewer-header">
+            <button class="back-btn" id="close-viewer-btn">◀ 本棚に戻る</button>
+            <span id="current-comic-title" style="margin-left:15px; font-weight:bold; color:#f3e5ab;"></span>
+        </div>
+        
+        <!-- ここに選択された漫画の画像が縦にずらりと並ぶ -->
+        <div class="comic-images-container" id="comic-pages-area"></div>
+    </div>
+
+    <!-- ここから下にJavaScript（中編）が続きます -->
+</body>
+</html>
