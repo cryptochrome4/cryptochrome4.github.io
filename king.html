@@ -245,5 +245,206 @@
     </div>
 
     <!-- ここから下にJavaScript（中編）が続きます -->
+        <!-- ==========================================================================
+         2013年基準：JavaScript コアロジック（中編）
+         ========================================================================== -->
+    <script>
+        (function() {
+            // 2013年当時の古い端末のメモリに配慮し、すべて厳格なローカルスコープ内で処理します。
+            
+            // ----------------------------------------------------------------------
+            // 1. 仮の漫画データ定義（計30冊分）
+            // ----------------------------------------------------------------------
+            // 画像URLは、ユーザー様が後から自由に差し替えられるように設計しています。
+            // 各漫画ごとに、縦スクロール用のページ画像を配列で持たせられる構造です。
+            var TOTAL_BOOKS = 30;
+            var initialComicData = [];
+            
+            for (var i = 1; i <= TOTAL_BOOKS; i++) {
+                initialComicData.push({
+                    id: i,
+                    title: "コミック第 " + i + " 巻",
+                    // 表紙画像（ダミー画像生成サービスを使用。本番環境では実際の画像パスへ変更してください）
+                    coverUrl: "https://placehold.jp." + i,
+                    // 縦スクロールで表示される中身のページ画像（サンプルとして3ページ分定義）
+                    pages: [
+                        "https://placehold.jp." + i + "_Page1",
+                        "https://placehold.jp." + i + "_Page2",
+                        "https://placehold.jp." + i + "_Page3"
+                    ]
+                });
+            }
+
+            // ----------------------------------------------------------------------
+            // 2. 状態管理 & 2013年安全仕様のストレージ機能（localStorage/Cookie）
+            // ----------------------------------------------------------------------
+            var STORAGE_KEY = "comic_shelf_order_2013";
+            var currentOrder = []; // 漫画のIDが並ぶ配列
+
+            // 本棚の並び順を保存（2013年当時すでに広く普及していたlocalStorageを使用、非対応ならCookieで代替）
+            function saveOrder(orderArray) {
+                var jsonStr = "[";
+                for (var i = 0; i < orderArray.length; i++) {
+                    jsonStr += orderArray[i] + (i === orderArray.length - 1 ? "" : ",");
+                }
+                jsonStr += "]";
+
+                if (window.localStorage) {
+                    try {
+                        window.localStorage.setItem(STORAGE_KEY, jsonStr);
+                    } catch (e) {
+                        // クォータ（容量）エラー対策
+                    }
+                } else {
+                    // 古いブラウザ用のCookieバックアップ処理（有効期限は1年）
+                    var exdate = new Date();
+                    exdate.setDate(exdate.getDate() + 365);
+                    document.cookie = STORAGE_KEY + "=" + escape(jsonStr) + "; expires=" + exdate.toGMTString();
+                }
+            }
+
+            // 本棚の並び順を読み込み
+            function loadOrder() {
+                var savedData = "";
+                if (window.localStorage) {
+                    savedData = window.localStorage.getItem(STORAGE_KEY);
+                } else {
+                    var cookies = document.cookie.split(";");
+                    for (var i = 0; i < cookies.length; i++) {
+                        var c = cookies[i].replace(/^\s+|\s+$/g, "");
+                        if (c.indexOf(STORAGE_KEY + "=") === 0) {
+                            savedData = unescape(c.substring(STORAGE_KEY.length + 1));
+                            break;
+                        }
+                    }
+                }
+
+                if (savedData) {
+                    // 2013年環境での安全性を最優先し、JSON.parseの代わりにeval風の簡易パース、または安全な置換で配列化
+                    try {
+                        var cleanStr = savedData.replace("[", "").replace("]", "");
+                        var strArray = cleanStr.split(",");
+                        var numArray = [];
+                        for (var j = 0; j < strArray.length; j++) {
+                            var num = parseInt(strArray[j], 10);
+                            if (!isNaN(num)) {
+                                numArray.push(num);
+                            }
+                        }
+                        if (numArray.length === TOTAL_BOOKS) {
+                            return numArray;
+                        }
+                    } catch(e) {}
+                }
+
+                // データがない、または壊れている場合はデフォルトの1〜30の並び
+                var defaultOrder = [];
+                for (var k = 1; k <= TOTAL_BOOKS; k++) {
+                    defaultOrder.push(k);
+                }
+                return defaultOrder;
+            }
+
+            // ----------------------------------------------------------------------
+            // 3. 本棚の描画（レンダリング）システム
+            // ----------------------------------------------------------------------
+            // 3階建て（3つのdiv）に10冊ずつ綺麗に分配し、DOMの再構築を行います。
+            function renderShelf() {
+                var row1 = document.getElementById("shelf-row-1");
+                var row2 = document.getElementById("shelf-row-2");
+                var row3 = document.getElementById("shelf-row-3");
+
+                // 古いブラウザのメモリリークを防ぐため、安全に中身を空にする
+                row1.innerHTML = "";
+                row2.innerHTML = "";
+                row3.innerHTML = "";
+
+                for (var index = 0; index < currentOrder.length; index++) {
+                    var bookId = currentOrder[index];
+                    var comic = null;
+
+                    // 対象のIDの漫画データを取得
+                    for (var d = 0; d < initialComicData.length; d++) {
+                        if (initialComicData[d].id === bookId) {
+                            comic = initialComicData[d];
+                            break;
+                        }
+                    }
+                    if (!comic) continue;
+
+                    // 本（表紙＋ボタン等）のHTML要素を組み立て（2013年仕様の文字列結合）
+                    var html = "";
+                    html += '<div class="book-item" data-id="' + comic.id + '" data-index="' + index + '">';
+                    html += '  <img src="' + comic.coverUrl + '" class="book-cover" alt="' + comic.title + '" title="' + comic.title + '">';
+                    html += '  <button class="read-btn" data-id="' + comic.id + '">読む</button>';
+                    html += '  <div class="sort-controls">';
+                    html += '    <span class="sort-arrow btn-left" data-index="' + index + '">◀</span>';
+                    html += '    <span class="sort-arrow btn-right" data-index="' + index + '">▶</span>';
+                    html += '  </div>';
+                    html += '</div>';
+
+                    // 1段に10冊ずつ配分（0〜9番目は1段目、10〜19番目は2段目、20〜29番目は3段目）
+                    if (index < 10) {
+                        row1.innerHTML += html;
+                    } else if (index < 20) {
+                        row2.innerHTML += html;
+                    } else {
+                        row3.innerHTML += html;
+                    }
+                }
+
+                // ボタン群へのイベント割り当てを行います（中編はここまで構築、実際のバインディング処理は後編へ）
+                bindShelfEvents();
+            }
+
+            // ----------------------------------------------------------------------
+            // 4. 配置移動（位置の入れ替え）ロジック
+            // ----------------------------------------------------------------------
+            function moveBook(fromIndex, direction) {
+                var toIndex = fromIndex + direction;
+                // 本棚の端（1番左、あるいは30番目の1番右）を超える移動は無視
+                if (toIndex < 0 || toIndex >= currentOrder.length) {
+                    return;
+                }
+                // 配列の要素を安全に入れ替え
+                var temp = currentOrder[fromIndex];
+                currentOrder[fromIndex] = currentOrder[toIndex];
+                currentOrder[toIndex] = temp;
+
+                // ストレージに即時保存
+                saveOrder(currentOrder);
+                // 本棚を再描画（アニメーションを挟まないため、古い端末でも処理が一瞬で終わります）
+                renderShelf();
+            }
+
+            // ----------------------------------------------------------------------
+            // 5. 4段階の「かまをかける」リセット確認ダイアログ
+            // ----------------------------------------------------------------------
+            // ユーザーが本当に初期化していいのか、しつこいほどに安全確認を行います。
+            function processStrictReset() {
+                var msg1 = "【確認 1/4】\n本当に本棚の並び順を最初（デフォルト）の状態に戻しますか？";
+                var msg2 = "【確認 2/4】\nよろしいですか？ 保存されていた配置データはすべて消去され、元には戻せません。";
+                var msg3 = "【確認 3/4】\nこれ以降の取り消しはできません。本当に、本当にリセットを実行しますか？";
+                var msg4 = "【最終確認 4/4】\nこれで本当に最後です。本棚を工場出荷時の状態に戻してもよろしいですね？";
+
+                if (confirm(msg1)) {
+                    if (confirm(msg2)) {
+                        if (confirm(msg3)) {
+                            if (confirm(msg4)) {
+                                // 4回すべての罠をクリアした場合のみリセット処理を実行
+                                var defaultOrder = [];
+                                for (var i = 1; i <= TOTAL_BOOKS; i++) {
+                                    defaultOrder.push(i);
+                                }
+                                currentOrder = defaultOrder;
+                                saveOrder(currentOrder);
+                                renderShelf();
+                                alert("本棚の配置を初期位置にリセットしました。");
+                            }
+                        }
+                    }
+                }
+            }
+
 </body>
 </html>
