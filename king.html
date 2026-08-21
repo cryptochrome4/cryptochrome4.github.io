@@ -445,6 +445,139 @@
                     }
                 }
             }
+                        // ----------------------------------------------------------------------
+            // 6. 2013年安全仕様：イベント紐付け（バインディング）システム
+            // ----------------------------------------------------------------------
+            // 本棚が再描画されるたびに呼び出され、ボタンに機能を安全に割り当てます。
+            function bindShelfEvents() {
+                // --- 1. 左移動ボタン (◀) ---
+                var leftBtns = document.getElementsByClassName("btn-left");
+                for (var i = 0; i < leftBtns.length; i++) {
+                    leftBtns[i].onclick = function(e) {
+                        // 古いブラウザのイベントバブリングを防止
+                        if (!e) var e = window.event;
+                        if (e.stopPropagation) e.stopPropagation(); else e.cancelBubble = true;
+                        
+                        var index = parseInt(this.getAttribute("data-index"), 10);
+                        moveBook(index, -1); // 左（インデックスをマイナス1）へ移動
+                    };
+                }
+
+                // --- 2. 右移動ボタン (▶) ---
+                var rightBtns = document.getElementsByClassName("btn-right");
+                for (var j = 0; j < rightBtns.length; j++) {
+                    rightBtns[j].onclick = function(e) {
+                        if (!e) var e = window.event;
+                        if (e.stopPropagation) e.stopPropagation(); else e.cancelBubble = true;
+                        
+                        var index = parseInt(this.getAttribute("data-index"), 10);
+                        moveBook(index, 1); // 右（インデックスをプラス1）へ移動
+                    };
+                }
+
+                // --- 3. 表紙下の「読む」ボタン ---
+                var readBtns = document.getElementsByClassName("read-btn");
+                for (var k = 0; k < readBtns.length; k++) {
+                    readBtns[k].onclick = function(e) {
+                        if (!e) var e = window.event;
+                        if (e.stopPropagation) e.stopPropagation(); else e.cancelBubble = true;
+                        
+                        var id = parseInt(this.getAttribute("data-id"), 10);
+                        openComicViewer(id);
+                    };
+                }
+            }
+
+            // ----------------------------------------------------------------------
+            // 7. ビューア表示切り替え（本棚を隠し、縦スクロールで漫画を展開）
+            // ----------------------------------------------------------------------
+            function openComicViewer(comicId) {
+                var comic = null;
+                // 対象の漫画データを特定
+                for (var i = 0; i < initialComicData.length; i++) {
+                    if (initialComicData[i].id === comicId) {
+                        comic = initialComicData[i];
+                        break;
+                    }
+                }
+                if (!comic) return;
+
+                // 画面要素の取得
+                var bookshelfSection = document.getElementById("bookshelf-section");
+                var viewerView = document.getElementById("comic-viewer-view");
+                var titleArea = document.getElementById("current-comic-title");
+                var pagesArea = document.getElementById("comic-pages-area");
+
+                // タイトルの設定と画像のクリア
+                titleArea.innerHTML = comic.title;
+                pagesArea.innerHTML = "";
+
+                // 漫画の画像（ページ）を縦一列にずらりと並べる（シンプルな縦スクロール仕様）
+                for (var p = 0; p < comic.pages.length; p++) {
+                    var img = document.createElement("img");
+                    img.src = comic.pages[p];
+                    img.className = "comic-page";
+                    img.alt = "ページ " + (p + 1);
+                    pagesArea.appendChild(img);
+                }
+
+                // 【重要】本棚エリアをサイト内から「一旦隠し」、ビューアを表示
+                bookshelfSection.style.display = "none";
+                viewerView.style.display = "block";
+
+                // 読書開始時に画面の1番上へ強制スクロール（古いスマホでのスクロール位置引き継ぎバグ防止）
+                window.scrollTo(0, 0);
+            }
+
+            // 漫画ビューアを閉じて本棚画面に戻る処理
+            function closeComicViewer() {
+                var bookshelfSection = document.getElementById("bookshelf-section");
+                var viewerView = document.getElementById("comic-viewer-view");
+                var pagesArea = document.getElementById("comic-pages-area");
+
+                // ビューアを隠し、本棚を再表示
+                viewerView.style.display = "none";
+                bookshelfSection.style.display = "block";
+
+                // メモリを即時解放するため、読み終わった漫画の画像を全消去
+                pagesArea.innerHTML = "";
+
+                // 本棚に戻った際にもトップへ戻す
+                window.scrollTo(0, 0);
+            }
+
+            // ----------------------------------------------------------------------
+            // 8. ページ初期起動処理（エントリーポイント）
+            // ----------------------------------------------------------------------
+            window.onload = function() {
+                // 1. 保存されている、またはデフォルトの並び順をロード
+                currentOrder = loadOrder();
+
+                // 2. 本棚を画面に描画
+                renderShelf();
+
+                // 3. リセットボタンへのイベント割り当て
+                var resetBtn = document.getElementById("reset-storage-btn");
+                if (resetBtn) {
+                    resetBtn.onclick = function() {
+                        processStrictReset();
+                    };
+                }
+
+                // 4. ビューアを閉じるボタンへのイベント割り当て
+                var closeBtn = document.getElementById("close-viewer-btn");
+                if (closeBtn) {
+                    closeBtn.onclick = function() {
+                        closeComicViewer();
+                    };
+                }
+            };
+
+        })();
+    </script>
+</body>
+</html>
+
 
 </body>
 </html>
