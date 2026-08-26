@@ -372,6 +372,207 @@ var selectedValues = {};
 // 前編（再）はここまで。
 // 次に中編①（再）CSSを適用してください。
 // ============================================================
+  // ============================================================
+// 中編②（再）：DOM生成 + ポップアップ配置 + localStorage保存
+// ============================================================
+
+// ---- 11段階の評価ラベル（赤色で表示） ----
+var evalLabels = [
+    "超下がり",
+    "強下がり",
+    "中下がり",
+    "弱下がり",
+    "下傾きの横ばい",
+    "横ばい",
+    "上傾きの横ばい",
+    "弱上がり",
+    "中上がり",
+    "強上がり",
+    "超上がり"
+];
+
+// ---- ポップアップを閉じる（全閉じ） ----
+function closeAllPopups() {
+    var popups = document.querySelectorAll('.eval-popup');
+    for (var i = 0; i < popups.length; i++) {
+        popups[i].classList.remove('show');
+    }
+}
+
+// ---- ポップアップのHTMLを生成 ----
+function createPopupHTML(wordIndex) {
+    var html = '<div class="eval-popup" data-word-index="' + wordIndex + '">';
+    for (var i = 0; i < evalLabels.length; i++) {
+        var label = evalLabels[i];
+        var id = 'eval_' + wordIndex + '_' + i;
+        html += '<div class="eval-item">';
+        html += '<input type="radio" name="eval_' + wordIndex + '" id="' + id + '" value="' + label + '">';
+        html += '<label for="' + id + '">' + label + '</label>';
+        html += '</div>';
+    }
+    html += '</div>';
+    return html;
+}
+
+// ---- 保存データを復元する関数 ----
+function restoreSelectedValues() {
+    var saved = loadFromStorage();
+    if (saved && typeof saved === 'object') {
+        // 保存されたデータをselectedValuesに反映
+        for (var key in saved) {
+            if (saved.hasOwnProperty(key)) {
+                selectedValues[key] = saved[key];
+            }
+        }
+        return true;
+    }
+    return false;
+}
+
+// ---- 選択値を保存（localStorageに即時保存） ----
+function saveSelectedValues() {
+    saveToStorage(selectedValues);
+}
+
+// ---- ステータス更新 ----
+function updateStatus() {
+    var total = Object.keys(selectedValues).length;
+    var allWords = document.querySelectorAll('.word-span');
+    var totalWords = allWords.length;
+    var statusBar = document.getElementById('statusBar');
+    if (statusBar) {
+        statusBar.textContent = '評価済み単語: ' + total + ' / ' + totalWords;
+    }
+}
+
+// ---- メイン描画関数 ----
+function renderText() {
+    var container = document.getElementById('textContainer');
+    container.innerHTML = ''; // 一旦クリア
+
+    var paragraphs = splitIntoParagraphs(englishText);
+    var globalWordIndex = 0;
+
+    // まず保存データを復元（描画前に読み込む）
+    var hasSavedData = restoreSelectedValues();
+
+    for (var p = 0; p < paragraphs.length; p++) {
+        var paragraphText = paragraphs[p];
+        if (paragraphText.trim() === '') continue;
+
+        var words = splitIntoWords(paragraphText);
+        var pElem = document.createElement('p');
+
+        for (var w = 0; w < words.length; w++) {
+            var word = words[w];
+            var index = globalWordIndex;
+
+            // ---- 単語用のspan ----
+            var wordSpan = document.createElement('span');
+            wordSpan.className = 'word-span';
+            wordSpan.setAttribute('data-word-index', index);
+            wordSpan.textContent = word;
+
+            // ---- 評価ボタン（▼） ----
+            var btn = document.createElement('span');
+            btn.className = 'btn-eval';
+            btn.textContent = '▼';
+            btn.setAttribute('data-word-index', index);
+
+            // ボタンクリックでポップアップ表示
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                var idx = parseInt(this.getAttribute('data-word-index'), 10);
+                var popup = document.querySelector('.eval-popup[data-word-index="' + idx + '"]');
+                if (popup) {
+                    closeAllPopups();
+                    popup.classList.toggle('show');
+                }
+            });
+
+            // ---- ポップアップ本体 ----
+            var popupHTML = createPopupHTML(index);
+            var tempDiv = document.createElement('div');
+            tempDiv.innerHTML = popupHTML;
+            var popupElem = tempDiv.firstChild;
+
+            // ラジオボタン変更イベント（選択値を保存＋localStorage即時保存）
+            var radios = popupElem.querySelectorAll('input[type="radio"]');
+            for (var r = 0; r < radios.length; r++) {
+                radios[r].addEventListener('change', function(e) {
+                    var idx = parseInt(this.name.replace('eval_', ''), 10);
+                    selectedValues[idx] = this.value;
+                    
+                    // ★ localStorageに即時保存 ★
+                    saveSelectedValues();
+                    
+                    // 選択済みの単語にマーク
+                    var wordSpan = document.querySelector('.word-span[data-word-index="' + idx + '"]');
+                    if (wordSpan) {
+                        wordSpan.classList.add('selected');
+                    }
+                    // ポップアップを閉じる
+                    var popup = this.closest('.eval-popup');
+                    if (popup) {
+                        popup.classList.remove('show');
+                    }
+                    updateStatus();
+                });
+            }
+
+            // ---- 保存データがあれば復元（チェックを入れる） ----
+            if (hasSavedData && selectedValues[index] !== undefined) {
+                var savedValue = selectedValues[index];
+                for (var r2 = 0; r2 < radios.length; r2++) {
+                    if (radios[r2].value === savedValue) {
+                        radios[r2].checked = true;
+                        wordSpan.classList.add('selected');
+                        break;
+                    }
+                }
+            }
+
+            // ---- 単語のspanにポップアップを追加 ----
+            wordSpan.appendChild(popupElem);
+
+            // ---- p要素に単語span + ボタンを追加 ----
+            pElem.appendChild(wordSpan);
+            pElem.appendChild(btn);
+            // 単語間にスペース
+            if (w < words.length - 1) {
+                pElem.appendChild(document.createTextNode(' '));
+            }
+
+            globalWordIndex++;
+        }
+
+        container.appendChild(pElem);
+    }
+
+    // ステータスバーを追加
+    var statusBar = document.createElement('div');
+    statusBar.id = 'statusBar';
+    statusBar.textContent = '評価済み単語: ' + Object.keys(selectedValues).length + ' / ' + globalWordIndex;
+    container.appendChild(statusBar);
+
+    // クリックでポップアップを閉じる（ページ全体）
+    document.addEventListener('click', function(e) {
+        var target = e.target;
+        if (!target.closest('.eval-popup') && !target.closest('.btn-eval')) {
+            closeAllPopups();
+        }
+    });
+}
+
+// ---- 初期描画 ----
+window.addEventListener('DOMContentLoaded', function() {
+    renderText();
+});
+
+// ============================================================
+// 中編②（再） ここまで
+// 次に後編（再）でリセット機能（4回確認）を追加
+// ============================================================
 </script>
 
 </body>
