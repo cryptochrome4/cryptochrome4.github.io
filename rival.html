@@ -573,6 +573,367 @@ window.addEventListener('DOMContentLoaded', function() {
 // 中編②（再） ここまで
 // 次に後編（再）でリセット機能（4回確認）を追加
 // ============================================================
+  // ============================================================
+// 後編（再）：4段階リセット確認 + コントロールパネル + 集計・JSON出力
+// ============================================================
+
+// ---- リセット確認用の変数 ----
+var resetStep = 0; // 0=未開始, 1〜4=確認ステップ
+var resetMessages = [
+    '',
+    '本当にリセットしますか？\n（この操作は元に戻せません）',
+    '本当に本当にリセットしますか？\n（もう一度確認します）',
+    '最終確認です。リセットしますか？\n（あと2回で実行されます）',
+    '最後の確認です。よろしいですか？\n（本当に実行しますか？）'
+];
+
+// ---- リセット実行（4回目の確認後） ----
+function executeReset() {
+    // データをクリア
+    selectedValues = {};
+    clearStorage();
+    
+    // すべてのラジオボタンのチェックを外す
+    var radios = document.querySelectorAll('.eval-popup input[type="radio"]');
+    for (var i = 0; i < radios.length; i++) {
+        radios[i].checked = false;
+    }
+    
+    // selectedクラスを除去
+    var wordSpans = document.querySelectorAll('.word-span');
+    for (var j = 0; j < wordSpans.length; j++) {
+        wordSpans[j].classList.remove('selected');
+    }
+    
+    // ステータス更新
+    updateStatus();
+    
+    // リセットステップを初期化
+    resetStep = 0;
+    
+    // ポップアップを閉じる
+    closeAllPopups();
+    
+    alert('全ての評価をリセットしました。');
+}
+
+// ---- リセット確認ダイアログを表示（4段階） ----
+function showResetConfirm() {
+    // リセットステップが0なら開始
+    if (resetStep === 0) {
+        resetStep = 1;
+    }
+    
+    // 現在のステップが4を超えていたら実行
+    if (resetStep > 4) {
+        executeReset();
+        return;
+    }
+    
+    // 既存の確認オーバーレイがあれば削除
+    var oldOverlay = document.getElementById('resetConfirmOverlay');
+    if (oldOverlay) {
+        oldOverlay.parentNode.removeChild(oldOverlay);
+    }
+    
+    // オーバーレイ作成
+    var overlay = document.createElement('div');
+    overlay.id = 'resetConfirmOverlay';
+    overlay.style.cssText = 
+        'position: fixed; top: 0; left: 0; width: 100%; height: 100%; ' +
+        'background: rgba(0,0,0,0.6); z-index: 99999; display: flex; ' +
+        'align-items: center; justify-content: center;';
+    
+    var box = document.createElement('div');
+    box.id = 'resetConfirmBox';
+    box.style.cssText = 
+        'background: #ffffff; padding: 30px 40px; border-radius: 10px; ' +
+        'border: 3px solid #cc0000; max-width: 500px; text-align: center; ' +
+        'box-shadow: 0 10px 40px rgba(0,0,0,0.5);';
+    
+    // メッセージ
+    var msg = document.createElement('p');
+    msg.textContent = resetMessages[resetStep];
+    msg.style.cssText = 'font-size: 18px; margin-bottom: 20px; color: #000000;';
+    box.appendChild(msg);
+    
+    // ステップ表示（現在のステップ/4）
+    var stepInfo = document.createElement('div');
+    stepInfo.textContent = '確認 ' + resetStep + ' / 4';
+    stepInfo.style.cssText = 
+        'font-size: 14px; color: #888888; margin-bottom: 20px;';
+    box.appendChild(stepInfo);
+    
+    // ボタン群
+    var btnGroup = document.createElement('div');
+    btnGroup.style.cssText = 'display: flex; justify-content: center; gap: 15px;';
+    
+    // 「はい」ボタン（次のステップへ）
+    var yesBtn = document.createElement('button');
+    yesBtn.textContent = 'はい';
+    yesBtn.className = 'reset-btn-yes';
+    yesBtn.style.cssText = 
+        'background: #cc0000; color: #ffffff; border: none; ' +
+        'padding: 10px 30px; border-radius: 4px; font-size: 16px; ' +
+        'cursor: pointer; font-weight: bold;';
+    yesBtn.addEventListener('mouseenter', function() {
+        this.style.background = '#990000';
+    });
+    yesBtn.addEventListener('mouseleave', function() {
+        this.style.background = '#cc0000';
+    });
+    yesBtn.addEventListener('click', function() {
+        // 次のステップへ
+        resetStep++;
+        // オーバーレイを閉じて再表示
+        document.body.removeChild(overlay);
+        showResetConfirm(); // 再帰呼び出し
+    });
+    
+    // 「いいえ」ボタン（中止）
+    var noBtn = document.createElement('button');
+    noBtn.textContent = 'いいえ（中止）';
+    noBtn.className = 'reset-btn-no';
+    noBtn.style.cssText = 
+        'background: #888888; color: #ffffff; border: none; ' +
+        'padding: 10px 30px; border-radius: 4px; font-size: 16px; ' +
+        'cursor: pointer; font-weight: bold;';
+    noBtn.addEventListener('mouseenter', function() {
+        this.style.background = '#666666';
+    });
+    noBtn.addEventListener('mouseleave', function() {
+        this.style.background = '#888888';
+    });
+    noBtn.addEventListener('click', function() {
+        // 中止：リセットステップを初期化
+        resetStep = 0;
+        document.body.removeChild(overlay);
+        alert('リセットを中止しました。');
+    });
+    
+    btnGroup.appendChild(yesBtn);
+    btnGroup.appendChild(noBtn);
+    box.appendChild(btnGroup);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+    
+    // 背景クリックでも中止
+    overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) {
+            resetStep = 0;
+            document.body.removeChild(overlay);
+            alert('リセットを中止しました。');
+        }
+    });
+}
+
+// ---- 集計結果を表示する関数 ----
+function showSummary() {
+    var totalWords = document.querySelectorAll('.word-span').length;
+    var evaluated = Object.keys(selectedValues).length;
+    
+    // 各評価ラベルのカウント
+    var countMap = {};
+    for (var i = 0; i < evalLabels.length; i++) {
+        countMap[evalLabels[i]] = 0;
+    }
+    for (var key in selectedValues) {
+        if (selectedValues.hasOwnProperty(key)) {
+            var val = selectedValues[key];
+            if (countMap[val] !== undefined) {
+                countMap[val]++;
+            }
+        }
+    }
+
+    // 集計結果の文字列を作成
+    var summaryText = '===== 集計結果 =====\n';
+    summaryText += '総単語数: ' + totalWords + '\n';
+    summaryText += '評価済み単語数: ' + evaluated + '\n';
+    summaryText += '未評価単語数: ' + (totalWords - evaluated) + '\n\n';
+    summaryText += '--- 評価分布 ---\n';
+    for (var label in countMap) {
+        if (countMap.hasOwnProperty(label)) {
+            var count = countMap[label];
+            if (count > 0) {
+                var bar = '';
+                for (var b = 0; b < count && b < 40; b++) {
+                    bar += '■';
+                }
+                summaryText += label + ': ' + count + ' ' + bar + '\n';
+            }
+        }
+    }
+    summaryText += '\n--- 各単語の評価（インデックス順） ---\n';
+    var allWordSpans = document.querySelectorAll('.word-span');
+    var idx = 0;
+    for (var s = 0; s < allWordSpans.length; s++) {
+        var wordText = allWordSpans[s].textContent.trim();
+        var evalText = selectedValues[idx] || '（未評価）';
+        summaryText += '[' + idx + '] ' + wordText + ' → ' + evalText + '\n';
+        idx++;
+    }
+
+    return summaryText;
+}
+
+// ---- JSONデータを出力する関数 ----
+function getJSONData() {
+    var data = {
+        totalWords: document.querySelectorAll('.word-span').length,
+        evaluatedCount: Object.keys(selectedValues).length,
+        selectedValues: selectedValues,
+        evalLabels: evalLabels,
+        timestamp: new Date().toISOString()
+    };
+    return JSON.stringify(data, null, 2);
+}
+
+// ---- ポップアップで集計結果を表示 ----
+function showSummaryPopup() {
+    var summary = showSummary();
+    var oldPopup = document.getElementById('summaryPopup');
+    if (oldPopup) {
+        oldPopup.parentNode.removeChild(oldPopup);
+    }
+
+    var overlay = document.createElement('div');
+    overlay.id = 'summaryPopup';
+    overlay.style.cssText = 
+        'position: fixed; top: 0; left: 0; width: 100%; height: 100%; ' +
+        'background: rgba(0,0,0,0.5); z-index: 9999; display: flex; ' +
+        'align-items: center; justify-content: center;';
+
+    var content = document.createElement('div');
+    content.style.cssText = 
+        'background: #ffffff; padding: 30px; max-width: 700px; max-height: 80%; ' +
+        'overflow: auto; border-radius: 8px; box-shadow: 0 8px 30px rgba(0,0,0,0.4); ' +
+        'font-family: monospace; font-size: 13px; white-space: pre-wrap; ' +
+        'border: 2px solid #cc0000;';
+
+    content.textContent = summary;
+
+    var closeBtn = document.createElement('button');
+    closeBtn.textContent = '閉じる';
+    closeBtn.style.cssText = 
+        'display: block; margin: 20px auto 0; padding: 10px 30px; ' +
+        'background: #cc0000; color: #ffffff; border: none; border-radius: 4px; ' +
+        'font-size: 16px; cursor: pointer; font-weight: bold;';
+    closeBtn.addEventListener('click', function() {
+        document.body.removeChild(overlay);
+    });
+
+    content.appendChild(closeBtn);
+    overlay.appendChild(content);
+    document.body.appendChild(overlay);
+
+    overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) {
+            document.body.removeChild(overlay);
+        }
+    });
+}
+
+// ---- JSONをクリップボードにコピー（2013年対応 fallback付き） ----
+function copyJSONToClipboard() {
+    var json = getJSONData();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(json).then(function() {
+            alert('JSONデータをクリップボードにコピーしました！');
+        }).catch(function() {
+            fallbackCopy(json);
+        });
+    } else {
+        fallbackCopy(json);
+    }
+}
+
+function fallbackCopy(text) {
+    var textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.cssText = 'position: fixed; left: -9999px; top: -9999px;';
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+        var success = document.execCommand('copy');
+        if (success) {
+            alert('JSONデータをクリップボードにコピーしました！（フォールバック方式）');
+        } else {
+            alert('コピーに失敗しました。手動で選択してコピーしてください。');
+        }
+    } catch (e) {
+        alert('コピーに失敗しました。手動で選択してコピーしてください。');
+    }
+    document.body.removeChild(textarea);
+}
+
+// ---- コントロールパネルを生成 ----
+function createControlPanel() {
+    var container = document.getElementById('textContainer');
+    
+    var panel = document.createElement('div');
+    panel.id = 'controlPanel';
+    
+    var title = document.createElement('div');
+    title.className = 'panel-title';
+    title.textContent = '⚙ コントロールパネル';
+    
+    var btnGroup = document.createElement('div');
+    btnGroup.className = 'btn-group';
+    
+    // 各ボタンを作成
+    var buttons = [
+        { text: '📊 集計表示', action: showSummaryPopup },
+        { text: '📋 JSONコピー', action: copyJSONToClipboard },
+        { text: '🔄 リセット（4段階確認）', action: showResetConfirm },
+        { text: '📥 JSON表示（コンソール）', action: function() { 
+            console.log(getJSONData()); 
+            alert('コンソールにJSONを出力しました（F12）'); 
+        }}
+    ];
+    
+    for (var b = 0; b < buttons.length; b++) {
+        var btn = document.createElement('button');
+        btn.textContent = buttons[b].text;
+        btn.addEventListener('click', buttons[b].action);
+        btnGroup.appendChild(btn);
+    }
+    
+    panel.appendChild(title);
+    panel.appendChild(btnGroup);
+    
+    // 既存のコントロールパネルを削除してから追加
+    var oldPanel = document.getElementById('controlPanel');
+    if (oldPanel) {
+        oldPanel.parentNode.removeChild(oldPanel);
+    }
+    container.insertBefore(panel, container.firstChild);
+}
+
+// ---- 描画完了後にコントロールパネルを追加（renderTextを拡張） ----
+var originalRender = renderText;
+renderText = function() {
+    originalRender();
+    if (!document.getElementById('controlPanel')) {
+        createControlPanel();
+    }
+};
+
+// ---- グローバルに公開（デバッグ用） ----
+window.showSummary = showSummary;
+window.getJSONData = getJSONData;
+window.copyJSONToClipboard = copyJSONToClipboard;
+window.showResetConfirm = showResetConfirm;
+window.executeReset = executeReset;
+
+// ---- ページ読み込み完了時に再描画（拡張版） ----
+window.addEventListener('DOMContentLoaded', function() {
+    renderText();
+});
+
+// ============================================================
+// 後編（再） 完了。全機能が揃いました！
+// ============================================================
 </script>
 
 </body>
