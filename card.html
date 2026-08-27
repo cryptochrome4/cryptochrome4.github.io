@@ -412,6 +412,8 @@ let game = {
     enemyHand: [],
     playerField: [],
     enemyField: [],
+    playerGrave: [],
+    enemyGrave: [],
     playerLife: MAX_LIFE,
     enemyLife: MAX_LIFE,
     turn: 0,
@@ -460,15 +462,31 @@ function drawCard(deck, hand, count = 1) {
     return drawn;
 }
 
+// ★★★ 墓地に追加する関数 ★★★
+function addToGrave(card, isPlayer) {
+    if (isPlayer) {
+        game.playerGrave.push(card);
+        if (card.id === 6) game.kennyInGrave = true;
+    } else {
+        game.enemyGrave.push(card);
+        if (card.id === 6) game.kennyInGrave = true;
+    }
+}
+
+// ★★★ フィールドからカードを破壊（墓地送り）★★★
+function destroyCard(field, index, isPlayerField) {
+    const card = field.splice(index, 1)[0];
+    addToGrave(card.card, isPlayerField);
+    return card;
+}
+
 // ★★★ 攻撃力計算（血の海・呪いのピアノ対応）★★★
 function getCardAtk(card, isEnemy = false) {
     if (!card || card.type === 'magic') return 0;
     let atk = card.atk || 0;
     
-    // 英雄 (id=22): 攻撃時に1/2で攻撃力6000
     if (card.id === 22 && Math.random() < 0.5) atk = 6000;
     
-    // 血の海 (id=29): 相手の攻撃力を-3000
     if (isEnemy && game.playerBloodSeaActive) {
         atk = Math.max(0, atk - 3000);
     }
@@ -476,7 +494,6 @@ function getCardAtk(card, isEnemy = false) {
         atk = Math.max(0, atk - 3000);
     }
     
-    // 呪いのピアノ (id=30): 使った側の「相手」の攻撃力を-2000
     if (game.curseActive) {
         if ((game.curseOwner === 'player' && isEnemy) || 
             (game.curseOwner === 'enemy' && !isEnemy)) {
@@ -515,13 +532,11 @@ function hasPasswordCoin(field) {
 
 // ★★★ 攻撃対象を選択（パスワード&コインは優先度が低い）★★★
 function getAttackTarget(field) {
-    // パスワード&コイン以外のカードを優先
     for (let i = 0; i < field.length; i++) {
         if (field[i].card.id !== 28) {
             return i;
         }
     }
-    // パスワード&コインしかいなければそれを攻撃
     return 0;
 }
 
@@ -535,6 +550,8 @@ function initGame() {
     game.enemyHand = [];
     game.playerField = [];
     game.enemyField = [];
+    game.playerGrave = [];
+    game.enemyGrave = [];
     game.playerLife = MAX_LIFE;
     game.enemyLife = MAX_LIFE;
     game.turn = Math.random() < 0.5 ? 0 : 1;
@@ -651,6 +668,8 @@ function playCardFromHand(index) {
         const magicCard = game.playerHand.splice(index, 1)[0];
         addLog(`📜 魔法「${magicCard.name}」を使用！`);
         applyMagicEffect(magicCard, 'player');
+        // 使用した魔法カードは墓地へ
+        addToGrave(magicCard, true);
         updateUI();
         checkDeckOut();
         return;
@@ -667,6 +686,7 @@ function applyMagicEffect(card, owner) {
     const enemyHand = isPlayer ? game.enemyHand : game.playerHand;
     const playerHand = isPlayer ? game.playerHand : game.enemyHand;
 
+    // 本 (id=19): 相手の手札を奪う
     if (id === 19) {
         if (enemyHand.length === 0) {
             addLog('相手の手札は空です');
@@ -689,19 +709,32 @@ function applyMagicEffect(card, owner) {
         return;
     }
 
+    // 不死身 (id=21): 墓地のケニーをフィールドに出す
     if (id === 21) {
-        if (game.kennyInGrave) {
+        const grave = isPlayer ? game.playerGrave : game.enemyGrave;
+        let kennyIndex = -1;
+        for (let i = 0; i < grave.length; i++) {
+            if (grave[i].id === 6) {
+                kennyIndex = i;
+                break;
+            }
+        }
+        if (kennyIndex >= 0) {
+            const kenny = grave.splice(kennyIndex, 1)[0];
+            const field = isPlayer ? game.playerField : game.enemyField;
             if (isFieldFull(isPlayer ? 'player' : 'enemy')) {
                 addLog('⚠️ フィールドが埋まっています');
+                grave.push(kenny);
             } else {
-                const kennyCard = CARD_DATA.find(c => c.id === 6);
-                if (kennyCard) {
-                    const count = (kennyCard.id === 18) ? 0 : 1;
-                    const field = isPlayer ? game.playerField : game.enemyField;
-                    field.push({ card: cloneCard(kennyCard), count: count });
-                    game.kennyInGrave = false;
-                    addLog('🧟 ケニーが墓地から復活しました！');
+                const count = (kenny.id === 18) ? 0 : 1;
+                field.push({ card: kenny, count: count });
+                // ケニーフラグを再チェック
+                let hasKenny = false;
+                for (let j = 0; j < grave.length; j++) {
+                    if (grave[j].id === 6) hasKenny = true;
                 }
+                game.kennyInGrave = hasKenny;
+                addLog('🧟 ケニーが墓地から復活しました！');
             }
         } else {
             addLog('墓地にケニーはいません');
@@ -714,6 +747,7 @@ function applyMagicEffect(card, owner) {
         return;
     }
 
+    // 念力 (id=26): 相手の手札を公開
     if (id === 26) {
         if (enemyHand.length === 0) {
             addLog('相手の手札は空です');
@@ -724,6 +758,7 @@ function applyMagicEffect(card, owner) {
         return;
     }
 
+    // 呪いのピアノ (id=30)
     if (id === 30) {
         game.curseActive = true;
         game.curseTurns = 2;
@@ -744,6 +779,7 @@ function performAllAttack(attackerFieldIndex, isEnemyAttacker = false) {
     const attackerCard = attacker.card;
     let atk = getCardAtk(attackerCard, isEnemyAttacker);
     const targetField = isEnemyAttacker ? game.playerField : game.enemyField;
+    const isPlayerField = !isEnemyAttacker;
     
     // クイヤ (id=27) の自爆チェック
     if (attackerCard.id === 27) {
@@ -767,6 +803,8 @@ function performAllAttack(attackerFieldIndex, isEnemyAttacker = false) {
                     return;
                 }
             }
+            // 自爆したクイヤは墓地へ
+            addToGrave(attackerCard, isPlayerField);
             field.splice(attackerFieldIndex, 1);
             return;
         }
@@ -793,6 +831,8 @@ function performAllAttack(attackerFieldIndex, isEnemyAttacker = false) {
                 return;
             }
         }
+        // 攻撃したカードは墓地へ
+        addToGrave(attackerCard, isPlayerField);
         field.splice(attackerFieldIndex, 1);
         return;
     }
@@ -810,6 +850,8 @@ function performAllAttack(attackerFieldIndex, isEnemyAttacker = false) {
             const dmg = atk - targetAtk;
             totalDamage += dmg;
             destroyedCards.push(targetCard.name);
+            // 相手カードを墓地へ
+            addToGrave(targetCard, !isPlayerField);
             targetField.splice(i, 1);
         } else if (atk < targetAtk) {
             if (attackerCard.id === 27) {
@@ -824,6 +866,7 @@ function performAllAttack(attackerFieldIndex, isEnemyAttacker = false) {
             }
         } else {
             destroyedCards.push(targetCard.name);
+            addToGrave(targetCard, !isPlayerField);
             targetField.splice(i, 1);
         }
     }
@@ -854,6 +897,8 @@ function performAllAttack(attackerFieldIndex, isEnemyAttacker = false) {
         }
     }
     
+    // 攻撃したカードは墓地へ
+    addToGrave(attackerCard, isPlayerField);
     field.splice(attackerFieldIndex, 1);
 }
 
@@ -864,6 +909,7 @@ function performNormalAttack(attackerFieldIndex, isEnemyAttacker = false) {
     const field = isEnemyAttacker ? game.enemyField : game.playerField;
     const attacker = field[attackerFieldIndex];
     const attackerCard = attacker.card;
+    const isPlayerField = !isEnemyAttacker;
     const isHero = (attackerCard.id === 17);
     let atk = getCardAtk(attackerCard, isEnemyAttacker);
     let attackCount = isHero ? 2 : 1;
@@ -873,12 +919,13 @@ function performNormalAttack(attackerFieldIndex, isEnemyAttacker = false) {
         if (!heroSurvived && isHero) break;
         
         const targetField = isEnemyAttacker ? game.playerField : game.enemyField;
+        const targetIsPlayerField = !isEnemyAttacker;
         
-        // ★★★ パスワード&コインの効果チェック（攻撃する側から見た相手フィールド）★★★
+        // ★★★ パスワード&コインの効果チェック ★★★
         if (hasPasswordCoin(targetField)) {
             if (Math.random() < 0.5) {
                 addLog(`🔒 パスワード&コインの効果で攻撃失敗！`);
-                return; // 攻撃が完全に失敗
+                return;
             }
         }
         
@@ -903,6 +950,7 @@ function performNormalAttack(attackerFieldIndex, isEnemyAttacker = false) {
                     return;
                 }
             }
+            // 攻撃後もカードは生き残る（ダイレクトアタックでは破壊されない）
             continue;
         }
 
@@ -914,7 +962,10 @@ function performNormalAttack(attackerFieldIndex, isEnemyAttacker = false) {
 
         if (atk > targetAtk) {
             const dmg = atk - targetAtk;
+            // 相手カードを破壊（墓地へ）
+            addToGrave(targetCard, targetIsPlayerField);
             targetField.splice(targetIndex, 1);
+            
             if (isEnemyAttacker) {
                 game.playerLife -= dmg;
                 addLog(`👾 ${attackerCard.name} が ${targetCard.name} を破壊！ ${dmg}ダメージ！`, 'danger');
@@ -940,6 +991,8 @@ function performNormalAttack(attackerFieldIndex, isEnemyAttacker = false) {
             }
             heroSurvived = true;
         } else if (atk < targetAtk) {
+            // 自分のカードが破壊される（墓地へ）
+            addToGrave(attackerCard, isPlayerField);
             field.splice(attackerFieldIndex, 1);
             const dmg = targetAtk - atk;
             if (isEnemyAttacker) {
@@ -964,6 +1017,9 @@ function performNormalAttack(attackerFieldIndex, isEnemyAttacker = false) {
             heroSurvived = false;
             break;
         } else {
+            // 相打ち（両方墓地へ）
+            addToGrave(attackerCard, isPlayerField);
+            addToGrave(targetCard, targetIsPlayerField);
             field.splice(attackerFieldIndex, 1);
             targetField.splice(targetIndex, 1);
             if (isEnemyAttacker) {
@@ -1011,6 +1067,8 @@ function performPlayerAttack() {
         if (game.enemyHand.length > 0) {
             const idx = Math.floor(Math.random() * game.enemyHand.length);
             const discarded = game.enemyHand.splice(idx, 1)[0];
+            // 捨てられたカードは相手の墓地へ
+            addToGrave(discarded, false);
             addLog(`😈 サタン: 相手の手札「${discarded.name}」を墓地に送った！`);
         } else {
             addLog('相手の手札は空です');
@@ -1026,6 +1084,8 @@ function performPlayerAttack() {
             if (Math.random() < 0.5) {
                 const idx = Math.floor(Math.random() * game.enemyField.length);
                 const removed = game.enemyField.splice(idx, 1)[0];
+                // 賭けで墓地に送る
+                addToGrave(removed.card, false);
                 addLog(`👻 ゴーストの賭け成功！ ${removed.card.name} を墓地に送った！`);
             } else {
                 addLog('👻 ゴーストの賭けに失敗...');
@@ -1137,6 +1197,8 @@ function executeEnemyTurn() {
                     const magic = game.enemyHand.splice(i, 1)[0];
                     addLog(`👾 相手が魔法「${magic.name}」を使用`);
                     applyMagicEffect(magic, 'enemy');
+                    // 使用した魔法カードは墓地へ
+                    addToGrave(magic, false);
                     magicUsed = true;
                     break;
                 }
