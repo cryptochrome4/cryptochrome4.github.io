@@ -421,7 +421,7 @@ let game = {
     enemySkipNextTurn: false,
     curseActive: false,
     curseTurns: 0,
-    curseOwner: null, // 'player' または 'enemy'
+    curseOwner: null,
     kennyInGrave: false,
     playerBloodSeaActive: false,
     enemyBloodSeaActive: false,
@@ -460,12 +460,15 @@ function drawCard(deck, hand, count = 1) {
     return drawn;
 }
 
+// ★★★ 攻撃力計算（血の海・呪いのピアノ対応）★★★
 function getCardAtk(card, isEnemy = false) {
     if (!card || card.type === 'magic') return 0;
     let atk = card.atk || 0;
+    
+    // 英雄 (id=22): 攻撃時に1/2で攻撃力6000
     if (card.id === 22 && Math.random() < 0.5) atk = 6000;
     
-    // 血の海の効果
+    // 血の海 (id=29): 相手の攻撃力を-3000
     if (isEnemy && game.playerBloodSeaActive) {
         atk = Math.max(0, atk - 3000);
     }
@@ -473,9 +476,8 @@ function getCardAtk(card, isEnemy = false) {
         atk = Math.max(0, atk - 3000);
     }
     
-    // ★★★ 呪いのピアノの効果（修正）★★★
+    // 呪いのピアノ (id=30): 使った側の「相手」の攻撃力を-2000
     if (game.curseActive) {
-        // 呪いのピアノを使った側の「相手」に適用
         if ((game.curseOwner === 'player' && isEnemy) || 
             (game.curseOwner === 'enemy' && !isEnemy)) {
             atk = Math.max(0, atk - 2000);
@@ -499,6 +501,28 @@ function addLog(msg, cls = '') {
     if (cls) div.className = cls;
     el.appendChild(div);
     el.scrollTop = el.scrollHeight;
+}
+
+// ★★★ 相手フィールドにパスワード&コインがあるかチェック ★★★
+function hasPasswordCoin(field) {
+    for (let i = 0; i < field.length; i++) {
+        if (field[i].card.id === 28) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// ★★★ 攻撃対象を選択（パスワード&コインは優先度が低い）★★★
+function getAttackTarget(field) {
+    // パスワード&コイン以外のカードを優先
+    for (let i = 0; i < field.length; i++) {
+        if (field[i].card.id !== 28) {
+            return i;
+        }
+    }
+    // パスワード&コインしかいなければそれを攻撃
+    return 0;
 }
 
 // ============================================================
@@ -700,20 +724,19 @@ function applyMagicEffect(card, owner) {
         return;
     }
 
-    // ★★★ 呪いのピアノ (id=30) ★★★
     if (id === 30) {
         game.curseActive = true;
         game.curseTurns = 2;
         game.curseOwner = isPlayer ? 'player' : 'enemy';
         const ownerName = isPlayer ? 'あなた' : 'コンピューター';
-        addLog(`🎹 ${ownerName}の呪いのピアノ: 相手の攻撃力が-2000！ (このターンと次の相手ターン)`);
+        addLog(`🎹 ${ownerName}の呪いのピアノ: 相手の攻撃力が-2000！`);
         return;
     }
     addLog(`魔法「${card.name}」を使用しました。`);
 }
 
 // ============================================================
-// 全体攻撃処理
+// 全体攻撃処理 (宝獣 id=16, クイヤ id=27)
 // ============================================================
 function performAllAttack(attackerFieldIndex, isEnemyAttacker = false) {
     const field = isEnemyAttacker ? game.enemyField : game.playerField;
@@ -722,6 +745,7 @@ function performAllAttack(attackerFieldIndex, isEnemyAttacker = false) {
     let atk = getCardAtk(attackerCard, isEnemyAttacker);
     const targetField = isEnemyAttacker ? game.playerField : game.enemyField;
     
+    // クイヤ (id=27) の自爆チェック
     if (attackerCard.id === 27) {
         if (Math.random() < 0.5) {
             if (isEnemyAttacker) {
@@ -748,6 +772,7 @@ function performAllAttack(attackerFieldIndex, isEnemyAttacker = false) {
         }
     }
     
+    // 相手フィールドが空の場合
     if (targetField.length === 0) {
         if (isEnemyAttacker) {
             game.playerLife -= atk;
@@ -772,6 +797,7 @@ function performAllAttack(attackerFieldIndex, isEnemyAttacker = false) {
         return;
     }
     
+    // ★★★ 全体攻撃: 相手フィールドの全カードに攻撃 ★★★
     let totalDamage = 0;
     const destroyedCards = [];
     
@@ -832,7 +858,7 @@ function performAllAttack(attackerFieldIndex, isEnemyAttacker = false) {
 }
 
 // ============================================================
-// 通常攻撃処理
+// 通常攻撃処理 (ヒーローの2回攻撃対応)
 // ============================================================
 function performNormalAttack(attackerFieldIndex, isEnemyAttacker = false) {
     const field = isEnemyAttacker ? game.enemyField : game.playerField;
@@ -848,6 +874,15 @@ function performNormalAttack(attackerFieldIndex, isEnemyAttacker = false) {
         
         const targetField = isEnemyAttacker ? game.playerField : game.enemyField;
         
+        // ★★★ パスワード&コインの効果チェック（攻撃する側から見た相手フィールド）★★★
+        if (hasPasswordCoin(targetField)) {
+            if (Math.random() < 0.5) {
+                addLog(`🔒 パスワード&コインの効果で攻撃失敗！`);
+                return; // 攻撃が完全に失敗
+            }
+        }
+        
+        // 相手フィールドが空ならダイレクトアタック
         if (targetField.length === 0) {
             if (isEnemyAttacker) {
                 game.playerLife -= atk;
@@ -871,14 +906,15 @@ function performNormalAttack(attackerFieldIndex, isEnemyAttacker = false) {
             continue;
         }
 
-        const targetIndex = 0;
+        // ★★★ 攻撃対象を選択（パスワード&コインは優先度が低い）★★★
+        const targetIndex = getAttackTarget(targetField);
         const target = targetField[targetIndex];
         const targetCard = target.card;
         let targetAtk = getCardAtk(targetCard, !isEnemyAttacker);
 
         if (atk > targetAtk) {
             const dmg = atk - targetAtk;
-            const removed = targetField.splice(targetIndex, 1)[0];
+            targetField.splice(targetIndex, 1);
             if (isEnemyAttacker) {
                 game.playerLife -= dmg;
                 addLog(`👾 ${attackerCard.name} が ${targetCard.name} を破壊！ ${dmg}ダメージ！`, 'danger');
@@ -904,7 +940,7 @@ function performNormalAttack(attackerFieldIndex, isEnemyAttacker = false) {
             }
             heroSurvived = true;
         } else if (atk < targetAtk) {
-            const removed = field.splice(attackerFieldIndex, 1)[0];
+            field.splice(attackerFieldIndex, 1);
             const dmg = targetAtk - atk;
             if (isEnemyAttacker) {
                 game.enemyLife -= dmg;
@@ -928,8 +964,8 @@ function performNormalAttack(attackerFieldIndex, isEnemyAttacker = false) {
             heroSurvived = false;
             break;
         } else {
-            field.splice(attackerFieldIndex, 1)[0];
-            const removed = targetField.splice(targetIndex, 1)[0];
+            field.splice(attackerFieldIndex, 1);
+            targetField.splice(targetIndex, 1);
             if (isEnemyAttacker) {
                 addLog(`💥 ${attackerCard.name} と ${targetCard.name} は相打ち！`);
             } else {
@@ -970,6 +1006,7 @@ function performPlayerAttack() {
 
     const attacker = game.playerField[attackerIndex].card;
 
+    // サタン (id=25): 攻撃の代わりに相手の手札を墓地へ
     if (attacker.id === 25) {
         if (game.enemyHand.length > 0) {
             const idx = Math.floor(Math.random() * game.enemyHand.length);
@@ -983,6 +1020,7 @@ function performPlayerAttack() {
         return;
     }
 
+    // ゴースト (id=23): 賭け
     if (attacker.id === 23) {
         if (game.enemyField.length > 0) {
             if (Math.random() < 0.5) {
@@ -1000,6 +1038,7 @@ function performPlayerAttack() {
         return;
     }
 
+    // 全体攻撃カード (宝獣 id=16, クイヤ id=27)
     if (attacker.id === 16 || attacker.id === 27) {
         performAllAttack(attackerIndex, false);
         game.usedAttackThisTurn = true;
@@ -1007,6 +1046,7 @@ function performPlayerAttack() {
         return;
     }
 
+    // 通常攻撃 (ヒーロー含む)
     performNormalAttack(attackerIndex, false);
     game.usedAttackThisTurn = true;
     updateUI();
@@ -1064,6 +1104,7 @@ function executeEnemyTurn() {
         return;
     }
 
+    // ドロー
     if (game.enemyDeck.length === 0) {
         addLog('⚠️ 相手の山札が切れました');
         checkDeckOut();
@@ -1078,7 +1119,7 @@ function executeEnemyTurn() {
     }
     drawCard(game.enemyDeck, game.enemyHand, drawCount);
 
-    // 魔法カードを使う（効果が発動できるものだけ）
+    // ★★★ 魔法カードを使う（効果が発動できるものだけ）★★★
     let magicUsed = true;
     while (magicUsed && game.enemyHand.length > 0) {
         magicUsed = false;
@@ -1103,7 +1144,7 @@ function executeEnemyTurn() {
         }
     }
 
-    // クリーチャーを出す
+    // ★★★ クリーチャーを出す ★★★
     let creatureIdx = -1;
     for (let i = 0; i < game.enemyHand.length; i++) {
         if (game.enemyHand[i].type === 'creature' && !isFieldFull('enemy')) {
@@ -1128,7 +1169,7 @@ function executeEnemyTurn() {
         }
     }
 
-    // 攻撃フェイズ
+    // ★★★ 攻撃フェイズ ★★★
     if (game.enemyField.length > 0 && !game.gameOver) {
         for (let i = 0; i < game.enemyField.length; i++) {
             const f = game.enemyField[i];
@@ -1136,19 +1177,10 @@ function executeEnemyTurn() {
             if (attacker.type !== 'creature') continue;
             if (f.count !== 0) continue;
             
-            let canAttack = true;
-            if (attacker.id === 28) {
-                if (Math.random() < 0.5) {
-                    canAttack = false;
-                    addLog('🔒 パスワード&コインの効果で攻撃失敗！');
-                }
-            }
-            if (!canAttack) continue;
-
             let enemyAtk = getCardAtk(attacker, true);
             if (enemyAtk <= 0) continue;
 
-            // 全体攻撃カードの判断
+            // ★★★ 全体攻撃カードの判断 ★★★
             if (attacker.id === 16 || attacker.id === 27) {
                 let canBeatCount = 0;
                 for (let j = 0; j < game.playerField.length; j++) {
@@ -1170,7 +1202,7 @@ function executeEnemyTurn() {
                 }
             }
 
-            // 通常攻撃の判断
+            // ★★★ 通常攻撃の判断 ★★★
             if (game.playerField.length > 0) {
                 const target = game.playerField[0].card;
                 let playerAtk = getCardAtk(target, false);
