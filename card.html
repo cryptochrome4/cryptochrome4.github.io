@@ -132,11 +132,12 @@
         }
         .card .count {
             color: #ffd700;
-            font-size: 0.7em;
+            font-size: 0.8em;
             background: #1a1a2e;
-            padding: 0 6px;
+            padding: 0 8px;
             border-radius: 10px;
             border: 1px solid #ffd700;
+            font-weight: bold;
         }
         .hand {
             background: #0f3460;
@@ -413,15 +414,14 @@ let game = {
     enemyField: [],
     playerLife: MAX_LIFE,
     enemyLife: MAX_LIFE,
-    turn: 0, // 0=player, 1=enemy
+    turn: 0,
     phase: 'draw',
     gameOver: false,
     usedAttackThisTurn: false,
     enemySkipNextTurn: false,
     curseActive: false,
-    curseTurns: 0, // 残りターン数
+    curseTurns: 0,
     kennyInGrave: false,
-    turnCount: 0,
 };
 
 // ============================================================
@@ -507,7 +507,6 @@ function initGame() {
     game.curseActive = false;
     game.curseTurns = 0;
     game.kennyInGrave = false;
-    game.turnCount = 0;
 
     drawCard(game.playerDeck, game.playerHand, 5);
     drawCard(game.enemyDeck, game.enemyHand, 5);
@@ -529,13 +528,11 @@ function initGame() {
 // ターン開始時のカウント更新
 // ============================================================
 function updateCounts() {
-    // プレイヤーフィールドのカウントを減らす (count: 1→0)
     for (let i = 0; i < game.playerField.length; i++) {
         if (game.playerField[i].count > 0) {
             game.playerField[i].count = 0;
         }
     }
-    // 敵フィールドも同様
     for (let i = 0; i < game.enemyField.length; i++) {
         if (game.enemyField[i].count > 0) {
             game.enemyField[i].count = 0;
@@ -587,17 +584,15 @@ function playCardFromHand(index) {
             addLog('⚠️ フィールドが上限(3枚)です');
             return;
         }
-        // 戦士(id=18)は即時攻撃可能なのでcount=0、それ以外はcount=1
         const count = (card.id === 18) ? 0 : 1;
         const fieldCard = game.playerHand.splice(index, 1)[0];
         game.playerField.push({ card: fieldCard, count: count });
         
         if (count === 0) {
             addLog(`🃏 ${fieldCard.name} をフィールドに召喚！ (即時攻撃可能)`);
-            // 戦士は即時攻撃
             performPlayerAttack();
         } else {
-            addLog(`🃏 ${fieldCard.name} をフィールドに召喚！ (次のターンから攻撃可能)`);
+            addLog(`🃏 ${fieldCard.name} をフィールドに召喚！ (待機中: 1)`);
         }
         game.phase = 'main';
         updateUI();
@@ -683,13 +678,128 @@ function applyMagicEffect(card, owner) {
     }
 
     if (id === 30) {
-        // 呪いのピアノ: 自分のターン + 次の相手ターン
         game.curseActive = true;
-        game.curseTurns = 2; // 自分のターン(残り) + 相手ターン
+        game.curseTurns = 2;
         addLog('🎹 呪いのピアノ: 相手の攻撃力が-2000！ (このターンと次の相手ターン)');
         return;
     }
     addLog(`魔法「${card.name}」を使用しました。`);
+}
+
+// ============================================================
+// 攻撃処理 (ヒーローの2回攻撃対応)
+// ============================================================
+function performAttack(attackerFieldIndex, isEnemyAttacker = false) {
+    const field = isEnemyAttacker ? game.enemyField : game.playerField;
+    const attacker = field[attackerFieldIndex];
+    const attackerCard = attacker.card;
+    const isHero = (attackerCard.id === 17);
+    let atk = getCardAtk(attackerCard, isEnemyAttacker);
+    let attackCount = isHero ? 2 : 1; // ヒーローは2回攻撃
+    let heroSurvived = true;
+
+    for (let attackNum = 0; attackNum < attackCount; attackNum++) {
+        if (!heroSurvived && isHero) break; // ヒーローが倒れたら2回目なし
+        
+        const targetField = isEnemyAttacker ? game.playerField : game.enemyField;
+        
+        // 相手フィールドが空ならダイレクトアタック
+        if (targetField.length === 0) {
+            if (isEnemyAttacker) {
+                game.playerLife -= atk;
+                addLog(`👾 ${attackerCard.name} のダイレクトアタック！ ${atk}ダメージ！`, 'danger');
+                if (game.playerLife <= 0) {
+                    game.playerLife = 0;
+                    game.gameOver = true;
+                    addLog('💀 あなたは敗北しました...', 'danger');
+                    return;
+                }
+            } else {
+                game.enemyLife -= atk;
+                addLog(`💢 ${attackerCard.name} のダイレクトアタック！ ${atk}ダメージ！`);
+                if (game.enemyLife <= 0) {
+                    game.enemyLife = 0;
+                    game.gameOver = true;
+                    addLog('🎉 あなたの勝利です！', 'highlight');
+                    return;
+                }
+            }
+            continue;
+        }
+
+        // 相手フィールドの最初のカードを攻撃
+        const targetIndex = 0;
+        const target = targetField[targetIndex];
+        const targetCard = target.card;
+        let targetAtk = getCardAtk(targetCard, !isEnemyAttacker);
+
+        if (atk > targetAtk) {
+            const dmg = atk - targetAtk;
+            const removed = targetField.splice(targetIndex, 1)[0];
+            if (isEnemyAttacker) {
+                game.playerLife -= dmg;
+                addLog(`👾 ${attackerCard.name} が ${targetCard.name} を破壊！ ${dmg}ダメージ！`, 'danger');
+                if (game.playerLife <= 0) {
+                    game.playerLife = 0;
+                    game.gameOver = true;
+                    addLog('💀 あなたは敗北しました...', 'danger');
+                    return;
+                }
+            } else {
+                game.enemyLife -= dmg;
+                addLog(`⚔️ ${attackerCard.name} が ${targetCard.name} を破壊！ ${dmg}ダメージ！`);
+                if (attackerCard.id === 24) {
+                    game.enemySkipNextTurn = true;
+                    addLog('❄️ 氷の効果: 相手の次のターンをスキップ！');
+                }
+                if (game.enemyLife <= 0) {
+                    game.enemyLife = 0;
+                    game.gameOver = true;
+                    addLog('🎉 あなたの勝利です！', 'highlight');
+                    return;
+                }
+            }
+            // ヒーローは生き残っているので2回目も可能
+            heroSurvived = true;
+        } else if (atk < targetAtk) {
+            // 自分のカードが破壊される
+            const removed = field.splice(attackerFieldIndex, 1)[0];
+            const dmg = targetAtk - atk;
+            if (isEnemyAttacker) {
+                game.enemyLife -= dmg; // コンピューターのライフが減る（自滅）
+                addLog(`👾 ${attackerCard.name} が ${targetCard.name} に敗れた！ ${dmg}ダメージ！`);
+                if (game.enemyLife <= 0) {
+                    game.enemyLife = 0;
+                    game.gameOver = true;
+                    addLog('🎉 あなたの勝利です！', 'highlight');
+                    return;
+                }
+            } else {
+                game.playerLife -= dmg;
+                addLog(`💥 ${attackerCard.name} が ${targetCard.name} に敗れた！ ${dmg}ダメージ！`, 'danger');
+                if (game.playerLife <= 0) {
+                    game.playerLife = 0;
+                    game.gameOver = true;
+                    addLog('💀 あなたは敗北しました...', 'danger');
+                    return;
+                }
+            }
+            heroSurvived = false; // 倒れたので2回目なし
+            // カードが破壊されたので攻撃終了
+            break;
+        } else {
+            // 相打ち
+            field.splice(attackerFieldIndex, 1)[0];
+            const removed = targetField.splice(targetIndex, 1)[0];
+            if (isEnemyAttacker) {
+                addLog(`💥 ${attackerCard.name} と ${targetCard.name} は相打ち！`);
+            } else {
+                addLog(`💥 ${attackerCard.name} と ${targetCard.name} は相打ち！`);
+            }
+            heroSurvived = false;
+            break;
+        }
+    }
 }
 
 // ============================================================
@@ -706,7 +816,7 @@ function performPlayerAttack() {
         return;
     }
 
-    // 攻撃可能なカードを探す (count===0 のクリーチャー)
+    // 攻撃可能なカードを探す (count===0)
     let attackerIndex = -1;
     for (let i = 0; i < game.playerField.length; i++) {
         const f = game.playerField[i];
@@ -716,14 +826,13 @@ function performPlayerAttack() {
         }
     }
     if (attackerIndex === -1) {
-        addLog('⚠️ 攻撃できるカードがありません (次のターンまで待機中)');
+        addLog('⚠️ 攻撃できるカードがありません (待機中: 1)');
         return;
     }
 
     const attacker = game.playerField[attackerIndex].card;
-    let atk = getCardAtk(attacker, false);
 
-    // サタン (25)
+    // 特殊カード処理（サタン、ゴースト、クイヤ）
     if (attacker.id === 25) {
         if (game.enemyHand.length > 0) {
             const idx = Math.floor(Math.random() * game.enemyHand.length);
@@ -737,7 +846,6 @@ function performPlayerAttack() {
         return;
     }
 
-    // ゴースト (23)
     if (attacker.id === 23) {
         if (game.enemyField.length > 0) {
             if (Math.random() < 0.5) {
@@ -755,8 +863,8 @@ function performPlayerAttack() {
         return;
     }
 
-    // クイヤ (27)
     if (attacker.id === 27) {
+        let atk = getCardAtk(attacker, false);
         let dmg = atk;
         if (Math.random() < 0.5) {
             game.playerLife -= dmg;
@@ -786,68 +894,10 @@ function performPlayerAttack() {
         return;
     }
 
-    // 通常攻撃
-    if (game.enemyField.length === 0) {
-        game.enemyLife -= atk;
-        addLog(`💢 ${attacker.name} のダイレクトアタック！ ${atk}ダメージ！`);
-        if (game.enemyLife <= 0) {
-            game.enemyLife = 0;
-            game.gameOver = true;
-            addLog('🎉 あなたの勝利です！', 'highlight');
-            updateUI();
-            return;
-        }
-        game.usedAttackThisTurn = true;
-        updateUI();
-        return;
-    }
-
-    const targetIndex = 0;
-    const target = game.enemyField[targetIndex].card;
-    let enemyAtk = getCardAtk(target, true);
-
-    if (atk > enemyAtk) {
-        const dmg = atk - enemyAtk;
-        game.enemyField.splice(targetIndex, 1);
-        game.enemyLife -= dmg;
-        addLog(`⚔️ ${attacker.name} が ${target.name} を破壊！ ${dmg}ダメージ！`);
-        if (attacker.id === 24) {
-            game.enemySkipNextTurn = true;
-            addLog('❄️ 氷の効果: 相手の次のターンをスキップ！');
-        }
-        if (game.enemyLife <= 0) {
-            game.enemyLife = 0;
-            game.gameOver = true;
-            addLog('🎉 あなたの勝利です！', 'highlight');
-            updateUI();
-            return;
-        }
-        game.usedAttackThisTurn = true;
-        updateUI();
-        return;
-    } else if (atk < enemyAtk) {
-        const dmg = enemyAtk - atk;
-        game.playerField.splice(attackerIndex, 1);
-        game.playerLife -= dmg;
-        addLog(`💥 ${attacker.name} が ${target.name} に敗れた！ ${dmg}ダメージ！`, 'danger');
-        if (game.playerLife <= 0) {
-            game.playerLife = 0;
-            game.gameOver = true;
-            addLog('💀 あなたは敗北しました...', 'danger');
-            updateUI();
-            return;
-        }
-        game.usedAttackThisTurn = true;
-        updateUI();
-        return;
-    } else {
-        game.playerField.splice(attackerIndex, 1);
-        game.enemyField.splice(targetIndex, 1);
-        addLog(`💥 ${attacker.name} と ${target.name} は相打ち！`);
-        game.usedAttackThisTurn = true;
-        updateUI();
-        return;
-    }
+    // 通常攻撃（ヒーロー含む）
+    performAttack(attackerIndex, false);
+    game.usedAttackThisTurn = true;
+    updateUI();
 }
 
 // ============================================================
@@ -856,7 +906,6 @@ function performPlayerAttack() {
 function endPlayerTurn() {
     if (game.gameOver || game.turn !== 0) return;
     
-    // 呪いのピアノのターンカウントを減らす
     if (game.curseActive) {
         game.curseTurns--;
         if (game.curseTurns <= 0) {
@@ -883,13 +932,11 @@ function endPlayerTurn() {
 function executeEnemyTurn() {
     if (game.gameOver) return;
     
-    // 相手ターン開始時にカウント更新
     updateCounts();
     
     if (game.enemySkipNextTurn) {
         game.enemySkipNextTurn = false;
         addLog('⏭️ 相手はスキップ！');
-        // スキップ時も呪いのピアノは減らす
         if (game.curseActive) {
             game.curseTurns--;
             if (game.curseTurns <= 0) {
@@ -931,7 +978,6 @@ function executeEnemyTurn() {
         game.enemyField.push({ card: card, count: count });
         addLog(`👾 相手が ${card.name} を召喚しました`);
     } else {
-        // 魔法カードを使用
         for (let i = 0; i < game.enemyHand.length; i++) {
             if (game.enemyHand[i].type === 'magic') {
                 const magic = game.enemyHand.splice(i, 1)[0];
@@ -942,13 +988,13 @@ function executeEnemyTurn() {
         }
     }
 
-    // 攻撃フェイズ
+    // 攻撃フェイズ（AI改良: 勝てる時だけ攻撃）
     if (game.enemyField.length > 0 && !game.gameOver) {
         for (let i = 0; i < game.enemyField.length; i++) {
             const f = game.enemyField[i];
             const attacker = f.card;
             if (attacker.type !== 'creature') continue;
-            if (f.count !== 0) continue; // 待機中は攻撃できない
+            if (f.count !== 0) continue;
             
             let canAttack = true;
             if (attacker.id === 28) {
@@ -957,55 +1003,35 @@ function executeEnemyTurn() {
                     addLog('🔒 パスワード&コインの効果で攻撃失敗！');
                 }
             }
-
             if (!canAttack) continue;
 
             let enemyAtk = getCardAtk(attacker, true);
             if (enemyAtk <= 0) continue;
 
-            if (game.playerField.length === 0) {
-                game.playerLife -= enemyAtk;
-                addLog(`👾 相手のダイレクトアタック！ ${enemyAtk}ダメージ！`, 'danger');
-                if (game.playerLife <= 0) {
-                    game.playerLife = 0;
-                    game.gameOver = true;
-                    addLog('💀 あなたは敗北しました...', 'danger');
-                    updateUI();
-                    return;
+            // ★ AI判断: 攻撃するかどうか
+            if (game.playerField.length > 0) {
+                const target = game.playerField[0].card;
+                let playerAtk = getCardAtk(target, false);
+                if (enemyAtk <= playerAtk) {
+                    addLog(`👾 ${attacker.name} は攻撃を控えた (${enemyAtk} ≤ ${playerAtk})`);
+                    continue;
                 }
-                continue;
             }
 
-            const targetIdx = 0;
-            const target = game.playerField[targetIdx].card;
-            let playerAtk = getCardAtk(target, false);
-
-            if (enemyAtk > playerAtk) {
-                const dmg = enemyAtk - playerAtk;
-                game.playerField.splice(targetIdx, 1);
-                game.playerLife -= dmg;
-                addLog(`👾 相手が ${target.name} を破壊！ ${dmg}ダメージ！`, 'danger');
-                if (game.playerLife <= 0) {
-                    game.playerLife = 0;
-                    game.gameOver = true;
-                    addLog('💀 あなたは敗北しました...', 'danger');
-                    updateUI();
-                    return;
-                }
-            } else if (enemyAtk < playerAtk) {
-                game.enemyField.splice(i, 1);
-                addLog(`⚔️ ${target.name} が相手の ${attacker.name} を撃退！`);
-                i--;
-            } else {
-                game.playerField.splice(targetIdx, 1);
-                game.enemyField.splice(i, 1);
-                addLog(`💥 相打ち！`);
-                i--;
+            // 攻撃実行（ヒーローの2回攻撃対応）
+            performAttack(i, true);
+            if (game.gameOver) break;
+            // カードが破壊された場合、インデックス調整
+            if (i >= game.enemyField.length) break;
+            // 攻撃したカードのcountをリセット（同一ターンに再度攻撃させない）
+            if (i < game.enemyField.length && game.enemyField[i].card.id === attacker.id) {
+                // ヒーローは2回攻撃済みなのでcountを1に戻す
+                game.enemyField[i].count = 1;
             }
         }
     }
 
-    // 相手ターン終了時にも呪いのピアノを減らす
+    // 相手ターン終了時
     if (game.curseActive) {
         game.curseTurns--;
         if (game.curseTurns <= 0) {
@@ -1018,7 +1044,6 @@ function executeEnemyTurn() {
     game.phase = 'draw';
     game.usedAttackThisTurn = false;
     addLog('--- あなたのターン ---');
-    // プレイヤーターン開始時にカウント更新
     updateCounts();
     updateUI();
     checkDeckOut();
@@ -1055,7 +1080,6 @@ function updateUI() {
     document.getElementById('fieldCountPlayer').textContent = game.playerField.length;
     document.getElementById('fieldCountEnemy').textContent = game.enemyField.length;
 
-    // 呪いのピアノ表示
     const curseInfo = document.getElementById('curseInfo');
     if (game.curseActive) {
         curseInfo.textContent = `🎹 呪い: 相手攻撃-2000 (残り${game.curseTurns}ターン)`;
@@ -1077,9 +1101,8 @@ function updateUI() {
             const c = f.card;
             const div = document.createElement('div');
             div.className = `card creature`;
-            const countText = f.count === 0 ? '⚔️' : '⏳';
-            const countLabel = f.count === 0 ? '攻撃可' : '待機中';
-            div.innerHTML = `<div class="name">${c.name}</div><div class="atk">⚔️ ${getCardAtk(c, false)}</div><div class="count">${countText} ${countLabel}</div><div class="info">${c.desc || ''}</div>`;
+            const countDisplay = f.count === 0 ? '0' : '1';
+            div.innerHTML = `<div class="name">${c.name}</div><div class="atk">⚔️ ${getCardAtk(c, false)}</div><div class="count">${countDisplay}</div><div class="info">${c.desc || ''}</div>`;
             pf.appendChild(div);
         });
     }
@@ -1095,8 +1118,8 @@ function updateUI() {
             const div = document.createElement('div');
             div.className = `card creature`;
             let atk = getCardAtk(c, true);
-            const countText = f.count === 0 ? '⚔️' : '⏳';
-            div.innerHTML = `<div class="name">${c.name}</div><div class="atk">⚔️ ${atk}</div><div class="count">${countText}</div><div class="info">${c.desc || ''}</div>`;
+            const countDisplay = f.count === 0 ? '0' : '1';
+            div.innerHTML = `<div class="name">${c.name}</div><div class="atk">⚔️ ${atk}</div><div class="count">${countDisplay}</div><div class="info">${c.desc || ''}</div>`;
             ef.appendChild(div);
         });
     }
