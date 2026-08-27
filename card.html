@@ -1065,17 +1065,30 @@ function executeEnemyTurn() {
     }
     drawCard(game.enemyDeck, game.enemyHand, drawCount);
 
-    // 魔法カードを全部使う
+    // ★★★ 魔法カードを使う（効果が発動できるものだけ）★★★
     let magicUsed = true;
     while (magicUsed && game.enemyHand.length > 0) {
         magicUsed = false;
         for (let i = 0; i < game.enemyHand.length; i++) {
-            if (game.enemyHand[i].type === 'magic') {
-                const magic = game.enemyHand.splice(i, 1)[0];
-                addLog(`👾 相手が魔法「${magic.name}」を使用`);
-                applyMagicEffect(magic, 'enemy');
-                magicUsed = true;
-                break;
+            const card = game.enemyHand[i];
+            if (card.type === 'magic') {
+                // 効果が発動できるかチェック
+                let canUse = true;
+                if (card.id === 19 && game.playerHand.length === 0) {
+                    canUse = false; // 本: 相手の手札が空なら使わない
+                }
+                if (card.id === 21 && !game.kennyInGrave) {
+                    canUse = false; // 不死身: 墓地にケニーがいなければ使わない
+                }
+                // 念力(id=26)と呪いのピアノ(id=30)は常に使える
+                
+                if (canUse) {
+                    const magic = game.enemyHand.splice(i, 1)[0];
+                    addLog(`👾 相手が魔法「${magic.name}」を使用`);
+                    applyMagicEffect(magic, 'enemy');
+                    magicUsed = true;
+                    break;
+                }
             }
         }
     }
@@ -1090,6 +1103,7 @@ function executeEnemyTurn() {
     }
     if (creatureIdx >= 0) {
         const card = game.enemyHand.splice(creatureIdx, 1)[0];
+        // ★★★ 戦士以外はcount=1（待機中） ★★★
         const count = (card.id === 18) ? 0 : 1;
         game.enemyField.push({ card: card, count: count });
         
@@ -1125,9 +1139,8 @@ function executeEnemyTurn() {
             let enemyAtk = getCardAtk(attacker, true);
             if (enemyAtk <= 0) continue;
 
-            // ★★★ 全体攻撃カードの判断 ★★★
+            // 全体攻撃カードの判断
             if (attacker.id === 16 || attacker.id === 27) {
-                // 倒せる相手カードの数をカウント
                 let canBeatCount = 0;
                 for (let j = 0; j < game.playerField.length; j++) {
                     const targetCard = game.playerField[j].card;
@@ -1137,7 +1150,6 @@ function executeEnemyTurn() {
                     }
                 }
                 
-                // 2体以上倒せるなら全体攻撃実行
                 if (canBeatCount >= 2) {
                     performAllAttack(i, true);
                     if (game.gameOver) break;
@@ -1149,7 +1161,7 @@ function executeEnemyTurn() {
                 }
             }
 
-            // ★★★ 通常攻撃の判断 ★★★
+            // 通常攻撃の判断
             if (game.playerField.length > 0) {
                 const target = game.playerField[0].card;
                 let playerAtk = getCardAtk(target, false);
@@ -1223,6 +1235,7 @@ function updateUI() {
     const turnText = game.gameOver ? 'ゲーム終了' : (game.turn === 0 ? 'あなたのターン' : 'コンピューターのターン');
     document.getElementById('turnInfo').textContent = `ターン: ${turnText}`;
 
+    // プレイヤーフィールド
     const pf = document.getElementById('playerField');
     pf.innerHTML = '';
     if (game.playerField.length === 0) {
@@ -1232,12 +1245,13 @@ function updateUI() {
             const c = f.card;
             const div = document.createElement('div');
             div.className = `card creature`;
-            const countDisplay = f.count === 0 ? '0' : '1';
+            const countDisplay = (f.count === 0) ? '0' : '1';
             div.innerHTML = `<div class="name">${c.name}</div><div class="atk">⚔️ ${getCardAtk(c, false)}</div><div class="count">${countDisplay}</div><div class="info">${c.desc || ''}</div>`;
             pf.appendChild(div);
         });
     }
 
+    // ★★★ 敵フィールド (カウンター表示を修正) ★★★
     const ef = document.getElementById('enemyField');
     ef.innerHTML = '';
     if (game.enemyField.length === 0) {
@@ -1248,12 +1262,15 @@ function updateUI() {
             const div = document.createElement('div');
             div.className = `card creature`;
             let atk = getCardAtk(c, true);
-            const countDisplay = f.count === 0 ? '0' : '1';
+            // ★★★ countの値を確実に数値として表示 ★★★
+            const countValue = (f.count !== undefined && f.count !== null) ? f.count : 1;
+            const countDisplay = (countValue === 0) ? '0' : '1';
             div.innerHTML = `<div class="name">${c.name}</div><div class="atk">⚔️ ${atk}</div><div class="count">${countDisplay}</div><div class="info">${c.desc || ''}</div>`;
             ef.appendChild(div);
         });
     }
 
+    // 手札
     const ph = document.getElementById('playerHand');
     ph.innerHTML = '';
     game.playerHand.forEach((card, idx) => {
