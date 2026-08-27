@@ -464,7 +464,6 @@ function getCardAtk(card, isEnemy = false) {
     let atk = card.atk || 0;
     if (card.id === 22 && Math.random() < 0.5) atk = 6000;
     
-    // 血の海の効果
     if (isEnemy && game.playerBloodSeaActive) {
         atk = Math.max(0, atk - 3000);
     }
@@ -472,7 +471,6 @@ function getCardAtk(card, isEnemy = false) {
         atk = Math.max(0, atk - 3000);
     }
     
-    // 呪いのピアノの効果
     if (game.curseActive && isEnemy) {
         atk = Math.max(0, atk - 2000);
     }
@@ -704,9 +702,128 @@ function applyMagicEffect(card, owner) {
 }
 
 // ============================================================
-// 攻撃処理
+// 全体攻撃処理
 // ============================================================
-function performAttack(attackerFieldIndex, isEnemyAttacker = false) {
+function performAllAttack(attackerFieldIndex, isEnemyAttacker = false) {
+    const field = isEnemyAttacker ? game.enemyField : game.playerField;
+    const attacker = field[attackerFieldIndex];
+    const attackerCard = attacker.card;
+    let atk = getCardAtk(attackerCard, isEnemyAttacker);
+    const targetField = isEnemyAttacker ? game.playerField : game.enemyField;
+    
+    if (attackerCard.id === 27) {
+        if (Math.random() < 0.5) {
+            if (isEnemyAttacker) {
+                game.enemyLife -= atk;
+                addLog(`💥 相手のクイヤが暴走！ 自分に${atk}ダメージ！`);
+                if (game.enemyLife <= 0) {
+                    game.enemyLife = 0;
+                    game.gameOver = true;
+                    addLog('🎉 あなたの勝利です！', 'highlight');
+                    return;
+                }
+            } else {
+                game.playerLife -= atk;
+                addLog(`💥 クイヤ暴走！ 自分に${atk}ダメージ！`, 'danger');
+                if (game.playerLife <= 0) {
+                    game.playerLife = 0;
+                    game.gameOver = true;
+                    addLog('💀 あなたは敗北しました...', 'danger');
+                    return;
+                }
+            }
+            field.splice(attackerFieldIndex, 1);
+            return;
+        }
+    }
+    
+    if (targetField.length === 0) {
+        if (isEnemyAttacker) {
+            game.playerLife -= atk;
+            addLog(`👾 ${attackerCard.name} のダイレクトアタック！ ${atk}ダメージ！`, 'danger');
+            if (game.playerLife <= 0) {
+                game.playerLife = 0;
+                game.gameOver = true;
+                addLog('💀 あなたは敗北しました...', 'danger');
+                return;
+            }
+        } else {
+            game.enemyLife -= atk;
+            addLog(`💢 ${attackerCard.name} のダイレクトアタック！ ${atk}ダメージ！`);
+            if (game.enemyLife <= 0) {
+                game.enemyLife = 0;
+                game.gameOver = true;
+                addLog('🎉 あなたの勝利です！', 'highlight');
+                return;
+            }
+        }
+        field.splice(attackerFieldIndex, 1);
+        return;
+    }
+    
+    let totalDamage = 0;
+    const destroyedCards = [];
+    
+    for (let i = targetField.length - 1; i >= 0; i--) {
+        const target = targetField[i];
+        const targetCard = target.card;
+        let targetAtk = getCardAtk(targetCard, !isEnemyAttacker);
+        
+        if (atk > targetAtk) {
+            const dmg = atk - targetAtk;
+            totalDamage += dmg;
+            destroyedCards.push(targetCard.name);
+            targetField.splice(i, 1);
+        } else if (atk < targetAtk) {
+            if (attackerCard.id === 27) {
+                const dmg = targetAtk - atk;
+                if (isEnemyAttacker) {
+                    game.enemyLife -= dmg;
+                    addLog(`👾 クイヤが ${targetCard.name} に敗れた！ ${dmg}ダメージ！`);
+                } else {
+                    game.playerLife -= dmg;
+                    addLog(`💥 クイヤが ${targetCard.name} に敗れた！ ${dmg}ダメージ！`, 'danger');
+                }
+            }
+        } else {
+            destroyedCards.push(targetCard.name);
+            targetField.splice(i, 1);
+        }
+    }
+    
+    if (destroyedCards.length > 0) {
+        addLog(`💥 ${attackerCard.name} の全体攻撃！ ${destroyedCards.join('、')} を破壊！`);
+    }
+    
+    if (totalDamage > 0) {
+        if (isEnemyAttacker) {
+            game.playerLife -= totalDamage;
+            addLog(`👾 全体攻撃で ${totalDamage}ダメージ！`, 'danger');
+            if (game.playerLife <= 0) {
+                game.playerLife = 0;
+                game.gameOver = true;
+                addLog('💀 あなたは敗北しました...', 'danger');
+                return;
+            }
+        } else {
+            game.enemyLife -= totalDamage;
+            addLog(`💢 全体攻撃で ${totalDamage}ダメージ！`);
+            if (game.enemyLife <= 0) {
+                game.enemyLife = 0;
+                game.gameOver = true;
+                addLog('🎉 あなたの勝利です！', 'highlight');
+                return;
+            }
+        }
+    }
+    
+    field.splice(attackerFieldIndex, 1);
+}
+
+// ============================================================
+// 通常攻撃処理
+// ============================================================
+function performNormalAttack(attackerFieldIndex, isEnemyAttacker = false) {
     const field = isEnemyAttacker ? game.enemyField : game.playerField;
     const attacker = field[attackerFieldIndex];
     const attackerCard = attacker.card;
@@ -872,38 +989,14 @@ function performPlayerAttack() {
         return;
     }
 
-    if (attacker.id === 27) {
-        let atk = getCardAtk(attacker, false);
-        let dmg = atk;
-        if (Math.random() < 0.5) {
-            game.playerLife -= dmg;
-            addLog(`💥 クイヤ暴走！ 自分に${dmg}ダメージ！`, 'danger');
-            if (game.playerLife <= 0) {
-                game.playerLife = 0;
-                game.gameOver = true;
-                addLog('💀 あなたは敗北しました...', 'danger');
-                updateUI();
-                return;
-            }
-            game.playerField.splice(attackerIndex, 1);
-        } else {
-            game.enemyLife -= dmg;
-            addLog(`🔥 クイヤの全体攻撃！ ${dmg}ダメージ！`);
-            if (game.enemyLife <= 0) {
-                game.enemyLife = 0;
-                game.gameOver = true;
-                addLog('🎉 あなたの勝利です！', 'highlight');
-                updateUI();
-                return;
-            }
-            game.playerField.splice(attackerIndex, 1);
-        }
+    if (attacker.id === 16 || attacker.id === 27) {
+        performAllAttack(attackerIndex, false);
         game.usedAttackThisTurn = true;
         updateUI();
         return;
     }
 
-    performAttack(attackerIndex, false);
+    performNormalAttack(attackerIndex, false);
     game.usedAttackThisTurn = true;
     updateUI();
 }
@@ -940,7 +1033,6 @@ function endPlayerTurn() {
 function executeEnemyTurn() {
     if (game.gameOver) return;
     
-    // 相手ターン開始時にカウント更新
     updateCounts();
     
     if (game.enemySkipNextTurn) {
@@ -959,7 +1051,6 @@ function executeEnemyTurn() {
         return;
     }
 
-    // ドロー
     if (game.enemyDeck.length === 0) {
         addLog('⚠️ 相手の山札が切れました');
         checkDeckOut();
@@ -974,7 +1065,7 @@ function executeEnemyTurn() {
     }
     drawCard(game.enemyDeck, game.enemyHand, drawCount);
 
-    // ★★★ まず魔法カードを全部使う ★★★
+    // 魔法カードを全部使う
     let magicUsed = true;
     while (magicUsed && game.enemyHand.length > 0) {
         magicUsed = false;
@@ -989,7 +1080,7 @@ function executeEnemyTurn() {
         }
     }
 
-    // ★★★ 次にクリーチャーを出す ★★★
+    // クリーチャーを出す
     let creatureIdx = -1;
     for (let i = 0; i < game.enemyHand.length; i++) {
         if (game.enemyHand[i].type === 'creature' && !isFieldFull('enemy')) {
@@ -999,7 +1090,6 @@ function executeEnemyTurn() {
     }
     if (creatureIdx >= 0) {
         const card = game.enemyHand.splice(creatureIdx, 1)[0];
-        // ★★★ 戦士以外はcount=1（待機中） ★★★
         const count = (card.id === 18) ? 0 : 1;
         game.enemyField.push({ card: card, count: count });
         
@@ -1035,7 +1125,31 @@ function executeEnemyTurn() {
             let enemyAtk = getCardAtk(attacker, true);
             if (enemyAtk <= 0) continue;
 
-            // AI判断: 勝てる時だけ攻撃
+            // ★★★ 全体攻撃カードの判断 ★★★
+            if (attacker.id === 16 || attacker.id === 27) {
+                // 倒せる相手カードの数をカウント
+                let canBeatCount = 0;
+                for (let j = 0; j < game.playerField.length; j++) {
+                    const targetCard = game.playerField[j].card;
+                    let targetAtk = getCardAtk(targetCard, false);
+                    if (enemyAtk > targetAtk) {
+                        canBeatCount++;
+                    }
+                }
+                
+                // 2体以上倒せるなら全体攻撃実行
+                if (canBeatCount >= 2) {
+                    performAllAttack(i, true);
+                    if (game.gameOver) break;
+                    if (i >= game.enemyField.length) break;
+                    continue;
+                } else {
+                    addLog(`👾 ${attacker.name} は全体攻撃を控えた (倒せるのは${canBeatCount}体のみ)`);
+                    continue;
+                }
+            }
+
+            // ★★★ 通常攻撃の判断 ★★★
             if (game.playerField.length > 0) {
                 const target = game.playerField[0].card;
                 let playerAtk = getCardAtk(target, false);
@@ -1045,13 +1159,12 @@ function executeEnemyTurn() {
                 }
             }
 
-            performAttack(i, true);
+            performNormalAttack(i, true);
             if (game.gameOver) break;
             if (i >= game.enemyField.length) break;
         }
     }
 
-    // 相手ターン終了時
     if (game.curseActive) {
         game.curseTurns--;
         if (game.curseTurns <= 0) {
@@ -1110,7 +1223,6 @@ function updateUI() {
     const turnText = game.gameOver ? 'ゲーム終了' : (game.turn === 0 ? 'あなたのターン' : 'コンピューターのターン');
     document.getElementById('turnInfo').textContent = `ターン: ${turnText}`;
 
-    // プレイヤーフィールド
     const pf = document.getElementById('playerField');
     pf.innerHTML = '';
     if (game.playerField.length === 0) {
@@ -1126,7 +1238,6 @@ function updateUI() {
         });
     }
 
-    // 敵フィールド
     const ef = document.getElementById('enemyField');
     ef.innerHTML = '';
     if (game.enemyField.length === 0) {
@@ -1143,7 +1254,6 @@ function updateUI() {
         });
     }
 
-    // 手札
     const ph = document.getElementById('playerHand');
     ph.innerHTML = '';
     game.playerHand.forEach((card, idx) => {
