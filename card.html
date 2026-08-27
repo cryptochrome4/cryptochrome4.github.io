@@ -789,6 +789,14 @@ function performAllAttack(attackerFieldIndex, isEnemyAttacker = false) {
     const targetField = isEnemyAttacker ? game.playerField : game.enemyField;
     const isPlayerField = !isEnemyAttacker;
     
+    // ★★★ パスワード&コインの効果チェック（最初に実行）★★★
+    if (hasPasswordCoin(targetField)) {
+        if (Math.random() < 0.5) {
+            addLog(`🔒 パスワード&コインの効果で全体攻撃失敗！`);
+            return;
+        }
+    }
+    
     if (attackerCard.id === 27) {
         if (Math.random() < 0.5) {
             if (isEnemyAttacker) {
@@ -925,13 +933,18 @@ function performNormalAttack(attackerFieldIndex, isEnemyAttacker = false) {
         const targetField = isEnemyAttacker ? game.playerField : game.enemyField;
         const targetIsPlayerField = !isEnemyAttacker;
         
+        // ★★★ パスワード&コインの効果チェック（最初に実行）★★★
         if (hasPasswordCoin(targetField)) {
             if (Math.random() < 0.5) {
                 addLog(`🔒 パスワード&コインの効果で攻撃失敗！`);
-                return;
+                return; // 攻撃終了（この攻撃は無効化）
             }
         }
         
+        // ★★★ 攻撃が成功したら、攻撃対象を選択（パスワード&コイン以外を優先）★★★
+        const targetIndex = getAttackTarget(targetField);
+        
+        // 相手フィールドが空ならダイレクトアタック
         if (targetField.length === 0) {
             if (isEnemyAttacker) {
                 game.playerLife -= atk;
@@ -955,7 +968,7 @@ function performNormalAttack(attackerFieldIndex, isEnemyAttacker = false) {
             continue;
         }
 
-        const targetIndex = getAttackTarget(targetField);
+        // 攻撃対象のカードを取得
         const target = targetField[targetIndex];
         const targetCard = target.card;
         let targetAtk = getCardAtk(targetCard, !isEnemyAttacker);
@@ -1062,7 +1075,6 @@ function performPlayerAttack() {
 
     const attacker = game.playerField[attackerIndex].card;
 
-    // ★★★ サタン (id=25): 弱体化版 ★★★
     if (attacker.id === 25) {
         if (game.enemyHand.length > 0) {
             const idx = Math.floor(Math.random() * game.enemyHand.length);
@@ -1070,7 +1082,6 @@ function performPlayerAttack() {
             addToGrave(discarded, false);
             addLog(`😈 サタン: 相手の手札「${discarded.name}」を墓地に送った！`);
             
-            // 1/4の確率でサタンが墓地に送られる
             if (Math.random() < 0.25) {
                 const satanCard = game.playerField[attackerIndex].card;
                 addToGrave(satanCard, true);
@@ -1238,7 +1249,6 @@ function executeEnemyTurn() {
             let enemyAtk = getCardAtk(attacker, true);
             if (enemyAtk <= 0) continue;
 
-            // ★★★ コンピューターのサタン処理 ★★★
             if (attacker.id === 25) {
                 if (game.playerHand.length > 0) {
                     const idx = Math.floor(Math.random() * game.playerHand.length);
@@ -1246,7 +1256,6 @@ function executeEnemyTurn() {
                     addToGrave(discarded, true);
                     addLog(`👾 相手のサタン: あなたの手札「${discarded.name}」を墓地に送った！`);
                     
-                    // 1/4の確率でサタンが墓地に送られる
                     if (Math.random() < 0.25) {
                         const satanCard = game.enemyField[i].card;
                         addToGrave(satanCard, false);
