@@ -130,6 +130,14 @@
             font-size: 0.65em;
             color: #aaa;
         }
+        .card .count {
+            color: #ffd700;
+            font-size: 0.7em;
+            background: #1a1a2e;
+            padding: 0 6px;
+            border-radius: 10px;
+            border: 1px solid #ffd700;
+        }
         .hand {
             background: #0f3460;
             padding: 12px;
@@ -251,7 +259,6 @@
     <br>
     <button class="btn" onclick="checkPassword()">認証</button>
     <div id="passwordError" class="error"></div>
-    <div style="margin-top: 30px; color: #533483; font-size: 0.8em;">※ 正しいパスワードを入力してください</div>
 </div>
 
 <!-- ===== ゲーム画面 ===== -->
@@ -265,6 +272,7 @@
         <span>📚 山札: <span id="deckPlayer">30</span> / <span id="deckEnemy">30</span></span>
         <span>✋ 手札: <span id="handPlayer">0</span> / <span id="handEnemy">0</span></span>
         <span>🏆 フィールド: <span id="fieldCountPlayer">0</span> / <span id="fieldCountEnemy">0</span></span>
+        <span id="curseInfo" style="color:#9b59b6;"></span>
     </div>
 
     <div class="field-area">
@@ -299,69 +307,45 @@
 <script>
 // ============================================================
 // パスワード認証 (分割 + 計算で難読化)
-// パスワードはコード内に直接書いていません
+// パスワード: 167
 // ============================================================
 
-// パスワードのピースをバラバラに分散
-// それぞれが独立した計算で値を生成
-
-// 1桁目を生成 (結果は "1")
 function getDigit1() {
-    // 一見複雑な計算
-    const x = 7 + 4;        // 11
-    const y = 3 * 3;        // 9
-    const z = x - y;        // 2
-    const w = 5 - 4;        // 1
-    // 色々計算して最終的に "1" を返す
-    const result = (z * 3) - 5; // 2*3-5 = 1
+    const x = 7 + 4;
+    const y = 3 * 3;
+    const z = x - y;
+    const result = (z * 3) - 5;
     return result.toString();
 }
 
-// 2桁目を生成 (結果は "6")
 function getDigit2() {
-    // 配列から取り出す
     const numbers = [9, 8, 7, 6, 5, 4, 3, 2, 1];
-    // 一見ランダムなインデックス
-    const idx = (3 * 2) - 3;  // 3
-    return numbers[idx].toString(); // numbers[3] = 6
+    const idx = (3 * 2) - 3;
+    return numbers[idx].toString();
 }
 
-// 3桁目を生成 (結果は "7")
 function getDigit3() {
-    // 素数を使った計算
     const primes = [2, 3, 5, 7, 11, 13, 17, 19, 23];
-    // インデックスを計算
-    const idx = (8 - 4) - 1;  // 3
-    return primes[idx].toString(); // primes[3] = 7
+    const idx = (8 - 4) - 1;
+    return primes[idx].toString();
 }
 
-// パスワードを組み立てる (コード内に "167" という文字列は一切出現しない)
 function buildPassword() {
-    // 各桁を結合
-    const d1 = getDigit1(); // "1"
-    const d2 = getDigit2(); // "6"
-    const d3 = getDigit3(); // "7"
-    return d1 + d2 + d3; // "167"
+    return getDigit1() + getDigit2() + getDigit3();
 }
 
-// さらに別の方法でもパスワードを生成できるようにしておく（混乱させる）
 function buildPasswordAlt() {
-    // 全く別の計算式で同じ "167" を生成
-    const a = 5 + 3 - 7;     // 1
-    const b = 12 / 2;        // 6
-    const c = 14 / 2;        // 7
+    const a = 5 + 3 - 7;
+    const b = 12 / 2;
+    const c = 14 / 2;
     return a.toString() + b.toString() + c.toString();
 }
 
-// 認証チェック
 function checkPassword() {
     const input = document.getElementById('passwordInput').value;
-    
-    // 複数の方法でパスワードを生成して比較（どちらも同じ "167"）
     const correct1 = buildPassword();
     const correct2 = buildPasswordAlt();
     
-    // どちらかと一致すればOK
     if (input === correct1 || input === correct2) {
         document.getElementById('passwordScreen').classList.add('hidden');
         document.getElementById('gameScreen').classList.remove('hidden');
@@ -373,7 +357,6 @@ function checkPassword() {
     }
 }
 
-// Enterキーで認証
 document.getElementById('passwordInput').addEventListener('keydown', function(e) {
     if (e.key === 'Enter') checkPassword();
 });
@@ -399,7 +382,7 @@ const CARD_DATA = [
     { id: 15, name: 'ダギャ', atk: 1000, type: 'creature', desc: '' },
     { id: 16, name: '宝獣', atk: 6000, type: 'creature', desc: '全体攻撃' },
     { id: 17, name: 'ヒーロー', atk: 6000, type: 'creature', desc: '2回攻撃' },
-    { id: 18, name: '戦士', atk: 5000, type: 'creature', desc: '即時攻撃' },
+    { id: 18, name: '戦士', atk: 5000, type: 'creature', desc: '即時攻撃可能' },
     { id: 19, name: '本', atk: 0, type: 'magic', desc: '相手手札を1枚奪う' },
     { id: 20, name: 'マシンガン', atk: 7000, type: 'creature', desc: '' },
     { id: 21, name: '不死身', atk: 0, type: 'magic', desc: '墓地のケニーを召喚' },
@@ -411,14 +394,13 @@ const CARD_DATA = [
     { id: 27, name: 'クイヤ', atk: 9000, type: 'creature', desc: '全体攻撃・1/2で自爆' },
     { id: 28, name: 'パスワード&コイン', atk: 1000, type: 'creature', desc: '相手攻撃1/2失敗・優先標的' },
     { id: 29, name: '血の海', atk: 2000, type: 'creature', desc: '相手攻撃力-3000' },
-    { id: 30, name: '呪いのピアノ', atk: 0, type: 'magic', desc: '相手攻撃力-2000' }
+    { id: 30, name: '呪いのピアノ', atk: 0, type: 'magic', desc: '相手攻撃力-2000(1ターン+次相手ターン)' }
 ];
 
 // ============================================================
 // ゲーム状態
 // ============================================================
 const MAX_LIFE = 40000;
-const DECK_SIZE = 30;
 const MAX_HAND = 8;
 const MAX_FIELD = 3;
 
@@ -427,18 +409,19 @@ let game = {
     enemyDeck: [],
     playerHand: [],
     enemyHand: [],
-    playerField: [],
+    playerField: [],    // { card, count } count: 0=攻撃可, 1=待機中
     enemyField: [],
     playerLife: MAX_LIFE,
     enemyLife: MAX_LIFE,
-    turn: 0,
+    turn: 0, // 0=player, 1=enemy
     phase: 'draw',
     gameOver: false,
     usedAttackThisTurn: false,
     enemySkipNextTurn: false,
     curseActive: false,
-    curseTurns: 0,
+    curseTurns: 0, // 残りターン数
     kennyInGrave: false,
+    turnCount: 0,
 };
 
 // ============================================================
@@ -478,7 +461,7 @@ function getCardAtk(card, isEnemy = false) {
     if (!card || card.type === 'magic') return 0;
     let atk = card.atk || 0;
     if (card.id === 22 && Math.random() < 0.5) atk = 6000;
-    if (isEnemy && game.playerField.some(c => c.id === 29)) {
+    if (isEnemy && game.playerField.some(f => f.card.id === 29)) {
         atk = Math.max(0, atk - 3000);
     }
     if (game.curseActive && isEnemy) {
@@ -524,6 +507,7 @@ function initGame() {
     game.curseActive = false;
     game.curseTurns = 0;
     game.kennyInGrave = false;
+    game.turnCount = 0;
 
     drawCard(game.playerDeck, game.playerHand, 5);
     drawCard(game.enemyDeck, game.enemyHand, 5);
@@ -538,6 +522,24 @@ function initGame() {
     } else {
         game.phase = 'draw';
         updateUI();
+    }
+}
+
+// ============================================================
+// ターン開始時のカウント更新
+// ============================================================
+function updateCounts() {
+    // プレイヤーフィールドのカウントを減らす (count: 1→0)
+    for (let i = 0; i < game.playerField.length; i++) {
+        if (game.playerField[i].count > 0) {
+            game.playerField[i].count = 0;
+        }
+    }
+    // 敵フィールドも同様
+    for (let i = 0; i < game.enemyField.length; i++) {
+        if (game.enemyField[i].count > 0) {
+            game.enemyField[i].count = 0;
+        }
     }
 }
 
@@ -585,12 +587,17 @@ function playCardFromHand(index) {
             addLog('⚠️ フィールドが上限(3枚)です');
             return;
         }
-        game.playerField.push(game.playerHand.splice(index, 1)[0]);
-        addLog(`🃏 ${game.playerField[game.playerField.length-1].name} をフィールドに召喚！`);
-        const lastIdx = game.playerField.length - 1;
-        if (game.playerField[lastIdx].id === 18) {
-            addLog('⚡ 戦士の効果: 即時攻撃！');
+        // 戦士(id=18)は即時攻撃可能なのでcount=0、それ以外はcount=1
+        const count = (card.id === 18) ? 0 : 1;
+        const fieldCard = game.playerHand.splice(index, 1)[0];
+        game.playerField.push({ card: fieldCard, count: count });
+        
+        if (count === 0) {
+            addLog(`🃏 ${fieldCard.name} をフィールドに召喚！ (即時攻撃可能)`);
+            // 戦士は即時攻撃
             performPlayerAttack();
+        } else {
+            addLog(`🃏 ${fieldCard.name} をフィールドに召喚！ (次のターンから攻撃可能)`);
         }
         game.phase = 'main';
         updateUI();
@@ -648,7 +655,8 @@ function applyMagicEffect(card, owner) {
             } else {
                 const kennyCard = CARD_DATA.find(c => c.id === 6);
                 if (kennyCard) {
-                    playerField.push(cloneCard(kennyCard));
+                    const count = (kennyCard.id === 18) ? 0 : 1;
+                    playerField.push({ card: cloneCard(kennyCard), count: count });
                     game.kennyInGrave = false;
                     addLog('🧟 ケニーが墓地から復活しました！');
                 }
@@ -675,9 +683,10 @@ function applyMagicEffect(card, owner) {
     }
 
     if (id === 30) {
+        // 呪いのピアノ: 自分のターン + 次の相手ターン
         game.curseActive = true;
-        game.curseTurns = 2;
-        addLog('🎹 呪いのピアノ: 相手の攻撃力が-2000！');
+        game.curseTurns = 2; // 自分のターン(残り) + 相手ターン
+        addLog('🎹 呪いのピアノ: 相手の攻撃力が-2000！ (このターンと次の相手ターン)');
         return;
     }
     addLog(`魔法「${card.name}」を使用しました。`);
@@ -697,21 +706,24 @@ function performPlayerAttack() {
         return;
     }
 
+    // 攻撃可能なカードを探す (count===0 のクリーチャー)
     let attackerIndex = -1;
     for (let i = 0; i < game.playerField.length; i++) {
-        if (game.playerField[i].type === 'creature') {
+        const f = game.playerField[i];
+        if (f.card.type === 'creature' && f.count === 0) {
             attackerIndex = i;
             break;
         }
     }
     if (attackerIndex === -1) {
-        addLog('⚠️ 攻撃できるカードがありません');
+        addLog('⚠️ 攻撃できるカードがありません (次のターンまで待機中)');
         return;
     }
 
-    const attacker = game.playerField[attackerIndex];
+    const attacker = game.playerField[attackerIndex].card;
     let atk = getCardAtk(attacker, false);
 
+    // サタン (25)
     if (attacker.id === 25) {
         if (game.enemyHand.length > 0) {
             const idx = Math.floor(Math.random() * game.enemyHand.length);
@@ -725,12 +737,13 @@ function performPlayerAttack() {
         return;
     }
 
+    // ゴースト (23)
     if (attacker.id === 23) {
         if (game.enemyField.length > 0) {
             if (Math.random() < 0.5) {
                 const idx = Math.floor(Math.random() * game.enemyField.length);
                 const removed = game.enemyField.splice(idx, 1)[0];
-                addLog(`👻 ゴーストの賭け成功！ ${removed.name} を墓地に送った！`);
+                addLog(`👻 ゴーストの賭け成功！ ${removed.card.name} を墓地に送った！`);
             } else {
                 addLog('👻 ゴーストの賭けに失敗...');
             }
@@ -742,6 +755,7 @@ function performPlayerAttack() {
         return;
     }
 
+    // クイヤ (27)
     if (attacker.id === 27) {
         let dmg = atk;
         if (Math.random() < 0.5) {
@@ -789,7 +803,7 @@ function performPlayerAttack() {
     }
 
     const targetIndex = 0;
-    const target = game.enemyField[targetIndex];
+    const target = game.enemyField[targetIndex].card;
     let enemyAtk = getCardAtk(target, true);
 
     if (atk > enemyAtk) {
@@ -837,9 +851,20 @@ function performPlayerAttack() {
 }
 
 // ============================================================
-// プレイヤーターン終了// ============================================================
+// プレイヤーターン終了
+// ============================================================
 function endPlayerTurn() {
     if (game.gameOver || game.turn !== 0) return;
+    
+    // 呪いのピアノのターンカウントを減らす
+    if (game.curseActive) {
+        game.curseTurns--;
+        if (game.curseTurns <= 0) {
+            game.curseActive = false;
+            addLog('🎹 呪いのピアノの効果が切れました');
+        }
+    }
+    
     game.turn = 1;
     game.phase = 'draw';
     game.usedAttackThisTurn = false;
@@ -857,9 +882,21 @@ function endPlayerTurn() {
 // ============================================================
 function executeEnemyTurn() {
     if (game.gameOver) return;
+    
+    // 相手ターン開始時にカウント更新
+    updateCounts();
+    
     if (game.enemySkipNextTurn) {
         game.enemySkipNextTurn = false;
         addLog('⏭️ 相手はスキップ！');
+        // スキップ時も呪いのピアノは減らす
+        if (game.curseActive) {
+            game.curseTurns--;
+            if (game.curseTurns <= 0) {
+                game.curseActive = false;
+                addLog('🎹 呪いのピアノの効果が切れました');
+            }
+        }
         game.turn = 0;
         game.phase = 'draw';
         updateUI();
@@ -880,6 +917,7 @@ function executeEnemyTurn() {
     }
     drawCard(game.enemyDeck, game.enemyHand, drawCount);
 
+    // クリーチャーを出す
     let creatureIdx = -1;
     for (let i = 0; i < game.enemyHand.length; i++) {
         if (game.enemyHand[i].type === 'creature' && !isFieldFull('enemy')) {
@@ -889,9 +927,11 @@ function executeEnemyTurn() {
     }
     if (creatureIdx >= 0) {
         const card = game.enemyHand.splice(creatureIdx, 1)[0];
-        game.enemyField.push(card);
+        const count = (card.id === 18) ? 0 : 1;
+        game.enemyField.push({ card: card, count: count });
         addLog(`👾 相手が ${card.name} を召喚しました`);
     } else {
+        // 魔法カードを使用
         for (let i = 0; i < game.enemyHand.length; i++) {
             if (game.enemyHand[i].type === 'magic') {
                 const magic = game.enemyHand.splice(i, 1)[0];
@@ -902,11 +942,14 @@ function executeEnemyTurn() {
         }
     }
 
+    // 攻撃フェイズ
     if (game.enemyField.length > 0 && !game.gameOver) {
         for (let i = 0; i < game.enemyField.length; i++) {
-            const attacker = game.enemyField[i];
+            const f = game.enemyField[i];
+            const attacker = f.card;
             if (attacker.type !== 'creature') continue;
-
+            if (f.count !== 0) continue; // 待機中は攻撃できない
+            
             let canAttack = true;
             if (attacker.id === 28) {
                 if (Math.random() < 0.5) {
@@ -934,7 +977,7 @@ function executeEnemyTurn() {
             }
 
             const targetIdx = 0;
-            const target = game.playerField[targetIdx];
+            const target = game.playerField[targetIdx].card;
             let playerAtk = getCardAtk(target, false);
 
             if (enemyAtk > playerAtk) {
@@ -962,10 +1005,21 @@ function executeEnemyTurn() {
         }
     }
 
+    // 相手ターン終了時にも呪いのピアノを減らす
+    if (game.curseActive) {
+        game.curseTurns--;
+        if (game.curseTurns <= 0) {
+            game.curseActive = false;
+            addLog('🎹 呪いのピアノの効果が切れました');
+        }
+    }
+
     game.turn = 0;
     game.phase = 'draw';
     game.usedAttackThisTurn = false;
     addLog('--- あなたのターン ---');
+    // プレイヤーターン開始時にカウント更新
+    updateCounts();
     updateUI();
     checkDeckOut();
 }
@@ -1001,36 +1055,53 @@ function updateUI() {
     document.getElementById('fieldCountPlayer').textContent = game.playerField.length;
     document.getElementById('fieldCountEnemy').textContent = game.enemyField.length;
 
+    // 呪いのピアノ表示
+    const curseInfo = document.getElementById('curseInfo');
+    if (game.curseActive) {
+        curseInfo.textContent = `🎹 呪い: 相手攻撃-2000 (残り${game.curseTurns}ターン)`;
+        curseInfo.style.color = '#9b59b6';
+    } else {
+        curseInfo.textContent = '';
+    }
+
     const turnText = game.gameOver ? 'ゲーム終了' : (game.turn === 0 ? 'あなたのターン' : 'コンピューターのターン');
     document.getElementById('turnInfo').textContent = `ターン: ${turnText}`;
 
+    // プレイヤーフィールド
     const pf = document.getElementById('playerField');
     pf.innerHTML = '';
     if (game.playerField.length === 0) {
         pf.innerHTML = 'なし';
     } else {
-        game.playerField.forEach((c) => {
+        game.playerField.forEach((f) => {
+            const c = f.card;
             const div = document.createElement('div');
             div.className = `card creature`;
-            div.innerHTML = `<div class="name">${c.name}</div><div class="atk">⚔️ ${getCardAtk(c, false)}</div><div class="info">${c.desc || ''}</div>`;
+            const countText = f.count === 0 ? '⚔️' : '⏳';
+            const countLabel = f.count === 0 ? '攻撃可' : '待機中';
+            div.innerHTML = `<div class="name">${c.name}</div><div class="atk">⚔️ ${getCardAtk(c, false)}</div><div class="count">${countText} ${countLabel}</div><div class="info">${c.desc || ''}</div>`;
             pf.appendChild(div);
         });
     }
 
+    // 敵フィールド
     const ef = document.getElementById('enemyField');
     ef.innerHTML = '';
     if (game.enemyField.length === 0) {
         ef.innerHTML = 'なし';
     } else {
-        game.enemyField.forEach((c) => {
+        game.enemyField.forEach((f) => {
+            const c = f.card;
             const div = document.createElement('div');
             div.className = `card creature`;
             let atk = getCardAtk(c, true);
-            div.innerHTML = `<div class="name">${c.name}</div><div class="atk">⚔️ ${atk}</div><div class="info">${c.desc || ''}</div>`;
+            const countText = f.count === 0 ? '⚔️' : '⏳';
+            div.innerHTML = `<div class="name">${c.name}</div><div class="atk">⚔️ ${atk}</div><div class="count">${countText}</div><div class="info">${c.desc || ''}</div>`;
             ef.appendChild(div);
         });
     }
 
+    // 手札
     const ph = document.getElementById('playerHand');
     ph.innerHTML = '';
     game.playerHand.forEach((card, idx) => {
