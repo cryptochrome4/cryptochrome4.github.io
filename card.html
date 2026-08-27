@@ -390,7 +390,7 @@ const CARD_DATA = [
     { id: 22, name: '英雄', atk: 4000, type: 'creature', desc: '1/2で攻撃力6000' },
     { id: 23, name: 'ゴースト', atk: 5000, type: 'creature', desc: '賭け: 相手カードを墓地へ' },
     { id: 24, name: '氷', atk: 4000, type: 'creature', desc: '攻撃で破壊で次ターンスキップ' },
-    { id: 25, name: 'サタン', atk: 6000, type: 'creature', desc: '代わりに手札を墓地へ' },
+    { id: 25, name: 'サタン', atk: 6000, type: 'creature', desc: '手札破壊(1/4自滅)' },
     { id: 26, name: '念力', atk: 0, type: 'magic', desc: '相手の手札を公開' },
     { id: 27, name: 'クイヤ', atk: 9000, type: 'creature', desc: '全体攻撃・1/2で自爆' },
     { id: 28, name: 'パスワード&コイン', atk: 1000, type: 'creature', desc: '相手攻撃1/2失敗・優先標的' },
@@ -462,7 +462,6 @@ function drawCard(deck, hand, count = 1) {
     return drawn;
 }
 
-// ★★★ 墓地に追加する関数 ★★★
 function addToGrave(card, isPlayer) {
     if (isPlayer) {
         game.playerGrave.push(card);
@@ -473,7 +472,6 @@ function addToGrave(card, isPlayer) {
     }
 }
 
-// ★★★ 血の海フラグを更新する関数 ★★★
 function updateBloodSeaFlags() {
     let hasPlayerBloodSea = false;
     for (let i = 0; i < game.playerField.length; i++) {
@@ -494,7 +492,6 @@ function updateBloodSeaFlags() {
     game.enemyBloodSeaActive = hasEnemyBloodSea;
 }
 
-// ★★★ フィールドからカードを破壊（墓地送り）★★★
 function destroyCard(field, index, isPlayerField) {
     const card = field.splice(index, 1)[0];
     addToGrave(card.card, isPlayerField);
@@ -502,7 +499,6 @@ function destroyCard(field, index, isPlayerField) {
     return card;
 }
 
-// ★★★ 攻撃力計算（血の海・呪いのピアノ対応）★★★
 function getCardAtk(card, isEnemy = false) {
     if (!card || card.type === 'magic') return 0;
     let atk = card.atk || 0;
@@ -542,7 +538,6 @@ function addLog(msg, cls = '') {
     el.scrollTop = el.scrollHeight;
 }
 
-// ★★★ 相手フィールドにパスワード&コインがあるかチェック ★★★
 function hasPasswordCoin(field) {
     for (let i = 0; i < field.length; i++) {
         if (field[i].card.id === 28) {
@@ -552,7 +547,6 @@ function hasPasswordCoin(field) {
     return false;
 }
 
-// ★★★ 攻撃対象を選択（パスワード&コインは優先度が低い）★★★
 function getAttackTarget(field) {
     for (let i = 0; i < field.length; i++) {
         if (field[i].card.id !== 28) {
@@ -670,7 +664,6 @@ function playCardFromHand(index) {
         const fieldCard = game.playerHand.splice(index, 1)[0];
         game.playerField.push({ card: fieldCard, count: count });
         
-        // 血の海フラグ更新
         updateBloodSeaFlags();
         
         if (count === 0) {
@@ -1069,12 +1062,22 @@ function performPlayerAttack() {
 
     const attacker = game.playerField[attackerIndex].card;
 
+    // ★★★ サタン (id=25): 弱体化版 ★★★
     if (attacker.id === 25) {
         if (game.enemyHand.length > 0) {
             const idx = Math.floor(Math.random() * game.enemyHand.length);
             const discarded = game.enemyHand.splice(idx, 1)[0];
             addToGrave(discarded, false);
             addLog(`😈 サタン: 相手の手札「${discarded.name}」を墓地に送った！`);
+            
+            // 1/4の確率でサタンが墓地に送られる
+            if (Math.random() < 0.25) {
+                const satanCard = game.playerField[attackerIndex].card;
+                addToGrave(satanCard, true);
+                game.playerField.splice(attackerIndex, 1);
+                updateBloodSeaFlags();
+                addLog(`💀 サタンは効果の代償で墓地に消えた...`);
+            }
         } else {
             addLog('相手の手札は空です');
         }
@@ -1234,6 +1237,29 @@ function executeEnemyTurn() {
             
             let enemyAtk = getCardAtk(attacker, true);
             if (enemyAtk <= 0) continue;
+
+            // ★★★ コンピューターのサタン処理 ★★★
+            if (attacker.id === 25) {
+                if (game.playerHand.length > 0) {
+                    const idx = Math.floor(Math.random() * game.playerHand.length);
+                    const discarded = game.playerHand.splice(idx, 1)[0];
+                    addToGrave(discarded, true);
+                    addLog(`👾 相手のサタン: あなたの手札「${discarded.name}」を墓地に送った！`);
+                    
+                    // 1/4の確率でサタンが墓地に送られる
+                    if (Math.random() < 0.25) {
+                        const satanCard = game.enemyField[i].card;
+                        addToGrave(satanCard, false);
+                        game.enemyField.splice(i, 1);
+                        updateBloodSeaFlags();
+                        addLog(`💀 サタンは効果の代償で墓地に消えた...`);
+                        i--;
+                    }
+                } else {
+                    addLog('あなたの手札は空です');
+                }
+                continue;
+            }
 
             if (attacker.id === 16 || attacker.id === 27) {
                 let canBeatCount = 0;
