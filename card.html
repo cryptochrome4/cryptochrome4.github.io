@@ -410,7 +410,7 @@ let game = {
     enemyDeck: [],
     playerHand: [],
     enemyHand: [],
-    playerField: [],    // { card, count } count: 0=攻撃可, 1=待機中
+    playerField: [],
     enemyField: [],
     playerLife: MAX_LIFE,
     enemyLife: MAX_LIFE,
@@ -422,6 +422,8 @@ let game = {
     curseActive: false,
     curseTurns: 0,
     kennyInGrave: false,
+    playerBloodSeaActive: false,
+    enemyBloodSeaActive: false,
 };
 
 // ============================================================
@@ -461,9 +463,16 @@ function getCardAtk(card, isEnemy = false) {
     if (!card || card.type === 'magic') return 0;
     let atk = card.atk || 0;
     if (card.id === 22 && Math.random() < 0.5) atk = 6000;
-    if (isEnemy && game.playerField.some(f => f.card.id === 29)) {
+    
+    // 血の海の効果
+    if (isEnemy && game.playerBloodSeaActive) {
         atk = Math.max(0, atk - 3000);
     }
+    if (!isEnemy && game.enemyBloodSeaActive) {
+        atk = Math.max(0, atk - 3000);
+    }
+    
+    // 呪いのピアノの効果
     if (game.curseActive && isEnemy) {
         atk = Math.max(0, atk - 2000);
     }
@@ -507,6 +516,8 @@ function initGame() {
     game.curseActive = false;
     game.curseTurns = 0;
     game.kennyInGrave = false;
+    game.playerBloodSeaActive = false;
+    game.enemyBloodSeaActive = false;
 
     drawCard(game.playerDeck, game.playerHand, 5);
     drawCard(game.enemyDeck, game.enemyHand, 5);
@@ -531,11 +542,13 @@ function updateCounts() {
     for (let i = 0; i < game.playerField.length; i++) {
         if (game.playerField[i].count > 0) {
             game.playerField[i].count = 0;
+            addLog(`⚔️ ${game.playerField[i].card.name} が攻撃可能になりました`);
         }
     }
     for (let i = 0; i < game.enemyField.length; i++) {
         if (game.enemyField[i].count > 0) {
             game.enemyField[i].count = 0;
+            addLog(`👾 ${game.enemyField[i].card.name} が攻撃可能になりました`);
         }
     }
 }
@@ -588,11 +601,16 @@ function playCardFromHand(index) {
         const fieldCard = game.playerHand.splice(index, 1)[0];
         game.playerField.push({ card: fieldCard, count: count });
         
+        if (fieldCard.id === 29) {
+            game.playerBloodSeaActive = true;
+            addLog('🌊 血の海: 相手の攻撃力が-3000！');
+        }
+        
         if (count === 0) {
             addLog(`🃏 ${fieldCard.name} をフィールドに召喚！ (即時攻撃可能)`);
             performPlayerAttack();
         } else {
-            addLog(`🃏 ${fieldCard.name} をフィールドに召喚！ (待機中: 1)`);
+            addLog(`🃏 ${fieldCard.name} をフィールドに召喚！ (待機中)`);
         }
         game.phase = 'main';
         updateUI();
@@ -618,8 +636,6 @@ function applyMagicEffect(card, owner) {
     const isPlayer = owner === 'player';
     const enemyHand = isPlayer ? game.enemyHand : game.playerHand;
     const playerHand = isPlayer ? game.playerHand : game.enemyHand;
-    const enemyField = isPlayer ? game.enemyField : game.playerField;
-    const playerField = isPlayer ? game.playerField : game.enemyField;
 
     if (id === 19) {
         if (enemyHand.length === 0) {
@@ -651,7 +667,8 @@ function applyMagicEffect(card, owner) {
                 const kennyCard = CARD_DATA.find(c => c.id === 6);
                 if (kennyCard) {
                     const count = (kennyCard.id === 18) ? 0 : 1;
-                    playerField.push({ card: cloneCard(kennyCard), count: count });
+                    const field = isPlayer ? game.playerField : game.enemyField;
+                    field.push({ card: cloneCard(kennyCard), count: count });
                     game.kennyInGrave = false;
                     addLog('🧟 ケニーが墓地から復活しました！');
                 }
@@ -687,7 +704,7 @@ function applyMagicEffect(card, owner) {
 }
 
 // ============================================================
-// 攻撃処理 (ヒーローの2回攻撃対応)
+// 攻撃処理
 // ============================================================
 function performAttack(attackerFieldIndex, isEnemyAttacker = false) {
     const field = isEnemyAttacker ? game.enemyField : game.playerField;
@@ -695,15 +712,14 @@ function performAttack(attackerFieldIndex, isEnemyAttacker = false) {
     const attackerCard = attacker.card;
     const isHero = (attackerCard.id === 17);
     let atk = getCardAtk(attackerCard, isEnemyAttacker);
-    let attackCount = isHero ? 2 : 1; // ヒーローは2回攻撃
+    let attackCount = isHero ? 2 : 1;
     let heroSurvived = true;
 
     for (let attackNum = 0; attackNum < attackCount; attackNum++) {
-        if (!heroSurvived && isHero) break; // ヒーローが倒れたら2回目なし
+        if (!heroSurvived && isHero) break;
         
         const targetField = isEnemyAttacker ? game.playerField : game.enemyField;
         
-        // 相手フィールドが空ならダイレクトアタック
         if (targetField.length === 0) {
             if (isEnemyAttacker) {
                 game.playerLife -= atk;
@@ -727,7 +743,6 @@ function performAttack(attackerFieldIndex, isEnemyAttacker = false) {
             continue;
         }
 
-        // 相手フィールドの最初のカードを攻撃
         const targetIndex = 0;
         const target = targetField[targetIndex];
         const targetCard = target.card;
@@ -759,14 +774,12 @@ function performAttack(attackerFieldIndex, isEnemyAttacker = false) {
                     return;
                 }
             }
-            // ヒーローは生き残っているので2回目も可能
             heroSurvived = true;
         } else if (atk < targetAtk) {
-            // 自分のカードが破壊される
             const removed = field.splice(attackerFieldIndex, 1)[0];
             const dmg = targetAtk - atk;
             if (isEnemyAttacker) {
-                game.enemyLife -= dmg; // コンピューターのライフが減る（自滅）
+                game.enemyLife -= dmg;
                 addLog(`👾 ${attackerCard.name} が ${targetCard.name} に敗れた！ ${dmg}ダメージ！`);
                 if (game.enemyLife <= 0) {
                     game.enemyLife = 0;
@@ -784,11 +797,9 @@ function performAttack(attackerFieldIndex, isEnemyAttacker = false) {
                     return;
                 }
             }
-            heroSurvived = false; // 倒れたので2回目なし
-            // カードが破壊されたので攻撃終了
+            heroSurvived = false;
             break;
         } else {
-            // 相打ち
             field.splice(attackerFieldIndex, 1)[0];
             const removed = targetField.splice(targetIndex, 1)[0];
             if (isEnemyAttacker) {
@@ -816,7 +827,6 @@ function performPlayerAttack() {
         return;
     }
 
-    // 攻撃可能なカードを探す (count===0)
     let attackerIndex = -1;
     for (let i = 0; i < game.playerField.length; i++) {
         const f = game.playerField[i];
@@ -826,13 +836,12 @@ function performPlayerAttack() {
         }
     }
     if (attackerIndex === -1) {
-        addLog('⚠️ 攻撃できるカードがありません (待機中: 1)');
+        addLog('⚠️ 攻撃できるカードがありません (待機中)');
         return;
     }
 
     const attacker = game.playerField[attackerIndex].card;
 
-    // 特殊カード処理（サタン、ゴースト、クイヤ）
     if (attacker.id === 25) {
         if (game.enemyHand.length > 0) {
             const idx = Math.floor(Math.random() * game.enemyHand.length);
@@ -894,7 +903,6 @@ function performPlayerAttack() {
         return;
     }
 
-    // 通常攻撃（ヒーロー含む）
     performAttack(attackerIndex, false);
     game.usedAttackThisTurn = true;
     updateUI();
@@ -932,6 +940,7 @@ function endPlayerTurn() {
 function executeEnemyTurn() {
     if (game.gameOver) return;
     
+    // 相手ターン開始時にカウント更新
     updateCounts();
     
     if (game.enemySkipNextTurn) {
@@ -950,6 +959,7 @@ function executeEnemyTurn() {
         return;
     }
 
+    // ドロー
     if (game.enemyDeck.length === 0) {
         addLog('⚠️ 相手の山札が切れました');
         checkDeckOut();
@@ -964,7 +974,22 @@ function executeEnemyTurn() {
     }
     drawCard(game.enemyDeck, game.enemyHand, drawCount);
 
-    // クリーチャーを出す
+    // ★★★ まず魔法カードを全部使う ★★★
+    let magicUsed = true;
+    while (magicUsed && game.enemyHand.length > 0) {
+        magicUsed = false;
+        for (let i = 0; i < game.enemyHand.length; i++) {
+            if (game.enemyHand[i].type === 'magic') {
+                const magic = game.enemyHand.splice(i, 1)[0];
+                addLog(`👾 相手が魔法「${magic.name}」を使用`);
+                applyMagicEffect(magic, 'enemy');
+                magicUsed = true;
+                break;
+            }
+        }
+    }
+
+    // ★★★ 次にクリーチャーを出す ★★★
     let creatureIdx = -1;
     for (let i = 0; i < game.enemyHand.length; i++) {
         if (game.enemyHand[i].type === 'creature' && !isFieldFull('enemy')) {
@@ -974,21 +999,23 @@ function executeEnemyTurn() {
     }
     if (creatureIdx >= 0) {
         const card = game.enemyHand.splice(creatureIdx, 1)[0];
+        // ★★★ 戦士以外はcount=1（待機中） ★★★
         const count = (card.id === 18) ? 0 : 1;
         game.enemyField.push({ card: card, count: count });
-        addLog(`👾 相手が ${card.name} を召喚しました`);
-    } else {
-        for (let i = 0; i < game.enemyHand.length; i++) {
-            if (game.enemyHand[i].type === 'magic') {
-                const magic = game.enemyHand.splice(i, 1)[0];
-                addLog(`👾 相手が魔法「${magic.name}」を使用`);
-                applyMagicEffect(magic, 'enemy');
-                break;
-            }
+        
+        if (card.id === 29) {
+            game.enemyBloodSeaActive = true;
+            addLog('🌊 相手の血の海: あなたの攻撃力が-3000！');
+        }
+        
+        if (count === 0) {
+            addLog(`👾 相手が ${card.name} を召喚しました (即時攻撃可能)`);
+        } else {
+            addLog(`👾 相手が ${card.name} を召喚しました (待機中)`);
         }
     }
 
-    // 攻撃フェイズ（AI改良: 勝てる時だけ攻撃）
+    // 攻撃フェイズ
     if (game.enemyField.length > 0 && !game.gameOver) {
         for (let i = 0; i < game.enemyField.length; i++) {
             const f = game.enemyField[i];
@@ -1008,7 +1035,7 @@ function executeEnemyTurn() {
             let enemyAtk = getCardAtk(attacker, true);
             if (enemyAtk <= 0) continue;
 
-            // ★ AI判断: 攻撃するかどうか
+            // AI判断: 勝てる時だけ攻撃
             if (game.playerField.length > 0) {
                 const target = game.playerField[0].card;
                 let playerAtk = getCardAtk(target, false);
@@ -1018,16 +1045,9 @@ function executeEnemyTurn() {
                 }
             }
 
-            // 攻撃実行（ヒーローの2回攻撃対応）
             performAttack(i, true);
             if (game.gameOver) break;
-            // カードが破壊された場合、インデックス調整
             if (i >= game.enemyField.length) break;
-            // 攻撃したカードのcountをリセット（同一ターンに再度攻撃させない）
-            if (i < game.enemyField.length && game.enemyField[i].card.id === attacker.id) {
-                // ヒーローは2回攻撃済みなのでcountを1に戻す
-                game.enemyField[i].count = 1;
-            }
         }
     }
 
@@ -1083,7 +1103,6 @@ function updateUI() {
     const curseInfo = document.getElementById('curseInfo');
     if (game.curseActive) {
         curseInfo.textContent = `🎹 呪い: 相手攻撃-2000 (残り${game.curseTurns}ターン)`;
-        curseInfo.style.color = '#9b59b6';
     } else {
         curseInfo.textContent = '';
     }
