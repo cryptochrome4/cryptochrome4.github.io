@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ドット絵鍵探し · DeepSeek解説</title>
+    <title>ドット絵ふらふら</title>
     <style>
         * {
             box-sizing: border-box;
@@ -108,7 +108,7 @@
             cursor: pointer;
             transition: 0.06s linear;
             border: 1px solid #8ab08a;
-            display: none; /* 鍵発見まで非表示 */
+            display: none;
         }
         #detailBtn:active {
             transform: translateY(4px);
@@ -123,7 +123,6 @@
             text-align: center;
             font-size: 15px;
         }
-        /* 解説オーバーレイ (フルスクリーン風) */
         .deepseek-overlay {
             position: fixed;
             top: 0;
@@ -248,7 +247,6 @@
             transform: translateY(6px);
             box-shadow: 0 0px 0 #2f3f2f;
         }
-        /* ゲーム中は非表示 */
         .hidden-canvas {
             display: none;
         }
@@ -259,11 +257,11 @@
     <canvas id="gameCanvas" width="800" height="600"></canvas>
     <div class="status-bar">
         <span id="roomDisplay">📍 リビング</span>
-        <span id="info-message">🔍 鍵を探せ</span>
+        <span id="info-message"></span>
         <button class="btn-reset" id="resetBtn">↺ リセット</button>
         <button id="detailBtn">📘 詳しく</button>
     </div>
-    <div class="footer">⚡ 2013 · ドット絵で鍵探し ⚡</div>
+    <div class="footer">⚡ 2013 · ドット絵ふらふら ⚡</div>
 </div>
 
 <!-- DeepSeek 詳細オーバーレイ -->
@@ -329,7 +327,6 @@
 
 <script>
     (function() {
-        // ---------- 2013 レトロ + DeepSeek 詳細 ----------
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         ctx.imageSmoothingEnabled = false;
@@ -339,7 +336,6 @@
         let playerX = 400, playerY = 300;
         let keyData = { room: ROOMS.LIVING, x: 0, y: 0, found: false };
 
-        // 家具定義
         const furniture = {
             [ROOMS.LIVING]: [
                 { x: 120, y: 180, w: 64, h: 48, color: '#8b6b4d', label: '🛋️', type: 'sofa' },
@@ -361,7 +357,6 @@
             ]
         };
 
-        // 鍵配置
         function placeKeyRandomly() {
             const room = Math.floor(Math.random() * 3);
             const roomFurniture = furniture[room];
@@ -384,9 +379,8 @@
             keyData.x = kx;
             keyData.y = ky;
             keyData.found = false;
-            // 詳細ボタンは非表示に
             document.getElementById('detailBtn').style.display = 'none';
-            document.getElementById('info-message').innerHTML = '🔍 鍵を探せ';
+            document.getElementById('info-message').textContent = '';
         }
 
         function movePlayerTo(targetX, targetY) {
@@ -400,17 +394,14 @@
                 const dx = playerX - keyData.x, dy = playerY - keyData.y;
                 if (Math.sqrt(dx*dx + dy*dy) < 25) {
                     keyData.found = true;
-                    document.getElementById('info-message').innerHTML = '🔑 鍵発見! 詳細を見る →';
+                    document.getElementById('info-message').textContent = '🔑 鍵発見!';
                     document.getElementById('detailBtn').style.display = 'inline-block';
-                    // オーバーレイを開く準備 (ボタン表示)
                 }
             }
         }
 
-        // 描画
         function drawScene() {
             ctx.clearRect(0, 0, 800, 600);
-            // 床
             ctx.fillStyle = '#3d4e5e';
             ctx.fillRect(0, 0, 800, 600);
             ctx.fillStyle = '#4d5e6e';
@@ -419,7 +410,6 @@
                     if ((i/20 + j/20) % 2 === 0) ctx.fillRect(i, j, 10, 10);
                 }
             }
-            // 壁
             let wallColor = '#4a5f6a';
             if (currentRoom === ROOMS.BAR) wallColor = '#4f3f2f';
             else if (currentRoom === ROOMS.LIBRARY) wallColor = '#3f4f5a';
@@ -429,7 +419,6 @@
             ctx.fillRect(0, 0, 20, 600);
             ctx.fillRect(780, 0, 20, 600);
 
-            // 部屋名
             ctx.font = 'bold 20px "Courier New", monospace';
             ctx.fillStyle = '#f0f0e0';
             ctx.shadowColor = '#000000';
@@ -438,7 +427,6 @@
             ctx.fillText(roomName, 40, 50);
             ctx.shadowBlur = 0;
 
-            // 家具
             const furnList = furniture[currentRoom] || [];
             for (let f of furnList) {
                 ctx.fillStyle = '#1f2a30';
@@ -458,7 +446,6 @@
                 for (let d=0; d<4; d++) ctx.fillRect(f.x+6+d*12, f.y+8+d*8, 4, 4);
             }
 
-            // 鍵
             if (!keyData.found && currentRoom === keyData.room) {
                 const kx = keyData.x, ky = keyData.y;
                 ctx.fillStyle = '#f7d44a';
@@ -475,7 +462,6 @@
                 ctx.fillRect(kx+6, ky-14, 4, 4);
             }
 
-            // 棒人間
             const px = playerX, py = playerY;
             ctx.fillStyle = '#1f2a30';
             ctx.beginPath();
@@ -497,13 +483,11 @@
             ctx.fillRect(px+3, py-16, 3, 3);
             ctx.shadowBlur = 0;
 
-            // ルーム表示
             document.getElementById('roomDisplay').textContent = 
                 currentRoom === ROOMS.LIVING ? '📍 リビング' :
                 currentRoom === ROOMS.BAR ? '🍺 バー' : '📚 図書館';
         }
 
-        // ----- イベント -----
         function handleCanvasClick(e) {
             const rect = canvas.getBoundingClientRect();
             const scaleX = canvas.width / rect.width;
@@ -520,7 +504,6 @@
             const canvasX = (clientX - rect.left) * scaleX;
             const canvasY = (clientY - rect.top) * scaleY;
             if (canvasX >= 0 && canvasX <= 800 && canvasY >= 0 && canvasY <= 600) {
-                // 壁クリックで移動 (バーに行くには右壁をクリック)
                 if (canvasX < 40 && currentRoom !== ROOMS.LIVING) {
                     currentRoom = ROOMS.LIVING;
                 } else if (canvasX > 760 && currentRoom !== ROOMS.BAR) {
@@ -542,15 +525,14 @@
             currentRoom = ROOMS.LIVING;
             keyData.found = false;
             document.getElementById('detailBtn').style.display = 'none';
-            document.getElementById('info-message').innerHTML = '🔍 鍵を探せ';
+            document.getElementById('info-message').textContent = '';
             drawScene();
         }
 
-        // ---- オーバーレイ制御 ----
         const overlay = document.getElementById('deepseekOverlay');
         function openOverlay() {
             overlay.classList.add('active');
-            canvas.style.display = 'none';  // ゲーム部分を非表示
+            canvas.style.display = 'none';
         }
         function closeOverlay() {
             overlay.classList.remove('active');
@@ -562,17 +544,12 @@
         document.getElementById('closeOverlayBtn').addEventListener('click', closeOverlay);
         document.getElementById('backToGameBtn').addEventListener('click', closeOverlay);
 
-        // ---- 初期化 ----
         canvas.addEventListener('click', handleCanvasClick);
         canvas.addEventListener('touchstart', handleCanvasClick, { passive: false });
         document.getElementById('resetBtn').addEventListener('click', resetGame);
 
         placeKeyRandomly();
         drawScene();
-
-        // バーの行き方: 右端をクリック (canvas の x > 760)
-        // 明示的にヒントを表示
-        console.log('ヒント: バーに行くには右端をクリック！');
     })();
 </script>
 </body>
