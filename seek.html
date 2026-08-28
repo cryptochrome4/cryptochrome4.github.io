@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ドット絵鍵探し · 2013 レトロ</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+        body {
+            background: #2d2d2d;
+            min-height: 100vh;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        .game-wrapper {
+            background: #1a1a1a;
+            padding: 20px 20px 25px;
+            border-radius: 20px;
+            box-shadow: 0 10px 0 #0a0a0a, 0 8px 20px rgba(0,0,0,0.7);
+            border: 2px solid #5a5a5a;
+        }
+        canvas {
+            display: block;
+            margin: 0 auto;
+            width: 800px;
+            height: 600px;
+            image-rendering: crisp-edges; /* ドット絵らしく */
+            image-rendering: pixelated;
+            background: #3a4a5a;
+            border: 4px solid #5f6b7a;
+            border-radius: 12px;
+            box-shadow: inset 0 0 0 2px #232323, 0 0 0 2px #6b6b6b;
+            cursor: pointer;
+            touch-action: none;
+        }
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 16px;
+            padding: 0 10px;
+            color: #b0c0d0;
+            text-shadow: 2px 2px 0 #0f0f0f;
+            font-size: 20px;
+            letter-spacing: 1px;
+            background: #262f36;
+            border-radius: 40px;
+            padding: 10px 24px;
+            border: 2px solid #4b5a66;
+        }
+        .status-bar span {
+            background: #141a1f;
+            padding: 4px 18px;
+            border-radius: 40px;
+            border: 1px solid #3d4d5a;
+            color: #d4e4f0;
+            font-weight: bold;
+        }
+        .btn-reset {
+            background: #3c4c5a;
+            border: none;
+            color: #eee;
+            font-family: inherit;
+            font-size: 20px;
+            font-weight: bold;
+            padding: 6px 24px;
+            border-radius: 40px;
+            box-shadow: 0 4px 0 #1a2228, 0 2px 8px black;
+            cursor: pointer;
+            transition: 0.06s linear;
+            border: 1px solid #6d7e8a;
+        }
+        .btn-reset:active {
+            transform: translateY(4px);
+            box-shadow: 0 0px 0 #1a2228;
+        }
+        .btn-reset:hover {
+            background: #4e6272;
+        }
+        #info-message {
+            background: #1d262e;
+            padding: 6px 18px;
+            border-radius: 50px;
+            border-left: 6px solid #e8b84b;
+            color: #f0e6c5;
+            font-size: 18px;
+        }
+        a {
+            color: #b8d0e0;
+            text-decoration: none;
+        }
+        /* 2013 らしい雰囲気 */
+        .footer {
+            margin-top: 8px;
+            color: #66747f;
+            text-align: center;
+            font-size: 15px;
+        }
+    </style>
+</head>
+<body>
+<div class="game-wrapper">
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <div class="status-bar">
+        <span id="roomDisplay">📍 リビング</span>
+        <span id="info-message">🔍 鍵を探せ</span>
+        <button class="btn-reset" id="resetBtn">↺ リセット</button>
+    </div>
+    <div class="footer">⚡ 2013 · ドット絵で鍵探し ⚡</div>
+</div>
+
+<script>
+    (function() {
+        // ---- 2013 レトロ仕様 ----
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        // 画像劣化防止 (2013風)
+        ctx.imageSmoothingEnabled = false;
+
+        // 部屋の定義
+        const ROOMS = {
+            LIVING: 0,
+            BAR: 1,
+            LIBRARY: 2
+        };
+
+        // 現在の部屋 (初期: リビング)
+        let currentRoom = ROOMS.LIVING;
+
+        // 棒人間の座標 (canvas内)
+        let playerX = 400, playerY = 300;
+
+        // 鍵の状態: { room: 0|1|2, x, y, found: boolean }
+        // 鍵はランダムに配置 (ただし家具の上に重ならないように調整)
+        let keyData = {
+            room: ROOMS.LIVING,
+            x: 0, y: 0,
+            found: false
+        };
+
+        // 家具の定義 (各ルームに3個ずつ、ドット絵家具)
+        // それぞれ { x, y, w, h, color, label,  type }
+        const furniture = {
+            [ROOMS.LIVING]: [
+                { x: 120, y: 180, w: 64, h: 48, color: '#8b6b4d', label: '🛋️', type: 'sofa' },
+                { x: 420, y: 120, w: 56, h: 70, color: '#b87333', label: '📺', type: 'tv' },
+                { x: 630, y: 400, w: 50, h: 40, color: '#5f7f5f', label: '🌿', type: 'plant' },
+                { x: 40, y: 440, w: 100, h: 30, color: '#7a5a3a', label: '🧺', type: 'basket' } // 追加
+            ],
+            [ROOMS.BAR]: [
+                { x: 80, y: 280, w: 100, h: 40, color: '#5d3a1a', label: '🍺', type: 'counter' },
+                { x: 320, y: 180, w: 48, h: 70, color: '#4d3e2e', label: '🥃', type: 'shelf' },
+                { x: 560, y: 380, w: 60, h: 60, color: '#4f6f4f', label: '🪑', type: 'stool' },
+                { x: 700, y: 140, w: 40, h: 50, color: '#7a5f4a', label: '🎱', type: 'pool' }
+            ],
+            [ROOMS.LIBRARY]: [
+                { x: 100, y: 100, w: 80, h: 100, color: '#6b4f3a', label: '📚', type: 'bookshelf' },
+                { x: 340, y: 350, w: 70, h: 50, color: '#4f6b4f', label: '📖', type: 'table' },
+                { x: 580, y: 150, w: 60, h: 90, color: '#5a4a3a', label: '🕯️', type: 'candle' },
+                { x: 730, y: 450, w: 40, h: 40, color: '#4a5a4a', label: '🗿', type: 'statue' }
+            ]
+        };
+
+        // 鍵をランダムに配置 (家具と被らないようにする)
+        function placeKeyRandomly() {
+            const room = Math.floor(Math.random() * 3); // 0,1,2
+            const roomFurniture = furniture[room];
+            // 候補位置をいくつか生成 (家具の近くを避ける)
+            let attempts = 0;
+            let placed = false;
+            let kx = 200, ky = 200;
+            while (!placed && attempts < 200) {
+                kx = 60 + Math.random() * 700;
+                ky = 60 + Math.random() * 480;
+                // 家具と重ならないチェック (距離)
+                let overlap = false;
+                for (let f of roomFurniture) {
+                    const cx = f.x + f.w/2;
+                    const cy = f.y + f.h/2;
+                    const dx = kx - cx;
+                    const dy = ky - cy;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+                    if (dist < 55) { overlap = true; break; }
+                }
+                // 端っこ過ぎない
+                if (kx < 30 || kx > 770 || ky < 30 || ky > 570) overlap = true;
+                if (!overlap) placed = true;
+                attempts++;
+            }
+            // それでも置けなかったら強制配置
+            if (!placed) {
+                kx = 200 + Math.random() * 400;
+                ky = 150 + Math.random() * 300;
+            }
+            keyData.room = room;
+            keyData.x = kx;
+            keyData.y = ky;
+            keyData.found = false;
+        }
+
+        // 初期配置 (ゲーム開始時)
+        placeKeyRandomly();
+
+        // 棒人間を指定座標に動かす (クリック/タッチ)
+        function movePlayerTo(targetX, targetY) {
+            // 部屋の境界を考慮 (はみ出さない)
+            const margin = 20;
+            let newX = Math.min(780, Math.max(margin, targetX));
+            let newY = Math.min(570, Math.max(margin, targetY));
+            playerX = newX;
+            playerY = newY;
+
+            // 鍵を見つけたかチェック (棒人間が鍵の上に乗った)
+            if (!keyData.found && currentRoom === keyData.room) {
+                const dx = playerX - keyData.x;
+                const dy = playerY - keyData.y;
+                // 棒人間の足元(半径15px)で判定
+                if (Math.sqrt(dx*dx + dy*dy) < 25) {
+                    keyData.found = true;
+                    // DeepSeek 情報を表示 (メッセージ変更)
+                    document.getElementById('info-message').innerHTML = '🔑 鍵発見! DeepSeekとは?';
+                    // 以降は描画でDeepSeek情報を表示
+                }
+            }
+        }
+
+        // ----- 描画 -----
+        function drawScene() {
+            ctx.clearRect(0, 0, 800, 600);
+
+            // ---- 部屋ごとの背景 (ドット調) ----
+            // 床のテクスチャ (ドット)
+            ctx.fillStyle = '#3d4e5e';
+            ctx.fillRect(0, 0, 800, 600);
+            // ドット柄の床
+            ctx.fillStyle = '#4d5e6e';
+            for (let i = 0; i < 800; i+= 20) {
+                for (let j = 0; j < 600; j+= 20) {
+                    if ((i/20 + j/20) % 2 === 0) {
+                        ctx.fillRect(i, j, 10, 10);
+                    }
+                }
+            }
+
+            // 壁 (部屋ごとに色味変更)
+            let wallColor = '#4a5f6a';
+            if (currentRoom === ROOMS.BAR) wallColor = '#4f3f2f';
+            else if (currentRoom === ROOMS.LIBRARY) wallColor = '#3f4f5a';
+            ctx.fillStyle = wallColor;
+            ctx.fillRect(0, 0, 800, 20);
+            ctx.fillRect(0, 580, 800, 20);
+            ctx.fillRect(0, 0, 20, 600);
+            ctx.fillRect(780, 0, 20, 600);
+
+            // 部屋名表示 (ドット風)
+            ctx.font = 'bold 20px "Courier New", monospace';
+            ctx.fillStyle = '#f0f0e0';
+            ctx.shadowColor = '#000000';
+            ctx.shadowBlur = 8;
+            let roomName = '';
+            if (currentRoom === ROOMS.LIVING) roomName = '🛋️ リビング';
+            else if (currentRoom === ROOMS.BAR) roomName = '🍺 バー';
+            else if (currentRoom === ROOMS.LIBRARY) roomName = '📚 図書館';
+            ctx.fillText(roomName, 40, 50);
+            ctx.shadowBlur = 0;
+
+            // ---- 家具の描画 (ドット絵風) ----
+            const furnList = furniture[currentRoom] || [];
+            for (let f of furnList) {
+                // 影
+                ctx.fillStyle = '#1f2a30';
+                ctx.fillRect(f.x+4, f.y+6, f.w, f.h);
+                // 本体
+                ctx.fillStyle = f.color;
+                ctx.fillRect(f.x, f.y, f.w, f.h);
+                // 枠線 (ドット感)
+                ctx.strokeStyle = '#101010';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(f.x, f.y, f.w, f.h);
+                // ラベル (アイコン)
+                ctx.font = '28px "Segoe UI", "Arial Unicode MS", sans-serif';
+                ctx.fillStyle = '#f5f0e0';
+                ctx.shadowColor = '#000000';
+                ctx.shadowBlur = 6;
+                ctx.fillText(f.label, f.x+10, f.y+32);
+                ctx.shadowBlur = 0;
+                // 小さいドットを家具に追加
+                ctx.fillStyle = '#1a1a1a';
+                for (let d=0; d<4; d++) {
+                    ctx.fillRect(f.x+6+d*12, f.y+8+d*8, 4, 4);
+                }
+            }
+
+            // ---- 鍵の描画 (見つかってなければ表示) ----
+            if (!keyData.found && currentRoom === keyData.room) {
+                // 鍵 (ドット絵風)
+                const kx = keyData.x, ky = keyData.y;
+                ctx.fillStyle = '#f7d44a';
+                ctx.shadowColor = '#b8860b';
+                ctx.shadowBlur = 12;
+                // 鍵の形 (簡易)
+                ctx.fillRect(kx-6, ky-10, 12, 20);
+                ctx.fillRect(kx-12, ky-6, 6, 6);
+                ctx.fillRect(kx+6, ky-6, 6, 6);
+                ctx.fillStyle = '#d4a020';
+                ctx.fillRect(kx-4, ky-6, 8, 12);
+                ctx.shadowBlur = 0;
+                // キラキラ
+                ctx.fillStyle = '#ffffc0';
+                ctx.fillRect(kx-8, ky-14, 4, 4);
+                ctx.fillRect(kx+6, ky-14, 4, 4);
+            }
+
+            // ---- 棒人間 (ドット絵) ----
+            const px = playerX, py = playerY;
+            // 影
+            ctx.fillStyle = '#1f2a30';
+            ctx.beginPath();
+            ctx.ellipse(px, py+28, 14, 6, 0, 0, Math.PI*2);
+            ctx.fill();
+
+            // 体 (頭, 胴, 足)
+            ctx.fillStyle = '#d4c8b0';
+            ctx.shadowColor = '#000000';
+            ctx.shadowBlur = 4;
+            // 頭
+            ctx.beginPath();
+            ctx.arc(px, py-12, 12, 0, Math.PI*2);
+            ctx.fill();
+            // 胴
+            ctx.fillRect(px-6, py-2, 12, 18);
+            // 足
+            ctx.fillRect(px-9, py+14, 6, 12);
+            ctx.fillRect(px+3, py+14, 6, 12);
+            // 腕 (動き)
+            ctx.fillRect(px-14, py+2, 8, 6);
+            ctx.fillRect(px+6, py+2, 8, 6);
+            // 目 (ドット)
+            ctx.fillStyle = '#1a1a2a';
+            ctx.fillRect(px-4, py-16, 3, 3);
+            ctx.fillRect(px+3, py-16, 3, 3);
+            ctx.shadowBlur = 0;
+
+            // ---- DeepSeek 情報表示 (鍵発見時) ----
+            if (keyData.found) {
+                ctx.font = 'bold 20px "Courier New", monospace';
+                ctx.fillStyle = '#faeec0';
+                ctx.shadowColor = '#000000';
+                ctx.shadowBlur = 12;
+                ctx.fillStyle = '#fcf3d9';
+                ctx.fillRect(120, 440, 560, 120);
+                ctx.fillStyle = '#1f2a30';
+                ctx.fillRect(124, 444, 552, 112);
+                ctx.fillStyle = '#faf0d0';
+                ctx.font = 'bold 22px "Courier New", monospace';
+                ctx.fillText('✨ DeepSeek とは ✨', 180, 480);
+                ctx.font = '18px "Courier New", monospace';
+                ctx.fillStyle = '#e8e0c0';
+                ctx.fillText('• 中国の深度求索が開発したAIアシスタント', 150, 514);
+                ctx.fillText('• 2023年11月にリリース、2024年から認知拡大', 150, 544);
+                ctx.fillText('• 無料・高性能で話題に (2026年現在も発展中)', 150, 574);
+                ctx.shadowBlur = 0;
+            }
+
+            // ルーム表示更新
+            document.getElementById('roomDisplay').textContent = 
+                currentRoom === ROOMS.LIVING ? '📍 リビング' :
+                currentRoom === ROOMS.BAR ? '🍺 バー' : '📚 図書館';
+        }
+
+        // ---- クリック / タッチ イベント ----
+        function handleCanvasClick(e) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+
+            let clientX, clientY;
+            if (e.touches) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+                e.preventDefault();
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+
+            const canvasX = (clientX - rect.left) * scaleX;
+            const canvasY = (clientY - rect.top) * scaleY;
+
+            // クリック位置が有効範囲内
+            if (canvasX >= 0 && canvasX <= 800 && canvasY >= 0 && canvasY <= 600) {
+                // 部屋切り替え (上下左右の壁をクリックで移動)
+                // 左壁, 右壁, 上壁, 下壁 で移動 (簡易)
+                if (canvasX < 40 && currentRoom !== ROOMS.LIVING) {
+                    currentRoom = ROOMS.LIVING;
+                } else if (canvasX > 760 && currentRoom !== ROOMS.BAR) {
+                    currentRoom = ROOMS.BAR;
+                } else if (canvasY < 40 && currentRoom !== ROOMS.LIBRARY) {
+                    currentRoom = ROOMS.LIBRARY;
+                } else if (canvasY > 560 && currentRoom !== ROOMS.LIVING) {
+                    currentRoom = ROOMS.LIVING;
+                } else {
+                    // 通常: 棒人間を移動
+                    movePlayerTo(canvasX, canvasY);
+                }
+                drawScene();
+            }
+        }
+
+        // リセット (鍵を再配置)
+        function resetGame() {
+            placeKeyRandomly();
+            // プレイヤーを中央へ
+            playerX = 400;
+            playerY = 300;
+            currentRoom = ROOMS.LIVING;
+            keyData.found = false;
+            document.getElementById('info-message').innerHTML = '🔍 鍵を探せ';
+            drawScene();
+        }
+
+        // ---- 初期化 ----
+        canvas.addEventListener('click', handleCanvasClick);
+        canvas.addEventListener('touchstart', handleCanvasClick, { passive: false });
+        document.getElementById('resetBtn').addEventListener('click', resetGame);
+
+        // 初回描画
+        drawScene();
+
+        // 2013年らしく resize しても大丈夫
+        window.addEventListener('resize', ()=>{});
+    })();
+</script>
+</body>
+</html>
