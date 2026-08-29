@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>マリオ風ステージ + カイツブリ生態 (マウス操作・2013)</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+        body {
+            background: #1a1a2e;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Arial', 'メイリオ', sans-serif;
+            touch-action: none;
+        }
+        .container {
+            background: #2d2d44;
+            padding: 20px 30px 30px;
+            border-radius: 28px;
+            box-shadow: 0 12px 0 #0f0f1a;
+        }
+        canvas {
+            display: block;
+            margin: 0 auto;
+            background: #7ec8ff;
+            border: 6px solid #4a3f2b;
+            border-radius: 16px;
+            box-shadow: inset 0 0 0 3px #c9a87c, 0 10px 0 #2b241b;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            width: 800px;
+            height: 400px;
+            cursor: pointer;
+            touch-action: none;
+        }
+        .info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 16px;
+            color: #f0e6b0;
+            text-shadow: 2px 2px 0 #3d2f1f;
+            font-weight: bold;
+            font-size: 18px;
+            background: #4a3f2b;
+            padding: 10px 20px;
+            border-radius: 60px;
+            border-bottom: 5px solid #2b241b;
+        }
+        .info span {
+            background: #2b241b;
+            padding: 4px 18px;
+            border-radius: 40px;
+            color: #ffd78a;
+        }
+        button {
+            background: #f5c542;
+            border: none;
+            border-bottom: 6px solid #b47d2a;
+            padding: 8px 28px;
+            border-radius: 60px;
+            font-weight: bold;
+            font-size: 18px;
+            color: #2d2d1c;
+            cursor: pointer;
+            transition: 0.05s linear;
+            box-shadow: 0 2px 0 #4f3d1a;
+        }
+        button:active {
+            transform: translateY(4px);
+            border-bottom-width: 2px;
+        }
+        .footer {
+            margin-top: 12px;
+            text-align: center;
+            color: #8d8da0;
+            font-size: 14px;
+            letter-spacing: 1px;
+        }
+        .footer .mouse-hint {
+            display: inline-block;
+            background: #3d3d5a;
+            padding: 4px 16px;
+            border-radius: 40px;
+            color: #d4d4e8;
+        }
+        /* カイツブリ情報表示（オーバーレイ） */
+        .bird-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(20, 30, 20, 0.85);
+            backdrop-filter: blur(4px);
+            justify-content: center;
+            align-items: center;
+            z-index: 999;
+            font-family: 'Segoe UI', 'Arial', sans-serif;
+        }
+        .bird-card {
+            background: #f5f0e1;
+            max-width: 700px;
+            width: 90%;
+            padding: 30px 35px;
+            border-radius: 50px 20px 50px 20px;
+            box-shadow: 0 25px 40px rgba(0,0,0,0.7);
+            border: 6px solid #6d8f6d;
+            color: #1f2e1f;
+            position: relative;
+        }
+        .bird-card h2 {
+            font-size: 34px;
+            border-bottom: 5px dotted #6d8f6d;
+            padding-bottom: 12px;
+            margin-bottom: 18px;
+            color: #2f4f2f;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .bird-card h2 small {
+            font-size: 18px;
+            font-weight: normal;
+            color: #5a6f5a;
+        }
+        .bird-card p {
+            line-height: 1.8;
+            font-size: 17px;
+            margin: 12px 0;
+        }
+        .bird-card ul {
+            margin: 10px 0 16px 20px;
+            list-style: square;
+        }
+        .bird-card li {
+            margin: 6px 0;
+        }
+        .bird-card .close-btn {
+            background: #b13e3e;
+            border: none;
+            border-bottom: 6px solid #6e2626;
+            color: white;
+            font-weight: bold;
+            font-size: 22px;
+            padding: 8px 30px;
+            border-radius: 60px;
+            cursor: pointer;
+            margin-top: 12px;
+            transition: 0.05s linear;
+            box-shadow: 0 2px 0 #3d1a1a;
+        }
+        .bird-card .close-btn:active {
+            transform: translateY(4px);
+            border-bottom-width: 2px;
+        }
+        .bird-card .footnote {
+            margin-top: 18px;
+            font-size: 14px;
+            color: #4d5e4d;
+            border-top: 2px dashed #b3c9b3;
+            padding-top: 14px;
+        }
+        @media (max-width: 860px) {
+            canvas { width: 100%; height: auto; aspect-ratio: 800/400; }
+            .container { padding: 12px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="gameCanvas" width="800" height="400"></canvas>
+        <div class="info">
+            <span>🍄 マウスで操作 2013</span>
+            <span id="scoreDisplay">🟡 0</span>
+            <button id="resetBtn">↺ リスタート</button>
+        </div>
+        <div class="footer">
+            <span class="mouse-hint">🖱 クリックでジャンプ / ドラッグで移動</span>
+            <span style="margin-left:16px;">🏁 旗でクリア！</span>
+        </div>
+    </div>
+
+    <!-- カイツブリ生態オーバーレイ -->
+    <div id="birdOverlay" class="bird-overlay">
+        <div class="bird-card">
+            <h2>🦆 カイツブリ <small>(Podiceps cristatus)</small></h2>
+            <p><strong>🔹 生態</strong> ・ ユーラシア・アフリカの湖沼に生息。潜水が得意で、水中を泳ぎ回って魚や水生昆虫を捕食します。</p>
+            <ul>
+                <li><strong>繁殖期</strong>  : 頭部に黒い冠羽と赤褐色の飾り羽が現れる。</li>
+                <li><strong>巣</strong>  : 水生植物を積み上げて浮き巣を作り、3〜6個の卵を産む。</li>
+                <li><strong>鳴き声</strong> : 甲高い「クィッ クィッ」や「ギャー」という声。</li>
+                <li><strong>冬鳥</strong>  : 日本では冬に沿岸や湖に飛来（冬鳥）。</li>
+            </ul>
+            <p><strong>🔹 特徴</strong> ・ 足は後方につき、泳ぎは達者だが陸上では不器用。飛ぶときは水面を助走して飛び立つ。</p>
+            <p><strong>🔹 保護</strong> ・ 環境省レッドリストでは<strong>「準絶滅危惧」</strong>に指定される地域も。</p>
+            <div class="footnote">📘 参考: 2013年時点の鳥類学データより</div>
+            <button id="closeBirdBtn" class="close-btn">✕ ステージに戻る</button>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            // ---------- 2013年 レガシー対応 / マウス操作 ----------
+            var canvas = document.getElementById('gameCanvas');
+            var ctx = canvas.getContext('2d');
+            var scoreSpan = document.getElementById('scoreDisplay');
+            var resetBtn = document.getElementById('resetBtn');
+            var birdOverlay = document.getElementById('birdOverlay');
+            var closeBirdBtn = document.getElementById('closeBirdBtn');
+
+            // ---------- ゲーム状態 ----------
+            var game = {
+                mario: {
+                    x: 50,
+                    y: 290,
+                    w: 28,
+                    h: 38,
+                    vy: 0,
+                    vx: 0,
+                    onGround: false,
+                    facing: 1
+                },
+                platforms: [],
+                coins: [],
+                flag: { x: 740, y: 130, w: 24, h: 60, baseY: 330 },
+                gravity: 0.45,
+                friction: 0.82,
+                jumpPower: -8.5,
+                moveSpeed: 3.8,
+                score: 0,
+                gameClear: false,
+                // マウス操作状態
+                mouseDown: false,
+                targetX: null,      // マウスのX座標 (キャンバス内)
+                mouseScreenX: 0,
+                jumpRequested: false
+            };
+
+            // ---------- ステージ構築 ----------
+            function buildStage() {
+                game.platforms = [
+                    { x: 0, y: 330, w: 800, h: 70 }
+                ];
+                game.platforms.push(
+                    { x: 160, y: 260, w: 80, h: 20 },
+                    { x: 300, y: 200, w: 80, h: 20 },
+                    { x: 480, y: 240, w: 80, h: 20 },
+                    { x: 620, y: 180, w: 80, h: 20 }
+                );
+                game.coins = [
+                    { x: 180, y: 230, w: 16, h: 16, collected: false },
+                    { x: 230, y: 230, w: 16, h: 16, collected: false },
+                    { x: 320, y: 170, w: 16, h: 16, collected: false },
+                    { x: 360, y: 170, w: 16, h: 16, collected: false },
+                    { x: 500, y: 210, w: 16, h: 16, collected: false },
+                    { x: 540, y: 210, w: 16, h: 16, collected: false },
+                    { x: 640, y: 150, w: 16, h: 16, collected: false },
+                    { x: 680, y: 150, w: 16, h: 16, collected: false }
+                ];
+                game.flag.x = 740;
+                game.flag.y = 130;
+                game.flag.baseY = 330;
+
+                var m = game.mario;
+                m.x = 50;
+                m.y = 290;
+                m.vy = 0;
+                m.vx = 0;
+                m.onGround = false;
+                m.facing = 1;
+                game.score = 0;
+                game.gameClear = false;
+                game.mouseDown = false;
+                game.targetX = null;
+                game.jumpRequested = false;
+                updateScore();
+            }
+
+            // ---------- 物理更新 (マウスによる移動・ジャンプ) ----------
+            function updatePhysics() {
+                if (game.gameClear) return;
+
+                var m = game.mario;
+
+                // ---- マウス操作：水平移動 ----
+                // targetX が設定されていれば、その方向に加速
+                if (game.targetX !== null && !game.gameClear) {
+                    var diff = game.targetX - (m.x + m.w/2);
+                    if (Math.abs(diff) > 6) {
+                        var dir = diff > 0 ? 1 : -1;
+                        m.vx += dir * 0.6;
+                        if (Math.abs(m.vx) > game.moveSpeed) {
+                            m.vx = dir * game.moveSpeed;
+                        }
+                    } else {
+                        // 目標付近なら減速
+                        m.vx *= 0.85;
+                        if (Math.abs(m.vx) < 0.2) m.vx = 0;
+                    }
+                } else {
+                    // マウスが離れたら摩擦で停止
+                    m.vx *= game.friction;
+                    if (Math.abs(m.vx) < 0.1) m.vx = 0;
+                }
+
+                // ---- マウスクリックでジャンプ (接地時) ----
+                if (game.jumpRequested && m.onGround) {
+                    m.vy = game.jumpPower;
+                    m.onGround = false;
+                    game.jumpRequested = false;
+                }
+
+                // 重力
+                m.vy += game.gravity;
+                if (m.vy > 12) m.vy = 12;
+
+                // X移動 + 衝突
+                var newX = m.x + m.vx;
+                var collideX = false;
+                for (var i = 0; i < game.platforms.length; i++) {
+                    var p = game.platforms[i];
+                    if (newX < p.x + p.w && newX + m.w > p.x &&
+                        m.y < p.y + p.h && m.y + m.h > p.y) {
+                        collideX = true;
+                        if (m.vx > 0) {
+                            newX = p.x - m.w;
+                        } else if (m.vx < 0) {
+                            newX = p.x + p.w;
+                        }
+                        m.vx = 0;
+                        break;
+                    }
+                }
+                m.x = newX;
+
+                // Y移動 + 衝突
+                var newY = m.y + m.vy;
+                m.onGround = false;
+                for (var j = 0; j < game.platforms.length; j++) {
+                    var p2 = game.platforms[j];
+                    if (m.x < p2.x + p2.w && m.x + m.w > p2.x &&
+                        newY < p2.y + p2.h && newY + m.h > p2.y) {
+                        if (m.vy > 0) {
+                            newY = p2.y - m.h;
+                            m.vy = 0;
+                            m.onGround = true;
+                        } else if (m.vy < 0) {
+                            newY = p2.y + p2.h;
+                            m.vy = 0;
+                        }
+                        break;
+                    }
+                }
+                m.y = newY;
+
+                // 画面端
+                if (m.x < 0) m.x = 0;
+                if (m.x + m.w > 800) m.x = 800 - m.w;
+                if (m.y > 400) {
+                    resetGame();
+                    return;
+                }
+
+                // コイン取得
+                for (var k = 0; k < game.coins.length; k++) {
+                    var coin = game.coins[k];
+                    if (coin.collected) continue;
+                    if (m.x + m.w > coin.x && m.x < coin.x + coin.w &&
+                        m.y + m.h > coin.y && m.y < coin.y + coin.h) {
+                        coin.collected = true;
+                        game.score += 100;
+                        updateScore();
+                    }
+                }
+
+                // 旗チェック
+                var f = game.flag;
+                if (m.x + m.w > f.x + 4 && m.x < f.x + f.w - 4 &&
+                    m.y + m.h > f.y + 8 && m.y < f.y + f.h - 8) {
+                    game.gameClear = true;
+                    showBirdOverlay();
+                }
+
+                if (m.vx > 0.2) m.facing = 1;
+                else if (m.vx < -0.2) m.facing = -1;
+            }
+
+            // ---------- 描画 ----------
+            function draw() {
+                ctx.clearRect(0, 0, 800, 400);
+
+                // 空
+                var grad = ctx.createLinearGradient(0, 0, 0, 400);
+                grad.addColorStop(0, '#6fc3ff');
+                grad.addColorStop(0.7, '#b3e0ff');
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, 800, 400);
+
+                // 雲
+                ctx.fillStyle = 'rgba(255,255,240,0.7)';
+                drawCloud(90, 40, 1);
+                drawCloud(550, 60, 0.9);
+                drawCloud(340, 20, 0.7);
+
+                // 地面・ブロック
+                for (var i = 0; i < game.platforms.length; i++) {
+                    var p = game.platforms[i];
+                    if (p.y === 330 && p.w === 800) {
+                        ctx.fillStyle = '#7d9e5d';
+                        ctx.fillRect(p.x, p.y, p.w, 16);
+                        ctx.fillStyle = '#8b6b4d';
+                        ctx.fillRect(p.x, p.y + 16, p.w, p.h - 16);
+                        ctx.fillStyle = '#5f7d42';
+                        for (var gx = 0; gx < 800; gx += 24) {
+                            ctx.fillRect(gx, p.y - 4, 6, 8);
+                        }
+                    } else {
+                        ctx.fillStyle = '#c49a6c';
+                        ctx.fillRect(p.x, p.y, p.w, p.h);
+                        ctx.fillStyle = '#a87d54';
+                        ctx.fillRect(p.x + 4, p.y + 4, p.w - 8, 4);
+                        ctx.fillRect(p.x + 4, p.y + p.h - 8, p.w - 8, 4);
+                        ctx.fillStyle = '#8b6b4d';
+                        ctx.fillRect(p.x + 2, p.y + 2, 6, 6);
+                        ctx.fillRect(p.x + p.w - 8, p.y + 2, 6, 6);
+                    }
+                }
+
+                // コイン
+                for (var c = 0; c < game.coins.length; c++) {
+                    var coin = game.coins[c];
+                    if (coin.collected) continue;
+                    ctx.fillStyle = '#f5c542';
+                    ctx.shadowColor = '#f5c542';
+                    ctx.shadowBlur = 12;
+                    ctx.beginPath();
+                    ctx.arc(coin.x + 8, coin.y + 8, 10, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#f0d050';
+                    ctx.shadowBlur = 4;
+                    ctx.beginPath();
+                    ctx.arc(coin.x + 8, coin.y + 8, 6, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                }
+
+                // 旗
+                var f = game.flag;
+                ctx.fillStyle = '#6a6a6a';
+                ctx.fillRect(f.x + 10, f.y, 6, f.baseY - f.y);
+                ctx.fillStyle = '#c92a2a';
+                ctx.beginPath();
+                ctx.moveTo(f.x + 16, f.y + 6);
+                ctx.lineTo(f.x + 46, f.y + 20);
+                ctx.lineTo(f.x + 16, f.y + 36);
+                ctx.fill();
+                ctx.fillStyle = '#f5e56b';
+                ctx.font = 'bold 18px sans-serif';
+                ctx.fillText('🏁', f.x - 2, f.y + 52);
+
+                // マリオ
+                var m = game.mario;
+                ctx.save();
+                ctx.translate(m.x + m.w/2, m.y + m.h/2);
+                if (m.facing < 0) ctx.scale(-1, 1);
+                ctx.translate(-m.w/2, -m.h/2);
+
+                ctx.fillStyle = '#e33b3b';
+                ctx.fillRect(2, -2, 24, 12);
+                ctx.fillRect(6, -6, 16, 6);
+                ctx.fillStyle = '#f7d9b0';
+                ctx.fillRect(4, 10, 20, 14);
+                ctx.fillStyle = '#222';
+                ctx.fillRect(16, 12, 6, 6);
+                ctx.fillRect(6, 12, 6, 6);
+                ctx.fillRect(10, 20, 10, 4);
+                ctx.fillStyle = '#e33b3b';
+                ctx.fillRect(2, 24, 24, 12);
+                ctx.fillStyle = '#f5c542';
+                ctx.fillRect(8, 28, 4, 4);
+                ctx.fillRect(18, 28, 4, 4);
+                ctx.fillStyle = '#2d2d8a';
+                ctx.fillRect(0, 34, 10, 6);
+                ctx.fillRect(18, 34, 10, 6);
+                ctx.restore();
+
+                // スコア
+                ctx.fillStyle = '#1f2e1f';
+                ctx.font = 'bold 20px monospace';
+                ctx.fillText('SCORE: ' + game.score, 620, 36);
+                if (game.gameClear) {
+                    ctx.fillStyle = '#f5e56b';
+                    ctx.font = 'bold 28px sans-serif';
+                    ctx.fillText('🎉 CLEAR!', 300, 120);
+                }
+
+                // マウスガイド (目標地点)
+                if (game.targetX !== null && !game.gameClear) {
+                    ctx.fillStyle = 'rgba(255, 200, 100, 0.25)';
+                    ctx.beginPath();
+                    ctx.arc(game.targetX, 360, 16, 0, Math.PI*2);
+                    ctx.fill();
+                    ctx.fillStyle = 'rgba(255, 200, 100, 0.5)';
+                    ctx.font = '18px sans-serif';
+                    ctx.fillText('⬇', game.targetX - 10, 375);
+                }
+            }
+
+            function drawCloud(x, y, s) {
+                ctx.beginPath();
+                ctx.arc(x, y, 24*s, 0, Math.PI*2);
+                ctx.arc(x+30*s, y-12*s, 30*s, 0, Math.PI*2);
+                ctx.arc(x+60*s, y, 26*s, 0, Math.PI*2);
+                ctx.arc(x+28*s, y+8*s, 22*s, 0, Math.PI*2);
+                ctx.fill();
+            }
+
+            function updateScore() {
+                scoreSpan.textContent = '🟡 ' + game.score;
+            }
+
+            // ---------- リセット ----------
+            function resetGame() {
+                buildStage();
+                birdOverlay.style.display = 'none';
+                game.gameClear = false;
+                game.targetX = null;
+                game.mouseDown = false;
+                game.jumpRequested = false;
+                updateScore();
+            }
+
+            // ---------- カイツブリ表示 ----------
+            function showBirdOverlay() {
+                birdOverlay.style.display = 'flex';
+            }
+
+            // ---------- マウスイベント (2013 対応) ----------
+            function getCanvasCoords(e) {
+                var rect = canvas.getBoundingClientRect();
+                var scaleX = canvas.width / rect.width;
+                var scaleY = canvas.height / rect.height;
+                var clientX, clientY;
+                if (e.touches) {
+                    clientX = e.touches[0].clientX;
+                    clientY = e.touches[0].clientY;
+                    e.preventDefault();
+                } else {
+                    clientX = e.clientX;
+                    clientY = e.clientY;
+                }
+                return {
+                    x: (clientX - rect.left) * scaleX,
+                    y: (clientY - rect.top) * scaleY
+                };
+            }
+
+            function onPointerDown(e) {
+                e.preventDefault();
+                if (game.gameClear) return;
+                var pos = getCanvasCoords(e);
+                game.mouseDown = true;
+                game.targetX = pos.x;
+                // クリック＝ジャンプ要求 (接地時に実行)
+                game.jumpRequested = true;
+            }
+
+            function onPointerMove(e) {
+                e.preventDefault();
+                if (!game.mouseDown || game.gameClear) return;
+                var pos = getCanvasCoords(e);
+                game.targetX = pos.x;
+            }
+
+            function onPointerUp(e) {
+                e.preventDefault();
+                game.mouseDown = false;
+                // targetX はすぐには消さない (減速のため)
+                // ただし、マウスがキャンバス外で離れたら targetX をクリア
+                if (e) {
+                    var rect = canvas.getBoundingClientRect();
+                    var clientX = e.clientX || (e.changedTouches && e.changedTouches[0].clientX);
+                    if (clientX !== undefined) {
+                        if (clientX < rect.left || clientX > rect.right) {
+                            game.targetX = null;
+                        }
+                    }
+                }
+                // ジャンプ要求はリセット (連続ジャンプ防止)
+                game.jumpRequested = false;
+            }
+
+            // キャンバスからマウスが出たら targetX をクリア
+            function onPointerLeave(e) {
+                game.mouseDown = false;
+                game.targetX = null;
+                game.jumpRequested = false;
+            }
+
+            // イベント登録 (マウス + タッチ)
+            canvas.addEventListener('mousedown', onPointerDown);
+            canvas.addEventListener('mousemove', onPointerMove);
+            canvas.addEventListener('mouseup', onPointerUp);
+            canvas.addEventListener('mouseleave', onPointerLeave);
+
+            canvas.addEventListener('touchstart', onPointerDown, { passive: false });
+            canvas.addEventListener('touchmove', onPointerMove, { passive: false });
+            canvas.addEventListener('touchend', onPointerUp, { passive: false });
+            canvas.addEventListener('touchcancel', onPointerUp, { passive: false });
+
+            // ---------- ゲームループ ----------
+            function gameLoop() {
+                if (!game.gameClear) {
+                    updatePhysics();
+                }
+                draw();
+                requestAnimationFrame(gameLoop);
+            }
+
+            // ---------- イベント初期化 ----------
+            resetBtn.addEventListener('click', resetGame);
+            closeBirdBtn.addEventListener('click', function() {
+                birdOverlay.style.display = 'none';
+                game.gameClear = false;
+                // 旗の上でクリアした場合、マリオを少し戻す (再開時)
+                var m = game.mario;
+                if (m.x > 700) {
+                    m.x = 680;
+                }
+            });
+
+            buildStage();
+            updateScore();
+            gameLoop();
+
+        })();
+    </script>
+</body>
+</html>
