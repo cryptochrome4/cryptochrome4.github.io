@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Lv1出口 · 15のテーマ</title>
+    <title>4番出口 · 15のテーマ</title>
     <style>
         * {
             margin: 0;
@@ -207,15 +207,15 @@
 <body>
 <div class="game-container" id="gameContainer">
     <div class="display-area">
-        <!-- Lv1出口 表示 -->
-        <div class="exit-sign" id="exitSign">🚪 Lv1出口</div>
+        <!-- 4番出口 表示 -->
+        <div class="exit-sign" id="exitSign">🚪 4番出口</div>
 
         <!-- メッセージ -->
         <div class="message-box" id="messageBox">
             <span id="dynamicMessage">▶ 出口はどこだろう？</span>
         </div>
 
-        <!-- 15テーマ表示エリア (サッカー例え) -->
+        <!-- 15テーマ表示エリア (サッカー例え) クリア後ここに切り替わる -->
         <div class="theme-grid" id="themeGrid">
             <h3>⚽ 15のテーマ × サッカー例え</h3>
             <div id="themeList"></div>
@@ -241,16 +241,17 @@
 </div>
 <script>
     (function() {
-        // ---------- 2013年スタイル マウス専用 ----------
+        // ---------- 2013年ハードウェア向け シンプル実装 ----------
+        // 状態管理 (キーボード不使用・マウスクリックのみ)
         let stepCount = 0;
-        let gameCleared = false;
+        let gameCleared = false;       // クリアフラグ (4番出口非表示)
 
+        // DOM 要素
         const exitSign = document.getElementById('exitSign');
         const dynamicMsg = document.getElementById('dynamicMessage');
         const themeGrid = document.getElementById('themeGrid');
         const themeList = document.getElementById('themeList');
         const stepCounter = document.getElementById('stepCounter');
-
         const leftBtn = document.getElementById('leftBtn');
         const rightBtn = document.getElementById('rightBtn');
         const straightBtn = document.getElementById('straightBtn');
@@ -291,17 +292,18 @@
         }
         renderThemes();
 
-        // ----- UI更新 -----
+        // メッセージ更新関数 (シンプル)
         function setMessage(text) {
             dynamicMsg.textContent = text;
         }
 
+        // クリア状態を更新 (テーマ表示 / 4番出口非表示)
         function setCleared(cleared) {
             gameCleared = cleared;
             if (cleared) {
                 exitSign.classList.add('hidden');
                 themeGrid.classList.add('visible');
-                setMessage('🎉 Lv1出口を発見！ 15のテーマをサッカー例えで表示中 ⚽');
+                setMessage('🎉 4番出口を発見！ 15のテーマをサッカー例えで表示中 ⚽');
             } else {
                 exitSign.classList.remove('hidden');
                 themeGrid.classList.remove('visible');
@@ -310,91 +312,116 @@
             stepCounter.textContent = 'ステップ: ' + stepCount;
         }
 
+        // ゲームリセット (初期状態)
         function resetGame() {
             stepCount = 0;
             setCleared(false);
-            setMessage('▶ ゲームをリセット。 Lv1出口を探そう。');
+            setMessage('▶ ゲームをリセット。 4番出口を探そう。');
             stepCounter.textContent = 'ステップ: 0';
         }
 
-        // ----- 進行処理 (マウスクリック) -----
+        // 進行処理 (左/右/直進) ← クリア前のロジックは完全に維持
         function advance(direction) {
+            // クリア済みなら テーマを表示しているだけ → 操作しても変化させない
             if (gameCleared) {
                 setMessage('⚽ もう出口は見つけたよ。 テーマを読んでね。');
                 return;
             }
 
+            // 歩数カウント
             stepCount++;
             stepCounter.textContent = 'ステップ: ' + stepCount;
 
-            // 出口確率 (2013年風 4の倍数でUP)
-            let chance = 0.18;
-            if (stepCount % 4 === 0) chance = 0.42;
-            if (direction === 'left') chance += 0.04;
+            // 乱数で出口出現 (2013年スタイル: シンプルに 20% でクリア)
+            // ただし 4番出口は "4" にちなんで ステップ数が4の倍数なら確率UP (レトロ感)
+            let chance = 0.20;
+            if (stepCount % 4 === 0) {
+                chance = 0.45;  // 4の倍数で確率アップ
+            }
+            // 左・右・直進でちょっとだけ確率変動 (遊び)
+            if (direction === 'left') chance += 0.05;
             else if (direction === 'right') chance -= 0.02;
-            else if (direction === 'straight') chance += 0.06;
+            else if (direction === 'straight') chance += 0.03;
 
+            // 乱数判定 (0~1)
             const roll = Math.random();
             if (roll < chance) {
+                // クリア！
                 setCleared(true);
-                setMessage('🎉 Lv1出口を発見！ 15テーマ＋サッカー例えを表示');
+                setMessage('🎉 4番出口を見つけた！ 15テーマ＋サッカー例えを表示');
                 stepCounter.textContent = 'ステップ: ' + stepCount;
                 return;
             } else {
+                // はずれメッセージ (バリエーション) ← 変更なし
                 const msgs = [
-                    '🚫 ここは違う… まだLv1出口じゃない。',
-                    '🌀 別の通路だ。 サッカーボールが転がってる…',
+                    '🚫 ここは違う… まだ4番出口じゃない。',
+                    '🌀 また別の通路だ。 気配を感じる。',
                     '⬛ 暗い… でも進むしかない。',
-                    '🔦 何か光った。 でも違う出口。',
+                    '🔦 何かが光った気がした。 でも違う。',
+                    '🕸️ 行き止まり？ いや、引き返そう。',
                     '🌫️ 霧が濃い… 出口はどこ？',
                     '💡 閃いた！ でも違った。',
-                    '⚽ サッカー場の匂いがする… でも出口じゃない。'
                 ];
                 const idx = Math.floor(Math.random() * msgs.length);
                 setMessage(msgs[idx]);
             }
-
-            if (stepCount > 25 && !gameCleared) {
+            // もしステップが20を超えてもクリアしなかったらヒント (2013年らしい親切)
+            if (stepCount > 20 && !gameCleared) {
                 setMessage('💡 ヒント: 4の倍数で確率が上がるかも…？');
             }
-            if (stepCount > 45 && !gameCleared) {
-                setMessage('⚠️ まだ見つからない… リセットして再挑戦しよう。');
+            if (stepCount > 40 && !gameCleared) {
+                setMessage('⚠️ まだ見つからない… もう一度リセットして挑戦しよう。');
             }
         }
 
-        // ----- イベント (マウス専用) -----
+        // ---- イベントリスナー (マウスクリックのみ) ----
         leftBtn.addEventListener('click', function(e) {
             e.preventDefault();
-            if (!gameCleared) advance('left');
-            else setMessage('⚽ テーマをじっくり読んでね。');
+            if (!gameCleared) {
+                advance('left');
+            } else {
+                setMessage('⚽ テーマをじっくり読んでね。');
+            }
         });
+
         rightBtn.addEventListener('click', function(e) {
             e.preventDefault();
-            if (!gameCleared) advance('right');
-            else setMessage('⚽ テーマをじっくり読んでね。');
+            if (!gameCleared) {
+                advance('right');
+            } else {
+                setMessage('⚽ テーマをじっくり読んでね。');
+            }
         });
+
         straightBtn.addEventListener('click', function(e) {
             e.preventDefault();
-            if (!gameCleared) advance('straight');
-            else setMessage('⚽ テーマをじっくり読んでね。');
+            if (!gameCleared) {
+                advance('straight');
+            } else {
+                setMessage('⚽ テーマをじっくり読んでね。');
+            }
         });
+
         resetBtn.addEventListener('click', function(e) {
             e.preventDefault();
             resetGame();
         });
 
-        // キーボード無効化 (2013年ハード制限)
+        // 初期化
+        resetGame();
+
+        // 2013年らしい: 何か細工を入れておく (ハードウェア制限を模擬: アニメーションなどは極力排除)
+        // マウスカーソルのみ使用、キーボード無効化 (念のため)
         document.addEventListener('keydown', function(e) {
             e.preventDefault();
             return false;
         });
+        // 右クリックも封じる (おまけ)
         document.addEventListener('contextmenu', function(e) {
             e.preventDefault();
         });
 
-        // 初期化
-        resetGame();
-        console.log('Lv1出口 · 15テーマ+サッカー例え 2013 style');
+        console.log('4番出口 · 15テーマ+サッカー例え 2013 style (クリア後のみ変更)');
     })();
 </script>
 </body>
