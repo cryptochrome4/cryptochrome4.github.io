@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>GRTを探せ！ - ブロックマイクラ</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+        body {
+            background: #1a1a2e;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+        }
+        #gameWrapper {
+            background: #16213e;
+            padding: 20px;
+            border-radius: 16px;
+            box-shadow: 0 0 40px rgba(0,200,255,0.3);
+            border: 2px solid #0f3460;
+        }
+        #canvas {
+            display: block;
+            margin: 0 auto;
+            background: #8cb0d9;
+            border: 4px solid #533483;
+            border-radius: 8px;
+            image-rendering: pixelated;
+            cursor: pointer;
+        }
+        #ui {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 12px;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .mode-btn {
+            background: #2d2d44;
+            border: 2px solid #6a4c93;
+            color: #eee;
+            padding: 6px 14px;
+            border-radius: 30px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.15s;
+            font-family: inherit;
+            letter-spacing: 1px;
+        }
+        .mode-btn.active {
+            background: #6a4c93;
+            border-color: #b58cd9;
+            box-shadow: 0 0 12px #b58cd9;
+        }
+        .mode-btn:hover { background: #3d3d5c; }
+        #bagDisplay {
+            background: #0d0d1a;
+            color: #ffd700;
+            padding: 4px 18px;
+            border-radius: 30px;
+            border: 2px solid #ffd700;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        #status {
+            color: #b0e0ff;
+            font-size: 15px;
+            background: #0d0d1a;
+            padding: 4px 14px;
+            border-radius: 30px;
+            border: 1px solid #3a6b8f;
+            min-width: 120px;
+            text-align: center;
+        }
+        #grtCounter {
+            color: #ff6b6b;
+            font-size: 18px;
+            background: #1a0a0a;
+            padding: 4px 16px;
+            border-radius: 30px;
+            border: 2px solid #ff6b6b;
+            font-weight: bold;
+        }
+        .arrow-pad {
+            display: grid;
+            grid-template-columns: 60px 60px 60px;
+            grid-template-rows: 60px 60px 60px;
+            gap: 6px;
+            margin: 8px auto 0;
+            justify-content: center;
+        }
+        .arrow-btn {
+            background: #2d2d44;
+            border: 2px solid #5a5a7a;
+            color: white;
+            font-size: 28px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: 0.1s;
+            text-align: center;
+            line-height: 60px;
+            font-weight: bold;
+            box-shadow: 0 4px 0 #0d0d1a;
+        }
+        .arrow-btn:active {
+            transform: translateY(4px);
+            box-shadow: none;
+        }
+        .arrow-btn.up { grid-column: 2; grid-row: 1; }
+        .arrow-btn.left { grid-column: 1; grid-row: 2; }
+        .arrow-btn.center { grid-column: 2; grid-row: 2; background: #3d3d5c; border-color: #7a7a9a; font-size: 14px; line-height: 60px; }
+        .arrow-btn.right { grid-column: 3; grid-row: 2; }
+        .arrow-btn.down { grid-column: 2; grid-row: 3; }
+        #studyModal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            z-index: 999;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+        #studyModal iframe {
+            width: 90%;
+            height: 80%;
+            border: 4px solid #ffd700;
+            border-radius: 16px;
+            background: white;
+        }
+        #studyModal .close-btn {
+            margin-top: 20px;
+            padding: 12px 40px;
+            background: #ff6b6b;
+            border: none;
+            border-radius: 40px;
+            color: white;
+            font-size: 22px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 0 30px #ff6b6b88;
+        }
+        #studyModal .close-btn:hover { background: #ff4757; }
+        #grtFoundMsg {
+            color: #ffd700;
+            font-size: 22px;
+            text-shadow: 0 0 30px gold;
+            margin-bottom: 10px;
+        }
+        .footer-note {
+            color: #667;
+            font-size: 11px;
+            text-align: center;
+            margin-top: 10px;
+            letter-spacing: 1px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="gameWrapper">
+    <canvas id="canvas" width="600" height="400"></canvas>
+
+    <div id="ui">
+        <div>
+            <button class="mode-btn active" data-mode="dig" id="modeDig">⛏ 掘る</button>
+            <button class="mode-btn" data-mode="place" id="modePlace">🧱 置く</button>
+            <button class="mode-btn" data-mode="move" id="modeMove">🚶 移動</button>
+        </div>
+        <div id="bagDisplay">🎒 <span id="bagCount">0</span></div>
+        <div id="status">🏠 地上</div>
+        <div id="grtCounter">GRT-</div>
+    </div>
+
+    <!-- 十字キー (移動モード用) -->
+    <div class="arrow-pad">
+        <div class="arrow-btn up" data-dir="up">▲</div>
+        <div class="arrow-btn left" data-dir="left">◀</div>
+        <div class="arrow-btn center">▼</div>
+        <div class="arrow-btn right" data-dir="right">▶</div>
+        <div class="arrow-btn down" data-dir="down">▼</div>
+    </div>
+    <div class="footer-note">[ 下キーでドア開閉 / ジャンプは上キー ]</div>
+</div>
+
+<!-- 勉強サイト表示モーダル -->
+<div id="studyModal">
+    <div id="grtFoundMsg">🎉 GRT+ 発見！ 学習サイトを開きます 🎉</div>
+    <iframe id="studyFrame" src="about:blank"></iframe>
+    <button class="close-btn" id="closeStudy">✕ 閉じてゲームに戻る</button>
+</div>
+
+<script>
+(function() {
+    // ---------- 2013年対応: var 使用, アロー関数なし ----------
+    var canvas = document.getElementById('canvas');
+    var ctx = canvas.getContext('2d');
+
+    // ワールド設定 (20x15 ブロック, 1ブロック=30px)
+    var COLS = 20;
+    var ROWS = 15;
+    var BLOCK = 30;
+
+    // ブロックタイプ
+    var AIR = 0;
+    var DIRT = 1;
+    var GRASS = 2;
+    var WOOD = 3;
+    var LEAVES = 4;
+    var STONE = 5;
+    var BRICK = 6;
+    var GRT_BLOCK = 7;   // GRTが埋まった特別ブロック
+
+    // ワールドデータ (二次元配列)
+    var world = [];
+    // プレイヤー
+    var player = { x: 2, y: 12 };  // グリッド座標
+    var bag = [];  // 所持ブロック (タイプ番号)
+    var mode = 'dig'; // 'dig' | 'place' | 'move'
+
+    // GRTカウント (探すべき数)
+    var GRT_TOTAL = 3;
+    var grtFound = 0;
+
+    // ドア状態 (プレイヤーがいる家のドアが開いているか)
+    var doorOpen = false;
+    // プレイヤーの高さ (ジャンプ用)
+    var playerHeight = 0; // 0=地上, 1=1段上
+
+    // スタディモーダル
+    var modal = document.getElementById('studyModal');
+    var studyFrame = document.getElementById('studyFrame');
+
+    // ---------- ワールド初期化 (家とGRTを配置) ----------
+    function initWorld() {
+        // 全部AIRで埋める
+        for (var r = 0; r < ROWS; r++) {
+            world[r] = [];
+            for (var c = 0; c < COLS; c++) {
+                world[r][c] = AIR;
+            }
+        }
+
+        // ---- 地面 (y=13,14) ----
+        for (var c = 0; c < COLS; c++) {
+            world[13][c] = GRASS;
+            world[14][c] = DIRT;
+        }
+
+        // ---- 家1 (左側) ----
+        // 壁 (x=3〜7, y=8〜12)
+        for (var y = 8; y <= 12; y++) {
+            for (var x = 3; x <= 7; x++) {
+                if (y === 8 || y === 12 || x === 3 || x === 7) {
+                    world[y][x] = WOOD;
+                }
+            }
+        }
+        // ドア (x=5, y=12) は開けるためにWOODではなく、特別な値は使わずに管理
+        world[12][5] = WOOD; // ドアは木で表現、開閉はフラグで
+
+        // 家1の中にGRTを1個 (x=5, y=10)
+        world[10][5] = GRT_BLOCK;
+
+        // ---- 家2 (右側、高台) ----
+        // 高台を作る (y=10,11,12 に土を積む)
+        for (var y = 10; y <= 12; y++) {
+            for (var x = 14; x <= 17; x++) {
+                world[y][x] = DIRT;
+            }
+        }
+        // 家2の壁 (y=6〜10, x=14〜17)
+        for (var y = 6; y <= 10; y++) {
+            for (var x = 14; x <= 17; x++) {
+                if (y === 6 || y === 10 || x === 14 || x === 17) {
+                    world[y][x] = BRICK;
+                }
+            }
+        }
+        // 家2の中にGRTを2個 (x=15, y=8) と (x=16, y=9)
+        world[8][15] = GRT_BLOCK;
+        world[9][16] = GRT_BLOCK;
+
+        // ---- 追加: 地下にもGRTを1個 (掘る体験用) ----
+        world[12][10] = GRT_BLOCK;  // 地面の下
+
+        // GRT総数カウント
+        GRT_TOTAL = 0;
+        for (var r = 0; r < ROWS; r++) {
+            for (var c = 0; c < COLS; c++) {
+                if (world[r][c] === GRT_BLOCK) GRT_TOTAL++;
+            }
+        }
+        grtFound = 0;
+        updateGrtDisplay();
+    }
+
+    // ---------- 描画 ----------
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // ブロック描画
+        for (var r = 0; r < ROWS; r++) {
+            for (var c = 0; c < COLS; c++) {
+                var type = world[r][c];
+                var x = c * BLOCK;
+                var y = r * BLOCK;
+                if (type === AIR) continue;
+                if (type === GRASS) { ctx.fillStyle = '#7cb342'; }
+                else if (type === DIRT) { ctx.fillStyle = '#8d6e63'; }
+                else if (type === WOOD) { ctx.fillStyle = '#a1887f'; }
+                else if (type === LEAVES) { ctx.fillStyle = '#558b2f'; }
+                else if (type === STONE) { ctx.fillStyle = '#9e9e9e'; }
+                else if (type === BRICK) { ctx.fillStyle = '#e53935'; }
+                else if (type === GRT_BLOCK) {
+                    ctx.fillStyle = '#ffd700';
+                    // キラキラ効果
+                    ctx.shadowColor = '#ffd700';
+                    ctx.shadowBlur = 15;
+                } else {
+                    ctx.fillStyle = '#888';
+                }
+                ctx.fillRect(x, y, BLOCK-1, BLOCK-1);
+                ctx.shadowBlur = 0;
+                // GRTに「？」マーク
+                if (type === GRT_BLOCK) {
+                    ctx.fillStyle = '#000';
+                    ctx.font = '18px monospace';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('?', x + BLOCK/2, y + BLOCK/2);
+                }
+            }
+        }
+
+        // プレイヤー (棒人間)
+        var px = player.x * BLOCK + BLOCK/2;
+        var py = player.y * BLOCK + BLOCK/2 - (playerHeight * BLOCK);
+        // 体 (丸)
+        ctx.beginPath();
+        ctx.arc(px, py-8, 8, 0, Math.PI*2);
+        ctx.fillStyle = '#4fc3f7';
+        ctx.fill();
+        ctx.strokeStyle = '#01579b';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        // 足
+        ctx.beginPath();
+        ctx.moveTo(px-5, py);
+        ctx.lineTo(px-8, py+10);
+        ctx.moveTo(px+5, py);
+        ctx.lineTo(px+8, py+10);
+        ctx.strokeStyle = '#0d47a1';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        // 目
+        ctx.fillStyle = '#000';
+        ctx.beginPath();
+        ctx.arc(px-4, py-10, 2, 0, Math.PI*2);
+        ctx.arc(px+4, py-10, 2, 0, Math.PI*2);
+        ctx.fill();
+
+        // ドア表示 (家1のドア)
+        var doorX = 5, doorY = 12;
+        var dx = doorX * BLOCK, dy = doorY * BLOCK;
+        ctx.fillStyle = doorOpen ? '#4caf50' : '#8d6e63';
+        ctx.fillRect(dx+2, dy+2, BLOCK-4, BLOCK-4);
+        if (doorOpen) {
+            ctx.fillStyle = '#2e7d32';
+            ctx.font = '16px monospace';
+            ctx.fillText('OPEN', dx+4, dy+20);
+        } else {
+            ctx.fillStyle = '#5d4037';
+            ctx.font = '16px monospace';
+            ctx.fillText('CLOSE', dx+2, dy+20);
+        }
+
+        // ステータス表示 (画面内)
+        ctx.fillStyle = '#000';
+        ctx.font = '12px monospace';
+        ctx.fillText('GRT:'+grtFound+'/'+GRT_TOTAL, 10, 20);
+        ctx.fillText('モード:'+mode, 10, 35);
+    }
+
+    // ---------- 更新関数 ----------
+    function updateGrtDisplay() {
+        var el = document.getElementById('grtCounter');
+        if (grtFound >= GRT_TOTAL) {
+            el.textContent = 'GRT+ 発見！';
+            el.style.color = '#ffd700';
+            el.style.borderColor = '#ffd700';
+            // モーダル表示 (少し遅延)
+            setTimeout(function() {
+                showStudyModal();
+            }, 400);
+        } else {
+            el.textContent = 'GRT- (' + grtFound + '/' + GRT_TOTAL + ')';
+            el.style.color = '#ff6b6b';
+            el.style.borderColor = '#ff6b6b';
+        }
+        document.getElementById('bagCount').textContent = bag.length;
+    }
+
+    // ---------- 掘る処理 ----------
+    function digBlock() {
+        if (mode !== 'dig') return;
+        var tx = player.x;
+        var ty = player.y - playerHeight; // 目の前 (プレイヤーの1マス上)
+        if (ty < 0 || ty >= ROWS || tx < 0 || tx >= COLS) return;
+        var block = world[ty][tx];
+        if (block === AIR) return;
+        if (block === GRT_BLOCK) {
+            // GRT発見！
+            world[ty][tx] = AIR;
+            grtFound++;
+            updateGrtDisplay();
+            // バッグには入れない（特別扱い）
+            return;
+        }
+        // 通常ブロックはバッグへ
+        bag.push(block);
+        world[ty][tx] = AIR;
+        updateGrtDisplay();
+        draw();
+    }
+
+    // ---------- 置く処理 ----------
+    function placeBlock() {
+        if (mode !== 'place') return;
+        if (bag.length === 0) return;
+        var tx = player.x;
+        var ty = player.y - playerHeight;
+        if (ty < 0 || ty >= ROWS || tx < 0 || tx >= COLS) return;
+        if (world[ty][tx] !== AIR) return;
+        // プレイヤーの足元には置けない (自分が立っている位置)
+        if (ty === player.y && tx === player.x) return;
+        var block = bag.pop();
+        world[ty][tx] = block;
+        updateGrtDisplay();
+        draw();
+    }
+
+    // ---------- 移動 (十字キー) ----------
+    function movePlayer(dir) {
+        if (mode !== 'move') return;
+        var nx = player.x;
+        var ny = player.y;
+        var jumped = false;
+
+        if (dir === 'up') {
+            // ジャンプ: 1段上に移動 (高さ+1)
+            if (playerHeight === 0) {
+                // 上のブロックが空気かどうか
+                var above = world[player.y-1] ? world[player.y-1][player.x] : AIR;
+                if (above === AIR) {
+                    playerHeight = 1;
+                    jumped = true;
+                }
+            } else {
+                // もう一段上にジャンプ (2段目)
+                var above2 = world[player.y-2] ? world[player.y-2][player.x] : AIR;
+                if (playerHeight === 1 && above2 === AIR) {
+                    playerHeight = 2;
+                    jumped = true;
+                }
+            }
+        } else if (dir === 'down') {
+            // 下キー: ドア開閉（家1のドア前で）
+            var doorX = 5, doorY = 12;
+            if (player.x === doorX && player.y === doorY+1) {
+                doorOpen = !doorOpen;
+                draw();
+                return;
+            }
+            // または 1段下がる
+            if (playerHeight > 0) {
+                var below = world[player.y+1] ? world[player.y+1][player.x] : AIR;
+                if (below === AIR || below === GRASS || below === DIRT) {
+                    playerHeight--;
+                }
+            }
+        } else if (dir === 'left') {
+            nx = player.x - 1;
+            if (nx < 0) return;
+            // 移動先がブロックでないか、かつ高さを考慮
+            var targetY = player.y - playerHeight;
+            var blockThere = world[targetY] ? world[targetY][nx] : AIR;
+            if (blockThere !== AIR) return;
+            // 足元がブロックか？
+            var footY = player.y;
+            var footBlock = world[footY] ? world[footY][nx] : AIR;
+            if (footBlock === AIR && playerHeight === 0) {
+                // 崖から落ちる
+                player.y = player.y + 1;
+                if (player.y >= ROWS) player.y = ROWS-1;
+            } else {
+                player.x = nx;
+            }
+        } else if (dir === 'right') {
+            nx = player.x + 1;
+            if (nx >= COLS) return;
+            var targetY2 = player.y - playerHeight;
+            var blockThere2 = world[targetY2] ? world[targetY2][nx] : AIR;
+            if (blockThere2 !== AIR) return;
+            var footY2 = player.y;
+            var footBlock2 = world[footY2] ? world[footY2][nx] : AIR;
+            if (footBlock2 === AIR && playerHeight === 0) {
+                player.y = player.y + 1;
+                if (player.y >= ROWS) player.y = ROWS-1;
+            } else {
+                player.x = nx;
+            }
+        }
+
+        // 高さ制限
+        if (playerHeight > 2) playerHeight = 2;
+        if (playerHeight < 0) playerHeight = 0;
+
+        // 地面より下に行かない
+        if (player.y >= ROWS) player.y = ROWS-1;
+        draw();
+    }
+
+    // ---------- 勉強サイト表示 ----------
+    function showStudyModal() {
+        modal.style.display = 'flex';
+        // 勉強コンテンツ (3枚の画像の内容をまとめたHTML)
+        var studyContent = `
+        <html>
+        <head><meta charset="UTF-8"><title>GRT 学習サイト</title>
+        <style>
+            body { font-family: 'Segoe UI', sans-serif; padding: 20px; background: #f0f4f8; }
+            h1 { color: #1a237e; border-bottom: 4px solid gold; }
+            .card { background: white; border-radius: 12px; padding: 16px; margin: 16px 0; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+            .soccer { background: #e8f5e9; padding: 10px; border-left: 6px solid #2e7d32; }
+            .grt-badge { color: #ffd700; font-weight: bold; }
+        </style>
+        </head>
+        <body>
+        <h1>⚽ GRT 学習コンテンツ (サッカー例え付き)</h1>
+        <div class="card">
+            <h2>📊 データベース + SQL</h2>
+            <p><strong>データベース</strong> = クラブの選手名簿。<br>
+            <strong>SQL</strong> = 監督のホイッスル。「左サイドバックを呼べ！」で即座に選手をピックアップ。</p>
+            <div class="soccer">⚽ 例: <code>SELECT * FROM players WHERE position = 'FW';</code> → フォワード一覧を取得</div>
+        </div>
+        <div class="card">
+            <h2>🔗 DB設計: リレーション・正規化・テーブル設計</h2>
+            <p><strong>リレーション</strong> = 選手とポジションの関連。<br>
+            <strong>正規化</strong> = ユニフォーム番号の重複を排除。<br>
+            <strong>テーブル設計</strong> = 先発・控え・スタッフを分けた名簿作成。</p>
+            <div class="soccer">⚽ 例: 選手テーブルとチームテーブルを外部キーで結ぶ</div>
+        </div>
+        <div class="card">
+            <h2>🔒 トランザクション・ロック・デッドロック</h2>
+            <p><strong>トランザクション</strong> = 交代手続き (すべて成功か全失敗)。<br>
+            <strong>ロック</strong> = ボール保持者は他者が奪えない。<br>
+            <strong>デッドロック</strong> = 2人が「先にパスをくれ」と譲らず停止。</p>
+            <div class="soccer">⚽ 例: ロック待ちで試合が止まる → デッドロック回避が必要</div>
+        </div>
+        <p style="margin-top:20px; color:#1a237e; font-weight:bold;">🎉 GRT+ 発見！ あなたはデータベースマスターへの第一歩を踏み出しました！</p>
+        </body>
+        </html>
+        `;
+        studyFrame.srcdoc = studyContent;
+    }
+
+    // ---------- イベント登録 ----------
+    // モード切替
+    document.getElementById('modeDig').addEventListener('click', function() {
+        mode = 'dig';
+        document.querySelectorAll('.mode-btn').forEach(function(b) { b.classList.remove('active'); });
+        this.classList.add('active');
+        document.getElementById('status').textContent = '⛏ 掘るモード';
+    });
+    document.getElementById('modePlace').addEventListener('click', function() {
+        mode = 'place';
+        document.querySelectorAll('.mode-btn').forEach(function(b) { b.classList.remove('active'); });
+        this.classList.add('active');
+        document.getElementById('status').textContent = '🧱 置くモード';
+    });
+    document.getElementById('modeMove').addEventListener('click', function() {
+        mode = 'move';
+        document.querySelectorAll('.mode-btn').forEach(function(b) { b.classList.remove('active'); });
+        this.classList.add('active');
+        document.getElementById('status').textContent = '🚶 移動モード';
+    });
+
+    // キャンバスクリック (掘る/置く)
+    canvas.addEventListener('click', function(e) {
+        var rect = canvas.getBoundingClientRect();
+        var scaleX = canvas.width / rect.width;
+        var scaleY = canvas.height / rect.height;
+        var mx = (e.clientX - rect.left) * scaleX;
+        var my = (e.clientY - rect.top) * scaleY;
+        var col = Math.floor(mx / BLOCK);
+        var row = Math.floor(my / BLOCK);
+        // プレイヤーの目の前のブロックを対象にする (掘る/置くはプレイヤーの向き固定: 上)
+        if (mode === 'dig') {
+            digBlock();
+        } else if (mode === 'place') {
+            placeBlock();
+        }
+    });
+
+    // 十字キー
+    document.querySelectorAll('.arrow-btn[data-dir]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var dir = this.getAttribute('data-dir');
+            movePlayer(dir);
+        });
+    });
+
+    // モーダル閉じる
+    document.getElementById('closeStudy').addEventListener('click', function() {
+        modal.style.display = 'none';
+    });
+
+    // ---------- 起動 ----------
+    initWorld();
+    draw();
+    updateGrtDisplay();
+    document.getElementById('status').textContent = '⛏ 掘るモード';
+
+    // デバッグ用: ゲーム内でGRTの場所を確認しやすくする (2013年はconsole.log)
+    console.log('GRT ブロックの位置:');
+    for (var r=0; r<ROWS; r++) {
+        for (var c=0; c<COLS; c++) {
+            if (world[r][c] === GRT_BLOCK) console.log('GRT at ('+c+','+r+')');
+        }
+    }
+
+})();
+</script>
+</body>
+</html>
