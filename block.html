@@ -38,7 +38,6 @@
             image-rendering: pixelated;
         }
         
-        /* 画面上の操作ボタン */
         #controls {
             position: absolute;
             bottom: 10px;
@@ -192,7 +191,7 @@
         <div id="blockCounter">🧱 0</div>
         <div id="grtCounter">GRT-</div>
     </div>
-    <div class="hint">【マウス操作】王将の周りをクリックで掘る / 左右移動で階段を登れる</div>
+    <div class="hint">【マウス操作】王将の周りをクリックで掘る / GRTはすり抜けて重なると発見！</div>
 </div>
 
 <div id="studyModal">
@@ -223,7 +222,6 @@
     var GRT_BLOCK = 6;
 
     var world = [];
-    // プレイヤー位置はブロック座標（整数）
     var player = { x: 5, y: 14 };
     var velocityY = 0;
     var onGround = false;
@@ -329,37 +327,36 @@
         }
     }
 
-    // ---------- 物理演算（完全グリッド） ----------
+    // ---------- 物理演算（GRTはすり抜け） ----------
+    function isBlocked(x, y) {
+        if (x < 0 || x >= WORLD_WIDTH || y < 0 || y >= WORLD_HEIGHT) return true;
+        var block = world[y][x];
+        // GRT_BLOCKはすり抜け可能
+        return block !== AIR && block !== GRT_BLOCK;
+    }
+
     function updatePhysics() {
         var GRAVITY = 0.4;
         var JUMP_FORCE = -2.8;
 
-        // 水平移動（1ブロック単位、階段昇り対応）
+        // 水平移動
         if (moveDir === 'left') {
             var newX = player.x - 1;
             if (newX >= 0) {
-                // 移動先にブロックがあるかチェック
-                var blockAtNew = world[player.y][newX];
-                if (blockAtNew === AIR) {
+                if (!isBlocked(newX, player.y)) {
                     // 1段下がる（崖）
-                    var belowNew = world[player.y + 1] ? world[player.y + 1][newX] : AIR;
-                    if (belowNew !== AIR) {
-                        // そのまま移動
-                        player.x = newX;
-                    } else {
-                        // 崖：1段下がる
+                    if (player.y + 1 < WORLD_HEIGHT && !isBlocked(newX, player.y + 1)) {
                         player.x = newX;
                         player.y = player.y + 1;
+                    } else if (!isBlocked(newX, player.y)) {
+                        player.x = newX;
                     }
                 } else {
                     // ブロックがある場合、1段上がれるか？
-                    var aboveBlock = world[player.y - 1] ? world[player.y - 1][newX] : AIR;
-                    if (aboveBlock === AIR) {
-                        // 1段上がって移動（階段）
+                    if (player.y - 1 >= 0 && !isBlocked(newX, player.y - 1)) {
                         player.x = newX;
                         player.y = player.y - 1;
                     }
-                    // それ以外は移動不可
                 }
             }
             moveDir = null;
@@ -367,18 +364,15 @@
         if (moveDir === 'right') {
             var newX = player.x + 1;
             if (newX < WORLD_WIDTH) {
-                var blockAtNew = world[player.y][newX];
-                if (blockAtNew === AIR) {
-                    var belowNew = world[player.y + 1] ? world[player.y + 1][newX] : AIR;
-                    if (belowNew !== AIR) {
-                        player.x = newX;
-                    } else {
+                if (!isBlocked(newX, player.y)) {
+                    if (player.y + 1 < WORLD_HEIGHT && !isBlocked(newX, player.y + 1)) {
                         player.x = newX;
                         player.y = player.y + 1;
+                    } else if (!isBlocked(newX, player.y)) {
+                        player.x = newX;
                     }
                 } else {
-                    var aboveBlock = world[player.y - 1] ? world[player.y - 1][newX] : AIR;
-                    if (aboveBlock === AIR) {
+                    if (player.y - 1 >= 0 && !isBlocked(newX, player.y - 1)) {
                         player.x = newX;
                         player.y = player.y - 1;
                     }
@@ -398,22 +392,20 @@
         velocityY += GRAVITY;
         if (velocityY > 3) velocityY = 3;
 
-        // Y軸移動（ブロック単位）
+        // Y軸移動
         var newY = player.y + velocityY;
-        var isBlocked = false;
+        var isBlockedFall = false;
 
-        // 落下先にブロックがあるか
         if (newY >= 0 && newY < WORLD_HEIGHT) {
-            if (world[Math.floor(newY + 0.5)] && world[Math.floor(newY + 0.5)][player.x] !== AIR) {
-                isBlocked = true;
+            if (isBlocked(player.x, Math.floor(newY + 0.5))) {
+                isBlockedFall = true;
             }
         }
 
-        if (isBlocked || newY >= WORLD_HEIGHT) {
+        if (isBlockedFall || newY >= WORLD_HEIGHT) {
             if (velocityY > 0) {
                 velocityY = 0;
                 onGround = true;
-                // 現在の位置を維持
             }
         } else if (newY < 0) {
             velocityY = 0;
@@ -423,16 +415,17 @@
             onGround = false;
         }
 
-        // 地面より下に行かない
         if (player.y >= WORLD_HEIGHT) player.y = WORLD_HEIGHT - 1;
+        if (player.y < 0) player.y = 0;
 
-        // GRTと重なったら発見！
+        // ★ GRTと重なったら即発見！★
         if (player.x >= 0 && player.x < WORLD_WIDTH && player.y >= 0 && player.y < WORLD_HEIGHT) {
             if (world[player.y][player.x] === GRT_BLOCK && !grtFound) {
                 grtFound = true;
+                // 見つけたら非表示にする（綺麗に）
                 world[player.y][player.x] = AIR;
                 updateGrtDisplay();
-                showStudyModal();
+                showStudyModal(); // 即座に勉強サイト表示
             }
         }
 
@@ -452,9 +445,9 @@
 
     // ---------- 描画 ----------
     function draw() {
+        // もしGRT発見済みならゲーム画面を暗くする
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // 背景
         var grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
         grad.addColorStop(0, '#1a1a2e');
         grad.addColorStop(0.5, '#2d2d44');
@@ -496,33 +489,23 @@
                         ctx.fillStyle = 'rgb(' + shade4 + ',' + Math.floor(110 * brightness) + ',' + Math.floor(99 * brightness) + ')';
                         break;
                     case GRT_BLOCK:
-                        ctx.fillStyle = '#FFD700';
+                        // GRTは目立たない色で（金色だけど「？」は表示しない）
+                        ctx.fillStyle = '#B8860B';
+                        ctx.fillRect(x, y, BLOCK-1, BLOCK-1);
+                        // ほのかに光らせる
+                        ctx.fillStyle = 'rgba(255,215,0,0.15)';
                         ctx.shadowColor = '#FFD700';
-                        ctx.shadowBlur = 20;
-                        break;
+                        ctx.shadowBlur = 10;
+                        ctx.fillRect(x+2, y+2, BLOCK-5, BLOCK-5);
+                        ctx.shadowBlur = 0;
+                        continue;
                     default: ctx.fillStyle = '#888';
                 }
                 ctx.fillRect(x, y, BLOCK-1, BLOCK-1);
-                ctx.shadowBlur = 0;
-
-                if (type === GRT_BLOCK) {
-                    ctx.fillStyle = '#000';
-                    ctx.font = '16px monospace';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText('?', x + BLOCK/2, y + BLOCK/2);
-                    ctx.fillStyle = 'rgba(255,215,0,0.3)';
-                    ctx.shadowColor = '#FFD700';
-                    ctx.shadowBlur = 30;
-                    ctx.beginPath();
-                    ctx.arc(x + BLOCK/2, y + BLOCK/2, 12, 0, Math.PI*2);
-                    ctx.fill();
-                    ctx.shadowBlur = 0;
-                }
             }
         }
 
-        // 王将の範囲表示（周囲1マス = 3×3）
+        // 王将の範囲表示
         var px = player.x * BLOCK - cameraX;
         var py = player.y * BLOCK - cameraY;
         ctx.strokeStyle = 'rgba(255,215,0,0.2)';
@@ -537,9 +520,8 @@
         ctx.ellipse(px + BLOCK/2, py + BLOCK - 2, 10, 4, 0, 0, Math.PI*2);
         ctx.fill();
 
-        // 王将（ブロックサイズにピッタリ）
+        // 王将
         var margin = 2;
-        // 台形（将棋の駒風）
         ctx.fillStyle = '#FFD700';
         ctx.strokeStyle = '#B8860B';
         ctx.lineWidth = 2;
@@ -552,32 +534,35 @@
         ctx.fill();
         ctx.stroke();
 
-        // 「王」の文字
         ctx.fillStyle = '#000';
         ctx.font = 'bold 16px monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('王', px + BLOCK/2, py + BLOCK/2 - 1);
 
-        // 目
         ctx.fillStyle = '#000';
         ctx.beginPath();
         ctx.arc(px + 7, py + 9, 2, 0, Math.PI*2);
         ctx.arc(px + BLOCK - 7, py + 9, 2, 0, Math.PI*2);
         ctx.fill();
 
-        // GRT発見メッセージ
+        // GRT発見後は画面にメッセージ
         if (grtFound) {
+            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = '#FFD700';
-            ctx.font = 'bold 32px monospace';
+            ctx.font = 'bold 40px monospace';
             ctx.textAlign = 'center';
             ctx.shadowColor = '#FFD700';
-            ctx.shadowBlur = 30;
-            ctx.fillText('🎉 GRT+ 発見！', canvas.width/2, 60);
+            ctx.shadowBlur = 50;
+            ctx.fillText('🎉 GRT+ 発見！', canvas.width/2, canvas.height/2 - 20);
             ctx.shadowBlur = 0;
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = '20px monospace';
+            ctx.fillText('学習サイトを開いています...', canvas.width/2, canvas.height/2 + 50);
         }
 
-        // 座標表示（デバッグ）
+        // 座標表示
         ctx.fillStyle = 'rgba(255,255,255,0.15)';
         ctx.font = '11px monospace';
         ctx.textAlign = 'left';
@@ -586,6 +571,8 @@
 
     // ---------- 掘る処理 ----------
     function digBlock() {
+        if (grtFound) return; // 発見後は掘れない
+        
         var rect = canvas.getBoundingClientRect();
         var scaleX = canvas.width / rect.width;
         var scaleY = canvas.height / rect.height;
@@ -600,12 +587,11 @@
         // 王将の範囲内か（周囲1マス = 3×3）
         var distX = Math.abs(worldX - player.x);
         var distY = Math.abs(worldY - player.y);
-
         if (distX > 1 || distY > 1) return;
 
         var block = world[worldY][worldX];
         if (block === AIR) return;
-        if (block === GRT_BLOCK) return; // 重なったときに発見
+        if (block === GRT_BLOCK) return; // GRTは掘れない（重なって発見）
 
         world[worldY][worldX] = AIR;
         blockCount++;
@@ -614,6 +600,8 @@
 
     // 下を掘る
     function digDown() {
+        if (grtFound) return;
+        
         var px = player.x;
         var py = player.y + 1;
 
@@ -624,8 +612,6 @@
         world[py][px] = AIR;
         blockCount++;
         document.getElementById('blockCounter').textContent = '🧱 ' + blockCount;
-        
-        // 掘ったら1ブロック下がる（重力で自然に落ちる）
         player.y = py;
     }
 
@@ -706,7 +692,7 @@
         var btn = document.getElementById(id);
         btn.addEventListener('mousedown', function(e) {
             e.preventDefault();
-            moveDir = dir;
+            if (!grtFound) moveDir = dir;
         });
     }
 
@@ -745,7 +731,7 @@
     
     document.getElementById('jumpBtn').addEventListener('mousedown', function(e) {
         e.preventDefault();
-        isJumping = true;
+        if (!grtFound) isJumping = true;
     });
     
     document.getElementById('digDown').addEventListener('click', function(e) {
@@ -758,6 +744,7 @@
 
     document.getElementById('closeStudy').addEventListener('click', function() {
         document.getElementById('studyModal').style.display = 'none';
+        // 閉じたらゲームに戻る（GRTはもう消えてる）
     });
 
     // ---------- 起動 ----------
@@ -767,6 +754,7 @@
 
     if (grtPosition) {
         console.log('GRTは (' + grtPosition.x + ', ' + grtPosition.y + ') にあります！');
+        console.log('王将が重なると自動発見！');
     }
 
 })();
