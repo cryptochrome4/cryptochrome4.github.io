@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ドット絵ふらふら 2013</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+        body {
+            background: #2d2d2d;
+            min-height: 100vh;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        .game-wrapper {
+            background: #1a1a1a;
+            padding: 20px 20px 25px;
+            border-radius: 20px;
+            box-shadow: 0 10px 0 #0a0a0a, 0 8px 20px rgba(0,0,0,0.7);
+            border: 2px solid #5a5a5a;
+            max-width: 860px;
+        }
+        canvas {
+            display: block;
+            margin: 0 auto;
+            width: 800px;
+            height: 600px;
+            image-rendering: crisp-edges;
+            image-rendering: pixelated;
+            background: #3a4a5a;
+            border: 4px solid #5f6b7a;
+            border-radius: 12px;
+            box-shadow: inset 0 0 0 2px #232323, 0 0 0 2px #6b6b6b;
+            cursor: pointer;
+            touch-action: none;
+        }
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 16px;
+            padding: 0 10px;
+            color: #b0c0d0;
+            text-shadow: 2px 2px 0 #0f0f0f;
+            font-size: 20px;
+            letter-spacing: 1px;
+            background: #262f36;
+            border-radius: 40px;
+            padding: 10px 24px;
+            border: 2px solid #4b5a66;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .status-bar span {
+            background: #141a1f;
+            padding: 4px 18px;
+            border-radius: 40px;
+            border: 1px solid #3d4d5a;
+            color: #d4e4f0;
+            font-weight: bold;
+        }
+        .btn-reset {
+            background: #3c4c5a;
+            border: none;
+            color: #eee;
+            font-family: inherit;
+            font-size: 20px;
+            font-weight: bold;
+            padding: 6px 24px;
+            border-radius: 40px;
+            box-shadow: 0 4px 0 #1a2228, 0 2px 8px black;
+            cursor: pointer;
+            transition: 0.06s linear;
+            border: 1px solid #6d7e8a;
+        }
+        .btn-reset:active {
+            transform: translateY(4px);
+            box-shadow: 0 0px 0 #1a2228;
+        }
+        .btn-reset:hover {
+            background: #4e6272;
+        }
+        #info-message {
+            background: #1d262e;
+            padding: 6px 18px;
+            border-radius: 50px;
+            border-left: 6px solid #e8b84b;
+            color: #f0e6c5;
+            font-size: 18px;
+            min-width: 60px;
+            font-weight: bold;
+        }
+        #detailBtn {
+            background: #6b8f6b;
+            border: none;
+            color: #f0f0e0;
+            font-family: inherit;
+            font-size: 20px;
+            font-weight: bold;
+            padding: 6px 24px;
+            border-radius: 40px;
+            box-shadow: 0 4px 0 #2f4f2f, 0 2px 8px black;
+            cursor: pointer;
+            transition: 0.06s linear;
+            border: 1px solid #8ab08a;
+            display: none;
+        }
+        #detailBtn:active {
+            transform: translateY(4px);
+            box-shadow: 0 0px 0 #2f4f2f;
+        }
+        #detailBtn:hover {
+            background: #7fa87f;
+        }
+        .footer {
+            margin-top: 8px;
+            color: #66747f;
+            text-align: center;
+            font-size: 15px;
+        }
+        /* 2013年風のシンプルなオーバーレイ */
+        .study-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #1e2a33;
+            background-image: radial-gradient(circle at 20% 30%, #2f4050, #0f1a22);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 30px 20px;
+            z-index: 999;
+            overflow-y: auto;
+            border: 8px solid #4a6a7a;
+            box-sizing: border-box;
+            font-family: 'Courier New', monospace;
+            text-align: center;
+        }
+        .study-overlay.active {
+            display: flex;
+        }
+        .study-overlay .content {
+            max-width: 700px;
+            width: 100%;
+            background: rgba(30, 40, 50, 0.9);
+            padding: 40px 30px;
+            border-radius: 40px;
+            border: 4px solid #6a8a7a;
+            box-shadow: 0 12px 0 #0a1a1a;
+            color: #f0f0e0;
+        }
+        .study-overlay h1 {
+            font-size: 38px;
+            letter-spacing: 2px;
+            text-shadow: 4px 4px 0 #0a1a1a;
+            border-bottom: 6px solid #b8d0a0;
+            padding-bottom: 16px;
+            color: #faf5e0;
+        }
+        .study-overlay p {
+            font-size: 22px;
+            line-height: 1.6;
+            color: #e6e8da;
+        }
+        .study-overlay .big-icon {
+            font-size: 80px;
+            display: block;
+            margin: 20px 0;
+        }
+        .study-overlay .btn-to-map {
+            background: #6a7a6a;
+            border: none;
+            color: #f0f0e0;
+            font-size: 28px;
+            padding: 16px 50px;
+            border-radius: 60px;
+            box-shadow: 0 6px 0 #2f3f2f;
+            cursor: pointer;
+            font-family: inherit;
+            border: 2px solid #9aba9a;
+            margin-top: 20px;
+            transition: 0.06s linear;
+        }
+        .study-overlay .btn-to-map:active {
+            transform: translateY(6px);
+            box-shadow: 0 0px 0 #2f3f2f;
+        }
+        .study-overlay .close-btn {
+            position: absolute;
+            top: 24px;
+            right: 40px;
+            background: #8a3a3a;
+            border: 3px solid #cc6a6a;
+            color: #ffe0c0;
+            font-size: 32px;
+            font-weight: bold;
+            padding: 6px 24px;
+            border-radius: 60px;
+            cursor: pointer;
+            box-shadow: 0 6px 0 #4a1a1a;
+            transition: 0.08s linear;
+            font-family: inherit;
+            z-index: 1000;
+        }
+        .study-overlay .close-btn:active {
+            transform: translateY(6px);
+            box-shadow: 0 0px 0 #4a1a1a;
+        }
+        .hidden-canvas {
+            display: none;
+        }
+        @media (max-width: 700px) {
+            .study-overlay .content { padding: 20px; }
+            .study-overlay h1 { font-size: 28px; }
+        }
+    </style>
+</head>
+<body>
+<div class="game-wrapper" id="gameWrapper">
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <div class="status-bar">
+        <span id="roomDisplay">🏔️ 山小屋</span>
+        <span id="info-message">GRT-</span>
+        <button class="btn-reset" id="resetBtn">↺ リセット</button>
+        <button id="detailBtn">📘 詳しく</button>
+    </div>
+    <div class="footer">⚡ 2013 · ドット絵ふらふら ⚡</div>
+</div>
+
+<!-- クリア後表示：勉強サイト削除 → map.html へ誘導 -->
+<div class="study-overlay" id="studyOverlay">
+    <button class="close-btn" id="closeOverlayBtn">✕ 閉じる</button>
+    <div class="content">
+        <span class="big-icon">🗺️</span>
+        <h1>🎉 GRT を発見！</h1>
+        <p style="font-size:24px; background:#1f2f2a; padding:12px; border-radius:30px; border:2px solid #7aaa7a;">
+            ⛰️ 探索はひとまず終了。<br>次のステージへ進もう！
+        </p>
+        <p style="font-size:20px; margin:20px 0; color:#c0d0b0;">
+            📖 勉強サイトは削除されました。<br>
+            代わりに <strong>map.html</strong> へ移動します。
+        </p>
+        <button class="btn-to-map" id="goToMapBtn">🗺️ map.html へ</button>
+    </div>
+</div>
+
+<script>
+    (function() {
+        // ---------- 2013年仕様：IE9/古いスマホでも動くように配慮 ----------
+        var canvas = document.getElementById('gameCanvas');
+        var ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+
+        // 定数 (古いJSでも読めるように var 使用)
+        var ROOMS = { MOUNTAIN: 0, FOREST: 1, SEA: 2, VOLCANO: 3, DESERT: 4 };
+        var ROOM_NAMES = ['🏔️ 山小屋', '🌲 森', '🌊 海', '🌋 火山', '🏜️ 砂漠'];
+        var ROOM_COLORS = ['#4a5f4a', '#2d5a2d', '#2a4a6a', '#5a2a1a', '#8a7a3a'];
+
+        var currentRoom = ROOMS.MOUNTAIN;
+        var playerX = 400, playerY = 300;
+        var grtData = { room: ROOMS.FOREST, x: 0, y: 0, found: false };
+
+        // 家具データ (各マップ)
+        var furniture = {
+            // 山小屋 (スタート、GRTなし)
+            0: [
+                { x: 120, y: 160, w: 80, h: 50, color: '#6b4f3a', label: '🪵', type: 'table' },
+                { x: 400, y: 100, w: 60, h: 80, color: '#5a3f2a', label: '🔥', type: 'fireplace' },
+                { x: 620, y: 380, w: 50, h: 50, color: '#4f6f4f', label: '🛏️', type: 'bed' },
+                { x: 40, y: 450, w: 100, h: 30, color: '#7a5a3a', label: '📦', type: 'chest' }
+            ],
+            // 森
+            1: [
+                { x: 80, y: 200, w: 70, h: 70, color: '#3a6a3a', label: '🌳', type: 'tree' },
+                { x: 300, y: 400, w: 60, h: 40, color: '#4a7a3a', label: '🌿', type: 'bush' },
+                { x: 550, y: 120, w: 50, h: 60, color: '#5a4a2a', label: '🪹', type: 'nest' },
+                { x: 700, y: 460, w: 60, h: 40, color: '#4f6f4f', label: '🍄', type: 'mushroom' }
+            ],
+            // 海
+            2: [
+                { x: 100, y: 300, w: 80, h: 40, color: '#3a5a7a', label: '⛵', type: 'boat' },
+                { x: 350, y: 160, w: 70, h: 50, color: '#5a7a5a', label: '🌴', type: 'palm' },
+                { x: 600, y: 400, w: 60, h: 30, color: '#4a6a5a', label: '🐚', type: 'shell' },
+                { x: 720, y: 200, w: 40, h: 40, color: '#7a7a4a', label: '🏖️', type: 'sand' }
+            ],
+            // 火山
+            3: [
+                { x: 100, y: 180, w: 90, h: 60, color: '#5a2a1a', label: '🌋', type: 'crater' },
+                { x: 340, y: 380, w: 50, h: 50, color: '#6a3a2a', label: '🪨', type: 'rock' },
+                { x: 560, y: 140, w: 60, h: 70, color: '#4a2a1a', label: '🔥', type: 'lava' },
+                { x: 730, y: 450, w: 40, h: 40, color: '#7a4a2a', label: '🗿', type: 'statue' }
+            ],
+            // 砂漠
+            4: [
+                { x: 80, y: 250, w: 70, h: 50, color: '#8a7a3a', label: '🐪', type: 'camel' },
+                { x: 320, y: 100, w: 80, h: 40, color: '#9a8a4a', label: '🏛️', type: 'ruin' },
+                { x: 580, y: 380, w: 50, h: 50, color: '#7a6a2a', label: '🌵', type: 'cactus' },
+                { x: 700, y: 200, w: 50, h: 40, color: '#8a7a4a', label: '🪔', type: 'lamp' }
+            ]
+        };
+
+        // GRT をランダム配置 (山小屋以外)
+        function placeGrtRandomly() {
+            // 山小屋(0)以外からランダム選択
+            var roomOptions = [ROOMS.FOREST, ROOMS.SEA, ROOMS.VOLCANO, ROOMS.DESERT];
+            var room = roomOptions[Math.floor(Math.random() * roomOptions.length)];
+            var roomFurniture = furniture[room] || [];
+            var attempts = 0, placed = false, kx = 200, ky = 200;
+            while (!placed && attempts < 300) {
+                kx = 60 + Math.random() * 700;
+                ky = 60 + Math.random() * 480;
+                var overlap = false;
+                for (var i = 0; i < roomFurniture.length; i++) {
+                    var f = roomFurniture[i];
+                    var cx = f.x + f.w/2, cy = f.y + f.h/2;
+                    var dx = kx - cx, dy = ky - cy;
+                    if (Math.sqrt(dx*dx + dy*dy) < 55) { overlap = true; break; }
+                }
+                if (kx < 30 || kx > 770 || ky < 30 || ky > 570) overlap = true;
+                if (!overlap) placed = true;
+                attempts++;
+            }
+            if (!placed) { kx = 200 + Math.random() * 400; ky = 150 + Math.random() * 300; }
+            grtData.room = room;
+            grtData.x = kx;
+            grtData.y = ky;
+            grtData.found = false;
+            document.getElementById('detailBtn').style.display = 'none';
+            document.getElementById('info-message').textContent = 'GRT-';
+        }
+
+        // プレイヤー移動
+        function movePlayerTo(targetX, targetY) {
+            var margin = 20;
+            var newX = Math.min(780, Math.max(margin, targetX));
+            var newY = Math.min(570, Math.max(margin, targetY));
+            playerX = newX;
+            playerY = newY;
+
+            if (!grtData.found && currentRoom === grtData.room) {
+                var dx = playerX - grtData.x, dy = playerY - grtData.y;
+                if (Math.sqrt(dx*dx + dy*dy) < 25) {
+                    grtData.found = true;
+                    document.getElementById('info-message').textContent = 'GRT+';
+                    document.getElementById('detailBtn').style.display = 'inline-block';
+                }
+            }
+        }
+
+        // 描画
+        function drawScene() {
+            ctx.clearRect(0, 0, 800, 600);
+            // 背景色 (マップごと)
+            var bgColor = ROOM_COLORS[currentRoom] || '#3a4a5a';
+            ctx.fillStyle = bgColor;
+            ctx.fillRect(0, 0, 800, 600);
+            // 床パターン (ドット調)
+            ctx.fillStyle = '#4d5e6e';
+            for (var i = 0; i < 800; i+= 20) {
+                for (var j = 0; j < 600; j+= 20) {
+                    if ((i/20 + j/20) % 2 === 0) ctx.fillRect(i, j, 10, 10);
+                }
+            }
+            // 壁 (枠)
+            ctx.fillStyle = '#2a3a3a';
+            ctx.fillRect(0, 0, 800, 20);
+            ctx.fillRect(0, 580, 800, 20);
+            ctx.fillRect(0, 0, 20, 600);
+            ctx.fillRect(780, 0, 20, 600);
+
+            // 部屋名
+            ctx.font = 'bold 20px "Courier New", monospace';
+            ctx.fillStyle = '#f0f0e0';
+            ctx.shadowColor = '#000000';
+            ctx.shadowBlur = 8;
+            ctx.fillText(ROOM_NAMES[currentRoom] || '山小屋', 40, 50);
+            ctx.shadowBlur = 0;
+
+            // 家具
+            var furnList = furniture[currentRoom] || [];
+            for (var k = 0; k < furnList.length; k++) {
+                var f = furnList[k];
+                ctx.fillStyle = '#1f2a30';
+                ctx.fillRect(f.x+4, f.y+6, f.w, f.h);
+                ctx.fillStyle = f.color;
+                ctx.fillRect(f.x, f.y, f.w, f.h);
+                ctx.strokeStyle = '#101010';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(f.x, f.y, f.w, f.h);
+                ctx.font = '28px "Segoe UI", "Arial Unicode MS", sans-serif';
+                ctx.fillStyle = '#f5f0e0';
+                ctx.shadowColor = '#000000';
+                ctx.shadowBlur = 6;
+                ctx.fillText(f.label, f.x+10, f.y+32);
+                ctx.shadowBlur = 0;
+                // 装飾ドット
+                ctx.fillStyle = '#1a1a1a';
+                for (var d=0; d<4; d++) ctx.fillRect(f.x+6+d*12, f.y+8+d*8, 4, 4);
+            }
+
+            // GRT (鍵マーク)
+            if (!grtData.found && currentRoom === grtData.room) {
+                var kx = grtData.x, ky = grtData.y;
+                ctx.fillStyle = '#f7d44a';
+                ctx.shadowColor = '#b8860b';
+                ctx.shadowBlur = 12;
+                ctx.fillRect(kx-6, ky-10, 12, 20);
+                ctx.fillRect(kx-12, ky-6, 6, 6);
+                ctx.fillRect(kx+6, ky-6, 6, 6);
+                ctx.fillStyle = '#d4a020';
+                ctx.fillRect(kx-4, ky-6, 8, 12);
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = '#ffffc0';
+                ctx.fillRect(kx-8, ky-14, 4, 4);
+                ctx.fillRect(kx+6, ky-14, 4, 4);
+            }
+
+            // プレイヤー (ドット絵風)
+            var px = playerX, py = playerY;
+            ctx.fillStyle = '#1f2a30';
+            ctx.beginPath();
+            ctx.ellipse(px, py+28, 14, 6, 0, 0, Math.PI*2);
+            ctx.fill();
+            ctx.fillStyle = '#d4c8b0';
+            ctx.shadowColor = '#000000';
+            ctx.shadowBlur = 4;
+            ctx.beginPath();
+            ctx.arc(px, py-12, 12, 0, Math.PI*2);
+            ctx.fill();
+            ctx.fillRect(px-6, py-2, 12, 18);
+            ctx.fillRect(px-9, py+14, 6, 12);
+            ctx.fillRect(px+3, py+14, 6, 12);
+            ctx.fillRect(px-14, py+2, 8, 6);
+            ctx.fillRect(px+6, py+2, 8, 6);
+            ctx.fillStyle = '#1a1a2a';
+            ctx.fillRect(px-4, py-16, 3, 3);
+            ctx.fillRect(px+3, py-16, 3, 3);
+            ctx.shadowBlur = 0;
+
+            document.getElementById('roomDisplay').textContent = ROOM_NAMES[currentRoom] || '🏔️ 山小屋';
+        }
+
+        // クリック / タッチ 処理 (2013年対応)
+        function handleCanvasClick(e) {
+            var rect = canvas.getBoundingClientRect();
+            var scaleX = canvas.width / rect.width;
+            var scaleY = canvas.height / rect.height;
+            var clientX, clientY;
+            if (e.touches) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+                e.preventDefault();
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+            var canvasX = (clientX - rect.left) * scaleX;
+            var canvasY = (clientY - rect.top) * scaleY;
+            if (canvasX >= 0 && canvasX <= 800 && canvasY >= 0 && canvasY <= 600) {
+                // 壁クリックで移動 (上下左右)
+                if (canvasY < 40 && currentRoom !== ROOMS.FOREST) {
+                    currentRoom = ROOMS.FOREST;
+                } else if (canvasY > 560 && currentRoom !== ROOMS.SEA) {
+                    currentRoom = ROOMS.SEA;
+                } else if (canvasX < 40 && currentRoom !== ROOMS.VOLCANO) {
+                    currentRoom = ROOMS.VOLCANO;
+                } else if (canvasX > 760 && currentRoom !== ROOMS.DESERT) {
+                    currentRoom = ROOMS.DESERT;
+                } else {
+                    movePlayerTo(canvasX, canvasY);
+                }
+                drawScene();
+            }
+        }
+
+        // リセット
+        function resetGame() {
+            placeGrtRandomly();
+            playerX = 400; playerY = 300;
+            currentRoom = ROOMS.MOUNTAIN;
+            grtData.found = false;
+            document.getElementById('detailBtn').style.display = 'none';
+            document.getElementById('info-message').textContent = 'GRT-';
+            drawScene();
+        }
+
+        // ---------- オーバーレイ (勉強サイト削除 → map.html) ----------
+        var overlay = document.getElementById('studyOverlay');
+        function openOverlay() {
+            overlay.classList.add('active');
+            canvas.style.display = 'none';
+        }
+        function closeOverlay() {
+            overlay.classList.remove('active');
+            canvas.style.display = 'block';
+            drawScene();
+        }
+        function goToMap() {
+            // map.html へ移動 (実際の環境に合わせて調整)
+            window.location.href = 'map.html';
+        }
+
+        document.getElementById('detailBtn').addEventListener('click', openOverlay);
+        document.getElementById('closeOverlayBtn').addEventListener('click', closeOverlay);
+        document.getElementById('goToMapBtn').addEventListener('click', goToMap);
+
+        canvas.addEventListener('click', handleCanvasClick);
+        canvas.addEventListener('touchstart', handleCanvasClick, { passive: false });
+        document.getElementById('resetBtn').addEventListener('click', resetGame);
+
+        // 初期化
+        placeGrtRandomly();
+        drawScene();
+    })();
+</script>
+</body>
+</html>
