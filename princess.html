@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>マリオ風ステージ + カイツブリ生態 (マウス操作・2013)</title>
+    <title>マリオ風 + カイツブリ生態 (マウス左右ボタン・2013)</title>
     <style>
         * {
             margin: 0;
@@ -37,7 +37,7 @@
             image-rendering: crisp-edges;
             width: 800px;
             height: 400px;
-            cursor: pointer;
+            cursor: default;
             touch-action: none;
         }
         .info {
@@ -53,6 +53,8 @@
             padding: 10px 20px;
             border-radius: 60px;
             border-bottom: 5px solid #2b241b;
+            flex-wrap: wrap;
+            gap: 8px;
         }
         .info span {
             background: #2b241b;
@@ -60,6 +62,32 @@
             border-radius: 40px;
             color: #ffd78a;
         }
+        .controls {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+        .mouse-btn {
+            background: #5a4f3a;
+            border: none;
+            border-bottom: 5px solid #2b241b;
+            color: #f0e6b0;
+            font-weight: bold;
+            font-size: 20px;
+            padding: 4px 20px;
+            border-radius: 40px;
+            cursor: pointer;
+            transition: 0.05s linear;
+            box-shadow: 0 2px 0 #1f1a12;
+            min-width: 60px;
+        }
+        .mouse-btn:active {
+            transform: translateY(4px);
+            border-bottom-width: 2px;
+        }
+        .mouse-btn.left-btn { background: #3d6b8a; }
+        .mouse-btn.right-btn { background: #8a5a3d; }
+        .mouse-btn.jump-btn { background: #6a8a3d; }
         button {
             background: #f5c542;
             border: none;
@@ -169,19 +197,51 @@
         @media (max-width: 860px) {
             canvas { width: 100%; height: auto; aspect-ratio: 800/400; }
             .container { padding: 12px; }
+            .controls { flex-wrap: wrap; justify-content: center; }
+        }
+        /* ゲームオーバー表示 */
+        .gameover-msg {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8);
+            color: #ff6b6b;
+            font-size: 42px;
+            font-weight: bold;
+            padding: 20px 50px;
+            border-radius: 30px;
+            border: 6px solid #ff6b6b;
+            text-shadow: 0 0 20px #ff0000;
+            z-index: 10;
+            display: none;
+            text-align: center;
+            pointer-events: none;
+        }
+        .canvas-wrap {
+            position: relative;
+            display: inline-block;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <canvas id="gameCanvas" width="800" height="400"></canvas>
+        <div class="canvas-wrap">
+            <canvas id="gameCanvas" width="800" height="400"></canvas>
+            <div id="gameoverMsg" class="gameover-msg">💀 GAME OVER</div>
+        </div>
         <div class="info">
-            <span>🍄 マウスで操作 2013</span>
+            <span>🍄 マウス左右操作 2013</span>
             <span id="scoreDisplay">🟡 0</span>
+            <div class="controls">
+                <button class="mouse-btn left-btn" id="leftBtn">◀</button>
+                <button class="mouse-btn jump-btn" id="jumpBtn">▲ ジャンプ</button>
+                <button class="mouse-btn right-btn" id="rightBtn">▶</button>
+            </div>
             <button id="resetBtn">↺ リスタート</button>
         </div>
         <div class="footer">
-            <span class="mouse-hint">🖱 クリックでジャンプ / ドラッグで移動</span>
+            <span class="mouse-hint">🖱 左右ボタンで移動 / ジャンプボタンでジャンプ</span>
             <span style="margin-left:16px;">🏁 旗でクリア！</span>
         </div>
     </div>
@@ -206,13 +266,19 @@
 
     <script>
         (function() {
-            // ---------- 2013年 レガシー対応 / マウス操作 ----------
+            // ---------- 2013年 レガシー対応 / マウス左右ボタン ----------
             var canvas = document.getElementById('gameCanvas');
             var ctx = canvas.getContext('2d');
             var scoreSpan = document.getElementById('scoreDisplay');
             var resetBtn = document.getElementById('resetBtn');
             var birdOverlay = document.getElementById('birdOverlay');
             var closeBirdBtn = document.getElementById('closeBirdBtn');
+            var gameoverMsg = document.getElementById('gameoverMsg');
+
+            // マウスボタン
+            var leftBtn = document.getElementById('leftBtn');
+            var rightBtn = document.getElementById('rightBtn');
+            var jumpBtn = document.getElementById('jumpBtn');
 
             // ---------- ゲーム状態 ----------
             var game = {
@@ -228,6 +294,7 @@
                 },
                 platforms: [],
                 coins: [],
+                enemies: [],
                 flag: { x: 740, y: 130, w: 24, h: 60, baseY: 330 },
                 gravity: 0.45,
                 friction: 0.82,
@@ -235,14 +302,14 @@
                 moveSpeed: 3.8,
                 score: 0,
                 gameClear: false,
-                // マウス操作状態
-                mouseDown: false,
-                targetX: null,      // マウスのX座標 (キャンバス内)
-                mouseScreenX: 0,
-                jumpRequested: false
+                gameOver: false,
+                // マウスボタン入力
+                leftPressed: false,
+                rightPressed: false,
+                jumpPressed: false
             };
 
-            // ---------- ステージ構築 ----------
+            // ---------- ステージ構築 (敵2体: 民主党モンスタークリボー) ----------
             function buildStage() {
                 game.platforms = [
                     { x: 0, y: 330, w: 800, h: 70 }
@@ -263,6 +330,13 @@
                     { x: 640, y: 150, w: 16, h: 16, collected: false },
                     { x: 680, y: 150, w: 16, h: 16, collected: false }
                 ];
+
+                // 敵: 民主党モンスタークリボー (2体)
+                game.enemies = [
+                    { x: 200, y: 310, w: 30, h: 30, vx: -0.8, alive: true, type: 'democrat' },
+                    { x: 520, y: 310, w: 30, h: 30, vx: 0.8, alive: true, type: 'democrat' }
+                ];
+
                 game.flag.x = 740;
                 game.flag.y = 130;
                 game.flag.baseY = 330;
@@ -276,44 +350,35 @@
                 m.facing = 1;
                 game.score = 0;
                 game.gameClear = false;
-                game.mouseDown = false;
-                game.targetX = null;
-                game.jumpRequested = false;
+                game.gameOver = false;
+                game.leftPressed = false;
+                game.rightPressed = false;
+                game.jumpPressed = false;
+                gameoverMsg.style.display = 'none';
                 updateScore();
             }
 
-            // ---------- 物理更新 (マウスによる移動・ジャンプ) ----------
+            // ---------- 物理更新 ----------
             function updatePhysics() {
-                if (game.gameClear) return;
+                if (game.gameClear || game.gameOver) return;
 
                 var m = game.mario;
 
-                // ---- マウス操作：水平移動 ----
-                // targetX が設定されていれば、その方向に加速
-                if (game.targetX !== null && !game.gameClear) {
-                    var diff = game.targetX - (m.x + m.w/2);
-                    if (Math.abs(diff) > 6) {
-                        var dir = diff > 0 ? 1 : -1;
-                        m.vx += dir * 0.6;
-                        if (Math.abs(m.vx) > game.moveSpeed) {
-                            m.vx = dir * game.moveSpeed;
-                        }
-                    } else {
-                        // 目標付近なら減速
-                        m.vx *= 0.85;
-                        if (Math.abs(m.vx) < 0.2) m.vx = 0;
-                    }
+                // マウスボタン入力 → 移動
+                if (game.leftPressed) {
+                    m.vx = -game.moveSpeed;
+                } else if (game.rightPressed) {
+                    m.vx = game.moveSpeed;
                 } else {
-                    // マウスが離れたら摩擦で停止
                     m.vx *= game.friction;
                     if (Math.abs(m.vx) < 0.1) m.vx = 0;
                 }
 
-                // ---- マウスクリックでジャンプ (接地時) ----
-                if (game.jumpRequested && m.onGround) {
+                // ジャンプ (接地時)
+                if (game.jumpPressed && m.onGround) {
                     m.vy = game.jumpPower;
                     m.onGround = false;
-                    game.jumpRequested = false;
+                    game.jumpPressed = false; // 1回限り
                 }
 
                 // 重力
@@ -363,7 +428,7 @@
                 if (m.x < 0) m.x = 0;
                 if (m.x + m.w > 800) m.x = 800 - m.w;
                 if (m.y > 400) {
-                    resetGame();
+                    setGameOver();
                     return;
                 }
 
@@ -379,6 +444,61 @@
                     }
                 }
 
+                // 敵更新 & 衝突判定
+                for (var e = 0; e < game.enemies.length; e++) {
+                    var enemy = game.enemies[e];
+                    if (!enemy.alive) continue;
+
+                    // 敵移動 (プラットフォームに沿って)
+                    enemy.x += enemy.vx;
+                    // 地面に沿って移動 (簡易: 地面 + ブロックに衝突)
+                    var onPlat = false;
+                    for (var pi = 0; pi < game.platforms.length; pi++) {
+                        var pl = game.platforms[pi];
+                        if (enemy.x + enemy.w > pl.x && enemy.x < pl.x + pl.w &&
+                            enemy.y + enemy.h >= pl.y && enemy.y + enemy.h <= pl.y + 10) {
+                            onPlat = true;
+                            break;
+                        }
+                    }
+                    // 壁反転 (地面端 or ブロック)
+                    var hitWall = false;
+                    for (var pi2 = 0; pi2 < game.platforms.length; pi2++) {
+                        var pl2 = game.platforms[pi2];
+                        if (enemy.x + enemy.w > pl2.x && enemy.x < pl2.x + pl2.w &&
+                            enemy.y < pl2.y + pl2.h && enemy.y + enemy.h > pl2.y) {
+                            // ブロックにぶつかったら反転
+                            if (enemy.vx > 0 && enemy.x + enemy.w >= pl2.x && enemy.x < pl2.x) {
+                                enemy.vx = -Math.abs(enemy.vx);
+                                hitWall = true;
+                            } else if (enemy.vx < 0 && enemy.x <= pl2.x + pl2.w && enemy.x + enemy.w > pl2.x + pl2.w) {
+                                enemy.vx = Math.abs(enemy.vx);
+                                hitWall = true;
+                            }
+                        }
+                    }
+                    // 画面端で反転
+                    if (enemy.x < 0) { enemy.x = 0; enemy.vx = Math.abs(enemy.vx); }
+                    if (enemy.x + enemy.w > 800) { enemy.x = 800 - enemy.w; enemy.vx = -Math.abs(enemy.vx); }
+
+                    // マリオと敵の衝突
+                    if (m.x + m.w > enemy.x + 4 && m.x < enemy.x + enemy.w - 4 &&
+                        m.y + m.h > enemy.y + 4 && m.y < enemy.y + enemy.h - 4) {
+                        // 上から踏んだ (マリオの足が敵の上半分より上)
+                        if (m.vy > 0 && m.y + m.h - enemy.y < 20) {
+                            // 敵を倒す
+                            enemy.alive = false;
+                            game.score += 200;
+                            updateScore();
+                            m.vy = -5; // 跳ね返り
+                        } else {
+                            // 接触 → ゲームオーバー
+                            setGameOver();
+                            return;
+                        }
+                    }
+                }
+
                 // 旗チェック
                 var f = game.flag;
                 if (m.x + m.w > f.x + 4 && m.x < f.x + f.w - 4 &&
@@ -389,6 +509,14 @@
 
                 if (m.vx > 0.2) m.facing = 1;
                 else if (m.vx < -0.2) m.facing = -1;
+            }
+
+            // ---------- ゲームオーバー ----------
+            function setGameOver() {
+                game.gameOver = true;
+                gameoverMsg.style.display = 'block';
+                // マリオを少し戻す
+                game.mario.y = 290;
             }
 
             // ---------- 描画 ----------
@@ -450,6 +578,29 @@
                     ctx.shadowBlur = 0;
                 }
 
+                // 敵 (民主党モンスタークリボー)
+                for (var e = 0; e < game.enemies.length; e++) {
+                    var enemy = game.enemies[e];
+                    if (!enemy.alive) continue;
+                    // 茶色いクリボー風 + 民主党マーク (D)
+                    ctx.fillStyle = '#8b5a3a';
+                    ctx.fillRect(enemy.x, enemy.y, enemy.w, enemy.h);
+                    ctx.fillStyle = '#6a3f2a';
+                    ctx.fillRect(enemy.x + 4, enemy.y + 4, enemy.w - 8, 6);
+                    ctx.fillRect(enemy.x + 4, enemy.y + enemy.h - 10, enemy.w - 8, 6);
+                    // 目
+                    ctx.fillStyle = '#fff';
+                    ctx.fillRect(enemy.x + 5, enemy.y + 8, 8, 8);
+                    ctx.fillRect(enemy.x + 17, enemy.y + 8, 8, 8);
+                    ctx.fillStyle = '#222';
+                    ctx.fillRect(enemy.x + 8, enemy.y + 11, 4, 4);
+                    ctx.fillRect(enemy.x + 20, enemy.y + 11, 4, 4);
+                    // 民主党マーク (D)
+                    ctx.fillStyle = '#1a3d7a';
+                    ctx.font = 'bold 14px sans-serif';
+                    ctx.fillText('D', enemy.x + 10, enemy.y + 26);
+                }
+
                 // 旗
                 var f = game.flag;
                 ctx.fillStyle = '#6a6a6a';
@@ -499,17 +650,6 @@
                     ctx.font = 'bold 28px sans-serif';
                     ctx.fillText('🎉 CLEAR!', 300, 120);
                 }
-
-                // マウスガイド (目標地点)
-                if (game.targetX !== null && !game.gameClear) {
-                    ctx.fillStyle = 'rgba(255, 200, 100, 0.25)';
-                    ctx.beginPath();
-                    ctx.arc(game.targetX, 360, 16, 0, Math.PI*2);
-                    ctx.fill();
-                    ctx.fillStyle = 'rgba(255, 200, 100, 0.5)';
-                    ctx.font = '18px sans-serif';
-                    ctx.fillText('⬇', game.targetX - 10, 375);
-                }
             }
 
             function drawCloud(x, y, s) {
@@ -530,9 +670,11 @@
                 buildStage();
                 birdOverlay.style.display = 'none';
                 game.gameClear = false;
-                game.targetX = null;
-                game.mouseDown = false;
-                game.jumpRequested = false;
+                game.gameOver = false;
+                gameoverMsg.style.display = 'none';
+                game.leftPressed = false;
+                game.rightPressed = false;
+                game.jumpPressed = false;
                 updateScore();
             }
 
@@ -541,99 +683,58 @@
                 birdOverlay.style.display = 'flex';
             }
 
-            // ---------- マウスイベント (2013 対応) ----------
-            function getCanvasCoords(e) {
-                var rect = canvas.getBoundingClientRect();
-                var scaleX = canvas.width / rect.width;
-                var scaleY = canvas.height / rect.height;
-                var clientX, clientY;
-                if (e.touches) {
-                    clientX = e.touches[0].clientX;
-                    clientY = e.touches[0].clientY;
-                    e.preventDefault();
-                } else {
-                    clientX = e.clientX;
-                    clientY = e.clientY;
+            // ---------- マウスボタンイベント ----------
+            // 左ボタン (押しっぱなしで左移動)
+            leftBtn.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                game.leftPressed = true;
+            });
+            leftBtn.addEventListener('mouseup', function(e) {
+                e.preventDefault();
+                game.leftPressed = false;
+            });
+            leftBtn.addEventListener('mouseleave', function(e) {
+                game.leftPressed = false;
+            });
+
+            // 右ボタン
+            rightBtn.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                game.rightPressed = true;
+            });
+            rightBtn.addEventListener('mouseup', function(e) {
+                e.preventDefault();
+                game.rightPressed = false;
+            });
+            rightBtn.addEventListener('mouseleave', function(e) {
+                game.rightPressed = false;
+            });
+
+            // ジャンプボタン (クリックでジャンプ)
+            jumpBtn.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                if (!game.gameClear && !game.gameOver) {
+                    game.jumpPressed = true;
                 }
-                return {
-                    x: (clientX - rect.left) * scaleX,
-                    y: (clientY - rect.top) * scaleY
-                };
-            }
+            });
 
-            function onPointerDown(e) {
-                e.preventDefault();
-                if (game.gameClear) return;
-                var pos = getCanvasCoords(e);
-                game.mouseDown = true;
-                game.targetX = pos.x;
-                // クリック＝ジャンプ要求 (接地時に実行)
-                game.jumpRequested = true;
-            }
-
-            function onPointerMove(e) {
-                e.preventDefault();
-                if (!game.mouseDown || game.gameClear) return;
-                var pos = getCanvasCoords(e);
-                game.targetX = pos.x;
-            }
-
-            function onPointerUp(e) {
-                e.preventDefault();
-                game.mouseDown = false;
-                // targetX はすぐには消さない (減速のため)
-                // ただし、マウスがキャンバス外で離れたら targetX をクリア
-                if (e) {
-                    var rect = canvas.getBoundingClientRect();
-                    var clientX = e.clientX || (e.changedTouches && e.changedTouches[0].clientX);
-                    if (clientX !== undefined) {
-                        if (clientX < rect.left || clientX > rect.right) {
-                            game.targetX = null;
-                        }
-                    }
-                }
-                // ジャンプ要求はリセット (連続ジャンプ防止)
-                game.jumpRequested = false;
-            }
-
-            // キャンバスからマウスが出たら targetX をクリア
-            function onPointerLeave(e) {
-                game.mouseDown = false;
-                game.targetX = null;
-                game.jumpRequested = false;
-            }
-
-            // イベント登録 (マウス + タッチ)
-            canvas.addEventListener('mousedown', onPointerDown);
-            canvas.addEventListener('mousemove', onPointerMove);
-            canvas.addEventListener('mouseup', onPointerUp);
-            canvas.addEventListener('mouseleave', onPointerLeave);
-
-            canvas.addEventListener('touchstart', onPointerDown, { passive: false });
-            canvas.addEventListener('touchmove', onPointerMove, { passive: false });
-            canvas.addEventListener('touchend', onPointerUp, { passive: false });
-            canvas.addEventListener('touchcancel', onPointerUp, { passive: false });
+            // リセット
+            resetBtn.addEventListener('click', resetGame);
+            closeBirdBtn.addEventListener('click', function() {
+                birdOverlay.style.display = 'none';
+                game.gameClear = false;
+                var m = game.mario;
+                if (m.x > 700) m.x = 680;
+            });
 
             // ---------- ゲームループ ----------
             function gameLoop() {
-                if (!game.gameClear) {
+                if (!game.gameClear && !game.gameOver) {
                     updatePhysics();
                 }
                 draw();
                 requestAnimationFrame(gameLoop);
             }
-
-            // ---------- イベント初期化 ----------
-            resetBtn.addEventListener('click', resetGame);
-            closeBirdBtn.addEventListener('click', function() {
-                birdOverlay.style.display = 'none';
-                game.gameClear = false;
-                // 旗の上でクリアした場合、マリオを少し戻す (再開時)
-                var m = game.mario;
-                if (m.x > 700) {
-                    m.x = 680;
-                }
-            });
 
             buildStage();
             updateScore();
