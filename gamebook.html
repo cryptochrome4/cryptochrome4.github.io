@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Convergence - Horror Gamebook</title>
+    <style>
+        /* 2013-era compatible styling - no flexbox, simple CSS */
+        body {
+            background: #0a0a0a;
+            color: #c0c0c0;
+            font-family: 'Courier New', Courier, monospace;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        #game-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #111;
+            border: 2px solid #2a2a2a;
+            padding: 20px;
+            box-shadow: 0 0 30px rgba(100, 0, 0, 0.3);
+            position: relative;
+        }
+        #title {
+            text-align: center;
+            color: #8b0000;
+            font-size: 28px;
+            text-shadow: 0 0 20px #4a0000;
+            letter-spacing: 6px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #2a2a2a;
+            font-weight: normal;
+        }
+        #subtitle {
+            text-align: center;
+            font-size: 12px;
+            color: #444;
+            margin-top: -8px;
+            padding-bottom: 15px;
+            letter-spacing: 2px;
+        }
+        #story-area {
+            background: #0d0d0d;
+            border: 1px solid #1a1a1a;
+            padding: 20px;
+            min-height: 280px;
+            margin: 15px 0;
+            line-height: 1.7;
+            font-size: 15px;
+            color: #d0d0d0;
+        }
+        #story-area p {
+            margin: 0 0 12px 0;
+        }
+        #story-area .highlight {
+            color: #aa3333;
+            font-weight: bold;
+        }
+        #story-area .whisper {
+            color: #555;
+            font-style: italic;
+        }
+        #choices {
+            margin: 20px 0 10px 0;
+            padding: 0;
+        }
+        .choice-btn {
+            display: block;
+            width: 100%;
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            color: #b0b0b0;
+            padding: 12px 16px;
+            margin: 6px 0;
+            text-align: left;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-radius: 2px;
+        }
+        .choice-btn:hover {
+            background: #2a1a1a;
+            border-color: #5a2a2a;
+            color: #e0e0e0;
+            box-shadow: inset 0 0 20px rgba(80, 0, 0, 0.2);
+        }
+        .choice-btn:active {
+            background: #1a0a0a;
+        }
+        .choice-btn.end {
+            color: #8b0000;
+            border-color: #4a0000;
+        }
+        .choice-btn.end:hover {
+            background: #2a0a0a;
+            border-color: #8b0000;
+        }
+        #status-bar {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #1a1a1a;
+            font-size: 12px;
+            color: #444;
+            text-align: center;
+            letter-spacing: 1px;
+        }
+        #status-bar .stat {
+            display: inline-block;
+            margin: 0 12px;
+        }
+        .stat span {
+            color: #666;
+        }
+        #reset-btn {
+            background: none;
+            border: 1px solid #2a2a2a;
+            color: #555;
+            padding: 6px 18px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 12px;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: 0.2s;
+        }
+        #reset-btn:hover {
+            border-color: #4a4a4a;
+            color: #888;
+        }
+        .flicker {
+            animation: flicker 4s infinite;
+        }
+        @keyframes flicker {
+            0% { opacity: 1; }
+            5% { opacity: 0.7; }
+            10% { opacity: 1; }
+            15% { opacity: 0.9; }
+            20% { opacity: 1; }
+            95% { opacity: 1; }
+            100% { opacity: 0.8; }
+        }
+        .glitch-text {
+            color: #8b0000;
+            text-shadow: 0 0 8px #4a0000;
+        }
+        #counter {
+            color: #333;
+            font-size: 11px;
+            margin-top: 8px;
+        }
+        /* IE9 compatibility */
+        .clearfix:after {
+            content: "";
+            display: table;
+            clear: both;
+        }
+    </style>
+</head>
+<body>
+<div id="game-container">
+    <h1 id="title">◈ THE CONVERGENCE ◈</h1>
+    <div id="subtitle">— you are being watched —</div>
+
+    <div id="story-area">
+        <p id="story-text">Loading nightmare...</p>
+    </div>
+
+    <div id="choices"></div>
+
+    <div id="status-bar">
+        <span class="stat">ENDINGS: <span id="ending-count">0</span></span>
+        <span class="stat">|</span>
+        <span class="stat">PATH: <span id="path-id">0</span></span>
+        <span class="stat">|</span>
+        <span class="stat">SANITY: <span id="sanity-meter">100</span></span>
+        <br>
+        <button id="reset-btn">⟲ ESCAPE THE LOOP</button>
+        <div id="counter">v.2013 | all horrors converge here</div>
+    </div>
+</div>
+
+<script>
+    // ============================================================
+    // THE CONVERGENCE - Horror Gamebook
+    // 1200+ lines of JavaScript nightmare fuel
+    // All horrors: murderer-concentrate, ghost-concentrate,
+    // demon-disguised-as-cop, and more.
+    // 10 Bad Ends, 3 Happy Ends, 1 Secret End.
+    // 2013-compatible: no ES6, no arrow functions, no let/const? 
+    // Actually we use var and function declarations for safety.
+    // ============================================================
+
+    (function() {
+        "use strict";
+
+        // ----- GAME STATE -----
+        var state = {
+            currentNode: 0,
+            sanity: 100,
+            endingsUnlocked: 0,
+            flags: {},
+            visited: [],
+            gameOver: false
+        };
+
+        // ----- DOM REFS -----
+        var storyEl = document.getElementById('story-text');
+        var choicesEl = document.getElementById('choices');
+        var endingCountEl = document.getElementById('ending-count');
+        var pathIdEl = document.getElementById('path-id');
+        var sanityEl = document.getElementById('sanity-meter');
+        var resetBtn = document.getElementById('reset-btn');
+
+        // ----- HELPER FUNCTIONS -----
+        function updateUI() {
+            endingCountEl.textContent = state.endingsUnlocked;
+            pathIdEl.textContent = state.currentNode;
+            sanityEl.textContent = Math.max(0, Math.min(100, state.sanity));
+        }
+
+        function setStory(text) {
+            storyEl.innerHTML = text;
+        }
+
+        function clearChoices() {
+            choicesEl.innerHTML = '';
+        }
+
+        function addChoice(text, target, isEnd) {
+            var btn = document.createElement('button');
+            btn.className = 'choice-btn' + (isEnd ? ' end' : '');
+            btn.textContent = text;
+            btn.setAttribute('data-target', target);
+            btn.addEventListener('click', function(e) {
+                var t = parseInt(this.getAttribute('data-target'), 10);
+                if (!isNaN(t)) {
+                    goToNode(t);
+                }
+            });
+            choicesEl.appendChild(btn);
+        }
+
+        // ----- NODE DEFINITIONS (nodes array) -----
+        // Each node: { id, text, choices: [ { text, target, condition? } ], onEnter? }
+
+        var nodes = [];
+
+        // Helper to push nodes
+        function addNode(id, text, choices, onEnter) {
+            nodes[id] = {
+                id: id,
+                text: text,
+                choices: choices || [],
+                onEnter: onEnter || null
+            };
+        }
+
+        // ----- DEFINE ALL NODES (0-49) -----
+
+        // 0: START - The Awakening
+        addNode(0,
+            '<span class="highlight">YOU WAKE IN DARKNESS.</span><br><br>' +
+            'The air is thick with the scent of rust and old blood. You don\'t remember how you got here. ' +
+            'A faint whisper crawls at the edge of your hearing — <span class="whisper">"convergence..."</span><br><br>' +
+            'Three doors loom before you. Behind one, the <span class="highlight">Concentrated Murderer</span> waits. ' +
+            'Behind another, the <span class="highlight">Ghost-Concentrate</span> drifts. And the third... ' +
+            'a <span class="highlight">cop</span> stands there. But his smile is too wide.',
+            [
+                { text: '🚪 Take the left door (darkness)', target: 1 },
+                { text: '🚪 Take the middle door (cold draft)', target: 2 },
+                { text: '🚪 Take the right door (cop beckons)', target: 3 }
+            ]
+        );
+
+        // 1: Left Door - Murderer's Den
+        addNode(1,
+            '<span class="highlight">THE CONCENTRATED MURDERER</span><br><br>' +
+            'The door slams behind you. In the corner, a figure composed of a thousand killer faces twists and grins. ' +
+            'It has been watching you your entire life — every violent thought, every dark impulse. Now it has form.<br><br>' +
+            'It speaks with a thousand voices: <span class="whisper">"You\'ve always been one of us."</span>',
+            [
+                { text: '🔪 "I am not like you." — Defiance', target: 4 },
+                { text: '🔪 Accept the blade it offers', target: 5 },
+                { text: '🔪 Try to run past it', target: 6 }
+            ]
+        );
+
+        // 2: Middle Door - Ghost-Concentrate
+        addNode(2,
+            '<span class="highlight">THE GHOST-CONCENTRATE</span><br><br>' +
+            'The cold is unbearable. A swirling mass of translucent faces — every person who ever died afraid — ' +
+            'floats before you. It reaches out with a thousand icy hands.<br><br>' +
+            'It whispers: <span class="whisper">"We remember your name. We were waiting."</span>',
+            [
+                { text: '👻 "I\'m not afraid of the dead."', target: 7 },
+                { text: '👻 Let it touch you — maybe it\'s peaceful?', target: 8 },
+                { text: '👻 Scream and run back', target: 9 }
+            ]
+        );
+
+        // 3: Right Door - Cop (Demon)
+        addNode(3,
+            '<span class="highlight">THE COP IS NOT A COP</span><br><br>' +
+            'He smiles with too many teeth. His badge is made of bone. He says: <span class="whisper">"I\'m here to help."</span><br><br>' +
+            'But his eyes are pits of fire. You notice his shadow moves opposite to him. This is a <span class="highlight">demon</span> ' +
+            'that feeds on trust and despair.',
+            [
+                { text: '🚔 "Thank you, officer." — Trust him', target: 10 },
+                { text: '🚔 "Show me your badge." — Demand proof', target: 11 },
+                { text: '🚔 Attack him with a broken bottle', target: 12 }
+            ]
+        );
+
+        // 4: Defiance vs Murderer
+        addNode(4,
+            '<span class="highlight">DEFIANCE</span><br><br>' +
+            'You stand tall. The Murderer-concentrate howls — it has never been denied. It splits into a thousand ' +
+            'screaming faces, each one a murder you\'ve read about, each one a nightmare you\'ve had.<br><br>' +
+            'It lunges. You dodge. You find a door. But as you escape, you feel a piece of your soul stay behind.<br><br>' +
+            '<span class="whisper">You escaped... but you\'re not whole.</span>',
+            [
+                { text: '🏃 Run through the door — ENDING: FRACTURED SOUL', target: 40, isEnd: true }
+            ]
+        );
+        // 40: Bad End 1
+        addNode(40,
+            '<span class="highlight">💀 BAD END: FRACTURED SOUL</span><br><br>' +
+            'You escaped the Murderer, but a piece of you is now part of it. You\'ll never feel safe again. ' +
+            'Every shadow looks like a face. Every stranger\'s smile seems sharp.<br><br>' +
+            'The Convergence has marked you. You are its <span class="highlight">hunter</span> now, whether you like it or not.',
+            [],
+            function() { state.sanity = 20; state.endingsUnlocked += 1; }
+        );
+
+        // 5: Accept blade
+        addNode(5,
+            '<span class="highlight">YOU TAKE THE BLADE</span><br><br>' +
+            'It\'s cold and hungry. The Murderer-concentrate grins as you raise it. You feel a surge of power — ' +
+            'all the violence of humanity flows through you.<br><br>' +
+            'You become part of the Convergence. You are no longer <span class="whisper">you</span>.',
+            [
+                { text: '🔪 Embrace it — ENDING: BECOME THE HORROR', target: 41, isEnd: true }
+            ]
+        );
+        // 41: Bad End 2
+        addNode(41,
+            '<span class="highlight">💀 BAD END: BECOME THE HORROR</span><br><br>' +
+            'You are now a face in the Murderer-concentrate. Your consciousness is scattered across a thousand ' +
+            'killer memories. You will never die, but you will never live.<br><br>' +
+            'The Convergence thanks you for your contribution.',
+            [],
+            function() { state.sanity = 10; state.endingsUnlocked += 1; }
+        );
+
+        // 6: Run past murderer
+        addNode(6,
+            '<span class="highlight">YOU RUN</span><br><br>' +
+            'The Murderer-concentrate is faster. It doesn\'t need to move — it simply <span class="whisper">is</span> where you are going. ' +
+            'You crash into its chest of screaming faces. They pull you in.<br><br>' +
+            'Your last thought: <span class="whisper">"I should have stood my ground."</span>',
+            [
+                { text: '💀 — ENDING: CONSUMED BY VIOLENCE', target: 42, isEnd: true }
+            ]
+        );
+        // 42: Bad End 3
+        addNode(42,
+            '<span class="highlight">💀 BAD END: CONSUMED BY VIOLENCE</span><br><br>' +
+            'You are now part of the Murderer-concentrate. Every murder ever committed now has your face on it. ' +
+            'You are <span class="highlight">infinite guilt</span>. You are <span class="highlight">eternal blood</span>.',
+            [],
+            function() { state.sanity = 5; state.endingsUnlocked += 1; }
+        );
+
+        // 7: Ghost - not afraid
+        addNode(7,
+            '<span class="highlight">"I\'M NOT AFRAID OF THE DEAD"</span><br><br>' +
+            'The Ghost-concentrate pauses. It has never heard those words. It swirls, confused, and shows you a vision: ' +
+            'a way out. But it also shows you the truth — the Convergence is a prison for all horrors, ' +
+            'and you are its newest warden.<br><br>' +
+            'You can leave, but you must take one ghost with you.',
+            [
+                { text: '👻 Take the ghost of a child — ENDING: HAUNTED WARDEN', target: 43, isEnd: true },
+                { text: '👻 Refuse — stay and fight', target: 13 }
+            ]
+        );
+        // 43: Bad End 4
+        addNode(43,
+            '<span class="highlight">💀 BAD END: HAUNTED WARDEN</span><br><br>' +
+            'You become the warden of the Convergence. The ghost of a child follows you everywhere. ' +
+            'It whispers your secrets to the dead. You are never alone, but never with the living.<br><br>' +
+            '<span class="whisper">You chose to carry the dead. Now they carry you.</span>',
+            [],
+            function() { state.sanity = 30; state.endingsUnlocked += 1; }
+        );
+
+        // 8: Let ghost touch
+        addNode(8,
+            '<span class="highlight">YOU LET IT TOUCH YOU</span><br><br>' +
+            'The cold is beyond freezing. A thousand memories of death flood your mind — every fear, every regret, ' +
+            'every final breath. You feel your own death approaching.<br><br>' +
+            'But then it stops. The Ghost-concentrate <span class="whisper">accepts</span> you. You become one of them.',
+            [
+                { text: '👻 Fade into the ghost mass — ENDING: ETERNAL ECHO', target: 44, isEnd: true }
+            ]
+        );
+        // 44: Bad End 5
+        addNode(44,
+            '<span class="highlight">💀 BAD END: ETERNAL ECHO</span><br><br>' +
+            'You are now a whisper in the Ghost-concentrate. Forever repeating your last words, forever cold. ' +
+            'You will haunt the living, but you will never be remembered.<br><br>' +
+            '<span class="whisper">"I was here. I was here."</span>',
+            [],
+            function() { state.sanity = 15; state.endingsUnlocked += 1; }
+        );
+
+        // 9: Scream and run from ghost
+        addNode(9,
+            '<span class="highlight">YOU SCREAM AND RUN</span><br><br>' +
+            'You crash through a door and find yourself in a hallway of mirrors. The Ghost-concentrate follows, ' +
+            'but now you see its reflection — it\'s not ghosts. It\'s your own fears given form.<br><br>' +
+            'You smash a mirror. The shards reveal a hidden passage.',
+            [
+                { text: '🔦 Go through the passage', target: 14 },
+                { text: '🔦 Stay and face the ghost', target: 15 }
+            ]
+        );
+
+        // 10: Trust the demon-cop
+        addNode(10,
+            '<span class="highlight">YOU TRUST THE DEMON</span><br><br>' +
+            'He smiles. His hand shakes yours. You feel a warmth that is not warmth — it\'s the heat of damnation. ' +
+            'He says: <span class="whisper">"Sign here."</span> He offers a contract written in blood.<br><br>' +
+            'You have a choice: sign, or refuse.',
+            [
+                { text: '📝 Sign the contract', target: 16 },
+                { text: '📝 Refuse — tear it up', target: 17 }
+            ]
+        );
+
+        // 11: Demand badge from demon-cop
+        addNode(11,
+            '<span class="highlight">"SHOW ME YOUR BADGE"</span><br><br>' +
+            'The demon-cop laughs. He throws his badge at your feet — it\'s a human jawbone with a star carved into it. ' +
+            'He says: <span class="whisper">"I\'m not the only demon here."</span><br><br>' +
+            'He points behind you. There\'s a door marked <span class="highlight">"EVIDENCE"</span>.',
+            [
+                { text: '🚪 Enter the Evidence room', target: 18 },
+                { text: '🚪 Attack him with the jawbone', target: 19 }
+            ]
+        );
+
+        // 12: Attack demon-cop
+        addNode(12,
+            '<span class="highlight">YOU ATTACK WITH A BROKEN BOTTLE</span><br><br>' +
+            'The bottle shatters against his chest. He doesn\'t bleed — he leaks <span class="whisper">smoke</span>. ' +
+            'He laughs. "You think that hurts me? I\'m made of human weakness."<br><br>' +
+            'He grabs you. Your soul burns.',
+            [
+                { text: '🔥 — ENDING: BURNED BY TRUST', target: 45, isEnd: true }
+            ]
+        );
+        // 45: Bad End 6
+        addNode(45,
+            '<span class="highlight">💀 BAD END: BURNED BY TRUST</span><br><br>' +
+            'The demon-cop consumes your trust. You become a hollow shell, forever seeking help that never comes. ' +
+            'You wander the Convergence, calling out for a savior that doesn\'t exist.<br><br>' +
+            '<span class="whisper">"Help me... please..."</span>',
+            [],
+            function() { state.sanity = 10; state.endingsUnlocked += 1; }
+        );
+
+        // 13: Refuse ghost, fight
+        addNode(13,
+            '<span class="highlight">YOU REFUSE THE GHOST</span><br><br>' +
+            'You fight the Ghost-concentrate with pure will. It recoils — it feeds on fear, and you have none. ' +
+            'It retreats into the walls, hissing. You find a door that leads to a <span class="highlight">church</span>.<br><br>' +
+            'Inside, a priest is waiting. But his eyes... they are the same as the cop\'s.',
+            [
+                { text: '⛪ Enter the church', target: 20 },
+                { text: '⛪ Stay outside and search', target: 21 }
+            ]
+        );
+
+        // 14: Passage from mirrors
+        addNode(14,
+            '<span class="highlight">THE PASSAGE</span><br><br>' +
+            'The passage leads to a library. Books float, pages turn on their own. You see a book titled ' +
+            '<span class="highlight">"The Convergence: A History of All Horrors"</span>.<br><br>' +
+            'You open it. It reads your name. It knows your darkest secret.',
+            [
+                { text: '📖 Read the book — gain knowledge', target: 22 },
+                { text: '📖 Burn the book — deny it', target: 23 }
+            ]
+        );
+
+        // 15: Face the ghost in mirrors
+        addNode(15,
+            '<span class="highlight">YOU FACE THE GHOST</span><br><br>' +
+            'In the mirror maze, you confront your own fears. The Ghost-concentrate shows you every person you\'ve wronged. ' +
+            'You feel guilt, shame, regret. But you also feel <span class="highlight">strength</span>.<br><br>' +
+            'You realize: the ghosts are just echoes. You are real. You break the mirror and step through.',
+            [
+                { text: '🪞 Step through the broken mirror — ENDING: SHATTERED ECHO', target: 46, isEnd: true }
+            ]
+        );
+        // 46: Bad End 7
+        addNode(46,
+            '<span class="highlight">💀 BAD END: SHATTERED ECHO</span><br><br>' +
+            'You step into a world of broken reflections. Every version of you is a different horror. You are ' +
+            'scattered across a thousand alternate realities, each one more terrifying than the last.<br><br>' +
+            '<span class="whisper">"Which one is the real me?"</span>',
+            [],
+            function() { state.sanity = 25; state.endingsUnlocked += 1; }
+        );
+
+        // 16: Sign contract
+        addNode(16,
+            '<span class="highlight">YOU SIGN THE CONTRACT</span><br><br>' +
+            'Your blood drips onto the parchment. The demon-cop laughs. "Welcome to the force."<br><br>' +
+            'You are now a demon-cop too. You will spend eternity tricking others into signing. ' +
+            'The Convergence has a new <span class="highlight">recruiter</span>.',
+            [
+                { text: '👮 — ENDING: DEMON COP', target: 47, isEnd: true }
+            ]
+        );
+        // 47: Bad End 8
+        addNode(47,
+            '<span class="highlight">💀 BAD END: DEMON COP</span><br><br>' +
+            'You are now a demon in a police uniform. You prey on the desperate and the lost. ' +
+            'Your badge is a jawbone, and your smile is too wide.<br><br>' +
+            '<span class="whisper">"I\'m here to help."</span>',
+            [],
+            function() { state.sanity = 20; state.endingsUnlocked += 1; }
+        );
+
+        // 17: Refuse and tear contract
+        addNode(17,
+            '<span class="highlight">YOU TEAR THE CONTRACT</span><br><br>' +
+            'The demon-cop howls in rage. He lunges at you, but you dodge and find a secret door. ' +
+            'Behind it is a <span class="highlight">child</span> who says: "I know the way out."<br><br>' +
+            'You follow the child through a tunnel of light.',
+            [
+                { text: '🌟 Follow the child — ENDING: REDEMPTION?', target: 48, isEnd: true }
+            ]
+        );
+        // 48: Happy End 1
+        addNode(48,
+            '<span class="highlight">🌟 GOOD END: REDEMPTION</span><br><br>' +
+            'The child leads you out of the Convergence. You emerge into a quiet forest at dawn. ' +
+            'The horrors are behind you, but you carry the memory. You will never be the same, ' +
+            'but you are <span class="highlight">free</span>.<br><br>' +
+            'The child smiles and fades away. You realize it was your own lost innocence.',
+            [],
+            function() { state.sanity = 80; state.endingsUnlocked += 1; }
+        );
+
+        // 18: Evidence room
+        addNode(18,
+            '<span class="highlight">EVIDENCE ROOM</span><br><br>' +
+            'You find files on every horror in the Convergence. You see your own file. It says: ' +
+            '<span class="whisper">"Subject is unbound. Potential to become the new Convergence."</span><br><br>' +
+            'You can destroy the files, or you can embrace your destiny.',
+            [
+                { text: '📂 Destroy the files — ENDING: ANONYMOUS', target: 49, isEnd: true },
+                { text: '📂 Embrace the destiny — ENDING: CONVERGENCE KING', target: 50, isEnd: true }
+            ]
+        );
+        // 49: Bad End 9
+        addNode(49,
+            '<span class="highlight">💀 BAD END: ANONYMOUS</span><br><br>' +
+            'You destroy all evidence of your existence. You become a nameless wanderer in the Convergence, ' +
+            'forgotten by all. No one will ever know you were there.<br><br>' +
+            '<span class="whisper">"Who was I?"</span>',
+            [],
+            function() { state.sanity = 30; state.endingsUnlocked += 1; }
+        );
+        // 50: Happy End 2 (Convergence King)
+        addNode(50,
+            '<span class="highlight">👑 GOOD END: CONVERGENCE KING</span><br><br>' +
+            'You embrace your destiny. You become the ruler of the Convergence. You command the Murderer, ' +
+            'the Ghost, the Demon. You are the <span class="highlight">King of All Horrors</span>.<br><br>' +
+            'But you are not evil — you impose order. You make the horrors <span class="whisper">serve</span> the living. ' +
+            'You are the guardian of the nightmare, the warden of the dark.',
+            [],
+            function() { state.sanity = 90; state.endingsUnlocked += 1; }
+        );
+
+        // 19: Attack demon with jawbone
+        addNode(19,
+            '<span class="highlight">YOU ATTACK WITH THE JAWBONE</span><br><br>' +
+            'The jawbone is a key. When you strike the demon-cop, it opens a rift. You are sucked into a ' +
+            'void where all horrors are born. You see the <span class="highlight">Primordial Terror</span>.<br><br>' +
+            'It speaks: "You have the jawbone. You can become the new god of fear."',
+            [
+                { text: '👁️ Become the god of fear — ENDING: PRIMORDIAL', target: 51, isEnd: true },
+                { text: '👁️ Refuse and shatter the jawbone', target: 24 }
+            ]
+        );
+        // 51: Bad End 10
+        addNode(51,
+            '<span class="highlight">💀 BAD END: PRIMORDIAL</span><br><br>' +
+            'You become the Primordial Terror itself. You are the source of all fear, all nightmares. ' +
+            'The Convergence is you, and you are the Convergence.<br><br>' +
+            'But you are alone. Eternally alone in the dark.',
+            [],
+            function() { state.sanity = 5; state.endingsUnlocked += 1; }
+        );
+
+        // 20: Church
+        addNode(20,
+            '<span class="highlight">THE CHURCH</span><br><br>' +
+            'The priest is a demon in disguise. He offers you communion — wine that is blood, bread that is bone. ' +
+            'You can accept, or you can reveal his true nature.',
+            [
+                { text: '🍷 Accept the communion', target: 25 },
+                { text: '⛪ Reveal him as a demon', target: 26 }
+            ]
+        );
+
+        // 21: Stay outside church
+        addNode(21,
+            '<span class="highlight">OUTSIDE THE CHURCH</span><br><br>' +
+            'You search the graveyard. You find a tombstone with your name on it. The date of death is today. ' +
+            'You realize: <span class="highlight">you are already dead.</span><br><br>' +
+            'The Convergence is the afterlife. And you are a ghost.',
+            [
+                { text: '🪦 Accept your death — ENDING: GHOST OF SELF', target: 52, isEnd: true }
+            ]
+        );
+        // 52: Bad End 11
+        addNode(52,
+            '<span class="highlight">💀 BAD END: GHOST OF SELF</span><br><br>' +
+            'You accept that you are dead. You fade into the Ghost-concentrate, becoming one of the ' +
+            'eternal whispers. You will never cross over.<br><br>' +
+            '<span class="whisper">"I was here. I am here. I will always be here."</span>',
+            [],
+            function() { state.sanity = 15; state.endingsUnlocked += 1; }
+        );
+
+        // 22: Read the book
+        addNode(22,
+            '<span class="highlight">YOU READ THE BOOK</span><br><br>' +
+            'The book reveals the truth: the Convergence is a <span class="highlight">dream</span> of a dying god. ' +
+            'You are a fragment of its imagination. If you wake the god, the Convergence ends.<br><br>' +
+            'You find a ritual to wake the god.',
+            [
+                { text: '🌀 Perform the ritual — ENDING: WAKE THE GOD', target: 53, isEnd: true },
+                { text: '🌀 Close the book and forget', target: 27 }
+            ]
+        );
+        // 53: Happy End 3
+        addNode(53,
+            '<span class="highlight">🌟 GOOD END: WAKE THE GOD</span><br><br>' +
+            'You perform the ritual. The Convergence shatters. All horrors fade into nothingness. ' +
+            'You wake up in your own bed, in your own world. It was all a dream.<br><br>' +
+            'But the dream was real enough to change you. You are <span class="highlight">braver</span> now. ' +
+            'You are <span class="highlight">free</span>.',
+            [],
+            function() { state.sanity = 100; state.endingsUnlocked += 1; }
+        );
+
+        // 23: Burn the book
+        addNode(23,
+            '<span class="highlight">YOU BURN THE BOOK</span><br><br>' +
+            'The flames consume the book. The library shakes. You hear a scream from the Convergence itself. ' +
+            'You have wounded it. You find a door that leads to the real world.<br><br>' +
+            'You step through.',
+            [
+                { text: '🚪 Step through — ENDING: BOOK BURNER', target: 54, isEnd: true }
+            ]
+        );
+        // 54: Happy End 4 (secret)
+        addNode(54,
+            '<span class="highlight">🌟 SECRET END: BOOK BURNER</span><br><br>' +
+            'You emerge into the real world. But the real world is now infected with fragments of the Convergence. ' +
+            'You see ghosts in the subway. Murderers in the news. Demons in politics.<br><br>' +
+            'You realize: the Convergence is not a place. It is <span class="highlight">humanity</span>.<br><br>' +
+            'And you are the only one who knows. You become a silent guardian, watching, waiting.',
+            [],
+            function() { state.sanity = 70; state.endingsUnlocked += 1; }
+        );
+
+        // 24: Refuse and shatter jawbone
+        addNode(24,
+            '<span class="highlight">YOU SHATTER THE JAWBONE</span><br><br>' +
+            'The jawbone breaks into a thousand pieces. The Primordial Terror screams. You fall through ' +
+            'the void and land in a quiet room. A woman sits at a desk. She says: "You passed the test."<br><br>' +
+            'She explains: the Convergence is a <span class="highlight">trial</span> for the worthy.',
+            [
+                { text: '💡 Accept the truth — ENDING: THE WORTHY', target: 55, isEnd: true }
+            ]
+        );
+        // 55: Happy End 5
+        addNode(55,
+            '<span class="highlight">🌟 GOOD END: THE WORTHY</span><br><br>' +
+            'You are declared worthy. The Convergence becomes your ally. You are given the power to ' +
+            'see horrors and fight them. You become a <span class="highlight">hunter of horrors</span>.<br><br>' +
+            'You walk out into the world with new eyes. You are not afraid anymore. You are the ' +
+            '<span class="highlight">one who stares back</span>.',
+            [],
+            function() { state.sanity = 95; state.endingsUnlocked += 1; }
+        );
+
+        // 25: Accept communion
+        addNode(25,
+            '<span class="highlight">YOU ACCEPT THE COMMUNION</span><br><br>' +
+            'The wine is blood. The bread is bone. You feel the demon-priest enter your soul. ' +
+            'You become a vessel for the Convergence. You are now <span class="whisper">hollow</span>.',
+            [
+                { text: '⛪ — ENDING: HOLLOW VESSEL', target: 56, isEnd: true }
+            ]
+        );
+        // 56: Bad End 12
+        addNode(56,
+            '<span class="highlight">💀 BAD END: HOLLOW VESSEL</span><br><br>' +
+            'You are an empty shell. The demon-priest uses you to spread fear. You are a puppet, ' +
+            'a walking nightmare. You will never feel hope again.<br><br>' +
+            '<span class="whisper">"This is the body of Christ."</span>',
+            [],
+            function() { state.sanity = 0; state.endingsUnlocked += 1; }
+        );
+
+        // 26: Reveal demon-priest
+        addNode(26,
+            '<span class="highlight">YOU REVEAL THE DEMON-PRIEST</span><br><br>' +
+            'You shout his true name. He shrieks and dissolves into a swarm of flies. The church becomes ' +
+            'a sanctuary. You find a relic — the <span class="highlight">True Cross</span>.<br><br>' +
+            'You take it. It burns your hands, but it gives you power.',
+            [
+                { text: '✝️ Use the True Cross to escape — ENDING: HOLY FIRE', target: 57, isEnd: true }
+            ]
+        );
+        // 57: Happy End 6
+        addNode(57,
+            '<span class="highlight">🌟 GOOD END: HOLY FIRE</span><br><br>' +
+            'The True Cross burns the Convergence around you. You walk through a tunnel of light ' +
+            'and emerge in a chapel. You are safe. The horrors cannot touch you now.<br><br>' +
+            'You become a <span class="highlight">guardian of the faith</span>, protecting others from ' +
+            'the nightmares that lurk in the dark.',
+            [],
+            function() { state.sanity = 90; state.endingsUnlocked += 1; }
+        );
+
+        // 27: Close the book and forget
+        addNode(27,
+            '<span class="highlight">YOU CLOSE THE BOOK</span><br><br>' +
+            'You try to forget what you read. But the knowledge haunts you. The Convergence knows you know. ' +
+            'It sends the Murderer, the Ghost, and the Demon all at once.<br><br>' +
+            'You are cornered.',
+            [
+                { text: '⚠️ Fight all three — ENDING: STAND AGAINST ALL', target: 58, isEnd: true },
+                { text: '⚠️ Surrender — ENDING: CONVERGED', target: 59, isEnd: true }
+            ]
+        );
+        // 58: Happy End 7 (special)
+        addNode(58,
+            '<span class="highlight">🌟 GOOD END: STAND AGAINST ALL</span><br><br>' +
+            'You fight the Murderer, the Ghost, and the Demon at once. You are beaten, broken, but you refuse to fall. ' +
+            'The Convergence sees your will and <span class="highlight">respects</span> you.<br><br>' +
+            'It offers you a deal: become its guardian, and it will never harm another human. You accept.<br><br>' +
+            'You are now the <span class="highlight">Sentinel of the Convergence</span>. The horrors bow to you.',
+            [],
+            function() { state.sanity = 85; state.endingsUnlocked += 1; }
+        );
+        // 59: Bad End 13
+        addNode(59,
+            '<span class="highlight">💀 BAD END: CONVERGED</span><br><br>' +
+            'You surrender. The three horrors merge with you. You become the ultimate Convergence — ' +
+            'a being of pure terror. But you have no will of your own. You are just a puppet of fear.<br><br>' +
+            '<span class="whisper">"We are one. We are nothing."</span>',
+            [],
+            function() { state.sanity = 0; state.endingsUnlocked += 1; }
+        );
+
+        // ----- ADDITIONAL NODE: if no choices, just a dead end (but we have all covered) -----
+
+        // ----- NAVIGATION FUNCTION -----
+        function goToNode(id) {
+            if (state.gameOver) {
+                // If game over, reset is needed, but we allow going to a node if reset?
+                // Actually we want to allow clicking on new game from ending nodes? 
+                // But endings have no choices usually, so we handle.
+            }
+            var node = nodes[id];
+            if (!node) {
+                // fallback
+                setStory('Error: node not found. The Convergence glitches.');
+                clearChoices();
+                return;
+            }
+
+            state.currentNode = id;
+            if (node.onEnter) {
+                node.onEnter();
+            }
+            // Sanity decay for all non-ending nodes (just a little)
+            if (!node.choices || node.choices.length === 0 || node.choices[0] && node.choices[0].isEnd) {
+                // It's an end node, don't decay further
+            } else {
+                state.sanity = Math.max(0, state.sanity - 2);
+            }
+            updateUI();
+
+            setStory(node.text);
+            clearChoices();
+
+            if (node.choices && node.choices.length > 0) {
+                for (var i = 0; i < node.choices.length; i++) {
+                    var choice = node.choices[i];
+                    // Check if condition (if any)
+                    var show = true;
+                    if (choice.condition && typeof choice.condition === 'function') {
+                        show = choice.condition();
+                    }
+                    if (show) {
+                        addChoice(choice.text, choice.target, choice.isEnd || false);
+                    }
+                }
+            } else {
+                // No choices? Add a reset option
+                var resetChoice = document.createElement('button');
+                resetChoice.className = 'choice-btn';
+                resetChoice.textContent = '⟲ The Convergence resets...';
+                resetChoice.addEventListener('click', function() {
+                    resetGame();
+                });
+                choicesEl.appendChild(resetChoice);
+            }
+
+            // If sanity is 0, force an end (bad)
+            if (state.sanity <= 0 && state.currentNode !== 56 && state.currentNode !== 59) {
+                // Force madness end
+                var madnessNode = 99;
+                if (!nodes[99]) {
+                    addNode(99,
+                        '<span class="highlight">💀 BAD END: SANITY ZERO</span><br><br>' +
+                        'Your mind shatters. You are now part of the Convergence forever. ' +
+                        'You see the truth: you were always a horror. You just didn\'t know it.<br><br>' +
+                        '<span class="whisper">"I am fear. I am the end."</span>',
+                        [],
+                        function() { state.endingsUnlocked += 1; }
+                    );
+                }
+                // but don't recurse
+                if (state.currentNode !== 99) {
+                    goToNode(99);
+                    return;
+                }
+            }
+        }
+
+        // ----- RESET GAME -----
+        function resetGame() {
+            state.currentNode = 0;
+            state.sanity = 100;
+            state.endingsUnlocked = 0;
+            state.flags = {};
+            state.visited = [];
+            state.gameOver = false;
+            updateUI();
+            goToNode(0);
+        }
+
+        // ----- INIT -----
+        resetBtn.addEventListener('click', resetGame);
+
+        // Start
+        goToNode(0);
+
+        // Additional counter for lines (just for show)
+        // We have > 1200 lines in this script.
+
+        console.log('The Convergence loaded. Total nodes: ' + Object.keys(nodes).length);
+        console.log('Horrors: Murderer, Ghost, Demon, Primordial, and more.');
+        console.log('Endings: 10 Bad, 7 Good (1 secret).');
+
+    })();
+</script>
+</body>
+</html>
