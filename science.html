@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>元素サッカーカードゲーム CFC</title>
+<style>
+/* ---------- 2013年スタイル ---------- */
+* { box-sizing: border-box; }
+body {
+  background: #0b0f14;
+  color: #c9d1d9;
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  padding: 10px;
+  margin: 0;
+}
+header {
+  text-align: center;
+  border-bottom: 2px solid #2a313c;
+  padding-bottom: 10px;
+  margin-bottom: 15px;
+}
+header h1 { color: #fff; margin:0; font-size:1.6rem; }
+header p { color: #8b949e; margin:4px 0 0; font-size:0.9rem; }
+
+/* メインレイアウト */
+.game-area {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  justify-content: center;
+}
+
+/* プレイヤーエリア */
+.player-zone {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 12px;
+  width: 100%;
+  max-width: 480px;
+  min-width: 300px;
+  flex: 1 1 45%;
+}
+
+.player-zone h2 {
+  margin: 0 0 6px 0;
+  font-size: 1.2rem;
+  color: #58a6ff;
+  border-bottom: 1px solid #30363d;
+  padding-bottom: 4px;
+}
+.player-zone .info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  margin: 4px 0 8px;
+  background: #0d1117;
+  padding: 4px 10px;
+  border-radius: 4px;
+}
+
+/* 手札 */
+.hand {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 70px;
+  padding: 6px 0;
+}
+.hand .card {
+  background: #1c2333;
+  border: 1px solid #3d4756;
+  border-radius: 5px;
+  padding: 4px 8px;
+  font-size: 0.7rem;
+  cursor: pointer;
+  width: 70px;
+  flex-shrink: 0;
+  transition: 0.1s;
+}
+.hand .card:hover { border-color: #58a6ff; background: #252e3f; }
+.hand .card .sym { font-size: 1.1rem; font-weight:bold; color:#fff; }
+.hand .card .atk { color: #ff7b72; }
+
+/* フィールド */
+.field {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 80px;
+  padding: 6px;
+  background: #0d1117;
+  border-radius: 6px;
+  border: 1px dashed #30363d;
+}
+.field .card {
+  background: #1a2233;
+  border: 2px solid #58a6ff;
+  border-radius: 5px;
+  padding: 4px 8px;
+  font-size: 0.7rem;
+  width: 80px;
+}
+.field .card .sym { font-size: 1.2rem; font-weight:bold; color:#fff; }
+.field .card .atk { color: #ff7b72; }
+
+/* ボタン */
+.btn {
+  background: #238636;
+  border: none;
+  color: #fff;
+  padding: 6px 16px;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  margin: 4px 2px;
+}
+.btn:hover { background: #2ea043; }
+.btn:disabled { opacity:0.4; cursor:not-allowed; }
+.btn-danger { background: #da3633; }
+.btn-danger:hover { background: #f85149; }
+
+/* ログ */
+.log {
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 5px;
+  padding: 6px 10px;
+  max-height: 100px;
+  overflow-y: auto;
+  font-size: 0.8rem;
+  margin-top: 8px;
+  font-family: monospace;
+}
+.log p { margin: 2px 0; }
+
+/* 説明ポップアップ（カードクリック時） */
+#card-detail {
+  position: fixed;
+  bottom: 10px;
+  left: 10px;
+  right: 10px;
+  background: #161b22;
+  border: 1px solid #58a6ff;
+  border-radius: 8px;
+  padding: 12px 16px;
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 99;
+  display: none;
+  font-size:0.85rem;
+  box-shadow: 0 0 20px rgba(0,0,0,0.8);
+}
+#card-detail .close {
+  float: right;
+  background: #da3633;
+  border: none;
+  color:#fff;
+  padding:2px 10px;
+  border-radius:4px;
+  cursor:pointer;
+}
+#card-detail .detail-sym { font-size:1.8rem; font-weight:bold; color:#fff; }
+#card-detail .detail-atk { color:#ff7b72; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⚽ Chemical Football Club (CFC) カードゲーム</h1>
+  <p>118元素 × サッカーポジション ｜ 攻撃力は後で自由に調整可能</p>
+</header>
+
+<div id="card-detail">
+  <button class="close" onclick="closeDetail()">✕</button>
+  <div id="detail-content"></div>
+</div>
+
+<div class="game-area">
+  <!-- コンピュータ側 -->
+  <div class="player-zone" id="computer-zone">
+    <h2>🖥️ コンピュータ</h2>
+    <div class="info">
+      <span>ライフ: <span id="com-life">40000</span></span>
+      <span>手札: <span id="com-hand-count">0</span> / 8</span>
+      <span>山札: <span id="com-deck-count">40</span></span>
+    </div>
+    <div class="field" id="com-field"></div>
+    <div class="hand" id="com-hand"></div>
+  </div>
+
+  <!-- プレイヤー側 -->
+  <div class="player-zone" id="player-zone">
+    <h2>👤 あなた</h2>
+    <div class="info">
+      <span>ライフ: <span id="player-life">40000</span></span>
+      <span>手札: <span id="player-hand-count">0</span> / 8</span>
+      <span>山札: <span id="player-deck-count">40</span></span>
+    </div>
+    <div class="field" id="player-field"></div>
+    <div class="hand" id="player-hand"></div>
+    <div style="margin-top:8px;">
+      <button class="btn" id="btn-draw">ドロー</button>
+      <button class="btn btn-danger" id="btn-end-turn">ターン終了</button>
+      <button class="btn" id="btn-restart">🔄 再戦</button>
+    </div>
+  </div>
+</div>
+
+<div class="log" id="log"><p>▶ ゲーム開始！ まずはドローしてください。</p></div>
+
+<script>
+// ============================================================
+// ★ ここが「攻撃力」の一覧です ★
+// 各カードの攻撃力 (ATK) を変更したい場合は、このオブジェクトの数値を編集してください。
+// 記号は元素記号 (例: H, He, Li ...) です。
+// ============================================================
+var CARD_ATK = {
+  "H":3000, "He":3000, "Li":3000, "Be":3000, "B":3000, "C":3000, "N":3000, "O":3000, "F":3000, "Ne":3000,
+  "Na":3000, "Mg":3000, "Al":3000, "Si":3000, "P":3000, "S":3000, "Cl":3000, "Ar":3000, "K":3000, "Ca":3000,
+  "Sc":3000, "Ti":3000, "V":3000, "Cr":3000, "Mn":3000, "Fe":3000, "Co":3000, "Ni":3000, "Cu":3000, "Zn":3000,
+  "Ga":3000, "Ge":3000, "As":3000, "Se":3000, "Br":3000, "Kr":3000, "Rb":3000, "Sr":3000, "Y":3000, "Zr":3000,
+  "Nb":3000, "Mo":3000, "Tc":3000, "Ru":3000, "Rh":3000, "Pd":3000, "Ag":3000, "Cd":3000, "In":3000, "Sn":3000,
+  "Sb":3000, "Te":3000, "I":3000, "Xe":3000, "Cs":3000, "Ba":3000, "La":3000, "Ce":3000, "Pr":3000, "Nd":3000,
+  "Pm":3000, "Sm":3000, "Eu":3000, "Gd":3000, "Tb":3000, "Dy":3000, "Ho":3000, "Er":3000, "Tm":3000, "Yb":3000,
+  "Lu":3000, "Hf":3000, "Ta":3000, "W":3000, "Re":3000, "Os":3000, "Ir":3000, "Pt":3000, "Au":3000, "Hg":3000,
+  "Tl":3000, "Pb":3000, "Bi":3000, "Po":3000, "At":3000, "Rn":3000, "Fr":3000, "Ra":3000, "Ac":3000, "Th":3000,
+  "Pa":3000, "U":3000, "Np":3000, "Pu":3000, "Am":3000, "Cm":3000, "Bk":3000, "Cf":3000, "Es":3000, "Fm":3000,
+  "Md":3000, "No":3000, "Lr":3000, "Rf":3000, "Db":3000, "Sg":3000, "Bh":3000, "Hs":3000, "Mt":3000, "Ds":3000,
+  "Rg":3000, "Cn":3000, "Nh":3000, "Fl":3000, "Mc":3000, "Lv":3000, "Ts":3000, "Og":3000
+};
+// ============================================================
+// ここまでが攻撃力設定エリアです
+// ============================================================
+
+// ----- 全118枚のカードデータ (元素名・記号・グループ・説明) -----
+var ALL_CARDS = [
+  {no:1, sym:"H", name:"水素", group:"特殊", desc:"宇宙で最も多く、すべての始まりとなる最も軽い気体。", soccer:"ボール（試合の起点）どこにでも現れ、すべての戦術（化合物）に絡む。"},
+  {no:2, sym:"He", name:"ヘリウム", group:"希ガス", desc:"非常に軽くて全く燃えない、最高に安定した気体。", soccer:"絶対的守護神（GK）他からのアプローチを完全にシャットアウト。"},
+  {no:3, sym:"Li", name:"リチウム", group:"1族", desc:"水に浮くほど軽いが、強力なエネルギーを秘めた金属。", soccer:"爆速ウインガー 軽快なフットワークでサイドを切り裂く。"},
+  {no:4, sym:"Be", name:"ベリリウム", group:"2族", desc:"軽くて非常に硬く、航空機などにも使われる金属。", soccer:"ハードタッカー（SB）軽さとタフさを兼ね備える。"},
+  {no:5, sym:"B", name:"ホウ素", group:"13族", desc:"植物の成長に必須で、ガラスの強化にも使われる非金属。", soccer:"チームのバランサー 目立たないが基礎を支える。"},
+  {no:6, sym:"C", name:"炭素", group:"14族", desc:"地球上のあらゆる生命体の骨格を作る、結合の天才。", soccer:"絶対的司令塔（10番）無限のパスルートを持つ。"},
+  {no:7, sym:"N", name:"窒素", group:"15族", desc:"空気の約8割を占める、普段はとても静かな気体。", soccer:"黒子役のアンカー ピッチの大部分をカバーする。"},
+  {no:8, sym:"O", name:"酸素", group:"16族", desc:"あらゆるものを燃やし、呼吸に不可欠な超エネルギッシュ元素。", soccer:"熱血ストライカー 強烈なボレーでスタジアムを熱狂させる。"},
+  {no:9, sym:"F", name:"フッ素", group:"17族", desc:"全元素の中で最強の反応性を持ち、何でも溶かすヤバい奴。", soccer:"悪童ストライカー 敵も味方も巻き込むトラブルメーカー。"},
+  {no:10, sym:"Ne", name:"ネオン", group:"希ガス", desc:"光り輝く看板でおなじみ、他と関わらない安定の気体。", soccer:"ファンタジスタ（控え）戦術に縛られない孤高の天才。"},
+  {no:11, sym:"Na", name:"ナトリウム", group:"1族", desc:"水に入れると爆発的に反応し、塩の主成分でもある。", soccer:"感情むき出しのFW 水（批判）を浴びると激昂する。"},
+  {no:12, sym:"Mg", name:"マグネシウム", group:"2族", desc:"強烈な白い光を放って燃える金属。", soccer:"一発があるセンターバック セットプレーで強烈ヘディング。"},
+  {no:13, sym:"Al", name:"アルミニウム", group:"13族", desc:"軽くて加工しやすい一円玉の金属。", soccer:"ユーティリティプレイヤー どんなポジションもこなす。"},
+  {no:14, sym:"Si", name:"ケイ素", group:"14族", desc:"半導体の主役でありパソコンの頭脳。", soccer:"インテリジェンスCB 状況を完璧に読み解く。"},
+  {no:15, sym:"P", name:"リン", group:"15族", desc:"マッチの頭薬や生体エネルギーの源。", soccer:"スタミナお化けのMF 運動量を1人で供給。"},
+  {no:16, sym:"S", name:"硫黄", group:"16族", desc:"温泉の臭いでおなじみの黄色い結晶。", soccer:"泥臭いディフェンダー 独特のマークで嫌がらせる。"},
+  {no:17, sym:"Cl", name:"塩素", group:"17族", desc:"強力な消毒・漂白作用を持つ気体。", soccer:"ハードワーカー（前線）猛烈なプレスで破壊する。"},
+  {no:18, sym:"Ar", name:"アルゴン", group:"希ガス", desc:"電球に詰められる、全く反応しない気体。", soccer:"動かない重鎮FW 守備免除でエリア内に居座る。"},
+  {no:19, sym:"K", name:"カリウム", group:"1族", desc:"水分バランスを保つ超反応金属。", soccer:"アップダウンの激しいSB 常に動き回る。"},
+  {no:20, sym:"Ca", name:"カルシウム", group:"2族", desc:"骨や歯を作り、体を強固に保つ。", soccer:"大型センターバック 空中戦で絶対に負けない。"},
+  {no:21, sym:"Sc", name:"スカンジウム", group:"遷移", desc:"レアでスポーツ用品を強化する。", soccer:"期待の若手（初招集）中盤を担う新星。"},
+  {no:22, sym:"Ti", name:"チタン", group:"遷移", desc:"軽くて強くて絶対にサビない金属。", soccer:"鉄壁のボランチ 激しい接触でも怪我しない。"},
+  {no:23, sym:"V", name:"バナジウム", group:"遷移", desc:"鋼鉄の強度を劇的に上げる元素。", soccer:"チームの起爆剤 周囲の攻撃力を引き上げる。"},
+  {no:24, sym:"Cr", name:"クロム", group:"遷移", desc:"美しいメッキに使われる硬い金属。", soccer:"華麗なテクニシャン 美しいフェイントを連発。"},
+  {no:25, sym:"Mn", name:"マンガン", group:"遷移", desc:"乾電池でおなじみ。混ざると強い。", soccer:"ダイナモ（スタミナ型）電池が切れず走る。"},
+  {no:26, sym:"Fe", name:"鉄", group:"遷移", desc:"文明の基礎。赤血球の主役。", soccer:"キャプテン（大黒柱）チームの絶対的支柱。"},
+  {no:27, sym:"Co", name:"コバルト", group:"遷移", desc:"美しい青色の染料や超合金の原料。", soccer:"ビューティフルパサー 鮮やかなロングパス。"},
+  {no:28, sym:"Ni", name:"ニッケル", group:"遷移", desc:"サビを防ぐコーティングに秀でる。", soccer:"マンマークの達人 エースに張り付く。"},
+  {no:29, sym:"Cu", name:"銅", group:"遷移", desc:"電気を最高に通しやすい10円玉金属。", soccer:"リンクマン（繋ぎ役）ボールをスムーズに配給。"},
+  {no:30, sym:"Zn", name:"亜鉛", group:"遷移", desc:"エネルギー代謝や鉄のサビ止めに。", soccer:"カバーリング専門DF 裏のスペースを埋める。"},
+  {no:31, sym:"Ga", name:"ガリウム", group:"13族", desc:"手のひらの体温で溶ける金属。", soccer:"プレッシャーに弱い天才 環境で変わる。"},
+  {no:32, sym:"Ge", name:"ゲルマニウム", group:"14族", desc:"初期のトランジスタ半導体。", soccer:"元祖・司令塔 かつての戦術を作ったレジェンド。"},
+  {no:33, sym:"As", name:"ヒ素", group:"15族", desc:"歴史的に有名な猛毒。", soccer:"マリーシアの塊 見えないところで無力化。"},
+  {no:34, sym:"Se", name:"セレン", group:"16族", desc:"コピー機等、光に反応する元素。", soccer:"大歓声で躍動するFW 観衆でパフォーマンスUP。"},
+  {no:35, sym:"Br", name:"臭素", group:"17族", desc:"唯一液体の非金属。強烈な激臭。", soccer:"狂犬ボランチ ぬるぬるドリブルで嫌がらせる。"},
+  {no:36, sym:"Kr", name:"クリプトン", group:"希ガス", desc:"電球を高輝度にするレア気体。", soccer:"最高級オプション ゲームをハイレベルに。"},
+  {no:37, sym:"Rb", name:"ルビジウム", group:"1族", desc:"原子時計に使われる超絶反応金属。", soccer:"1ミリの狂いもない韋駄天 完璧なタイミング。"},
+  {no:38, sym:"Sr", name:"ストロンチウム", group:"2族", desc:"花火の赤い光を出す金属。", soccer:"大舞台で映えるFW 派手なゴールを決める。"},
+  {no:39, sym:"Y", name:"イットリウム", group:"遷移", desc:"超伝導技術に不可欠なレアメタル。", soccer:"戦術のマスターキー 膠着を一本のパスで。"},
+  {no:40, sym:"Zr", name:"ジルコニウム", group:"遷移", desc:"人工ダイヤの原料になる耐熱金属。", soccer:"金満クラブの高級DF 圧力にビクともしない。"},
+  {no:41, sym:"Nb", name:"ニオブ", group:"遷移", desc:"超伝導リニアの立役者。", soccer:"高速カウンターの起点 一瞬でトップギアに。"},
+  {no:42, sym:"Mo", name:"モリブデン", group:"遷移", desc:"高硬度な工具に使われる頑強元素。", soccer:"ハードワーカー 妥協しないチャージ。"},
+  {no:43, sym:"Tc", name:"テクネチウム", group:"遷移", desc:"人類が初めて人工的に作った元素。", soccer:"秘密兵器（ユース出身）データがない。"},
+  {no:44, sym:"Ru", name:"ルテニウム", group:"遷移", desc:"高級万年筆のペン先などに使われる。", soccer:"洗練されたラストパサー 繊細なスルーパス。"},
+  {no:45, sym:"Rh", name:"ロジウム", group:"遷移", desc:"地球上で最も価格が高騰しやすい貴金属。", soccer:"市場価値150億円のエース ビッグクラブが欲しがる。"},
+  {no:46, sym:"Pd", name:"パラジウム", group:"遷移", desc:"驚異の水素吸収力を持つ。", soccer:"セカンドボール回収屋 クリアを自分のものに。"},
+  {no:47, sym:"Ag", name:"銀", group:"遷移", desc:"電気伝導率・光反射率が第1位。", soccer:"アシスト王 最も効率よくボールを運ぶ。"},
+  {no:48, sym:"Cd", name:"カドミウム", group:"遷移", desc:"公害の歴史を持つ金属。", soccer:"一発退場持ちのクラッシャー 危険な選手。"},
+  {no:49, sym:"In", name:"インジウム", group:"13族", desc:"スマホのタッチパネル電極に使用。", soccer:"ピッチを俯瞰できるMF 攻撃展開が見えている。"},
+  {no:50, sym:"Sn", name:"スズ", group:"14族", desc:"ブリキ缶のコーティング。古来の青銅。", soccer:"大ベテランのDF 経験でライン崩壊を防ぐ。"},
+  {no:51, sym:"Sb", name:"アンチモン", group:"15族", desc:"燃えにくくする難燃剤として活躍。", soccer:"カウンター対策のアンカー 攻撃を消火。"},
+  {no:52, sym:"Te", name:"テルル", group:"16族", desc:"ブルーレイディスク等に使われる。", soccer:"記憶に残るワンダーボーイ 出れば大仕事。"},
+  {no:53, sym:"I", name:"ヨウ素", group:"17族", desc:"うがい薬や消毒に使われる。日本が主産地。", soccer:"バイタルエリアの掃除屋 攻撃の芽を摘む。"},
+  {no:54, sym:"Xe", name:"キセノン", group:"希ガス", desc:"強力なイオンエンジンに使われる。", soccer:"推進力を持つ重戦車 圧倒的パワーで突進。"},
+  {no:55, sym:"Cs", name:"セシウム", group:"1族", desc:"「1秒」の基準を決める原子時計の主役。", soccer:"チームのメトロノーム 正確なテンポで回す。"},
+  {no:56, sym:"Ba", name:"バリウム", group:"2族", desc:"胃の検査でおなじみ、X線をブロック。", soccer:"壁（シュートブロック専門） 体を張る。"},
+  {no:57, sym:"La", name:"ランタン", group:"レア", desc:"ここからランタノイド。ハイテク機器の基礎。", soccer:"サブ組のリーダー ベンチから戦況を見極める。"},
+  {no:58, sym:"Ce", name:"セリウム", group:"レア", desc:"ライターの発火石に使われる。", soccer:"火付け役のジョーカー 闘争心に火をつける。"},
+  {no:59, sym:"Pr", name:"プラセオジウム", group:"レア", desc:"ゴーグルのガラス等使われる黄色の元素。", soccer:"視野を広げるMF 死角を見抜くパス。"},
+  {no:60, sym:"Nd", name:"ネオジウム", group:"レア", desc:"最強の永久磁石の材料として有名。", soccer:"ボールを引き寄せるDF こぼれ球が集まる。"},
+  {no:61, sym:"Pm", name:"プロメチウム", group:"レア", desc:"人工的に作られる幻の放射性レアアース。", soccer:"登録を隠された超新星 ミステリアスなスキル。"},
+  {no:62, sym:"Sm", name:"サマリウム", group:"レア", desc:"強い磁石やがん治療の現場で使われる。", soccer:"相手の核を潰すボランチ 絶対的エースを無力化。"},
+  {no:63, sym:"Eu", name:"ユウロピウム", group:"レア", desc:"テレビの赤色蛍光体に使われる。", soccer:"華麗なサイドアタッカー スタジアムに映える。"},
+  {no:64, sym:"Gd", name:"ガドリニウム", group:"レア", desc:"MRIの造影剤として使われる。", soccer:"敵の弱点を見抜くアナリスト 守備のほころびをスキャン。"},
+  {no:65, sym:"Tb", name:"テルビウム", group:"レア", desc:"固体に電圧をかけると変形する超磁歪材料。", soccer:"変幻自在のマルチロール 役割を変える。"},
+  {no:66, sym:"Dy", name:"ジスプロシウム", group:"レア", desc:"ネオジウム磁石の耐熱性を上げる。", soccer:"泥臭い相棒ボランチ 猛暑で真価発揮。"},
+  {no:67, sym:"Ho", name:"ホルミウム", group:"レア", desc:"磁場を最も強く集中させる性質を持つ。", soccer:"戦術の中心（ポストプレイヤー） すべての攻撃の形を整える。"},
+  {no:68, sym:"Er", name:"エルビウム", group:"レア", desc:"光ファイバーの通信信号を増幅する。", soccer:"高速カウンターのハブ スピードと精度を落とさない。"},
+  {no:69, sym:"Tm", name:"ツリウム", group:"レア", desc:"携帯型X線装置の光源に使われる。", soccer:"コンパクトな頭脳派MF フォーメーションを透視。"},
+  {no:70, sym:"Yb", name:"イッテルビウム", group:"レア", desc:"レーザーや特殊なステンレス鋼に。", soccer:"切れ味鋭いドリブラー 一直線に突破。"},
+  {no:71, sym:"Lu", name:"ルテチウム", group:"レア", desc:"ランタノイドの最後。非常に高価で重い。", soccer:"サブ組の絶対的ラスボス 重量級ストライカー。"},
+  {no:72, sym:"Hf", name:"ハフニウム", group:"遷移", desc:"中性子をめちゃくちゃ吸収する。", soccer:"絶対的な防波堤 縦パスをシャットアウト。"},
+  {no:73, sym:"Ta", name:"タンタル", group:"遷移", desc:"酸にめちゃくちゃ強く頑丈。", soccer:"メンタルモンスター アウェイでも動じない。"},
+  {no:74, sym:"W", name:"タングステン", group:"遷移", desc:"全金属で最高の融点を持つ。", soccer:"世界最強の壁（CB） 絶対に倒れない。"},
+  {no:75, sym:"Re", name:"レニウム", group:"遷移", desc:"ジェットエンジンに使われる耐熱メタル。", soccer:"限界なきハイプレッシャー 90分走り続ける。"},
+  {no:76, sym:"Os", name:"オスミウム", group:"遷移", desc:"地球上の全物質の中で最も密度が高い。", soccer:"最重量パワーフォワード ポジションを譲らない。"},
+  {no:77, sym:"Ir", name:"イリジウム", group:"遷移", desc:"恐竜絶滅の地層から見つかるロマン元素。", soccer:"歴史に名を残すエース 一瞬で守備を絶滅。"},
+  {no:78, sym:"Pt", name:"白金（プラチナ）", group:"遷移", desc:"希少価値が高く、触媒として大活躍。", soccer:"ピッチ上の調停役 荒れた試合を収める。"},
+  {no:79, sym:"Au", name:"金", group:"遷移", desc:"絶対にサビない価値の象徴。", soccer:"バロンドーラー いるだけで価値が上がる。"},
+  {no:80, sym:"Hg", name:"水銀", group:"遷移", desc:"常温で唯一液体の不思議な金属。", soccer:"変幻自在のドリブラー 捕まえようとしてもすり抜ける。"},
+  {no:81, sym:"Tl", name:"タリウム", group:"13族", desc:"強力な神経毒を持つ。", soccer:"サイレントキラー 気配を消してゴールを奪う。"},
+  {no:82, sym:"Pb", name:"鉛", group:"14族", desc:"非常に重く放射線を遮断する。", soccer:"ベタ引きディフェンス ゴール前に重厚ブロック。"},
+  {no:83, sym:"Bi", name:"ビスマス", group:"15族", desc:"結晶を作ると虹色の美しい階段状に。", soccer:"魅せるファンタジスタ プレイが美しい。"},
+  {no:84, sym:"Po", name:"ポロニウム", group:"16族", desc:"とんでもない量の放射線を出す。", soccer:"立ち入り禁止区域を作るDF 恐怖のプレッシャー。"},
+  {no:85, sym:"At", name:"アスタチン", group:"17族", desc:"地球上にわずか数グラムの幻のハロゲン。", soccer:"伝説の未登録選手 滅多に姿を現さない。"},
+  {no:86, sym:"Rn", name:"ラドン", group:"希ガス", desc:"温泉でおなじみ重い放射性気体。", soccer:"癒やし系のベテランGK 安定感で安心をもたらす。"},
+  {no:87, sym:"Fr", name:"フランシウム", group:"1族", desc:"最速で崩壊する不安定な金属。", soccer:"ガラスの天才ウインガー すぐにケガする。"},
+  {no:88, sym:"Ra", name:"ラジウム", group:"2族", desc:"暗闇で自ら青白く発光する。", soccer:"夜間練習の鬼 居残り練習で目立つ。"},
+  {no:89, sym:"Ac", name:"アクチニウム", group:"ウラン系", desc:"アクチノイドの始まり。強力な放射能。", soccer:"超高火力ユニットの主将 試合を吹き飛ばす。"},
+  {no:90, sym:"Th", name:"トリウム", group:"ウラン系", desc:"次世代の原子力燃料として期待される。", soccer:"次世代のエース候補 無限のポテンシャル。"},
+  {no:91, sym:"Pa", name:"プロトアクチニウム", group:"ウラン系", desc:"非常に希少で猛毒の放射性元素。", soccer:"危険すぎるインサイドハーフ 戦術を麻痺させる。"},
+  {no:92, sym:"U", name:"ウラン", group:"ウラン系", desc:"原子力発電の主役。天然で最も重い元素。", soccer:"核爆弾級のストライカー パワーバランスを破壊。"},
+  {no:93, sym:"Np", name:"ネプツニウム", group:"ウラン系", desc:"ウランに中性子を当てて作った人工元素。", soccer:"強化改造されたサイドアタッカー 後天的に能力UP。"},
+  {no:94, sym:"Pu", name:"プルトニウム", group:"ウラン系", desc:"強力なエネルギーと凄まじい毒性を持つ。", soccer:"禁断の最終兵器 出番を制限されるレベル。"},
+  {no:95, sym:"Am", name:"アメリシウム", group:"ウラン系", desc:"家庭用の火災報知器に実は使われている。", soccer:"危機察知専門ボランチ 急襲を瞬時に察知。"},
+  {no:96, sym:"Cm", name:"キュリウム", group:"ウラン系", desc:"キュリー夫妻にちなむ。強い熱を放つ。", soccer:"熱血漢のディフェンダー 熱いパッションで鼓舞。"},
+  {no:97, sym:"Bk", name:"バークリウム", group:"ウラン系", desc:"カリフォルニア大学バークレー校で発見。", soccer:"エリートアカデミー出身 英才教育を受けたMF。"},
+  {no:98, sym:"Cf", name:"カリホルニウム", group:"ウラン系", desc:"凄まじい量の中性子を放出する。", soccer:"圧倒的パス供給マシン 何百本もの縦パス。"},
+  {no:99, sym:"Es", name:"アインシュタニウム", group:"ウラン系", desc:"アインシュタインにちなむ、水爆実験で発見。", soccer:"世紀の天才ファンタジスタ 異次元の物理軌道。"},
+  {no:100, sym:"Fm", name:"フェルミウム", group:"ウラン系", desc:"これより重い元素は中性子吸収では作れない限界点。", soccer:"人間の限界を超えたフィジカル これ以上の改造は不可。"},
+  {no:101, sym:"Md", name:"メンデレビウム", group:"ウラン系", desc:"周期表の生みの親メンデレーエフにちなむ。", soccer:"プレイングマネージャー ピッチ全体の戦術を支配。"},
+  {no:102, sym:"No", name:"ノーベリウム", group:"ウラン系", desc:"ノーベル賞のノーベルにちなむ。", soccer:"栄光のメガスター 数々のタイトルを総なめ。"},
+  {no:103, sym:"Lr", name:"ローレンシウム", group:"ウラン系", desc:"アクチノイドの最後を飾る超重元素。", soccer:"原子力組の絶対的アンカー 最後尾を締める。"},
+  {no:104, sym:"Rf", name:"ラザホジウム", group:"遷移", desc:"一瞬で崩壊する超重元素。", soccer:"アディショナルタイムの神 終了間際に嵐を起こす。"},
+  {no:105, sym:"Db", name:"ドブニウム", group:"遷移", desc:"ロシアの研究都市に由来する人工元素。", soccer:"北欧の重戦車 フィジカルが強そうな新戦力。"},
+  {no:106, sym:"Sg", name:"シーボーギウム", group:"遷移", desc:"生前に名前をつけられた超激レア元素。", soccer:"生きる伝説 スタジアムに銅像がある重鎮。"},
+  {no:107, sym:"Bh", name:"ボーリウム", group:"遷移", desc:"量子力学の祖ボーアにちなむ。", soccer:"理論派データアナリスト 動きを物理法則で捉える。"},
+  {no:108, sym:"Hs", name:"ハッシウム", group:"遷移", desc:"一瞬で別の元素に変わる。", soccer:"高速ポジションチェンジ マークを振り切る。"},
+  {no:109, sym:"Mt", name:"マイトネリウム", group:"遷移", desc:"女性物理学者マイトナーにちなむ。", soccer:"精緻極まるコントロール 正確なトラップ。"},
+  {no:110, sym:"Ds", name:"ダームスタチウム", group:"遷移", desc:"数個の原子しか合成されていない幻。", soccer:"スカウトの隠し球 世界で3人しか見ていない。"},
+  {no:111, sym:"Rg", name:"レントゲニウム", group:"遷移", desc:"X線を発見したレントゲンにちなむ。", soccer:"戦術を透視するDF 相手監督の狙いを見抜く。"},
+  {no:112, sym:"Cn", name:"コペルニシウム", group:"遷移", desc:"地動説のコペルニクスにちなむ。", soccer:"コペルニクス的転回 チームの戦術が180度変わる。"},
+  {no:113, sym:"Nh", name:"ニホニウム", group:"13族", desc:"日本が発見したアジア初の歴史的元素！", soccer:"日本が誇る若き10番 世界の頂点へ挑む。"},
+  {no:114, sym:"Fl", name:"フレロビウム", group:"14族", desc:"理論上の「安定の島」に近い元素。", soccer:"ピンチを救う超冷静CB 超重圧でも落ち着く。"},
+  {no:115, sym:"Mc", name:"モスコビウム", group:"15族", desc:"一瞬で別の重元素に変わる。", soccer:"偽9番（ゼロトップ） FWから中盤へ降りる。"},
+  {no:116, sym:"Lv", name:"リバモリウム", group:"16族", desc:"アメリカの研究所にちなむ超重量級。", soccer:"超攻撃的センターバック セットプレーで量産。"},
+  {no:117, sym:"Ts", name:"テネシン", group:"17族", desc:"最も新しく認定された幻のハロゲン。", soccer:"次世代の破壊型ストライカー 超重量級モンスター。"},
+  {no:118, sym:"Og", name:"オガネソン", group:"希ガス", desc:"周期表のラスト、最も重い第18族元素。", soccer:"伝説のラスボス（グランドGK） 絶対的な守護神。"}
+];
+
+// ----- ゲーム状態 -----
+var state = {
+  player: { life: 40000, deck: [], hand: [], field: [], hasAttacked: false },
+  computer: { life: 40000, deck: [], hand: [], field: [], hasAttacked: false },
+  turn: 'player', // 'player' or 'computer'
+  gameOver: false,
+  turnPhase: 'main' // 'draw' or 'main'
+};
+
+// ----- 補助関数 -----
+function shuffle(a) {
+  for (var i = a.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var t = a[i]; a[i] = a[j]; a[j] = t;
+  }
+  return a;
+}
+
+function cloneCard(c) {
+  return { no:c.no, sym:c.sym, name:c.name, group:c.group, desc:c.desc, soccer:c.soccer };
+}
+
+function getAtk(sym) {
+  return CARD_ATK[sym] || 3000;
+}
+
+// ----- 初期化 -----
+function initGame() {
+  // 山札作成 (118枚をシャッフル)
+  var deckAll = ALL_CARDS.map(function(c) { return cloneCard(c); });
+  shuffle(deckAll);
+  // プレイヤーとコンピュータに40枚ずつ配布
+  state.player.deck = deckAll.slice(0, 40);
+  state.computer.deck = deckAll.slice(40, 80);
+  // 手札・フィールドをリセット
+  state.player.hand = [];
+  state.player.field = [];
+  state.player.life = 40000;
+  state.player.hasAttacked = false;
+  state.computer.hand = [];
+  state.computer.field = [];
+  state.computer.life = 40000;
+  state.computer.hasAttacked = false;
+  state.gameOver = false;
+  state.turnPhase = 'draw';
+
+  // 先攻後攻ランダム
+  state.turn = Math.random() < 0.5 ? 'player' : 'computer';
+  addLog('🔄 再戦！ 先攻は ' + (state.turn === 'player' ? 'あなた' : 'コンピュータ') + ' です。');
+
+  // 各プレイヤー5枚ドロー
+  for (var i=0; i<5; i++) {
+    drawCard('player');
+    drawCard('computer');
+  }
+
+  // コンピュータの手札が見えないようにする（表示はハンド数だけ）
+  // コンピュータの手札は内部で管理、表示は伏せる
+  renderAll();
+  // もし先攻がコンピュータなら、自動でコンピュータターン開始
+  if (state.turn === 'computer') {
+    setTimeout(computerTurn, 500);
+  } else {
+    addLog('👤 あなたのターンです。ドローしてください。');
+  }
+}
+
+// ----- ドロー -----
+function drawCard(who) {
+  var p = (who === 'player') ? state.player : state.computer;
+  if (p.deck.length === 0) return null;
+  if (p.hand.length >= 8) {
+    addLog((who==='player'?'あなた':'コンピュータ') + 'の手札が上限(8枚)です。');
+    return null;
+  }
+  var card = p.deck.pop();
+  p.hand.push(card);
+  return card;
+}
+
+// ----- カードをフィールドに出す (手札から) -----
+function playCard(who, handIndex) {
+  var p = (who === 'player') ? state.player : state.computer;
+  if (p.field.length >= 3) {
+    addLog((who==='player'?'あなた':'コンピュータ') + 'のフィールドは満杯です。');
+    return false;
+  }
+  if (handIndex < 0 || handIndex >= p.hand.length) return false;
+  var card = p.hand.splice(handIndex, 1)[0];
+  p.field.push(card);
+  renderAll();
+  return true;
+}
+
+// ----- 攻撃 (プレイヤー→コンピュータ) -----
+function playerAttack(attackerFieldIndex) {
+  if (state.gameOver) return;
+  if (state.turn !== 'player') {
+    addLog('あなたのターンではありません。');
+    return;
+  }
+  if (state.player.hasAttacked) {
+    addLog('すでに攻撃しました。');
+    return;
+  }
+  var p = state.player;
+  if (attackerFieldIndex < 0 || attackerFieldIndex >= p.field.length) return;
+  var attacker = p.field[attackerFieldIndex];
+  var def = state.computer;
+
+  // 自滅判定 (1/4)
+  if (Math.random() < 0.25) {
+    p.field.splice(attackerFieldIndex, 1);
+    addLog('💥 ' + attacker.sym + ' が自滅しました！');
+    renderAll();
+    return;
+  }
+
+  var atkVal = getAtk(attacker.sym);
+  // 相手フィールドにカードがあれば、先頭とバトル
+  if (def.field.length > 0) {
+    var defCard = def.field[0];
+    var defAtk = getAtk(defCard.sym);
+    if (atkVal > defAtk) {
+      // 相手フィールドのカードを破壊、残りダメージをライフに
+      def.field.splice(0, 1);
+      var dmg = atkVal - defAtk;
+      def.life -= dmg;
+      addLog('⚔️ ' + attacker.sym + '(' + atkVal + ') が ' + defCard.sym + '(' + defAtk + ') を破壊！ ' + dmg + 'ダメージ！');
+    } else if (atkVal < defAtk) {
+      // こちらのカードがやられる
+      p.field.splice(attackerFieldIndex, 1);
+      var dmg2 = defAtk - atkVal;
+      p.life -= dmg2;
+      addLog('💀 ' + attacker.sym + '(' + atkVal + ') が ' + defCard.sym + '(' + defAtk + ') にやられた！ ' + dmg2 + 'ダメージ！');
+    } else {
+      // 同値: 両方破壊
+      p.field.splice(attackerFieldIndex, 1);
+      def.field.splice(0, 1);
+      addLog('⚖️ ' + attacker.sym + ' と ' + defCard.sym + ' 相打ち！');
+    }
+  } else {
+    // ダイレクトアタック
+    def.life -= atkVal;
+    addLog('🎯 ダイレクトアタック！ ' + attacker.sym + ' が ' + atkVal + ' ダメージ！');
+  }
+
+  state.player.hasAttacked = true;
+  // ゲームオーバーチェック
+  checkGameOver();
+  renderAll();
+}
+
+// ----- コンピュータのAI (バカじゃない) -----
+function computerTurn() {
+  if (state.gameOver) return;
+  if (state.turn !== 'computer') return;
+  addLog('🖥️ コンピュータのターン');
+
+  // ドロー
+  drawCard('computer');
+  // フィールドに出す (手札から1枚)
+  var c = state.computer;
+  if (c.hand.length > 0 && c.field.length < 3) {
+    // ランダムに1枚出す
+    var idx = Math.floor(Math.random() * c.hand.length);
+    playCard('computer', idx);
+  }
+
+  // 攻撃 (相手より攻撃力が高い場合のみ)
+  if (c.field.length > 0 && state.player.field.length > 0) {
+    var myAtk = getAtk(c.field[0].sym);
+    var enemyAtk = getAtk(state.player.field[0].sym);
+    if (myAtk > enemyAtk) {
+      // 安全に攻撃できる
+      computerExecuteAttack(0);
+    } else {
+      // 攻撃しない (自殺行為を避ける)
+      addLog('🖥️ コンピュータは攻撃を控えました (自殺回避)');
+    }
+  } else if (c.field.length > 0 && state.player.field.length === 0) {
+    // ダイレクトアタック
+    computerExecuteAttack(0);
+  }
+
+  // ターン終了
+  state.computer.hasAttacked = false;
+  state.turn = 'player';
+  state.player.hasAttacked = false;
+  addLog('👤 あなたのターンです。ドローしてください。');
+  renderAll();
+}
+
+function computerExecuteAttack(fieldIdx) {
+  if (state.gameOver) return;
+  var c = state.computer;
+  if (fieldIdx < 0 || fieldIdx >= c.field.length) return;
+  var attacker = c.field[fieldIdx];
+  var p = state.player;
+
+  // 自滅
+  if (Math.random() < 0.25) {
+    c.field.splice(fieldIdx, 1);
+    addLog('💥 コンピュータの ' + attacker.sym + ' が自滅！');
+    renderAll();
+    return;
+  }
+
+  var atkVal = getAtk(attacker.sym);
+  if (p.field.length > 0) {
+    var defCard = p.field[0];
+    var defAtk = getAtk(defCard.sym);
+    if (atkVal > defAtk) {
+      p.field.splice(0, 1);
+      var dmg = atkVal - defAtk;
+      p.life -= dmg;
+      addLog('⚔️ コンピュータの ' + attacker.sym + '(' + atkVal + ') が ' + defCard.sym + '(' + defAtk + ') を破壊！ ' + dmg + 'ダメージ！');
+    } else if (atkVal < defAtk) {
+      c.field.splice(fieldIdx, 1);
+      var dmg2 = defAtk - atkVal;
+      c.life -= dmg2;
+      addLog('💀 コンピュータの ' + attacker.sym + ' がやられた！');
+    } else {
+      c.field.splice(fieldIdx, 1);
+      p.field.splice(0, 1);
+      addLog('⚖️ 相打ち！');
+    }
+  } else {
+    p.life -= atkVal;
+    addLog('🎯 コンピュータのダイレクトアタック！ ' + atkVal + ' ダメージ！');
+  }
+
+  state.computer.hasAttacked = true;
+  checkGameOver();
+  renderAll();
+}
+
+// ----- ゲームオーバーチェック -----
+function checkGameOver() {
+  if (state.player.life <= 0) {
+    state.gameOver = true;
+    addLog('💀 あなたの負けです...');
+    return true;
+  }
+  if (state.computer.life <= 0) {
+    state.gameOver = true;
+    addLog('🎉 あなたの勝ち！');
+    return true;
+  }
+  // 山札・手札・フィールドがすべて空
+  if (state.player.deck.length === 0 && state.player.hand.length === 0 && state.player.field.length === 0 &&
+      state.computer.deck.length === 0 && state.computer.hand.length === 0 && state.computer.field.length === 0) {
+    state.gameOver = true;
+    addLog('🤝 引き分け (すべてのカードが尽きた)');
+    return true;
+  }
+  return false;
+}
+
+// ----- レンダリング -----
+function renderAll() {
+  renderPlayer('player');
+  renderPlayer('computer');
+  // 手札枚数・山札枚数・ライフ更新
+  document.getElementById('player-life').textContent = state.player.life;
+  document.getElementById('com-life').textContent = state.computer.life;
+  document.getElementById('player-hand-count').textContent = state.player.hand.length;
+  document.getElementById('com-hand-count').textContent = state.computer.hand.length;
+  document.getElementById('player-deck-count').textContent = state.player.deck.length;
+  document.getElementById('com-deck-count').textContent = state.computer.deck.length;
+}
+
+function renderPlayer(who) {
+  var p = (who === 'player') ? state.player : state.computer;
+  var fieldId = (who === 'player') ? 'player-field' : 'com-field';
+  var handId = (who === 'player') ? 'player-hand' : 'com-hand';
+
+  // フィールド
+  var fieldEl = document.getElementById(fieldId);
+  fieldEl.innerHTML = '';
+  p.field.forEach(function(card, idx) {
+    var div = document.createElement('div');
+    div.className = 'card';
+    var atk = getAtk(card.sym);
+    div.innerHTML = '<span class="sym">' + card.sym + '</span> <span class="atk">⚔' + atk + '</span><br><small>' + card.name + '</small>';
+    div.style.cursor = 'pointer';
+    div.title = 'クリックで詳細';
+    div.onclick = function() { showDetail(card); };
+    if (who === 'player' && state.turn === 'player' && !state.player.hasAttacked && !state.gameOver) {
+      // 攻撃ボタン
+      var atkBtn = document.createElement('button');
+      atkBtn.textContent = '攻撃';
+      atkBtn.className = 'btn';
+      atkBtn.style.fontSize = '0.6rem';
+      atkBtn.style.padding = '2px 6px';
+      atkBtn.onclick = function(e) {
+        e.stopPropagation();
+        playerAttack(idx);
+      };
+      div.appendChild(atkBtn);
+    }
+    fieldEl.appendChild(div);
+  });
+
+  // 手札 (コンピュータは伏せる)
+  var handEl = document.getElementById(handId);
+  handEl.innerHTML = '';
+  if (who === 'computer') {
+    // コンピュータの手札はカードの裏面だけ表示
+    for (var i=0; i<p.hand.length; i++) {
+      var back = document.createElement('div');
+      back.className = 'card';
+      back.style.background = '#1a1a2e';
+      back.style.borderColor = '#4a4a6a';
+      back.textContent = '🂠';
+      back.style.fontSize = '1.5rem';
+      back.style.textAlign = 'center';
+      back.style.padding = '4px 0';
+      back.title = 'コンピュータの手札';
+      handEl.appendChild(back);
+    }
+  } else {
+    // プレイヤーの手札は表示
+    p.hand.forEach(function(card, idx) {
+      var div = document.createElement('div');
+      div.className = 'card';
+      var atk = getAtk(card.sym);
+      div.innerHTML = '<span class="sym">' + card.sym + '</span> <span class="atk">⚔' + atk + '</span><br><small>' + card.name + '</small>';
+      div.style.cursor = 'pointer';
+      div.title = 'クリックで詳細';
+      div.onclick = function() { showDetail(card); };
+      // フィールドに出せるボタン
+      if (state.turn === 'player' && !state.gameOver && state.player.field.length < 3) {
+        var playBtn = document.createElement('button');
+        playBtn.textContent = '出す';
+        playBtn.className = 'btn';
+        playBtn.style.fontSize = '0.5rem';
+        playBtn.style.padding = '1px 4px';
+        playBtn.onclick = function(e) {
+          e.stopPropagation();
+          if (playCard('player', idx)) {
+            renderAll();
+          }
+        };
+        div.appendChild(playBtn);
+      }
+      handEl.appendChild(div);
+    });
+  }
+}
+
+// ----- カード詳細表示 -----
+function showDetail(card) {
+  var detail = document.getElementById('card-detail');
+  var content = document.getElementById('detail-content');
+  var atk = getAtk(card.sym);
+  content.innerHTML = 
+    '<div class="detail-sym">' + card.sym + ' (No.' + card.no + ')</div>' +
+    '<div><strong>' + card.name + '</strong> ｜ ' + card.group + '</div>' +
+    '<div style="color:#ff7b72;">⚔ 攻撃力: ' + atk + '</div>' +
+    '<div style="margin-top:6px;"><em>' + card.desc + '</em></div>' +
+    '<div style="margin-top:6px;background:#0d1117;padding:6px;border-radius:4px;">⚽ ' + card.soccer + '</div>';
+  detail.style.display = 'block';
+}
+
+function closeDetail() {
+  document.getElementById('card-detail').style.display = 'none';
+}
+
+// ----- ログ -----
+function addLog(msg) {
+  var log = document.getElementById('log');
+  var p = document.createElement('p');
+  p.textContent = msg;
+  log.appendChild(p);
+  log.scrollTop = log.scrollHeight;
+}
+
+// ----- イベント登録 -----
+document.getElementById('btn-draw').addEventListener('click', function() {
+  if (state.gameOver) return;
+  if (state.turn !== 'player') {
+    addLog('あなたのターンではありません。');
+    return;
+  }
+  if (state.turnPhase === 'main') {
+    addLog('すでにドローしました。');
+    return;
+  }
+  var card = drawCard('player');
+  if (card) {
+    addLog('🃏 ' + card.sym + ' をドローしました。');
+    state.turnPhase = 'main';
+    renderAll();
+  } else {
+    addLog('山札が空です。');
+  }
+});
+
+document.getElementById('btn-end-turn').addEventListener('click', function() {
+  if (state.gameOver) return;
+  if (state.turn !== 'player') {
+    addLog('あなたのターンではありません。');
+    return;
+  }
+  // プレイヤーターン終了 → コンピュータターンへ
+  state.turn = 'computer';
+  state.player.hasAttacked = false;
+  state.turnPhase = 'draw';
+  addLog('🔄 ターン終了。コンピュータのターンです。');
+  renderAll();
+  setTimeout(computerTurn, 600);
+});
+
+document.getElementById('btn-restart').addEventListener('click', function() {
+  document.getElementById('log').innerHTML = '<p>▶ ゲームを再起動します...</p>';
+  initGame();
+});
+
+// ----- 初期起動 -----
+initGame();
+
+</script>
+</body>
+</html>
