@@ -7,7 +7,7 @@
 /* 2013年頃のブラウザでも動く、シンプルなスタイル */
 * {
   box-sizing: border-box;
-  user-select: none; /* ドラッグ時の選択防止 */
+  user-select: none;
 }
 body {
   background: #eaeef2;
@@ -34,7 +34,6 @@ body {
   flex-wrap: wrap;
   justify-content: center;
 }
-/* キャンバスと左右パレットをまとめるコンテナ */
 .canvas-with-palettes {
   display: flex;
   gap: 16px;
@@ -51,14 +50,13 @@ body {
 canvas#dotCanvas {
   display: block;
   background: #ffffff;
-  image-rendering: crisp-edges; /* ドット感 */
+  image-rendering: crisp-edges;
   image-rendering: pixelated;
-  width: 400px;  /* デフォルトサイズ、JSで調整 */
+  width: 400px;
   height: 400px;
   border: none;
   cursor: crosshair;
 }
-/* 左側の塗りつぶしパレット */
 .fill-palette {
   background: #dce4ec;
   border: 2px solid #7a8a9a;
@@ -75,7 +73,6 @@ canvas#dotCanvas {
   transform: scale(1.08);
   border-color: #000000;
 }
-/* 右側の通常パレット */
 .palette {
   background: #e0e8f0;
   border: 2px solid #8a9aaa;
@@ -187,19 +184,26 @@ canvas#dotCanvas {
 .download-btn:active {
   transform: scale(0.95);
 }
+.save-indicator {
+  font-size: 12px;
+  color: #2a6a3a;
+  background: #d8f0d8;
+  padding: 2px 12px;
+  border-radius: 30px;
+  border: 1px solid #5a8a5a;
+  display: inline-block;
+  margin-left: 8px;
+}
 </style>
 </head>
 <body>
 <div class="editor-wrapper">
   <div class="canvas-area">
-    <!-- キャンバス + 左右パレット -->
     <div class="canvas-with-palettes">
       <!-- 塗りつぶし用パレット (左側) -->
       <div class="fill-palette">
         <div class="palette-label">▼塗りつぶし</div>
-        <div class="palette-colors" id="fillPaletteContainer">
-          <!-- 13色 上から順に -->
-        </div>
+        <div class="palette-colors" id="fillPaletteContainer"></div>
       </div>
 
       <!-- ドット絵キャンバス -->
@@ -209,9 +213,7 @@ canvas#dotCanvas {
 
       <!-- 通常パレット (右側) -->
       <div class="palette">
-        <div class="palette-colors" id="paletteContainer">
-          <!-- 13色 上から順に -->
-        </div>
+        <div class="palette-colors" id="paletteContainer"></div>
       </div>
     </div>
   </div>
@@ -224,6 +226,7 @@ canvas#dotCanvas {
     <button id="applySizeBtn">変更</button>
     <span id="sizeDisplay">10×10</span>
     <button id="resetBtn" class="reset-btn">🗑 リセット</button>
+    <span class="save-indicator" id="saveIndicator">💾 自動保存</span>
   </div>
   <div class="download-section">
     <button id="downloadBtn" class="download-btn">⬇ 画像ダウンロード</button>
@@ -243,29 +246,52 @@ canvas#dotCanvas {
 
   // カラーパレット (13色) 上から順
   var paletteColors = [
-    '#FF0000', // 赤
-    '#00BFFF', // 水色
-    '#FFD700', // 黄色
-    '#FF69B4', // ピンク
-    '#0000FF', // 青
-    '#8B4513', // 茶色
-    '#FFFFFF', // 白
-    '#FF8C00', // 橙
-    '#800080', // 紫
-    '#000000', // 黒
-    '#808080', // 灰色
-    '#008000', // 緑
-    '#ADFF2F'  // 黄緑
+    '#FF0000', '#00BFFF', '#FFD700', '#FF69B4', '#0000FF',
+    '#8B4513', '#FFFFFF', '#FF8C00', '#800080', '#000000',
+    '#808080', '#008000', '#ADFF2F'
   ];
 
-  // 現在選択中の色 (デフォルト: 黒)
   var selectedColor = '#000000';
-
-  // グリッドデータ (二次元配列) デフォルトは白背景だが、黒線は描画時に引く
-  var gridData = []; // gridData[row][col] = colorString
-
-  // マウス押下フラグ (ドラッグ描画用)
+  var gridData = [];
   var isMouseDown = false;
+
+  // ---- ローカルストレージ保存/読込 ----
+  function saveToStorage() {
+    try {
+      var data = {
+        rows: rows,
+        cols: cols,
+        grid: gridData,
+        selected: selectedColor
+      };
+      localStorage.setItem('dotEditorData', JSON.stringify(data));
+      var indicator = document.getElementById('saveIndicator');
+      indicator.textContent = '💾 保存済み';
+      setTimeout(function() {
+        indicator.textContent = '💾 自動保存';
+      }, 1500);
+    } catch(e) {
+      // 2013年ブラウザでもlocalStorageは大抵使える
+    }
+  }
+
+  function loadFromStorage() {
+    try {
+      var raw = localStorage.getItem('dotEditorData');
+      if (!raw) return false;
+      var data = JSON.parse(raw);
+      if (!data || !data.grid || !data.grid.length) return false;
+      rows = data.rows || 10;
+      cols = data.cols || 10;
+      gridData = data.grid;
+      selectedColor = data.selected || '#000000';
+      cellSizeX = 400 / cols;
+      cellSizeY = 400 / rows;
+      return true;
+    } catch(e) {
+      return false;
+    }
+  }
 
   // 初期化 (全セルを白にする)
   function initGrid(r, c) {
@@ -273,16 +299,15 @@ canvas#dotCanvas {
     for (var i = 0; i < r; i++) {
       data[i] = [];
       for (var j = 0; j < c; j++) {
-        data[i][j] = '#FFFFFF'; // 白
+        data[i][j] = '#FFFFFF';
       }
     }
     return data;
   }
 
-  // キャンバスにドット絵を描画 (黒線 + カラーセル)
+  // キャンバスにドット絵を描画
   function drawCanvas() {
     ctx.clearRect(0, 0, 400, 400);
-    // セル描画
     for (var r = 0; r < rows; r++) {
       for (var c = 0; c < cols; c++) {
         var color = gridData[r][c];
@@ -290,7 +315,6 @@ canvas#dotCanvas {
         ctx.fillRect(c * cellSizeX, r * cellSizeY, cellSizeX, cellSizeY);
       }
     }
-    // 黒線 (グリッド線) を引く
     ctx.strokeStyle = '#000000';
     ctx.lineWidth = 1.0;
     ctx.beginPath();
@@ -305,85 +329,69 @@ canvas#dotCanvas {
     ctx.stroke();
   }
 
-  // 座標からセルインデックス取得 (クリック/ドラッグ)
   function getCellIndexFromCoord(x, y) {
     var rect = canvas.getBoundingClientRect();
-    var scaleX = canvas.width / rect.width;   // 常に400/表示幅
+    var scaleX = canvas.width / rect.width;
     var scaleY = canvas.height / rect.height;
     var canvasX = (x - rect.left) * scaleX;
     var canvasY = (y - rect.top) * scaleY;
-    if (canvasX < 0 || canvasX >= 400 || canvasY < 0 || canvasY >= 400) {
-      return null;
-    }
+    if (canvasX < 0 || canvasX >= 400 || canvasY < 0 || canvasY >= 400) return null;
     var col = Math.floor(canvasX / cellSizeX);
     var row = Math.floor(canvasY / cellSizeY);
     if (row < 0 || row >= rows || col < 0 || col >= cols) return null;
     return { row: row, col: col };
   }
 
-  // セルに色をセット (描画更新)
   function setCellColor(row, col, color) {
     if (row < 0 || row >= rows || col < 0 || col >= cols) return;
     gridData[row][col] = color;
     ctx.fillStyle = color;
     ctx.fillRect(col * cellSizeX, row * cellSizeY, cellSizeX, cellSizeY);
-    drawCanvas(); // 全描画 (シンプル)
+    drawCanvas();
+    saveToStorage(); // 自動保存
   }
 
-  // ---- 塗りつぶし機能 ----
+  // 塗りつぶし
   function fillAllCells(color) {
-    // 二重確認
     var confirm1 = confirm('全てのセルをこの色で塗りつぶしますか？');
     if (!confirm1) return;
     var confirm2 = confirm('本当に全てのセルを塗りつぶしますか？ (元に戻せません)');
     if (!confirm2) return;
-
-    // 実行
     for (var r = 0; r < rows; r++) {
       for (var c = 0; c < cols; c++) {
         gridData[r][c] = color;
       }
     }
     drawCanvas();
+    saveToStorage();
   }
 
-  // イベント処理 (マウス)
+  // マウスイベント
   function handleCanvasMouse(e) {
     var coord = getCellIndexFromCoord(e.clientX, e.clientY);
     if (!coord) return;
-    var row = coord.row;
-    var col = coord.col;
-    if (row >= 0 && row < rows && col >= 0 && col < cols) {
-      setCellColor(row, col, selectedColor);
-    }
+    setCellColor(coord.row, coord.col, selectedColor);
   }
 
-  // マウスダウン
   function onMouseDown(e) {
     isMouseDown = true;
     handleCanvasMouse(e);
     e.preventDefault();
   }
-
   function onMouseMove(e) {
-    if (isMouseDown) {
-      handleCanvasMouse(e);
-    }
+    if (isMouseDown) handleCanvasMouse(e);
     e.preventDefault();
   }
-
   function onMouseUp(e) {
     isMouseDown = false;
     e.preventDefault();
   }
-
   function onMouseLeave(e) {
     isMouseDown = false;
   }
 
-  // パレット作成 (通常用 + 塗りつぶし用)
+  // パレット作成
   function buildPalettes() {
-    // 通常パレット (右側)
     var container = document.getElementById('paletteContainer');
     container.innerHTML = '';
     for (var i = 0; i < paletteColors.length; i++) {
@@ -392,28 +400,24 @@ canvas#dotCanvas {
       swatch.className = 'color-swatch';
       swatch.style.backgroundColor = color;
       swatch.dataset.color = color;
-      if (color === selectedColor) {
-        swatch.classList.add('active');
-      }
+      if (color === selectedColor) swatch.classList.add('active');
       swatch.addEventListener('click', function(e) {
         var c = this.dataset.color;
         selectedColor = c;
-        // アクティブ表示更新 (通常パレットのみ)
         var allSwatches = document.querySelectorAll('#paletteContainer .color-swatch');
         for (var s = 0; s < allSwatches.length; s++) {
           allSwatches[s].classList.remove('active');
         }
         this.classList.add('active');
-        // 塗りつぶしパレットのアクティブは外す
         var fillSwatches = document.querySelectorAll('#fillPaletteContainer .color-swatch');
         for (var f = 0; f < fillSwatches.length; f++) {
           fillSwatches[f].classList.remove('active');
         }
+        saveToStorage();
       });
       container.appendChild(swatch);
     }
 
-    // 塗りつぶし用パレット (左側)
     var fillContainer = document.getElementById('fillPaletteContainer');
     fillContainer.innerHTML = '';
     for (var j = 0; j < paletteColors.length; j++) {
@@ -424,15 +428,12 @@ canvas#dotCanvas {
       swatch2.dataset.color = color2;
       swatch2.addEventListener('click', function(e) {
         var c = this.dataset.color;
-        // 塗りつぶし実行 (二重確認付き)
         fillAllCells(c);
-        // アクティブ表示更新 (塗りつぶしパレットのみ)
         var allSwatches = document.querySelectorAll('#fillPaletteContainer .color-swatch');
         for (var s = 0; s < allSwatches.length; s++) {
           allSwatches[s].classList.remove('active');
         }
         this.classList.add('active');
-        // 通常パレットのアクティブは外す
         var normalSwatches = document.querySelectorAll('#paletteContainer .color-swatch');
         for (var n = 0; n < normalSwatches.length; n++) {
           normalSwatches[n].classList.remove('active');
@@ -442,23 +443,21 @@ canvas#dotCanvas {
     }
   }
 
-  // サイズ表示更新
   function updateSizeDisplay() {
     document.getElementById('sizeDisplay').textContent = rows + '×' + cols;
     document.getElementById('gridSizeInput').value = rows;
     document.getElementById('gridSizeInput2').value = cols;
   }
 
-  // リセット (確認ダイアログ)
   function resetGrid() {
     var really = confirm('本当にリセットしますか？ (すべて白に戻ります)');
     if (really) {
       gridData = initGrid(rows, cols);
       drawCanvas();
+      saveToStorage();
     }
   }
 
-  // 画像ダウンロード (PNG)
   function downloadImage() {
     var link = document.createElement('a');
     link.download = 'dot_art.png';
@@ -466,61 +465,55 @@ canvas#dotCanvas {
     link.click();
   }
 
-  // サイズ変更 (入力値に基づく)
   function applySizeChange() {
-    var input1 = document.getElementById('gridSizeInput');
-    var val1 = parseInt(input1.value, 10);
-    var input2 = document.getElementById('gridSizeInput2');
-    var val2 = parseInt(input2.value, 10);
+    var val1 = parseInt(document.getElementById('gridSizeInput').value, 10);
+    var val2 = parseInt(document.getElementById('gridSizeInput2').value, 10);
     if (isNaN(val1) || val1 < 1) val1 = 1;
     if (isNaN(val2) || val2 < 1) val2 = 1;
     if (val1 > 400) val1 = 400;
     if (val2 > 400) val2 = 400;
-
     rows = val1;
     cols = val2;
     cellSizeX = 400 / cols;
     cellSizeY = 400 / rows;
-
-    // グリッドデータを初期化 (白)
     gridData = initGrid(rows, cols);
     drawCanvas();
     updateSizeDisplay();
+    saveToStorage();
   }
 
-  // 初期化処理
+  // 初期化
   function init() {
-    rows = 10;
-    cols = 10;
-    cellSizeX = 400 / cols;
-    cellSizeY = 400 / rows;
+    // 保存データがあれば読み込む
+    var loaded = loadFromStorage();
+    if (!loaded) {
+      rows = 10;
+      cols = 10;
+      cellSizeX = 400 / cols;
+      cellSizeY = 400 / rows;
+      gridData = initGrid(rows, cols);
+    }
+    // 選択色が有効か確認
+    var found = false;
+    for (var i = 0; i < paletteColors.length; i++) {
+      if (paletteColors[i] === selectedColor) { found = true; break; }
+    }
+    if (!found) selectedColor = '#000000';
 
-    gridData = initGrid(rows, cols);
-
-    // パレット作成
     buildPalettes();
-    // 描画
     drawCanvas();
     updateSizeDisplay();
 
-    // イベント登録
     canvas.addEventListener('mousedown', onMouseDown);
     canvas.addEventListener('mousemove', onMouseMove);
     canvas.addEventListener('mouseup', onMouseUp);
     canvas.addEventListener('mouseleave', onMouseLeave);
 
-    document.getElementById('applySizeBtn').addEventListener('click', function() {
-      applySizeChange();
-    });
-    document.getElementById('resetBtn').addEventListener('click', function() {
-      resetGrid();
-    });
-    document.getElementById('downloadBtn').addEventListener('click', function() {
-      downloadImage();
-    });
+    document.getElementById('applySizeBtn').addEventListener('click', applySizeChange);
+    document.getElementById('resetBtn').addEventListener('click', resetGrid);
+    document.getElementById('downloadBtn').addEventListener('click', downloadImage);
   }
 
-  // スタート
   init();
 })();
 </script>
