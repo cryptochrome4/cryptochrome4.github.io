@@ -46,6 +46,7 @@ body {
   padding: 4px;
   box-shadow: inset 0 0 0 1px #c0cedc;
   flex-shrink: 0;
+  position: relative;
 }
 canvas#dotCanvas {
   display: block;
@@ -56,6 +57,31 @@ canvas#dotCanvas {
   height: 400px;
   border: none;
   cursor: crosshair;
+}
+/* テキスト入力用オーバーレイ */
+#textOverlay {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 400px;
+  height: 400px;
+  pointer-events: none;
+  z-index: 10;
+}
+.text-cell {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: bold;
+  color: #000000;
+  pointer-events: none;
+  font-family: 'Meiryo', 'Segoe UI', sans-serif;
+  text-shadow: none;
+  line-height: 1;
+  overflow: hidden;
+  white-space: nowrap;
 }
 .fill-palette {
   background: #dce4ec;
@@ -159,6 +185,15 @@ canvas#dotCanvas {
   border-color: #a06050;
   color: #4a2018;
 }
+.controls button.mode-btn {
+  background: #d0e0f0;
+  border-color: #4a7a9a;
+}
+.controls button.mode-btn.active-mode {
+  background: #f0e8a0;
+  border-color: #8a7a30;
+  box-shadow: 0 0 0 2px #8a7a30;
+}
 #sizeDisplay {
   font-weight: bold;
   color: #0a1a2a;
@@ -194,6 +229,15 @@ canvas#dotCanvas {
   display: inline-block;
   margin-left: 8px;
 }
+.mode-indicator {
+  font-size: 13px;
+  font-weight: bold;
+  color: #1a3a5a;
+  padding: 2px 14px;
+  border-radius: 30px;
+  background: #e8f0f8;
+  border: 1px solid #6a8aaa;
+}
 </style>
 </head>
 <body>
@@ -209,6 +253,7 @@ canvas#dotCanvas {
       <!-- ドット絵キャンバス -->
       <div id="gridContainer">
         <canvas id="dotCanvas" width="400" height="400"></canvas>
+        <div id="textOverlay"></div>
       </div>
 
       <!-- 通常パレット (右側) -->
@@ -226,6 +271,8 @@ canvas#dotCanvas {
     <button id="applySizeBtn">変更</button>
     <span id="sizeDisplay">10×10</span>
     <button id="resetBtn" class="reset-btn">🗑 リセット</button>
+    <button id="modeToggleBtn" class="mode-btn">📝 テキストモード</button>
+    <span class="mode-indicator" id="modeIndicator">🎨 描画</span>
     <span class="save-indicator" id="saveIndicator">💾 自動保存</span>
   </div>
   <div class="download-section">
@@ -237,6 +284,7 @@ canvas#dotCanvas {
   // ---------- 2013年仕様: 古いブラウザでも動くようにvar, function, シンプル ----------
   var canvas = document.getElementById('dotCanvas');
   var ctx = canvas.getContext('2d');
+  var overlay = document.getElementById('textOverlay');
 
   // デフォルト 10x10
   var rows = 10;
@@ -253,7 +301,9 @@ canvas#dotCanvas {
 
   var selectedColor = '#000000';
   var gridData = [];
+  var textData = {}; // key: "row,col" => 文字列 (最大4文字)
   var isMouseDown = false;
+  var isTextMode = false; // false=描画モード, true=テキストモード
 
   // ---- ローカルストレージ保存/読込 ----
   function saveToStorage() {
@@ -262,7 +312,9 @@ canvas#dotCanvas {
         rows: rows,
         cols: cols,
         grid: gridData,
-        selected: selectedColor
+        selected: selectedColor,
+        textData: textData,
+        isTextMode: isTextMode
       };
       localStorage.setItem('dotEditorData', JSON.stringify(data));
       var indicator = document.getElementById('saveIndicator');
@@ -270,9 +322,7 @@ canvas#dotCanvas {
       setTimeout(function() {
         indicator.textContent = '💾 自動保存';
       }, 1500);
-    } catch(e) {
-      // 2013年ブラウザでもlocalStorageは大抵使える
-    }
+    } catch(e) {}
   }
 
   function loadFromStorage() {
@@ -285,6 +335,8 @@ canvas#dotCanvas {
       cols = data.cols || 10;
       gridData = data.grid;
       selectedColor = data.selected || '#000000';
+      textData = data.textData || {};
+      isTextMode = data.isTextMode || false;
       cellSizeX = 400 / cols;
       cellSizeY = 400 / rows;
       return true;
@@ -327,6 +379,35 @@ canvas#dotCanvas {
       ctx.lineTo(j * cellSizeX, 400);
     }
     ctx.stroke();
+    drawTextOverlay();
+  }
+
+  // テキストオーバーレイ描画
+  function drawTextOverlay() {
+    overlay.innerHTML = '';
+    for (var key in textData) {
+      if (!textData.hasOwnProperty(key)) continue;
+      var parts = key.split(',');
+      var row = parseInt(parts[0], 10);
+      var col = parseInt(parts[1], 10);
+      var text = textData[key];
+      if (!text || text.length === 0) continue;
+      var div = document.createElement('div');
+      div.className = 'text-cell';
+      var x = col * cellSizeX;
+      var y = row * cellSizeY;
+      div.style.left = x + 'px';
+      div.style.top = y + 'px';
+      div.style.width = cellSizeX + 'px';
+      div.style.height = cellSizeY + 'px';
+      // フォントサイズ調整 (セルサイズに合わせる)
+      var fontSize = Math.min(cellSizeX, cellSizeY) * 0.6;
+      if (text.length > 2) fontSize = fontSize * 0.7;
+      if (text.length > 3) fontSize = fontSize * 0.6;
+      div.style.fontSize = Math.max(8, fontSize) + 'px';
+      div.textContent = text;
+      overlay.appendChild(div);
+    }
   }
 
   function getCellIndexFromCoord(x, y) {
@@ -342,32 +423,46 @@ canvas#dotCanvas {
     return { row: row, col: col };
   }
 
+  // セルに色をセット
   function setCellColor(row, col, color) {
     if (row < 0 || row >= rows || col < 0 || col >= cols) return;
     gridData[row][col] = color;
-    ctx.fillStyle = color;
-    ctx.fillRect(col * cellSizeX, row * cellSizeY, cellSizeX, cellSizeY);
+    // テキストデータは維持
     drawCanvas();
-    saveToStorage(); // 自動保存
+    saveToStorage();
   }
 
-  // 塗りつぶし
-  function fillAllCells(color) {
-    var confirm1 = confirm('全てのセルをこの色で塗りつぶしますか？');
-    if (!confirm1) return;
-    var confirm2 = confirm('本当に全てのセルを塗りつぶしますか？ (元に戻せません)');
-    if (!confirm2) return;
-    for (var r = 0; r < rows; r++) {
-      for (var c = 0; c < cols; c++) {
-        gridData[r][c] = color;
-      }
+  // セルにテキストをセット
+  function setCellText(row, col) {
+    if (row < 0 || row >= rows || col < 0 || col >= cols) return;
+    var key = row + ',' + col;
+    var currentText = textData[key] || '';
+    // プロンプトで入力 (最大4文字)
+    var input = prompt('テキストを入力 (最大4文字、黒文字):', currentText);
+    if (input === null) return; // キャンセル
+    input = input.substring(0, 4); // 最大4文字
+    if (input.length === 0) {
+      delete textData[key];
+    } else {
+      textData[key] = input;
     }
     drawCanvas();
     saveToStorage();
   }
 
+  // テキストモードでのクリック処理
+  function handleTextClick(e) {
+    var coord = getCellIndexFromCoord(e.clientX, e.clientY);
+    if (!coord) return;
+    setCellText(coord.row, coord.col);
+  }
+
   // マウスイベント
   function handleCanvasMouse(e) {
+    if (isTextMode) {
+      handleTextClick(e);
+      return;
+    }
     var coord = getCellIndexFromCoord(e.clientX, e.clientY);
     if (!coord) return;
     setCellColor(coord.row, coord.col, selectedColor);
@@ -443,6 +538,22 @@ canvas#dotCanvas {
     }
   }
 
+  // 塗りつぶし (テキストもクリア)
+  function fillAllCells(color) {
+    var confirm1 = confirm('全てのセルをこの色で塗りつぶしますか？');
+    if (!confirm1) return;
+    var confirm2 = confirm('本当に全てのセルを塗りつぶしますか？ (元に戻せません)');
+    if (!confirm2) return;
+    for (var r = 0; r < rows; r++) {
+      for (var c = 0; c < cols; c++) {
+        gridData[r][c] = color;
+      }
+    }
+    textData = {}; // テキストもクリア
+    drawCanvas();
+    saveToStorage();
+  }
+
   function updateSizeDisplay() {
     document.getElementById('sizeDisplay').textContent = rows + '×' + cols;
     document.getElementById('gridSizeInput').value = rows;
@@ -453,16 +564,54 @@ canvas#dotCanvas {
     var really = confirm('本当にリセットしますか？ (すべて白に戻ります)');
     if (really) {
       gridData = initGrid(rows, cols);
+      textData = {};
       drawCanvas();
       saveToStorage();
     }
   }
 
   function downloadImage() {
+    // テキストを一時的にキャンバスに描画してからダウンロード
+    drawCanvas(); // テキストはオーバーレイなので、キャンバスに描画する必要がある
+    // テキストをキャンバスに直接描画
+    for (var key in textData) {
+      if (!textData.hasOwnProperty(key)) continue;
+      var parts = key.split(',');
+      var row = parseInt(parts[0], 10);
+      var col = parseInt(parts[1], 10);
+      var text = textData[key];
+      if (!text || text.length === 0) continue;
+      var x = col * cellSizeX + cellSizeX / 2;
+      var y = row * cellSizeY + cellSizeY / 2;
+      var fontSize = Math.min(cellSizeX, cellSizeY) * 0.6;
+      if (text.length > 2) fontSize = fontSize * 0.7;
+      if (text.length > 3) fontSize = fontSize * 0.6;
+      ctx.fillStyle = '#000000';
+      ctx.font = 'bold ' + Math.max(8, fontSize) + 'px Meiryo, "Segoe UI", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, x, y);
+    }
+    // 線を再描画（テキストの上に線を重ねる）
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 1.0;
+    ctx.beginPath();
+    for (var i = 0; i <= rows; i++) {
+      ctx.moveTo(0, i * cellSizeY);
+      ctx.lineTo(400, i * cellSizeY);
+    }
+    for (var j = 0; j <= cols; j++) {
+      ctx.moveTo(j * cellSizeX, 0);
+      ctx.lineTo(j * cellSizeX, 400);
+    }
+    ctx.stroke();
+
     var link = document.createElement('a');
     link.download = 'dot_art.png';
     link.href = canvas.toDataURL('image/png');
     link.click();
+    // 元に戻す
+    drawCanvas();
   }
 
   function applySizeChange() {
@@ -477,14 +626,33 @@ canvas#dotCanvas {
     cellSizeX = 400 / cols;
     cellSizeY = 400 / rows;
     gridData = initGrid(rows, cols);
+    textData = {};
     drawCanvas();
     updateSizeDisplay();
     saveToStorage();
   }
 
+  // モード切替
+  function toggleMode() {
+    isTextMode = !isTextMode;
+    var btn = document.getElementById('modeToggleBtn');
+    var indicator = document.getElementById('modeIndicator');
+    if (isTextMode) {
+      btn.textContent = '🎨 描画モード';
+      btn.classList.add('active-mode');
+      indicator.textContent = '📝 テキスト';
+      canvas.style.cursor = 'text';
+    } else {
+      btn.textContent = '📝 テキストモード';
+      btn.classList.remove('active-mode');
+      indicator.textContent = '🎨 描画';
+      canvas.style.cursor = 'crosshair';
+    }
+    saveToStorage();
+  }
+
   // 初期化
   function init() {
-    // 保存データがあれば読み込む
     var loaded = loadFromStorage();
     if (!loaded) {
       rows = 10;
@@ -492,8 +660,8 @@ canvas#dotCanvas {
       cellSizeX = 400 / cols;
       cellSizeY = 400 / rows;
       gridData = initGrid(rows, cols);
+      textData = {};
     }
-    // 選択色が有効か確認
     var found = false;
     for (var i = 0; i < paletteColors.length; i++) {
       if (paletteColors[i] === selectedColor) { found = true; break; }
@@ -504,6 +672,21 @@ canvas#dotCanvas {
     drawCanvas();
     updateSizeDisplay();
 
+    // モードボタンの状態を反映
+    var btn = document.getElementById('modeToggleBtn');
+    var indicator = document.getElementById('modeIndicator');
+    if (isTextMode) {
+      btn.textContent = '🎨 描画モード';
+      btn.classList.add('active-mode');
+      indicator.textContent = '📝 テキスト';
+      canvas.style.cursor = 'text';
+    } else {
+      btn.textContent = '📝 テキストモード';
+      btn.classList.remove('active-mode');
+      indicator.textContent = '🎨 描画';
+      canvas.style.cursor = 'crosshair';
+    }
+
     canvas.addEventListener('mousedown', onMouseDown);
     canvas.addEventListener('mousemove', onMouseMove);
     canvas.addEventListener('mouseup', onMouseUp);
@@ -512,6 +695,7 @@ canvas#dotCanvas {
     document.getElementById('applySizeBtn').addEventListener('click', applySizeChange);
     document.getElementById('resetBtn').addEventListener('click', resetGrid);
     document.getElementById('downloadBtn').addEventListener('click', downloadImage);
+    document.getElementById('modeToggleBtn').addEventListener('click', toggleMode);
   }
 
   init();
