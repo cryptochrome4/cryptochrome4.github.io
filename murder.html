@@ -1,659 +1,374 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ジェイソンからの脱出 - 完全版</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            user-select: none;
-        }
-        body {
-            background: #0a0a1a;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            font-family: 'Courier New', monospace;
-            image-rendering: pixelated;
-        }
-        #gameContainer {
-            background: #1a1a2e;
-            padding: 15px;
-            border-radius: 10px;
-            box-shadow: 0 0 40px rgba(0,0,0,0.9);
-            border: 2px solid #333;
-        }
-        #topPanel {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: #0f0f1f;
-            padding: 6px 12px;
-            border-radius: 5px;
-            margin-bottom: 8px;
-            color: #ccc;
-            font-size: 12px;
-            flex-wrap: wrap;
-            gap: 4px;
-        }
-        #topPanel .label { color: #888; }
-        #topPanel .value { color: #ffd93d; font-weight: bold; }
-        #topPanel .danger { color: #ff6b6b; }
-        #canvasWrapper {
-            position: relative;
-            border: 3px solid #2a2a4a;
-            background: #1a3a1a;
-            cursor: crosshair;
-        }
-        canvas {
-            display: block;
-            width: 800px;
-            height: 600px;
-            image-rendering: pixelated;
-            background: #1a3a1a;
-        }
-        #bottomPanel {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-top: 8px;
-            gap: 10px;
-        }
-        #statusMsg {
-            color: #ff6b6b;
-            padding: 6px 10px;
-            background: #0f0f1f;
-            border-radius: 5px;
-            font-size: 13px;
-            flex: 1;
-            min-height: 30px;
-            border: 1px solid #2a2a4a;
-        }
-        #statusMsg.info { color: #64d8ff; }
-        #statusMsg.success { color: #69db7c; }
-        #minimap {
-            display: grid;
-            grid-template-columns: repeat(3, 26px);
-            grid-template-rows: repeat(3, 26px);
-            gap: 2px;
-            background: #0f0f1f;
-            padding: 4px;
-            border-radius: 5px;
-            border: 1px solid #2a2a4a;
-            flex-shrink: 0;
-        }
-        .minimap-cell {
-            background: #1a3a1a;
-            border: 1px solid #2a2a4a;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 7px;
-            color: #444;
-            position: relative;
-            cursor: pointer;
-        }
-        .minimap-cell.current { border: 2px solid #ffd93d; }
-        .minimap-cell.has-jason { background: #4a0a0a; }
-        .minimap-cell.has-bear { background: #3a2a0a; }
-        .minimap-cell .dot {
-            width: 4px;
-            height: 4px;
-            border-radius: 50%;
-            position: absolute;
-        }
-        .minimap-cell .dot.player { background: #ff6b6b; top: 2px; left: 2px; }
-        .minimap-cell .dot.jason { 
-            background: #ff0000; bottom: 2px; right: 2px;
-            animation: pulse 0.5s infinite;
-        }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.3; }
-        }
-        #gameOverlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.85);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-            color: white;
-            pointer-events: none;
-            z-index: 10;
-        }
-        #gameOverlay.show { display: flex; pointer-events: auto; }
-        #gameOverlay .title { font-size: 32px; margin-bottom: 10px; }
-        #gameOverlay .sub { font-size: 18px; color: #aaa; margin-bottom: 20px; }
-        #gameOverlay button {
-            background: #4a4a6a;
-            color: white;
-            border: 2px solid #6a6a8a;
-            padding: 10px 30px;
-            font-family: 'Courier New', monospace;
-            font-size: 16px;
-            cursor: pointer;
-            pointer-events: auto;
-            transition: 0.2s;
-        }
-        #gameOverlay button:hover { background: #5a5a8a; transform: scale(1.05); }
-        #inventoryDisplay {
-            color: #a8e6cf;
-            font-size: 12px;
-            background: #0f0f1f;
-            padding: 4px 10px;
-            border-radius: 3px;
-            border: 1px solid #2a2a4a;
-            min-width: 80px;
-            text-align: center;
-        }
-        .controls-hint { color: #444; font-size: 9px; text-align: center; padding: 4px; }
-        #warehouseDisplay {
-            color: #ffd93d;
-            font-size: 11px;
-            background: #0f0f1f;
-            padding: 2px 8px;
-            border-radius: 3px;
-            border: 1px solid #2a2a4a;
-        }
-        .arrow-btn {
-            position: absolute;
-            background: rgba(255,255,255,0.1);
-            border: 2px solid rgba(255,255,255,0.3);
-            color: white;
-            font-size: 24px;
-            width: 50px;
-            height: 50px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            border-radius: 5px;
-            transition: 0.2s;
-            z-index: 5;
-            font-family: 'Courier New', monospace;
-        }
-        .arrow-btn:hover {
-            background: rgba(255,255,255,0.2);
-            border-color: rgba(255,255,255,0.6);
-        }
-        .arrow-btn.top { top: 10px; left: 50%; transform: translateX(-50%); }
-        .arrow-btn.bottom { bottom: 10px; left: 50%; transform: translateX(-50%); }
-        .arrow-btn.left { left: 10px; top: 50%; transform: translateY(-50%); }
-        .arrow-btn.right { right: 10px; top: 50%; transform: translateY(-50%); }
-        .arrow-btn.hidden { display: none; }
-        #stageLabel {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: rgba(0,0,0,0.7);
-            color: #ffd93d;
-            padding: 4px 12px;
-            border-radius: 5px;
-            font-size: 14px;
-            z-index: 5;
-            border: 1px solid #ffd93d33;
-        }
-        #defenseLimit {
-            position: absolute;
-            bottom: 10px;
-            right: 10px;
-            background: rgba(0,0,0,0.7);
-            color: #69db7c;
-            padding: 4px 12px;
-            border-radius: 5px;
-            font-size: 12px;
-            z-index: 5;
-            border: 1px solid #69db7c33;
-        }
-    </style>
+<meta charset="UTF-8">
+<title>ジェイソンからの脱出 - ドット絵完全版</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+body {
+    background: #0a0a1a;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    font-family: 'Courier New', monospace;
+}
+#gameContainer {
+    background: #1a1a2e;
+    padding: 15px;
+    border-radius: 10px;
+    border: 2px solid #333;
+}
+#topPanel {
+    display: flex;
+    justify-content: space-between;
+    background: #0f0f1f;
+    padding: 6px 12px;
+    border-radius: 5px;
+    margin-bottom: 8px;
+    color: #ccc;
+    font-size: 12px;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+#topPanel .val { color: #ffd93d; font-weight: bold; }
+#canvasWrapper {
+    position: relative;
+    border: 3px solid #2a2a4a;
+    background: #1a3a1a;
+    cursor: pointer;
+}
+canvas {
+    display: block;
+    width: 1000px;
+    height: 800px;
+    image-rendering: pixelated;
+    background: #1a3a1a;
+}
+#bottomPanel {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 8px;
+    gap: 10px;
+}
+#statusMsg {
+    color: #ff6b6b;
+    padding: 6px 10px;
+    background: #0f0f1f;
+    border-radius: 5px;
+    font-size: 13px;
+    flex: 1;
+    min-height: 30px;
+    border: 1px solid #2a2a4a;
+}
+#statusMsg.info { color: #64d8ff; }
+#statusMsg.success { color: #69db7c; }
+#inventoryDisplay {
+    color: #a8e6cf;
+    font-size: 12px;
+    background: #0f0f1f;
+    padding: 4px 10px;
+    border-radius: 3px;
+    border: 1px solid #2a2a4a;
+    min-width: 80px;
+    text-align: center;
+}
+#gameOverlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.85);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    color: white;
+    z-index: 10;
+}
+#gameOverlay.show { display: flex; }
+#gameOverlay .title { font-size: 32px; margin-bottom: 10px; }
+#gameOverlay .sub { font-size: 18px; color: #aaa; margin-bottom: 20px; }
+#gameOverlay button {
+    background: #4a4a6a;
+    color: white;
+    border: 2px solid #6a6a8a;
+    padding: 10px 30px;
+    font-family: 'Courier New', monospace;
+    font-size: 16px;
+    cursor: pointer;
+}
+#gameOverlay button:hover { background: #5a5a8a; }
+.minimap {
+    display: grid;
+    grid-template-columns: repeat(3, 26px);
+    grid-template-rows: repeat(3, 26px);
+    gap: 2px;
+    background: #0f0f1f;
+    padding: 4px;
+    border-radius: 5px;
+    border: 1px solid #2a2a4a;
+    flex-shrink: 0;
+}
+.minimap-cell {
+    background: #1a3a1a;
+    border: 1px solid #2a2a4a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 7px;
+    color: #444;
+    position: relative;
+    cursor: pointer;
+}
+.minimap-cell.current { border: 2px solid #ffd93d; }
+.minimap-cell.has-jason { background: #4a0a0a; }
+.minimap-cell .dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    position: absolute;
+}
+.minimap-cell .dot.player { background: #ff6b6b; top: 2px; left: 2px; }
+.minimap-cell .dot.jason { 
+    background: #ff0000; bottom: 2px; right: 2px;
+    animation: pulse 0.5s infinite;
+}
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+.arrow-btn {
+    position: absolute;
+    background: rgba(255,255,255,0.08);
+    border: 2px solid rgba(255,255,255,0.2);
+    color: white;
+    font-size: 20px;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 5px;
+    z-index: 5;
+    transition: 0.2s;
+}
+.arrow-btn:hover { background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.4); }
+.arrow-btn.hidden { display: none; }
+.arrow-btn.top { top: 10px; left: 50%; transform: translateX(-50%); }
+.arrow-btn.bottom { bottom: 10px; left: 50%; transform: translateX(-50%); }
+.arrow-btn.left { left: 10px; top: 50%; transform: translateY(-50%); }
+.arrow-btn.right { right: 10px; top: 50%; transform: translateY(-50%); }
+#stageLabel {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(0,0,0,0.7);
+    color: #ffd93d;
+    padding: 4px 12px;
+    border-radius: 5px;
+    font-size: 13px;
+    z-index: 5;
+    border: 1px solid #ffd93d33;
+}
+</style>
 </head>
 <body>
 <div id="gameContainer">
     <div id="topPanel">
-        <span><span class="label">📅 日</span> <span class="value" id="dayDisplay">1</span>/7</span>
-        <span><span class="label">⏰</span> <span class="value" id="phaseDisplay">朝</span></span>
-        <span><span class="label">🏠 補強</span> <span class="value" id="defenseDisplay">0</span>/100</span>
-        <span id="inventoryDisplay">🎒 なし</span>
-        <span><span class="label">📌</span> <span class="value" id="stageDisplay">中央</span></span>
-        <span id="warehouseDisplay">🏚 木材:0/21</span>
+        <span>日 <span class="val" id="dayDisplay">1</span>/7</span>
+        <span><span class="val" id="phaseDisplay">朝</span></span>
+        <span>補強 <span class="val" id="defenseDisplay">0</span></span>
+        <span id="inventoryDisplay">[ なし ]</span>
+        <span><span class="val" id="stageDisplay">中央</span></span>
+        <span>木 <span class="val" id="woodDisplay">0</span>/20</span>
     </div>
     <div id="canvasWrapper">
-        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <canvas id="gameCanvas" width="1000" height="800"></canvas>
         <div id="stageLabel">ステージ: <span id="stageNameLabel">中央</span></div>
-        <div id="defenseLimit">補強上限: <span id="defenseLimitLabel">∞</span></div>
-        <div id="gameOverlay">
-            <div class="title" id="resultTitle">ゲームオーバー</div>
-            <div class="sub" id="resultSub">ジェイソンにやられた...</div>
-            <button id="restartBtn">🔄 やり直す</button>
-        </div>
-        <!-- 移動矢印 -->
         <div class="arrow-btn top" id="arrowUp">▲</div>
         <div class="arrow-btn bottom" id="arrowDown">▼</div>
         <div class="arrow-btn left" id="arrowLeft">◄</div>
         <div class="arrow-btn right" id="arrowRight">►</div>
+        <div id="gameOverlay">
+            <div class="title" id="resultTitle">ゲームオーバー</div>
+            <div class="sub" id="resultSub">ジェイソンにやられた...</div>
+            <button id="restartBtn">[ やり直す ]</button>
+        </div>
     </div>
     <div id="bottomPanel">
-        <div id="statusMsg">▶ マウスで移動 | クリックでアクション</div>
-        <div id="minimap"></div>
+        <div id="statusMsg">> クリックでアイテム取得 | 矢印で移動</div>
+        <div class="minimap" id="minimap"></div>
     </div>
-    <div class="controls-hint">矢印でステージ移動 | 倉庫ブロック(8) | 各ステージ補強上限あり</div>
 </div>
 
 <script>
 // ============================================================
-// ステージ構成: 森8 + 小屋外観(中央) + 家の中 = 10ステージ
+// ドット絵ステージ - 絵文字不使用
 // ============================================================
 
-const CELL = 40;
+const CELL = 50;
 const COLS = 20;
-const ROWS = 15;
-const STAGE_COUNT = 10;
-
-// ステージ定義
-// 0=左上,1=上,2=右上,3=左,4=中央(小屋),5=右,6=左下,7=下,8=右下,9=家の中
+const ROWS = 16;
 const STAGE_NAMES = ['左上','上','右上','左','小屋','右','左下','下','右下','家の中'];
 
-// 各ステージの補強上限
-const DEFENSE_LIMITS = {
-    0: 10, 1: 10, 2: 10, 3: 10, 4: 20, 5: 10, 6: 10, 7: 10, 8: 10, 9: 70
-};
-
 // ===== ステージマップ =====
-function createStageMaps() {
+// 0=森, 1=小屋/家, 2=倉庫(緑), 3=ドア前(茶色), 4=タンス, 5=ベッド, 6=窓
+function createMaps() {
     const maps = [];
-    // 0-8: 森ステージ (中央は小屋外観)
     for(let i=0; i<9; i++) {
         maps.push(Array(ROWS).fill().map(() => Array(COLS).fill(0)));
     }
-    // 中央ステージ(4)に小屋外観 (当たり判定なし、ただの見た目)
-    for(let r=5; r<=9; r++) {
-        for(let c=7; c<=11; c++) {
-            maps[4][r][c] = 1; // 小屋の見た目
+    
+    // === 中央ステージ(4): 小屋 ===
+    for(let r=5; r<=10; r++) {
+        for(let c=6; c<=13; c++) {
+            maps[4][r][c] = 1;
         }
     }
-    // 倉庫 (8ブロック)
+    // 倉庫 (緑)
     for(let i=0; i<8; i++) {
-        const col = 7 + (i % 4);
+        const col = 6 + (i % 4);
         const row = 11 + Math.floor(i / 4);
         maps[4][row][col] = 2;
     }
-    // ドア (クリックで家の中へ)
-    maps[4][9][8] = 3; // ドアマーク
+    // ドア前 (茶色)
+    maps[4][10][9] = 3;
+    maps[4][10][10] = 3;
+    maps[4][10][8] = 1;
+    maps[4][10][11] = 1;
     
-    // ステージ9: 家の中 (8x8)
-    const houseMap = Array(ROWS).fill().map(() => Array(COLS).fill(0));
-    for(let r=4; r<=10; r++) {
-        for(let c=6; c<=13; c++) {
-            houseMap[r][c] = 1;
+    // === ステージ9: 家の中 ===
+    const house = Array(ROWS).fill().map(() => Array(COLS).fill(0));
+    for(let r=4; r<=12; r++) {
+        for(let c=5; c<=14; c++) {
+            house[r][c] = 1;
         }
     }
-    // タンス (王将の範囲でアクション)
-    houseMap[7][10] = 4;
-    // ベッド
-    houseMap[8][8] = 5;
-    // 窓 (補強ポイント)
-    houseMap[6][7] = 6;
-    houseMap[6][12] = 6;
-    maps.push(houseMap);
+    // ベッド (青) - 左下
+    house[9][6] = 5;
+    house[9][7] = 5;
+    house[10][6] = 5;
+    house[10][7] = 5;
+    // タンス (茶色) - 右上
+    house[6][11] = 4;
+    house[6][12] = 4;
+    house[7][11] = 4;
+    house[7][12] = 4;
+    // 窓 - 上の方
+    house[5][7] = 6;
+    house[5][8] = 6;
+    house[5][12] = 6;
+    house[5][13] = 6;
+    // ドア
+    house[12][9] = 3;
+    house[12][10] = 3;
+    maps.push(house);
     
     return maps;
 }
 
-// ===== ドット絵描画関数 =====
-function drawPixelPerson(ctx, x, y, color, hairColor, isHero, hasWood) {
-    const s = 2;
-    ctx.fillStyle = hairColor;
-    ctx.fillRect(x-6*s, y-10*s, 12*s, 10*s);
-    ctx.fillStyle = '#f5d0b8';
-    ctx.fillRect(x-4*s, y-8*s, 8*s, 6*s);
-    ctx.fillStyle = '#000';
-    ctx.fillRect(x-3*s, y-6*s, 2*s, 2*s);
-    ctx.fillRect(x+1*s, y-6*s, 2*s, 2*s);
-    ctx.fillStyle = '#c0392b';
-    ctx.fillRect(x-1*s, y-3*s, 2*s, 1*s);
-    ctx.fillStyle = color;
-    ctx.fillRect(x-4*s, y, 8*s, 10*s);
-    ctx.fillRect(x-6*s, y+1*s, 2*s, 6*s);
-    ctx.fillRect(x+4*s, y+1*s, 2*s, 6*s);
-    ctx.fillStyle = '#2c3e50';
-    ctx.fillRect(x-3*s, y+10*s, 2*s, 4*s);
-    ctx.fillRect(x+1*s, y+10*s, 2*s, 4*s);
-    if(isHero) {
-        ctx.fillStyle = '#ffd700';
-        ctx.font = '14px "Courier New"';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'bottom';
-        ctx.fillText('★', x, y-12*s);
-    }
-    if(hasWood) {
-        ctx.fillStyle = '#8b6b4d';
-        ctx.fillRect(x+2*s, y-6*s, 4*s, 3*s);
-    }
-}
-
-function drawPixelBear(ctx, x, y, isHungry) {
-    const s = 2.5;
-    ctx.fillStyle = isHungry ? '#4a0a0a' : '#5d4037';
-    ctx.fillRect(x-8*s, y-3*s, 16*s, 10*s);
-    ctx.fillRect(x-6*s, y-8*s, 12*s, 8*s);
-    ctx.fillRect(x-8*s, y-10*s, 4*s, 5*s);
-    ctx.fillRect(x+4*s, y-10*s, 4*s, 5*s);
-    ctx.fillStyle = isHungry ? '#8b0000' : '#795548';
-    ctx.fillRect(x-7*s, y-9*s, 2*s, 3*s);
-    ctx.fillRect(x+5*s, y-9*s, 2*s, 3*s);
-    ctx.fillStyle = '#000';
-    ctx.fillRect(x-4*s, y-6*s, 2*s, 2*s);
-    ctx.fillRect(x+2*s, y-6*s, 2*s, 2*s);
-    ctx.fillStyle = isHungry ? '#ff0000' : '#333';
-    ctx.fillRect(x-1*s, y-4*s, 2*s, 2*s);
-    if(isHungry) {
-        ctx.fillStyle = '#ff0000';
-        ctx.font = '12px "Courier New"';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'bottom';
-        ctx.fillText('🔥', x, y-12*s);
-    }
-}
-
-function drawPixelWolf(ctx, x, y, isFed) {
-    const s = 1.8;
-    ctx.fillStyle = isFed ? '#78909c' : '#90a4ae';
-    ctx.fillRect(x-6*s, y-2*s, 12*s, 7*s);
-    ctx.fillRect(x-8*s, y-6*s, 8*s, 6*s);
-    ctx.fillRect(x-8*s, y-8*s, 3*s, 4*s);
-    ctx.fillRect(x-5*s, y-8*s, 3*s, 4*s);
-    ctx.fillStyle = '#000';
-    ctx.fillRect(x-6*s, y-4*s, 1.5*s, 1.5*s);
-    ctx.fillRect(x-3*s, y-4*s, 1.5*s, 1.5*s);
-    ctx.fillStyle = isFed ? '#ff8a80' : '#ff1744';
-    ctx.fillRect(x-5*s, y-1*s, 3*s, 1.5*s);
-    if(isFed) {
-        ctx.fillStyle = '#ff6b6b';
-        ctx.font = '10px "Courier New"';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'bottom';
-        ctx.fillText('❤', x, y-10*s);
-    }
-}
-
-function drawPixelJason(ctx, x, y) {
-    const s = 2.2;
-    ctx.fillStyle = '#e8e8e8';
-    ctx.fillRect(x-6*s, y-10*s, 12*s, 10*s);
-    ctx.fillStyle = '#1a1a2e';
-    ctx.fillRect(x-4*s, y-7*s, 2.5*s, 3*s);
-    ctx.fillRect(x+1.5*s, y-7*s, 2.5*s, 3*s);
-    ctx.fillRect(x-1*s, y-3*s, 2*s, 2*s);
-    ctx.fillStyle = '#2c3e50';
-    ctx.fillRect(x-5*s, y, 10*s, 10*s);
-    ctx.fillRect(x-7*s, y+2*s, 2*s, 6*s);
-    ctx.fillRect(x+5*s, y+2*s, 2*s, 6*s);
-    ctx.fillStyle = '#1a1a2e';
-    ctx.fillRect(x-3*s, y+10*s, 2*s, 4*s);
-    ctx.fillRect(x+1*s, y+10*s, 2*s, 4*s);
-    ctx.fillStyle = '#78909c';
-    ctx.fillRect(x+6*s, y-4*s, 1.5*s, 8*s);
-    ctx.fillRect(x+5*s, y-6*s, 3.5*s, 2*s);
-    ctx.fillStyle = '#ff1744';
-    ctx.fillRect(x+5.5*s, y-5*s, 2*s, 1*s);
-    ctx.fillStyle = '#8b0000';
-    ctx.fillRect(x-2*s, y+3*s, 1.5*s, 1.5*s);
-    ctx.fillRect(x+1*s, y+5*s, 1.5*s, 1.5*s);
-}
-
-// ===== ゲーム状態 =====
-const G = {
-    day: 1,
-    phase: 0,
-    phaseTimer: 0,
-    defense: 0,
-    gameOver: false,
-    won: false,
-    ended: false,
-    currentStage: 4,
-    maps: null,
-    player: null,
-    mouseX: 400,
-    mouseY: 300,
-    jason: null,
-    jasonSpeed: 10,
-    jasonMoveTimer: 0,
-    inventory: null,
-    woodStock: 0,
-    woodInWarehouse: 0,
-    reinforcedBlocks: 0,
-    items: {},
-    wolves: {},
-    bear: null,
-    windowReinforced: false,
-    trapSet: false,
-    wolfFed: false,
-    gunStored: false,
-    axeStored: false,
-    characters: {},
-    frame: 0,
-    // 補強フラグ (家の中)
-    houseDefenseDone: false,
-    // 各ステージの補強ポイント
-    stageDefense: {},
-    // 倉庫ブロック (8ブロック)
-    warehouseBlocks: new Array(8).fill(false)
-};
-
-// ===== ユーティリティ =====
-function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
-function dist(a, b) { return Math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2); }
-function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
-
-// ===== 初期化 =====
-function initGame() {
-    G.maps = createStageMaps();
-    
-    // プレイヤー
-    G.player = {
-        name: '紅葉',
-        x: 400,
-        y: 300,
-        stage: 4,
-        speed: 70,
-        color: '#e74c3c',
-        hairColor: '#e74c3c',
-        isHero: true,
-        alive: true,
-        hasWood: false
-    };
-    
-    // 9人のキャラクター (全員中央ステージ)
-    const charData = [
-        {name: '坪池', color: '#e74c3c', hair: '#c0392b', speed: 70},
-        {name: '加藤', color: '#3498db', hair: '#2980b9', speed: 40},
-        {name: '山崎', color: '#2ecc71', hair: '#27ae60', speed: 10},
-        {name: '松本', color: '#9b59b6', hair: '#8e44ad', speed: 60},
-        {name: '角田', color: '#f39c12', hair: '#d68910', speed: 20},
-        {name: '木元', color: '#1abc9c', hair: '#16a085', speed: 50},
-        {name: '市川', color: '#e67e22', hair: '#d35400', speed: 30},
-        {name: '青笹', color: '#2e86de', hair: '#1a5276', speed: 80}
-    ];
-    
-    G.characters = {};
-    charData.forEach((data, i) => {
-        G.characters[data.name] = {
-            name: data.name,
-            x: 300 + (i%4)*60 + rand(-20,20),
-            y: 200 + Math.floor(i/4)*80 + rand(-20,20),
-            stage: 4,
-            speed: data.speed,
-            color: data.color,
-            hairColor: data.hair,
-            isHero: false,
-            alive: true,
-            hasWood: false,
-            actionTimer: rand(0, 30),
-            targetX: 400,
-            targetY: 300
-        };
-    });
-    
-    // ジェイソン (森からスタート)
-    const forestStages = [0,1,2,3,5,6,7,8];
-    G.jason = {
-        stage: forestStages[rand(0, forestStages.length-1)],
-        x: rand(50, 750),
-        y: rand(50, 550),
-        speed: 10
-    };
-    G.jasonSpeed = 10;
-    G.jasonMoveTimer = 0;
-    
-    // アイテム (森のステージのみ)
-    G.items = {};
+// ===== 木の配置 =====
+function createTrees() {
+    const trees = {};
     for(let stage=0; stage<9; stage++) {
-        G.items[stage] = generateStageItems(stage);
-    }
-    G.items[9] = []; // 家の中にはアイテムなし
-    
-    // 狼 (森のみ)
-    G.wolves = {};
-    for(let stage=0; stage<9; stage++) {
-        G.wolves[stage] = generateStageWolves(stage);
-    }
-    G.wolves[9] = [];
-    
-    // 熊
-    const bearStage = rand(0, 8);
-    while(bearStage === 4) bearStage = rand(0, 8);
-    const bearMap = G.maps[bearStage];
-    const cells = [];
-    for(let r=0; r<ROWS; r++) {
-        for(let c=0; c<COLS; c++) {
-            if(bearMap[r][c] === 0) cells.push({x: c*CELL+CELL/2, y: r*CELL+CELL/2});
+        const stageTrees = [];
+        const count = stage === 4 ? 3 : 6 + Math.floor(Math.random() * 3);
+        for(let i=0; i<count; i++) {
+            let x, y, valid;
+            let attempts = 0;
+            do {
+                x = 30 + Math.random() * 940;
+                y = 30 + Math.random() * 740;
+                valid = true;
+                if(stage === 4) {
+                    if(x > 300 && x < 700 && y > 250 && y < 550) valid = false;
+                    if(x > 300 && x < 550 && y > 550 && y < 650) valid = false;
+                }
+                for(let t of stageTrees) {
+                    if(Math.abs(t.x - x) < 60 && Math.abs(t.y - y) < 60) valid = false;
+                }
+                attempts++;
+            } while(!valid && attempts < 30);
+            if(valid) {
+                stageTrees.push({x: x, y: y, w: 40, h: 40});
+            }
         }
+        trees[stage] = stageTrees;
     }
-    const pos = cells[rand(0, cells.length-1)] || {x: 400, y: 300};
-    G.bear = {
-        stage: bearStage,
-        x: pos.x,
-        y: pos.y,
-        speed: 60,
-        isHungry: false,
-        alive: true,
-        hungryDays: new Set(),
-        moveTimer: 0
-    };
-    while(G.bear.hungryDays.size < 2) {
-        G.bear.hungryDays.add(rand(1, 7));
-    }
-    
-    // 倉庫
-    G.woodInWarehouse = 0;
-    G.warehouseBlocks = new Array(8).fill(false);
-    G.reinforcedBlocks = 0;
-    
-    // 補強フラグ
-    G.windowReinforced = false;
-    G.trapSet = false;
-    G.wolfFed = false;
-    G.gunStored = false;
-    G.axeStored = false;
-    G.houseDefenseDone = false;
-    
-    // 各ステージの補強ポイント
-    G.stageDefense = {};
-    for(let i=0; i<10; i++) {
-        G.stageDefense[i] = 0;
-    }
-    
-    // リセット
-    G.day = 1;
-    G.phase = 0;
-    G.phaseTimer = 0;
-    G.defense = 0;
-    G.inventory = null;
-    G.woodStock = 0;
-    G.gameOver = false;
-    G.won = false;
-    G.ended = false;
-    G.currentStage = 4;
-    G.frame = 0;
-    
-    updateUI();
-    updateMinimap();
-    updateArrows();
-    document.getElementById('gameOverlay').classList.remove('show');
-    document.getElementById('statusMsg').textContent = '▶ ゲームスタート！ 森で木材を集めて倉庫へ！';
-    document.getElementById('statusMsg').className = 'info';
+    trees[9] = [];
+    return trees;
 }
 
-// ===== ステージアイテム生成 =====
-function generateStageItems(stage) {
-    if(stage === 4) return []; // 小屋にはアイテムなし
-    const map = G.maps[stage];
-    const cells = [];
-    for(let r=0; r<ROWS; r++) {
-        for(let c=0; c<COLS; c++) {
-            if(map[r][c] === 0) cells.push({x: c*CELL+CELL/2, y: r*CELL+CELL/2});
+// ===== アイテム配置 =====
+function createItems() {
+    const items = {};
+    for(let stage=0; stage<9; stage++) {
+        const stageItems = [];
+        const cells = [];
+        for(let r=0; r<ROWS; r++) {
+            for(let c=0; c<COLS; c++) {
+                if(maps[stage][r][c] === 0) {
+                    cells.push({x: c*CELL + CELL/2, y: r*CELL + CELL/2});
+                }
+            }
         }
-    }
-    for(let i=cells.length-1; i>0; i--) {
-        const j = rand(0, i);
-        [cells[i], cells[j]] = [cells[j], cells[i]];
-    }
-    const items = [];
-    // 木材 (21個)
-    for(let i=0; i<21; i++) {
-        if(i < cells.length) {
-            items.push({
-                x: cells[i].x,
-                y: cells[i].y,
-                type: '木材',
-                collected: false,
-                isWood: true
-            });
+        for(let i=cells.length-1; i>0; i--) {
+            const j = Math.floor(Math.random() * (i+1));
+            [cells[i], cells[j]] = [cells[j], cells[i]];
         }
-    }
-    // アイテム
-    const specialItems = ['スコップ', '狼の餌', '銃', '斧'];
-    let idx = 21;
-    for(let type of specialItems) {
-        if(idx < cells.length) {
-            items.push({
+        const woodPerStage = [3,3,3,3,0,2,2,2,2];
+        let idx = 0;
+        for(let i=0; i<woodPerStage[stage] && i<cells.length; i++) {
+            stageItems.push({
                 x: cells[idx].x,
                 y: cells[idx].y,
-                type: type,
+                type: '木材',
                 collected: false,
-                isWood: false
+                color: '#ff8c00'
             });
             idx++;
         }
+        const specialItems = ['スコップ', '狼の餌', '銃', '斧'];
+        for(let si of specialItems) {
+            if(idx < cells.length) {
+                stageItems.push({
+                    x: cells[idx].x,
+                    y: cells[idx].y,
+                    type: si,
+                    collected: false,
+                    color: si === 'スコップ' ? '#b8860b' : '#ff6b6b'
+                });
+                idx++;
+            }
+        }
+        items[stage] = stageItems;
     }
+    items[9] = [];
     return items;
 }
 
-// ===== ステージ狼生成 =====
-function generateStageWolves(stage) {
-    if(stage === 4) return [];
-    const map = G.maps[stage];
-    const cells = [];
-    for(let r=0; r<ROWS; r++) {
-        for(let c=0; c<COLS; c++) {
-            if(map[r][c] === 0) cells.push({x: c*CELL+CELL/2, y: r*CELL+CELL/2});
+// ===== 狼の配置 =====
+function createWolves() {
+    const wolves = {};
+    for(let stage=0; stage<9; stage++) {
+        if(stage === 4) { wolves[stage] = []; continue; }
+        const cells = [];
+        for(let r=0; r<ROWS; r++) {
+            for(let c=0; c<COLS; c++) {
+                if(maps[stage][r][c] === 0) {
+                    cells.push({x: c*CELL + CELL/2, y: r*CELL + CELL/2});
+                }
+            }
         }
-    }
-    const wolves = [];
-    const count = rand(0, 2);
-    for(let i=0; i<count; i++) {
-        if(cells.length > 0) {
-            const idx = rand(0, cells.length-1);
-            wolves.push({
+        const count = Math.floor(Math.random() * 2);
+        const stageWolves = [];
+        for(let i=0; i<count && cells.length>0; i++) {
+            const idx = Math.floor(Math.random() * cells.length);
+            stageWolves.push({
                 x: cells[idx].x,
                 y: cells[idx].y,
                 speed: 40,
@@ -661,16 +376,156 @@ function generateStageWolves(stage) {
                 alive: true,
                 targetX: cells[idx].x,
                 targetY: cells[idx].y,
-                moveTimer: rand(0, 30),
-                stage: stage
+                moveTimer: Math.floor(Math.random() * 30)
             });
             cells.splice(idx, 1);
         }
+        wolves[stage] = stageWolves;
     }
+    wolves[9] = [];
     return wolves;
 }
 
-// ===== フェーズ更新 =====
+// ===== キャラクター =====
+function initCharacters() {
+    const names = ['坪池','加藤','山崎','松本','角田','木元','市川','青笹'];
+    const colors = ['#e74c3c','#3498db','#2ecc71','#9b59b6','#f39c12','#1abc9c','#e67e22','#2e86de'];
+    const chars = {};
+    names.forEach((name, i) => {
+        chars[name] = {
+            x: 200 + i * 70 + Math.random() * 30,
+            y: 200 + Math.floor(i/4) * 100 + Math.random() * 30,
+            stage: 4,
+            speed: [70,40,10,60,20,50,30,80][i],
+            color: colors[i],
+            alive: true,
+            hasWood: false,
+            actionTimer: Math.floor(Math.random() * 30),
+            targetX: 400,
+            targetY: 300
+        };
+    });
+    return chars;
+}
+
+// ===== グローバル =====
+const G = {
+    maps: null,
+    trees: null,
+    items: null,
+    wolves: null,
+    characters: null,
+    day: 1,
+    phase: 0,
+    phaseTimer: 0,
+    defense: 0,
+    woodCount: 0,
+    maxWood: 20,
+    player: { x: 500, y: 400, stage: 4, speed: 70, size: 20 },
+    mouseX: 500,
+    mouseY: 400,
+    jason: { x: 50, y: 50, stage: 0, speed: 10 },
+    jasonSpeed: 10,
+    jasonTimer: 0,
+    inventory: null,
+    currentStage: 4,
+    windowReinforced: false,
+    trapSet: false,
+    wolfFed: false,
+    gunStored: false,
+    axeStored: false,
+    reinforcedBlocks: 0,
+    woodInWarehouse: 0,
+    gameOver: false,
+    won: false,
+    ended: false,
+    frame: 0
+};
+
+// ===== 衝突判定 =====
+function isBlocked(x, y, stage, size) {
+    const half = size || 20;
+    if(x - half < 0 || x + half > 1000 || y - half < 0 || y + half > 800) return true;
+    const map = G.maps[stage];
+    const col = Math.floor(x / CELL);
+    const row = Math.floor(y / CELL);
+    if(col < 0 || col >= COLS || row < 0 || row >= ROWS) return true;
+    if(map[row] && map[row][col] === 1) return true;
+    if(map[row] && map[row][col] === 2) return true;
+    if(map[row] && map[row][col] === 3) return true;
+    if(map[row] && map[row][col] === 4) return true;
+    if(map[row] && map[row][col] === 5) return true;
+    const trees = G.trees[stage] || [];
+    for(let tree of trees) {
+        if(Math.abs(x - tree.x) < tree.w/2 + half && Math.abs(y - tree.y) < tree.h/2 + half) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function tryMove(obj, dx, dy, stage) {
+    const size = obj.size || 20;
+    if(!isBlocked(obj.x + dx, obj.y, stage, size)) {
+        obj.x += dx;
+    }
+    if(!isBlocked(obj.x, obj.y + dy, stage, size)) {
+        obj.y += dy;
+    }
+    obj.x = Math.max(20, Math.min(980, obj.x));
+    obj.y = Math.max(20, Math.min(780, obj.y));
+}
+
+// ===== 初期化 =====
+function initGame() {
+    G.maps = createMaps();
+    G.trees = createTrees();
+    G.items = createItems();
+    G.wolves = createWolves();
+    G.characters = initCharacters();
+    
+    G.player.x = 500;
+    G.player.y = 400;
+    G.player.stage = 4;
+    G.mouseX = 500;
+    G.mouseY = 400;
+    
+    const forestStages = [0,1,2,3,5,6,7,8];
+    G.jason.stage = forestStages[Math.floor(Math.random() * forestStages.length)];
+    G.jason.x = 50 + Math.random() * 900;
+    G.jason.y = 50 + Math.random() * 700;
+    G.jason.speed = 10;
+    G.jasonSpeed = 10;
+    G.jasonTimer = 0;
+    
+    G.day = 1;
+    G.phase = 0;
+    G.phaseTimer = 0;
+    G.defense = 0;
+    G.woodCount = 0;
+    G.inventory = null;
+    G.currentStage = 4;
+    G.windowReinforced = false;
+    G.trapSet = false;
+    G.wolfFed = false;
+    G.gunStored = false;
+    G.axeStored = false;
+    G.reinforcedBlocks = 0;
+    G.woodInWarehouse = 0;
+    G.gameOver = false;
+    G.won = false;
+    G.ended = false;
+    G.frame = 0;
+    
+    document.getElementById('gameOverlay').classList.remove('show');
+    updateUI();
+    updateMinimap();
+    updateArrows();
+    document.getElementById('statusMsg').textContent = '> クリックでアイテム取得 | 矢印で移動';
+    document.getElementById('statusMsg').className = 'info';
+}
+
+// ===== フェーズ =====
 function updatePhase() {
     G.phaseTimer++;
     if(G.phaseTimer >= 30) {
@@ -678,15 +533,9 @@ function updatePhase() {
         G.phase = (G.phase + 1) % 3;
         if(G.phase === 0) {
             G.day++;
-            if(G.day > 7) {
-                endGame();
-                return;
-            }
+            if(G.day > 7) { endGame(); return; }
             G.jasonSpeed = Math.min(70, 10 + (G.day-1) * 10);
             G.jason.speed = G.jasonSpeed;
-            if(G.bear) {
-                G.bear.isHungry = G.bear.hungryDays.has(G.day);
-            }
             updateUI();
         }
         const phaseNames = ['朝', '昼', '夜'];
@@ -695,15 +544,15 @@ function updatePhase() {
     }
 }
 
-// ===== ジェイソン移動 =====
+// ===== ジェイソン =====
 function updateJason() {
     if(G.gameOver || G.ended) return;
-    const jason = G.jason;
     const player = G.player;
+    const jason = G.jason;
     
-    G.jasonMoveTimer++;
-    if(G.jasonMoveTimer > 40 + rand(0, 40)) {
-        G.jasonMoveTimer = 0;
+    G.jasonTimer++;
+    if(G.jasonTimer > 40 + Math.random() * 40) {
+        G.jasonTimer = 0;
         const current = jason.stage;
         const row = Math.floor(current / 3);
         const col = current % 3;
@@ -712,16 +561,16 @@ function updateJason() {
         if(row < 2) neighbors.push(current + 3);
         if(col > 0) neighbors.push(current - 1);
         if(col < 2) neighbors.push(current + 1);
-        if(current === 4 || current === 9) {
-            neighbors.push(current === 4 ? 9 : 4);
-        }
-        if(neighbors.includes(player.stage) && Math.random() < 0.4) {
+        if(current === 4) neighbors.push(9);
+        if(current === 9) neighbors.push(4);
+        
+        if(neighbors.includes(player.stage) && Math.random() < 0.35) {
             jason.stage = player.stage;
         } else {
-            jason.stage = neighbors[rand(0, neighbors.length-1)];
+            jason.stage = neighbors[Math.floor(Math.random() * neighbors.length)];
         }
-        jason.x = rand(50, 750);
-        jason.y = rand(50, 550);
+        jason.x = 50 + Math.random() * 900;
+        jason.y = 50 + Math.random() * 700;
     }
     
     if(jason.stage === player.stage && player.alive) {
@@ -729,71 +578,43 @@ function updateJason() {
         const dy = player.y - jason.y;
         const d = Math.sqrt(dx*dx + dy*dy);
         if(d > 20) {
-            const speed = jason.speed * 0.15;
-            jason.x += (dx/d) * Math.min(speed, d);
-            jason.y += (dy/d) * Math.min(speed, d);
+            const speed = jason.speed * 0.12;
+            const mx = (dx/d) * Math.min(speed, d);
+            const my = (dy/d) * Math.min(speed, d);
+            tryMove(jason, mx, my, jason.stage);
         }
-        if(d < 25) {
+        if(d < 30) {
             gameOver(false, 'ジェイソンに捕まった...');
         }
     }
-    jason.x = clamp(jason.x, 20, 780);
-    jason.y = clamp(jason.y, 20, 580);
 }
 
-// ===== キャラクター移動 =====
-function updateCharacters() {
+// ===== プレイヤー =====
+function updatePlayer() {
     if(G.gameOver || G.ended) return;
     const player = G.player;
-    
-    // プレイヤー移動
     const dx = G.mouseX - player.x;
     const dy = G.mouseY - player.y;
     const d = Math.sqrt(dx*dx + dy*dy);
     if(d > 5) {
-        const speed = player.speed * 0.15;
-        player.x += (dx/d) * Math.min(speed, d);
-        player.y += (dy/d) * Math.min(speed, d);
+        const speed = player.speed * 0.12;
+        const mx = (dx/d) * Math.min(speed, d);
+        const my = (dy/d) * Math.min(speed, d);
+        tryMove(player, mx, my, player.stage);
     }
-    player.x = clamp(player.x, 20, 780);
-    player.y = clamp(player.y, 20, 580);
-    
-    // ドアクリックで家の中へ (小屋ステージのみ)
-    if(G.currentStage === 4) {
-        const col = Math.floor(player.x / CELL);
-        const row = Math.floor(player.y / CELL);
-        // ドアの位置 (8,9)
-        if(col >= 7 && col <= 9 && row >= 8 && row <= 10) {
-            // ドアの範囲内
-        }
-    }
-    
-    // 家の中から外へ
-    if(G.currentStage === 9) {
-        const col = Math.floor(player.x / CELL);
-        const row = Math.floor(player.y / CELL);
-        if(col < 6 || col > 13 || row < 4 || row > 10) {
-            // 家の外に出たら小屋ステージへ
-            moveToStage(4);
-            player.x = 400;
-            player.y = 380;
-        }
-    }
-    
-    // 他のキャラクター (家の中には入れない)
+}
+
+// ===== モブ =====
+function updateMobs() {
+    if(G.gameOver || G.ended) return;
     for(let name in G.characters) {
         const char = G.characters[name];
         if(!char.alive) continue;
-        if(char.stage === 9) {
-            // 家の中にいる場合は外に出す
-            char.stage = 4;
-            char.x = rand(50, 750);
-            char.y = rand(50, 550);
-        }
-        char.actionTimer = (char.actionTimer || 0) + 1;
-        if(char.actionTimer > 30 + rand(0, 20)) {
+        if(char.stage === 9) { char.stage = 4; continue; }
+        char.actionTimer++;
+        if(char.actionTimer > 30 + Math.random() * 20) {
             char.actionTimer = 0;
-            if(Math.random() < 0.4) {
+            if(Math.random() < 0.3) {
                 const current = char.stage;
                 const row = Math.floor(current / 3);
                 const col = current % 3;
@@ -802,153 +623,55 @@ function updateCharacters() {
                 if(row < 2) neighbors.push(current + 3);
                 if(col > 0) neighbors.push(current - 1);
                 if(col < 2) neighbors.push(current + 1);
-                if(current === 4) neighbors.push(9);
-                char.stage = neighbors[rand(0, neighbors.length-1)];
-                char.x = rand(50, 750);
-                char.y = rand(50, 550);
+                char.stage = neighbors[Math.floor(Math.random() * neighbors.length)];
+                char.x = 50 + Math.random() * 900;
+                char.y = 50 + Math.random() * 700;
             } else {
-                char.targetX = rand(50, 750);
-                char.targetY = rand(50, 550);
+                char.targetX = 50 + Math.random() * 900;
+                char.targetY = 50 + Math.random() * 700;
             }
         }
         if(char.stage === G.currentStage) {
-            const dx2 = char.targetX - char.x;
-            const dy2 = char.targetY - char.y;
-            const d2 = Math.sqrt(dx2*dx2 + dy2*dy2);
-            if(d2 > 10) {
-                char.x += (dx2/d2) * Math.min(char.speed * 0.08, d2);
-                char.y += (dy2/d2) * Math.min(char.speed * 0.08, d2);
-            }
-        }
-        char.x = clamp(char.x, 20, 780);
-        char.y = clamp(char.y, 20, 580);
-    }
-}
-
-// ===== 熊の更新 =====
-function updateBear() {
-    if(G.gameOver || G.ended) return;
-    if(!G.bear || !G.bear.alive) return;
-    const bear = G.bear;
-    const player = G.player;
-    
-    if(bear.stage === player.stage && bear.isHungry && player.alive) {
-        const dx = player.x - bear.x;
-        const dy = player.y - bear.y;
-        const d = Math.sqrt(dx*dx + dy*dy);
-        if(d > 15) {
-            bear.x += (dx/d) * Math.min(bear.speed * 0.12, d);
-            bear.y += (dy/d) * Math.min(bear.speed * 0.12, d);
-        }
-        if(d < 30) {
-            gameOver(false, '熊に襲われた...');
-        }
-    } else {
-        bear.moveTimer = (bear.moveTimer || 0) + 1;
-        if(bear.moveTimer > 50) {
-            bear.moveTimer = 0;
-            bear.targetX = rand(50, 750);
-            bear.targetY = rand(50, 550);
-        }
-        if(bear.targetX !== undefined) {
-            const dx = bear.targetX - bear.x;
-            const dy = bear.targetY - bear.y;
+            const dx = char.targetX - char.x;
+            const dy = char.targetY - char.y;
             const d = Math.sqrt(dx*dx + dy*dy);
             if(d > 10) {
-                bear.x += (dx/d) * Math.min(bear.speed * 0.05, d);
-                bear.y += (dy/d) * Math.min(bear.speed * 0.05, d);
+                const speed = char.speed * 0.08;
+                const mx = (dx/d) * Math.min(speed, d);
+                const my = (dy/d) * Math.min(speed, d);
+                tryMove(char, mx, my, char.stage);
             }
         }
     }
-    bear.x = clamp(bear.x, 20, 780);
-    bear.y = clamp(bear.y, 20, 580);
 }
 
-// ===== 狼の更新 =====
+// ===== 狼 =====
 function updateWolves() {
     if(G.gameOver || G.ended) return;
     for(let stage in G.wolves) {
         for(let wolf of G.wolves[stage]) {
             if(!wolf.alive) continue;
-            wolf.moveTimer = (wolf.moveTimer || 0) + 1;
-            if(wolf.moveTimer > 30 + rand(0, 30)) {
+            wolf.moveTimer++;
+            if(wolf.moveTimer > 30 + Math.random() * 30) {
                 wolf.moveTimer = 0;
-                wolf.targetX = rand(50, 750);
-                wolf.targetY = rand(50, 550);
+                wolf.targetX = 50 + Math.random() * 900;
+                wolf.targetY = 50 + Math.random() * 700;
             }
             if(wolf.stage === G.currentStage) {
                 const dx = wolf.targetX - wolf.x;
                 const dy = wolf.targetY - wolf.y;
                 const d = Math.sqrt(dx*dx + dy*dy);
                 if(d > 10) {
-                    wolf.x += (dx/d) * Math.min(wolf.speed * 0.08, d);
-                    wolf.y += (dy/d) * Math.min(wolf.speed * 0.08, d);
+                    const speed = wolf.speed * 0.08;
+                    const mx = (dx/d) * Math.min(speed, d);
+                    const my = (dy/d) * Math.min(speed, d);
+                    tryMove(wolf, mx, my, parseInt(stage));
                 }
             }
-            wolf.x = clamp(wolf.x, 20, 780);
-            wolf.y = clamp(wolf.y, 20, 580);
+            wolf.x = Math.max(20, Math.min(980, wolf.x));
+            wolf.y = Math.max(20, Math.min(780, wolf.y));
         }
     }
-}
-
-// ===== ステージ移動 (矢印) =====
-function moveStage(direction) {
-    if(G.gameOver || G.ended) return;
-    const current = G.currentStage;
-    let target = current;
-    
-    // 家の中からは外にしか出られない
-    if(current === 9) {
-        moveToStage(4);
-        G.player.x = 400;
-        G.player.y = 380;
-        return;
-    }
-    
-    const row = Math.floor(current / 3);
-    const col = current % 3;
-    
-    switch(direction) {
-        case 'up': if(row > 0) target = current - 3; break;
-        case 'down': if(row < 2) target = current + 3; break;
-        case 'left': if(col > 0) target = current - 1; break;
-        case 'right': if(col < 2) target = current + 1; break;
-    }
-    
-    if(target !== current) {
-        moveToStage(target);
-        // プレイヤーを端に移動
-        if(direction === 'up') G.player.y = 580;
-        else if(direction === 'down') G.player.y = 20;
-        else if(direction === 'left') G.player.x = 780;
-        else if(direction === 'right') G.player.x = 20;
-    }
-}
-
-// ===== ステージ移動 =====
-function moveToStage(stage) {
-    if(stage < 0 || stage > 9) return;
-    if(stage === G.currentStage) return;
-    G.currentStage = stage;
-    document.getElementById('stageDisplay').textContent = STAGE_NAMES[stage] || stage;
-    document.getElementById('stageNameLabel').textContent = STAGE_NAMES[stage] || stage;
-    const limit = DEFENSE_LIMITS[stage] || 100;
-    document.getElementById('defenseLimitLabel').textContent = limit === 100 ? '∞' : limit;
-    updateMinimap();
-    updateArrows();
-}
-
-// ===== 矢印表示更新 =====
-function updateArrows() {
-    const current = G.currentStage;
-    const isHouse = current === 9;
-    const row = Math.floor(current / 3);
-    const col = current % 3;
-    
-    document.getElementById('arrowUp').classList.toggle('hidden', isHouse || row === 0);
-    document.getElementById('arrowDown').classList.toggle('hidden', isHouse || row === 2);
-    document.getElementById('arrowLeft').classList.toggle('hidden', isHouse || col === 0);
-    document.getElementById('arrowRight').classList.toggle('hidden', isHouse || col === 2);
 }
 
 // ===== クリック処理 =====
@@ -957,17 +680,39 @@ function handleClick() {
     const player = G.player;
     const stage = G.currentStage;
     
-    // === ドアクリック (小屋ステージのみ) ===
+    // === ドアクリック (小屋→家の中) ===
     if(stage === 4) {
         const col = Math.floor(player.x / CELL);
         const row = Math.floor(player.y / CELL);
-        // ドア位置 (8,9)
-        if(col >= 7 && col <= 9 && row >= 8 && row <= 10) {
-            // 家の中へ
-            moveToStage(9);
-            player.x = 400;
-            player.y = 300;
-            document.getElementById('statusMsg').textContent = '🏠 家の中に入った!';
+        if((row === 10 && col === 9) || (row === 10 && col === 10)) {
+            G.currentStage = 9;
+            player.x = 500;
+            player.y = 400;
+            document.getElementById('stageDisplay').textContent = '家の中';
+            document.getElementById('stageNameLabel').textContent = '家の中';
+            updateUI();
+            updateMinimap();
+            updateArrows();
+            document.getElementById('statusMsg').textContent = '[ 家の中に入った ]';
+            document.getElementById('statusMsg').className = 'info';
+            return;
+        }
+    }
+    
+    // === 家の中から外 ===
+    if(stage === 9) {
+        const col = Math.floor(player.x / CELL);
+        const row = Math.floor(player.y / CELL);
+        if(col < 5 || col > 14 || row < 4 || row > 12) {
+            G.currentStage = 4;
+            player.x = 500;
+            player.y = 480;
+            document.getElementById('stageDisplay').textContent = '小屋';
+            document.getElementById('stageNameLabel').textContent = '小屋';
+            updateUI();
+            updateMinimap();
+            updateArrows();
+            document.getElementById('statusMsg').textContent = '[ 外に出た ]';
             document.getElementById('statusMsg').className = 'info';
             return;
         }
@@ -977,69 +722,97 @@ function handleClick() {
     const items = G.items[stage] || [];
     for(let item of items) {
         if(item.collected) continue;
-        if(dist(player, item) < 35) {
-            if(item.isWood) {
-                G.woodStock++;
-                item.collected = true;
-                document.getElementById('statusMsg').textContent = `🌲 木材を拾った! (${G.woodStock}/21)`;
-                document.getElementById('statusMsg').className = 'success';
-                updateUI();
-                return;
+        const d = Math.sqrt((player.x - item.x)**2 + (player.y - item.y)**2);
+        if(d < 45) {
+            if(item.type === '木材') {
+                if(G.woodCount < G.maxWood) {
+                    G.woodCount++;
+                    item.collected = true;
+                    document.getElementById('statusMsg').textContent = '[ 木材を拾った ] ' + G.woodCount + '/' + G.maxWood;
+                    document.getElementById('statusMsg').className = 'success';
+                    updateUI();
+                    return;
+                } else {
+                    document.getElementById('statusMsg').textContent = '[ 木材はもういっぱい ]';
+                    document.getElementById('statusMsg').className = '';
+                    return;
+                }
             } else if(G.inventory === null) {
                 G.inventory = item.type;
                 item.collected = true;
-                document.getElementById('statusMsg').textContent = `🎒 ${item.type}を拾った!`;
+                document.getElementById('statusMsg').textContent = '[ ' + item.type + 'を拾った ]';
                 document.getElementById('statusMsg').className = 'success';
                 updateUI();
                 return;
             } else {
-                document.getElementById('statusMsg').textContent = '⚠ インベントリが一杯!';
+                document.getElementById('statusMsg').textContent = '[ インベントリが一杯 ]';
                 document.getElementById('statusMsg').className = '';
                 return;
             }
         }
     }
     
-    // === 倉庫アクション (小屋ステージ) ===
+    // === 倉庫(緑) ===
     if(stage === 4) {
         const col = Math.floor(player.x / CELL);
         const row = Math.floor(player.y / CELL);
-        // 倉庫エリア (7-10, 11-12)
-        if(col >= 7 && col <= 10 && row >= 11 && row <= 12) {
-            if(G.woodStock > 0) {
-                const toStore = Math.min(G.woodStock, 21 - G.woodInWarehouse);
-                G.woodStock -= toStore;
+        if(col >= 6 && col <= 9 && row >= 11 && row <= 12) {
+            if(G.woodCount > 0) {
+                const toStore = Math.min(G.woodCount, 20 - G.woodInWarehouse);
+                G.woodCount -= toStore;
                 G.woodInWarehouse += toStore;
-                
                 while(G.woodInWarehouse >= 3 && G.reinforcedBlocks < 8) {
                     G.woodInWarehouse -= 3;
                     G.reinforcedBlocks++;
                     G.defense += 10;
-                    document.getElementById('statusMsg').textContent = `🔨 補強材出現! (${G.reinforcedBlocks}/8) +10ポイント`;
+                    document.getElementById('statusMsg').textContent = '[ 補強材出現 ] +10 (' + G.reinforcedBlocks + '/8)';
                     document.getElementById('statusMsg').className = 'success';
                 }
                 updateUI();
                 return;
             } else {
-                document.getElementById('statusMsg').textContent = `📦 倉庫: ${G.woodInWarehouse}/21 (あと${3 - (G.woodInWarehouse%3)}個で補強材)`;
+                document.getElementById('statusMsg').textContent = '[ 倉庫: ' + G.woodInWarehouse + '/20 ]';
                 document.getElementById('statusMsg').className = 'info';
                 return;
             }
         }
     }
     
-    // === 家の中のアクション ===
+    // === ドア前(茶色) - スコップ ===
+    if(stage === 4) {
+        const col = Math.floor(player.x / CELL);
+        const row = Math.floor(player.y / CELL);
+        if((row === 10 && col === 9) || (row === 10 && col === 10)) {
+            if(G.inventory === 'スコップ' && !G.trapSet) {
+                G.trapSet = true;
+                G.defense += 10;
+                G.inventory = null;
+                document.getElementById('statusMsg').textContent = '[ 落とし穴を掘った ] +10';
+                document.getElementById('statusMsg').className = 'success';
+                updateUI();
+                return;
+            } else if(G.trapSet) {
+                document.getElementById('statusMsg').textContent = '[ もう掘ってある ]';
+                document.getElementById('statusMsg').className = '';
+                return;
+            } else {
+                document.getElementById('statusMsg').textContent = '[ スコップが必要 ]';
+                document.getElementById('statusMsg').className = '';
+                return;
+            }
+        }
+    }
+    
+    // === 家の中 - タンス ===
     if(stage === 9) {
         const col = Math.floor(player.x / CELL);
         const row = Math.floor(player.y / CELL);
-        
-        // タンス (7,10)
-        if(col >= 9 && col <= 11 && row >= 6 && row <= 8) {
+        if(col >= 11 && col <= 12 && row >= 6 && row <= 7) {
             if(G.inventory === '銃' && !G.gunStored) {
                 G.gunStored = true;
                 G.defense += 10;
                 G.inventory = null;
-                document.getElementById('statusMsg').textContent = '🔫 銃をタンスにしまった! +10ポイント';
+                document.getElementById('statusMsg').textContent = '[ 銃をタンスに ] +10';
                 document.getElementById('statusMsg').className = 'success';
                 updateUI();
                 return;
@@ -1047,116 +820,139 @@ function handleClick() {
                 G.axeStored = true;
                 G.defense += 10;
                 G.inventory = null;
-                document.getElementById('statusMsg').textContent = '🪓 斧をタンスにしまった! +10ポイント';
+                document.getElementById('statusMsg').textContent = '[ 斧をタンスに ] +10';
                 document.getElementById('statusMsg').className = 'success';
                 updateUI();
                 return;
-            } else if(G.reinforcedBlocks > 0 && G.stageDefense[9] < 70) {
-                const add = Math.min(G.reinforcedBlocks, 70 - G.stageDefense[9]);
+            } else if(G.reinforcedBlocks > 0) {
+                const add = Math.min(G.reinforcedBlocks, 7 - G.reinforcedBlocks);
                 G.reinforcedBlocks -= add;
                 G.defense += add * 10;
-                G.stageDefense[9] += add * 10;
-                document.getElementById('statusMsg').textContent = `📦 補強材をタンスに! +${add*10}ポイント`;
+                document.getElementById('statusMsg').textContent = '[ 補強材をタンスに ] +' + (add*10);
                 document.getElementById('statusMsg').className = 'success';
                 updateUI();
                 return;
             } else {
-                document.getElementById('statusMsg').textContent = '❌ タンスに置けるものがない';
+                document.getElementById('statusMsg').textContent = '[ タンスに置けるものがない ]';
+                document.getElementById('statusMsg').className = '';
+                return;
+            }
+        }
+        // === 家の中 - 窓補強 ===
+        if((col === 7 || col === 8) && row === 5) {
+            if(G.inventory === '木材' && G.woodCount >= 3 && !G.windowReinforced) {
+                G.woodCount -= 3;
+                G.windowReinforced = true;
+                G.defense += 10;
+                G.inventory = null;
+                document.getElementById('statusMsg').textContent = '[ 窓を補強 ] +10';
+                document.getElementById('statusMsg').className = 'success';
+                updateUI();
+                return;
+            } else if(G.windowReinforced) {
+                document.getElementById('statusMsg').textContent = '[ もう補強済み ]';
+                document.getElementById('statusMsg').className = '';
+                return;
+            } else {
+                document.getElementById('statusMsg').textContent = '[ 木材3個必要 ]';
+                document.getElementById('statusMsg').className = '';
+                return;
+            }
+        }
+        if((col === 12 || col === 13) && row === 5) {
+            if(G.inventory === '木材' && G.woodCount >= 3 && !G.windowReinforced) {
+                G.woodCount -= 3;
+                G.windowReinforced = true;
+                G.defense += 10;
+                G.inventory = null;
+                document.getElementById('statusMsg').textContent = '[ 窓を補強 ] +10';
+                document.getElementById('statusMsg').className = 'success';
+                updateUI();
+                return;
+            } else if(G.windowReinforced) {
+                document.getElementById('statusMsg').textContent = '[ もう補強済み ]';
+                document.getElementById('statusMsg').className = '';
+                return;
+            } else {
+                document.getElementById('statusMsg').textContent = '[ 木材3個必要 ]';
                 document.getElementById('statusMsg').className = '';
                 return;
             }
         }
     }
     
-    // === アイテム使用 (インベントリあり) ===
-    if(G.inventory !== null) {
-        useItem();
-    } else {
-        document.getElementById('statusMsg').textContent = '⚠ 何もありません';
-        document.getElementById('statusMsg').className = '';
-    }
-}
-
-// ===== アイテム使用 =====
-function useItem() {
-    if(G.gameOver || G.ended) return;
-    if(G.inventory === null) return;
-    
-    const item = G.inventory;
-    const player = G.player;
-    const stage = G.currentStage;
-    const limit = DEFENSE_LIMITS[stage] || 100;
-    const currentDefense = G.stageDefense[stage] || 0;
-    
-    if(currentDefense >= limit) {
-        document.getElementById('statusMsg').textContent = `⚠ このステージの補強は上限(${limit})に達しています`;
+    // === 狼の餌 ===
+    if(stage !== 4 && stage !== 9 && G.inventory === '狼の餌') {
+        const wolves = G.wolves[stage] || [];
+        for(let wolf of wolves) {
+            const d = Math.sqrt((player.x - wolf.x)**2 + (player.y - wolf.y)**2);
+            if(!wolf.isFed && d < 60) {
+                wolf.isFed = true;
+                G.wolfFed = true;
+                G.defense += 10;
+                G.inventory = null;
+                document.getElementById('statusMsg').textContent = '[ 狼に餌をあげた ] +10';
+                document.getElementById('statusMsg').className = 'success';
+                updateUI();
+                return;
+            }
+        }
+        document.getElementById('statusMsg').textContent = '[ 狼の近くで使って ]';
         document.getElementById('statusMsg').className = '';
         return;
     }
     
-    let used = false;
-    let msg = '';
-    
-    switch(item) {
-        case 'スコップ':
-            if(stage === 4 && !G.trapSet) {
-                G.trapSet = true;
-                G.defense += 10;
-                G.stageDefense[4] = (G.stageDefense[4] || 0) + 10;
-                msg = '落とし穴を掘った! +10ポイント';
-                used = true;
-            } else if(stage !== 4) {
-                msg = '小屋ステージで使って!';
-            } else {
-                msg = 'もう落とし穴は掘ってある';
-            }
-            break;
-            
-        case '狼の餌':
-            if(stage !== 4 && stage !== 9) {
-                const wolves = G.wolves[stage] || [];
-                let fed = false;
-                for(let wolf of wolves) {
-                    if(!wolf.isFed && dist(player, wolf) < 50) {
-                        wolf.isFed = true;
-                        G.wolfFed = true;
-                        G.defense += 10;
-                        G.stageDefense[stage] = (G.stageDefense[stage] || 0) + 10;
-                        fed = true;
-                        msg = '狼に餌をあげた! +10ポイント';
-                        used = true;
-                        break;
-                    }
-                }
-                if(!fed) msg = '狼の近くで使って!';
-            } else {
-                msg = '森ステージで使って!';
-            }
-            break;
-            
-        case '銃':
-        case '斧':
-            // 家の中でタンスにしまう (上の処理で)
-            msg = '家の中のタンスで使って!';
-            break;
-            
-        case '木材':
-            msg = '木材は倉庫に預けてください';
-            break;
-            
-        default:
-            msg = 'ここでは使えない';
-    }
-    
-    if(used) {
-        G.inventory = null;
-        document.getElementById('statusMsg').textContent = '✅ ' + msg;
-        document.getElementById('statusMsg').className = 'success';
+    document.getElementById('statusMsg').textContent = '[ ここには何もない ]';
+    document.getElementById('statusMsg').className = '';
+}
+
+// ===== ステージ移動 =====
+function moveStage(dir) {
+    if(G.gameOver || G.ended) return;
+    const current = G.currentStage;
+    if(current === 9) {
+        G.currentStage = 4;
+        G.player.x = 500;
+        G.player.y = 480;
+        document.getElementById('stageDisplay').textContent = '小屋';
+        document.getElementById('stageNameLabel').textContent = '小屋';
         updateUI();
-    } else {
-        document.getElementById('statusMsg').textContent = '❌ ' + msg;
-        document.getElementById('statusMsg').className = '';
+        updateMinimap();
+        updateArrows();
+        return;
     }
+    const row = Math.floor(current / 3);
+    const col = current % 3;
+    let target = current;
+    switch(dir) {
+        case 'up': if(row > 0) target = current - 3; break;
+        case 'down': if(row < 2) target = current + 3; break;
+        case 'left': if(col > 0) target = current - 1; break;
+        case 'right': if(col < 2) target = current + 1; break;
+    }
+    if(target !== current) {
+        G.currentStage = target;
+        G.player.x = 500;
+        G.player.y = 400;
+        document.getElementById('stageDisplay').textContent = STAGE_NAMES[target];
+        document.getElementById('stageNameLabel').textContent = STAGE_NAMES[target];
+        updateUI();
+        updateMinimap();
+        updateArrows();
+        document.getElementById('statusMsg').textContent = '[ ' + STAGE_NAMES[target] + 'に移動 ]';
+        document.getElementById('statusMsg').className = 'info';
+    }
+}
+
+function updateArrows() {
+    const current = G.currentStage;
+    const isHouse = current === 9;
+    const row = Math.floor(current / 3);
+    const col = current % 3;
+    document.getElementById('arrowUp').classList.toggle('hidden', isHouse || row === 0);
+    document.getElementById('arrowDown').classList.toggle('hidden', isHouse || row === 2);
+    document.getElementById('arrowLeft').classList.toggle('hidden', isHouse || col === 0);
+    document.getElementById('arrowRight').classList.toggle('hidden', isHouse || col === 2);
 }
 
 // ===== ゲームオーバー =====
@@ -1165,48 +961,43 @@ function gameOver(win, reason) {
     G.ended = true;
     G.gameOver = !win;
     G.won = win;
-    const overlay = document.getElementById('gameOverlay');
-    overlay.classList.add('show');
+    document.getElementById('gameOverlay').classList.add('show');
     if(win) {
-        document.getElementById('resultTitle').textContent = '🏆 勝利!';
-        document.getElementById('resultSub').textContent = `防御: ${G.defense}ポイント`;
+        document.getElementById('resultTitle').textContent = '[ 勝利 ]';
+        document.getElementById('resultSub').textContent = '防御: ' + G.defense + 'ポイント';
     } else {
-        document.getElementById('resultTitle').textContent = '💀 ゲームオーバー';
+        document.getElementById('resultTitle').textContent = '[ ゲームオーバー ]';
         document.getElementById('resultSub').textContent = reason || 'ジェイソンにやられた...';
     }
 }
 
-// ===== ゲーム終了 =====
 function endGame() {
     if(G.ended) return;
-    const jasonPoints = rand(50, 90);
+    const jasonPoints = 50 + Math.floor(Math.random() * 41);
     if(G.defense > jasonPoints) {
-        gameOver(true, `防御${G.defense} vs ジェイソン${jasonPoints}`);
+        gameOver(true, '防御' + G.defense + ' vs ジェイソン' + jasonPoints);
     } else {
-        gameOver(false, `防御${G.defense} vs ジェイソン${jasonPoints} で敗北`);
+        gameOver(false, '防御' + G.defense + ' vs ジェイソン' + jasonPoints + ' で敗北');
     }
 }
 
-// ===== UI更新 =====
+// ===== UI =====
 function updateUI() {
     document.getElementById('defenseDisplay').textContent = G.defense;
     document.getElementById('dayDisplay').textContent = G.day;
+    document.getElementById('woodDisplay').textContent = G.woodCount;
     const inv = G.inventory ? G.inventory : 'なし';
-    document.getElementById('inventoryDisplay').textContent = `🎒 ${inv}`;
-    document.getElementById('warehouseDisplay').textContent = `🏚 木材:${G.woodInWarehouse}/21 (${G.reinforcedBlocks}/8)`;
+    document.getElementById('inventoryDisplay').textContent = '[ ' + inv + ' ]';
 }
 
-// ===== ミニマップ更新 =====
 function updateMinimap() {
     const container = document.getElementById('minimap');
     container.innerHTML = '';
-    const stages = [0,1,2,3,4,5,6,7,8,9];
-    for(let i of stages) {
+    for(let i=0; i<9; i++) {
         const cell = document.createElement('div');
         cell.className = 'minimap-cell';
         if(i === G.currentStage) cell.classList.add('current');
         if(i === G.jason.stage) cell.classList.add('has-jason');
-        if(G.bear && i === G.bear.stage && G.bear.isHungry) cell.classList.add('has-bear');
         if(i === G.currentStage) {
             const dot = document.createElement('span');
             dot.className = 'dot player';
@@ -1222,21 +1013,39 @@ function updateMinimap() {
         label.style.color = '#555';
         label.textContent = i;
         cell.appendChild(label);
-        cell.onclick = () => moveToStage(i);
+        cell.onclick = () => { if(!G.gameOver && !G.ended) { moveStageTo(i); } };
         container.appendChild(cell);
     }
+}
+
+function moveStageTo(stage) {
+    if(G.gameOver || G.ended) return;
+    if(stage === G.currentStage) return;
+    if(G.currentStage === 9) return;
+    const row = Math.floor(G.currentStage / 3);
+    const col = G.currentStage % 3;
+    const tRow = Math.floor(stage / 3);
+    const tCol = stage % 3;
+    if(Math.abs(row - tRow) + Math.abs(col - tCol) !== 1) return;
+    G.currentStage = stage;
+    G.player.x = 500;
+    G.player.y = 400;
+    document.getElementById('stageDisplay').textContent = STAGE_NAMES[stage];
+    document.getElementById('stageNameLabel').textContent = STAGE_NAMES[stage];
+    updateUI();
+    updateMinimap();
+    updateArrows();
 }
 
 // ===== 描画 =====
 function draw() {
     const ctx = document.getElementById('gameCanvas').getContext('2d');
-    ctx.clearRect(0, 0, 800, 600);
+    ctx.clearRect(0, 0, 1000, 800);
     
     const stage = G.currentStage;
     const map = G.maps[stage];
     const isNight = G.phase === 2;
     
-    // マップ描画
     for(let r=0; r<ROWS; r++) {
         for(let c=0; c<COLS; c++) {
             const x = c * CELL;
@@ -1244,229 +1053,328 @@ function draw() {
             const tile = map[r][c];
             
             if(tile === 0) {
-                ctx.fillStyle = isNight ? '#0a1a0a' : '#1a3a1a';
+                ctx.fillStyle = isNight ? '#0a1a0a' : '#1a4a1a';
                 ctx.fillRect(x, y, CELL, CELL);
-                if((r+c) % 3 === 0) {
-                    ctx.fillStyle = isNight ? '#050f05' : '#0a2a0a';
-                    ctx.fillRect(x+10, y+10, 20, 20);
-                    ctx.fillStyle = isNight ? '#0a1a0a' : '#2a5a2a';
-                    ctx.fillRect(x+14, y+5, 12, 12);
-                    ctx.fillStyle = isNight ? '#1a0a05' : '#3a2a1a';
-                    ctx.fillRect(x+18, y+22, 4, 8);
+                if((r+c)%2===0) {
+                    ctx.fillStyle = isNight ? '#0f1f0f' : '#1f5a1f';
+                    ctx.fillRect(x+10, y+10, 30, 30);
                 }
             } else if(tile === 1) {
-                // 小屋/家
-                ctx.fillStyle = isNight ? '#3a2a1a' : '#7a5a3a';
+                ctx.fillStyle = isNight ? '#3a2a1a' : '#8b6b4d';
                 ctx.fillRect(x, y, CELL, CELL);
-                ctx.fillStyle = isNight ? '#2a1a0a' : '#5a3a2a';
+                ctx.fillStyle = isNight ? '#2a1a0a' : '#6b4d2d';
                 ctx.fillRect(x+2, y+2, CELL-4, CELL-4);
-                // 窓 (外観のみ)
                 if(stage === 4) {
-                    if(r===6 && c===8) {
-                        ctx.fillStyle = isNight ? '#1a2a1a' : '#4a7a4a';
-                        ctx.fillRect(x+10, y+8, 20, 20);
-                        ctx.fillStyle = isNight ? '#2a3a2a' : '#6a9a6a';
-                        ctx.fillRect(x+14, y+12, 12, 12);
-                    }
-                    // 屋根
                     if(r===5) {
                         ctx.fillStyle = isNight ? '#2a1a0a' : '#5a3a1a';
                         ctx.fillRect(x-5, y-5, CELL+10, 8);
                         ctx.fillRect(x-10, y-2, CELL+20, 5);
                     }
                 }
-                // 家の中
                 if(stage === 9) {
-                    // タンス
-                    if(r===7 && c===10) {
-                        ctx.fillStyle = '#4a3a2a';
-                        ctx.fillRect(x+5, y+5, 30, 30);
-                        ctx.fillStyle = '#6a5a4a';
-                        ctx.fillRect(x+10, y+10, 20, 20);
-                        ctx.fillStyle = '#ffd93d';
-                        ctx.font = '12px "Courier New"';
-                        ctx.textAlign = 'center';
-                        ctx.textBaseline = 'middle';
-                        ctx.fillText('タンス', x+20, y+20);
-                    }
-                    // ベッド
-                    if(r===8 && c===8) {
-                        ctx.fillStyle = '#2a3a4a';
-                        ctx.fillRect(x+5, y+25, 30, 15);
-                        ctx.fillStyle = '#3a4a5a';
-                        ctx.fillRect(x+8, y+28, 24, 8);
-                    }
-                    // 窓 (補強ポイント)
-                    if((r===6 && c===7) || (r===6 && c===12)) {
-                        ctx.fillStyle = G.windowReinforced ? '#4a7a4a' : '#3a5a3a';
-                        ctx.fillRect(x+10, y+8, 20, 20);
-                        ctx.fillStyle = G.windowReinforced ? '#6a9a6a' : '#4a6a4a';
-                        ctx.fillRect(x+14, y+12, 12, 12);
-                        if(G.windowReinforced) {
-                            ctx.fillStyle = '#ffd93d';
-                            ctx.font = '10px "Courier New"';
-                            ctx.textAlign = 'center';
-                            ctx.textBaseline = 'middle';
-                            ctx.fillText('✓', x+20, y+18);
-                        }
+                    ctx.fillStyle = isNight ? '#1a0a00' : '#5a3a1a';
+                    for(let i=0; i<2; i++) {
+                        ctx.fillRect(x+10+i*20, y+8, 2, CELL-16);
                     }
                 }
             } else if(tile === 2) {
-                // 倉庫ブロック
-                const blockIndex = (r-11)*4 + (c-7);
-                const isFilled = blockIndex < G.reinforcedBlocks;
-                ctx.fillStyle = isFilled ? '#ffd93d' : '#5a4a3a';
+                // 倉庫 (緑)
+                ctx.fillStyle = '#2d7a2d';
                 ctx.fillRect(x, y, CELL, CELL);
-                ctx.fillStyle = isFilled ? '#ccaa22' : '#3a2a1a';
+                ctx.fillStyle = '#1a5a1a';
                 ctx.fillRect(x+2, y+2, CELL-4, CELL-4);
-                if(isFilled) {
-                    ctx.fillStyle = '#000';
+                ctx.fillStyle = '#4a9a4a';
+                ctx.font = '20px "Courier New"';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('箱', x+25, y+25);
+                const idx = (r-11)*4 + (c-6);
+                const filled = idx < G.reinforcedBlocks && idx >= 0;
+                if(filled) {
+                    ctx.fillStyle = 'rgba(255,215,0,0.3)';
+                    ctx.fillRect(x, y, CELL, CELL);
+                    ctx.fillStyle = '#ffd93d';
                     ctx.font = '16px "Courier New"';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText('補', x+20, y+20);
-                } else {
-                    ctx.fillStyle = '#7a6a5a';
-                    ctx.font = '12px "Courier New"';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText('□', x+20, y+20);
+                    ctx.fillText('v', x+25, y+28);
                 }
             } else if(tile === 3) {
-                // ドア
-                ctx.fillStyle = '#4a3a2a';
-                ctx.fillRect(x+12, y+25, 16, 15);
+                // ドア前 (茶色)
+                ctx.fillStyle = '#8b6b3d';
+                ctx.fillRect(x, y, CELL, CELL);
                 ctx.fillStyle = '#6b4d2d';
-                ctx.fillRect(x+14, y+27, 12, 11);
-                ctx.fillStyle = '#ffd93d';
-                ctx.font = '10px "Courier New"';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText('🚪', x+20, y+32);
-            } else if(tile === 4) {
-                // タンス (家の中)
-                ctx.fillStyle = '#4a3a2a';
-                ctx.fillRect(x+5, y+5, 30, 30);
-                ctx.fillStyle = '#6a5a4a';
-                ctx.fillRect(x+10, y+10, 20, 20);
-                ctx.fillStyle = '#ffd93d';
-                ctx.font = '12px "Courier New"';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText('タンス', x+20, y+20);
-            } else if(tile === 5) {
-                // ベッド
-                ctx.fillStyle = '#2a3a4a';
-                ctx.fillRect(x+5, y+25, 30, 15);
-                ctx.fillStyle = '#3a4a5a';
-                ctx.fillRect(x+8, y+28, 24, 8);
-            } else if(tile === 6) {
-                // 窓 (家の中)
-                ctx.fillStyle = G.windowReinforced ? '#4a7a4a' : '#3a5a3a';
-                ctx.fillRect(x+10, y+8, 20, 20);
-                ctx.fillStyle = G.windowReinforced ? '#6a9a6a' : '#4a6a4a';
-                ctx.fillRect(x+14, y+12, 12, 12);
-                if(G.windowReinforced) {
-                    ctx.fillStyle = '#ffd93d';
-                    ctx.font = '10px "Courier New"';
+                ctx.fillRect(x+2, y+2, CELL-4, CELL-4);
+                if(stage === 4) {
+                    ctx.fillStyle = '#b8860b';
+                    ctx.font = '22px "Courier New"';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.fillText('✓', x+20, y+18);
+                    ctx.fillText('穴', x+25, y+25);
+                    if(G.trapSet) {
+                        ctx.fillStyle = 'rgba(255,0,0,0.2)';
+                        ctx.fillRect(x, y, CELL, CELL);
+                        ctx.fillStyle = '#ff6b6b';
+                        ctx.font = '16px "Courier New"';
+                        ctx.fillText('v', x+25, y+28);
+                    }
+                } else if(stage === 9) {
+                    // 家の中のドア
+                    ctx.fillStyle = '#4a3a2a';
+                    ctx.fillRect(x+12, y+25, 26, 20);
+                    ctx.fillStyle = '#6b4d2d';
+                    ctx.fillRect(x+16, y+28, 18, 14);
+                    ctx.fillStyle = '#ffd93d';
+                    ctx.font = '18px "Courier New"';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('門', x+25, y+35);
+                }
+            } else if(tile === 4) {
+                // タンス
+                ctx.fillStyle = '#4a3a2a';
+                ctx.fillRect(x+2, y+2, CELL-4, CELL-4);
+                ctx.fillStyle = '#6a5a4a';
+                ctx.fillRect(x+6, y+6, CELL-12, CELL-12);
+                for(let i=0; i<3; i++) {
+                    ctx.fillStyle = '#5a4a3a';
+                    ctx.fillRect(x+8, y+10+i*12, CELL-16, 8);
+                    ctx.fillStyle = '#ffd93d';
+                    ctx.fillRect(x+15, y+12+i*12, 4, 4);
+                    ctx.fillRect(x+CELL-19, y+12+i*12, 4, 4);
+                }
+                ctx.fillStyle = '#ffd93d';
+                ctx.font = '11px "Courier New"';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'bottom';
+                ctx.fillText('タンス', x+25, y+6);
+            } else if(tile === 5) {
+                // ベッド
+                ctx.fillStyle = '#2a4a6a';
+                ctx.fillRect(x+2, y+30, CELL-4, 18);
+                ctx.fillStyle = '#3a5a7a';
+                ctx.fillRect(x+5, y+33, CELL-10, 12);
+                ctx.fillStyle = '#5a7a9a';
+                ctx.fillRect(x+30, y+28, 14, 8);
+                ctx.fillStyle = '#6a8aaa';
+                ctx.fillRect(x+32, y+29, 10, 6);
+                ctx.fillStyle = '#4a6a8a';
+                for(let i=0; i<4; i++) {
+                    ctx.fillRect(x+8+i*10, y+35, 4, 8);
+                }
+            } else if(tile === 6) {
+                // 窓
+                ctx.fillStyle = G.windowReinforced ? '#4a8a4a' : '#3a6a3a';
+                ctx.fillRect(x+8, y+6, 34, 34);
+                ctx.fillStyle = G.windowReinforced ? '#6aaa6a' : '#4a7a4a';
+                ctx.fillRect(x+12, y+10, 26, 26);
+                ctx.fillStyle = '#3a2a1a';
+                ctx.fillRect(x+23, y+4, 4, 38);
+                ctx.fillRect(x+4, y+21, 42, 4);
+                if(G.windowReinforced) {
+                    ctx.fillStyle = '#ffd93d';
+                    ctx.font = '20px "Courier New"';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('v', x+25, y+23);
                 }
             }
         }
     }
     
-    // アイテム描画
+    // 木
+    const trees = G.trees[stage] || [];
+    for(let tree of trees) {
+        ctx.fillStyle = isNight ? '#1a0a05' : '#4a2a1a';
+        ctx.fillRect(tree.x-4, tree.y+4, 8, 16);
+        ctx.fillStyle = isNight ? '#0a1a0a' : '#2a6a2a';
+        ctx.beginPath();
+        ctx.arc(tree.x, tree.y-4, 24, 0, Math.PI*2);
+        ctx.fill();
+        ctx.fillStyle = isNight ? '#0f1f0f' : '#3a7a3a';
+        ctx.beginPath();
+        ctx.arc(tree.x-10, tree.y-8, 16, 0, Math.PI*2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(tree.x+10, tree.y-8, 16, 0, Math.PI*2);
+        ctx.fill();
+    }
+    
+    // アイテム
     const items = G.items[stage] || [];
     for(let item of items) {
         if(item.collected) continue;
         const colors = {
-            '木材': '#8b6b4d',
-            'スコップ': '#7a7a7a',
+            '木材': '#ff8c00',
+            'スコップ': '#b8860b',
             '狼の餌': '#c0392b',
             '銃': '#2c3e50',
             '斧': '#7f8c8d'
         };
+        ctx.fillStyle = 'rgba(255,255,200,0.05)';
+        ctx.beginPath();
+        ctx.arc(item.x, item.y, 30, 0, Math.PI*2);
+        ctx.fill();
         ctx.fillStyle = colors[item.type] || '#ffd700';
-        ctx.fillRect(item.x-8, item.y-8, 16, 16);
+        ctx.fillRect(item.x-12, item.y-12, 24, 24);
         ctx.fillStyle = '#fff';
-        ctx.font = '9px "Courier New"';
+        ctx.font = '12px "Courier New"';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(item.type.substring(0,2), item.x, item.y);
-        if(dist(G.player, item) < 50) {
-            ctx.fillStyle = 'rgba(255,255,200,0.1)';
-            ctx.beginPath();
-            ctx.arc(item.x, item.y, 35, 0, Math.PI*2);
-            ctx.stroke();
-        }
+        const label = item.type === '木材' ? '木' : item.type.substring(0,2);
+        ctx.fillText(label, item.x, item.y+1);
     }
     
-    // 狼描画
+    // 狼
     const wolves = G.wolves[stage] || [];
     for(let wolf of wolves) {
         if(!wolf.alive) continue;
-        drawPixelWolf(ctx, wolf.x, wolf.y, wolf.isFed);
+        const s = 2.2;
+        ctx.fillStyle = wolf.isFed ? '#78909c' : '#90a4ae';
+        ctx.fillRect(wolf.x-7*s, wolf.y-3*s, 14*s, 8*s);
+        ctx.fillRect(wolf.x-9*s, wolf.y-7*s, 9*s, 7*s);
+        ctx.fillRect(wolf.x-9*s, wolf.y-9*s, 4*s, 5*s);
+        ctx.fillRect(wolf.x-6*s, wolf.y-9*s, 4*s, 5*s);
+        ctx.fillStyle = '#000';
+        ctx.fillRect(wolf.x-7*s, wolf.y-5*s, 2*s, 2*s);
+        ctx.fillRect(wolf.x-4*s, wolf.y-5*s, 2*s, 2*s);
+        ctx.fillStyle = wolf.isFed ? '#ff8a80' : '#ff1744';
+        ctx.fillRect(wolf.x-6*s, wolf.y-2*s, 3*s, 2*s);
+        if(wolf.isFed) {
+            ctx.fillStyle = '#ff6b6b';
+            ctx.font = '12px "Courier New"';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText('+', wolf.x, wolf.y-12*s);
+        }
     }
     
-    // 熊描画
-    if(G.bear && G.bear.alive && G.bear.stage === stage) {
-        drawPixelBear(ctx, G.bear.x, G.bear.y, G.bear.isHungry);
-    }
-    
-    // ジェイソン描画
+    // ジェイソン
     if(G.jason.stage === stage) {
-        drawPixelJason(ctx, G.jason.x, G.jason.y);
-        ctx.fillStyle = 'rgba(255,0,0,0.08)';
+        const s = 2.8;
+        ctx.fillStyle = '#e8e8e8';
+        ctx.fillRect(G.jason.x-7*s, G.jason.y-12*s, 14*s, 12*s);
+        ctx.fillStyle = '#1a1a2e';
+        ctx.fillRect(G.jason.x-5*s, G.jason.y-8*s, 3*s, 4*s);
+        ctx.fillRect(G.jason.x+2*s, G.jason.y-8*s, 3*s, 4*s);
+        ctx.fillRect(G.jason.x-1*s, G.jason.y-4*s, 2*s, 3*s);
+        ctx.fillStyle = '#2c3e50';
+        ctx.fillRect(G.jason.x-6*s, G.jason.y, 12*s, 12*s);
+        ctx.fillRect(G.jason.x-8*s, G.jason.y+2*s, 2*s, 7*s);
+        ctx.fillRect(G.jason.x+6*s, G.jason.y+2*s, 2*s, 7*s);
+        ctx.fillStyle = '#1a1a2e';
+        ctx.fillRect(G.jason.x-4*s, G.jason.y+12*s, 3*s, 5*s);
+        ctx.fillRect(G.jason.x+1*s, G.jason.y+12*s, 3*s, 5*s);
+        ctx.fillStyle = '#78909c';
+        ctx.fillRect(G.jason.x+7*s, G.jason.y-5*s, 2*s, 10*s);
+        ctx.fillRect(G.jason.x+6*s, G.jason.y-7*s, 4*s, 3*s);
+        ctx.fillStyle = '#ff1744';
+        ctx.fillRect(G.jason.x+6.5*s, G.jason.y-6*s, 3*s, 1.5*s);
+        ctx.fillStyle = 'rgba(255,0,0,0.05)';
         ctx.beginPath();
-        ctx.arc(G.jason.x, G.jason.y, 50, 0, Math.PI*2);
+        ctx.arc(G.jason.x, G.jason.y, 60, 0, Math.PI*2);
         ctx.fill();
     }
     
-    // キャラクター描画 (家の中にはモブは入れない)
+    // モブキャラ
     for(let name in G.characters) {
         const char = G.characters[name];
-        if(!char.alive || char.stage !== stage) continue;
-        if(stage === 9) continue; // 家の中には入れない
-        drawPixelPerson(ctx, char.x, char.y, char.color, char.hairColor, false, char.hasWood);
+        if(!char.alive || char.stage !== stage || stage === 9) continue;
+        const s = 2.5;
+        ctx.fillStyle = char.hairColor || '#333';
+        ctx.fillRect(char.x-7*s, char.y-12*s, 14*s, 12*s);
+        ctx.fillStyle = '#f5d0b8';
+        ctx.fillRect(char.x-5*s, char.y-9*s, 10*s, 7*s);
+        ctx.fillStyle = '#000';
+        ctx.fillRect(char.x-4*s, char.y-7*s, 2.5*s, 2.5*s);
+        ctx.fillRect(char.x+1.5*s, char.y-7*s, 2.5*s, 2.5*s);
+        ctx.fillStyle = '#c0392b';
+        ctx.fillRect(char.x-1*s, char.y-4*s, 2*s, 1.5*s);
+        ctx.fillStyle = char.color;
+        ctx.fillRect(char.x-5*s, char.y, 10*s, 12*s);
+        ctx.fillRect(char.x-7*s, char.y+2*s, 2*s, 7*s);
+        ctx.fillRect(char.x+5*s, char.y+2*s, 2*s, 7*s);
+        ctx.fillStyle = '#2c3e50';
+        ctx.fillRect(char.x-4*s, char.y+12*s, 3*s, 5*s);
+        ctx.fillRect(char.x+1*s, char.y+12*s, 3*s, 5*s);
         ctx.fillStyle = '#aaa';
-        ctx.font = '9px "Courier New"';
+        ctx.font = '10px "Courier New"';
         ctx.textAlign = 'center';
-        ctx.fillText(name, char.x, char.y+26);
+        ctx.fillText(name, char.x, char.y+30);
     }
     
     // プレイヤー
     if(G.player.alive && G.player.stage === stage) {
-        drawPixelPerson(ctx, G.player.x, G.player.y, '#e74c3c', '#e74c3c', true, G.player.hasWood);
-        ctx.fillStyle = '#fff';
-        ctx.font = '9px "Courier New"';
+        const s = 2.5;
+        ctx.fillStyle = '#c0392b';
+        ctx.fillRect(G.player.x-7*s, G.player.y-12*s, 14*s, 12*s);
+        ctx.fillStyle = '#f5d0b8';
+        ctx.fillRect(G.player.x-5*s, G.player.y-9*s, 10*s, 7*s);
+        ctx.fillStyle = '#000';
+        ctx.fillRect(G.player.x-4*s, G.player.y-7*s, 2.5*s, 2.5*s);
+        ctx.fillRect(G.player.x+1.5*s, G.player.y-7*s, 2.5*s, 2.5*s);
+        ctx.fillStyle = '#c0392b';
+        ctx.fillRect(G.player.x-1*s, G.player.y-4*s, 2*s, 1.5*s);
+        ctx.fillStyle = '#e74c3c';
+        ctx.fillRect(G.player.x-5*s, G.player.y, 10*s, 12*s);
+        ctx.fillRect(G.player.x-7*s, G.player.y+2*s, 2*s, 7*s);
+        ctx.fillRect(G.player.x+5*s, G.player.y+2*s, 2*s, 7*s);
+        ctx.fillStyle = '#2c3e50';
+        ctx.fillRect(G.player.x-4*s, G.player.y+12*s, 3*s, 5*s);
+        ctx.fillRect(G.player.x+1*s, G.player.y+12*s, 3*s, 5*s);
+        ctx.fillStyle = '#ffd700';
+        ctx.font = '18px "Courier New"';
         ctx.textAlign = 'center';
-        ctx.fillText('紅葉', G.player.x, G.player.y+26);
+        ctx.textBaseline = 'bottom';
+        ctx.fillText('*', G.player.x, G.player.y-14*s);
+        ctx.fillStyle = '#fff';
+        ctx.font = '10px "Courier New"';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText('紅葉', G.player.x, G.player.y+30);
     }
     
     // 情報
     ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    ctx.fillRect(0, 0, 300, 22);
+    ctx.fillRect(0, 0, 320, 24);
     ctx.fillStyle = '#fff';
+    ctx.font = '12px "Courier New"';
+    ctx.textAlign = 'left';
+    ctx.fillText('速' + G.jasonSpeed + ' 木' + G.woodCount + '/' + G.maxWood + ' 防' + G.defense, 8, 18);
+    
+    // 倉庫ブロック
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(700, 0, 300, 24);
+    ctx.fillStyle = '#ffd93d';
     ctx.font = '11px "Courier New"';
     ctx.textAlign = 'left';
-    ctx.fillText(`⚡${G.jasonSpeed}  🌲${G.woodStock}  🏠${G.defense}`, 8, 16);
-    
-    // ステージ補強上限表示
-    const limit = DEFENSE_LIMITS[stage] || 100;
-    const current = G.stageDefense[stage] || 0;
-    ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    ctx.fillRect(600, 0, 200, 22);
-    ctx.fillStyle = current >= limit ? '#69db7c' : '#ffd93d';
-    ctx.font = '11px "Courier New"';
-    ctx.textAlign = 'right';
-    ctx.fillText(`補強 ${current}/${limit}`, 790, 16);
+    ctx.fillText('倉庫: ', 710, 18);
+    for(let i=0; i<8; i++) {
+        const bx = 770 + i * 28;
+        ctx.fillStyle = i < G.reinforcedBlocks ? '#ffd93d' : '#333';
+        ctx.fillRect(bx, 6, 22, 14);
+        ctx.strokeStyle = '#555';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(bx, 6, 22, 14);
+        if(i < G.reinforcedBlocks) {
+            ctx.fillStyle = '#000';
+            ctx.font = '8px "Courier New"';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('補', bx+11, 13);
+        }
+    }
     
     // 夜
     if(isNight) {
-        ctx.fillStyle = 'rgba(0,0,30,0.25)';
-        ctx.fillRect(0, 0, 800, 600);
+        ctx.fillStyle = 'rgba(0,0,30,0.2)';
+        ctx.fillRect(0, 0, 1000, 800);
+        ctx.fillStyle = 'rgba(255,255,200,0.1)';
+        ctx.beginPath();
+        ctx.arc(900, 60, 40, 0, Math.PI*2);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,200,0.05)';
+        ctx.beginPath();
+        ctx.arc(900, 60, 60, 0, Math.PI*2);
+        ctx.fill();
     }
 }
 
@@ -1476,8 +1384,8 @@ function gameLoop() {
         G.frame++;
         updatePhase();
         updateJason();
-        updateCharacters();
-        updateBear();
+        updatePlayer();
+        updateMobs();
         updateWolves();
         updateUI();
         updateMinimap();
@@ -1493,51 +1401,47 @@ canvas.addEventListener('mousemove', (e) => {
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
-    G.mouseX = clamp((e.clientX - rect.left) * scaleX, 20, 780);
-    G.mouseY = clamp((e.clientY - rect.top) * scaleY, 20, 580);
+    G.mouseX = Math.max(20, Math.min(980, (e.clientX - rect.left) * scaleX));
+    G.mouseY = Math.max(20, Math.min(780, (e.clientY - rect.top) * scaleY));
 });
 
 canvas.addEventListener('click', handleClick);
 
 canvas.addEventListener('contextmenu', (e) => {
     e.preventDefault();
-    if(G.ended || G.gameOver) return;
+    if(G.gameOver || G.ended) return;
     if(G.inventory !== null) {
         const items = G.items[G.currentStage] || [];
         items.push({
-            x: G.player.x + rand(-30, 30),
-            y: G.player.y + rand(-30, 30),
+            x: G.player.x + (Math.random()-0.5)*60,
+            y: G.player.y + (Math.random()-0.5)*60,
             type: G.inventory,
             collected: false,
-            isWood: G.inventory === '木材'
+            color: '#ff8c00'
         });
         G.items[G.currentStage] = items;
         G.inventory = null;
-        document.getElementById('statusMsg').textContent = '📤 アイテムを捨てた';
+        document.getElementById('statusMsg').textContent = '[ アイテムを捨てた ]';
         document.getElementById('statusMsg').className = 'info';
         updateUI();
     }
 });
 
-// 矢印ボタン
 document.getElementById('arrowUp').addEventListener('click', () => moveStage('up'));
 document.getElementById('arrowDown').addEventListener('click', () => moveStage('down'));
 document.getElementById('arrowLeft').addEventListener('click', () => moveStage('left'));
 document.getElementById('arrowRight').addEventListener('click', () => moveStage('right'));
 
-// キーボード
 document.addEventListener('keydown', (e) => {
-    const num = parseInt(e.key);
-    if(num >= 0 && num <= 9) {
-        moveToStage(num);
-    }
-    if(e.key === 'r' || e.key === 'R') {
-        initGame();
-    }
+    if(e.key === 'r' || e.key === 'R') initGame();
     if(e.key === 'ArrowUp') moveStage('up');
     if(e.key === 'ArrowDown') moveStage('down');
     if(e.key === 'ArrowLeft') moveStage('left');
     if(e.key === 'ArrowRight') moveStage('right');
+    if(e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        handleClick();
+    }
 });
 
 document.getElementById('restartBtn').addEventListener('click', initGame);
