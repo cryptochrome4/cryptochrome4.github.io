@@ -51,6 +51,12 @@ canvas#dotCanvas {
   border: none;
   cursor: crosshair;
 }
+.palette-area {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+/* 通常パレット (右側) */
 .palette {
   background: #e0e8f0;
   border: 2px solid #8a9aaa;
@@ -59,10 +65,35 @@ canvas#dotCanvas {
   display: inline-block;
   box-shadow: inset 0 0 0 1px #f0f8ff;
 }
+/* 塗りつぶしパレット (左側) */
+.fill-palette {
+  background: #dce4ec;
+  border: 2px solid #7a8a9a;
+  border-radius: 4px;
+  padding: 6px 6px 6px 8px;
+  display: inline-block;
+  box-shadow: inset 0 0 0 1px #e8f0f8;
+  order: -1; /* 左側に表示 */
+}
+.fill-palette .palette-colors .color-swatch {
+  border-color: #4a5a6a;
+}
+.fill-palette .palette-colors .color-swatch:hover {
+  transform: scale(1.08);
+  border-color: #000000;
+}
 .palette-colors {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+.palette-label {
+  font-size: 10px;
+  font-weight: bold;
+  color: #2a3a4a;
+  text-align: center;
+  margin-bottom: 3px;
+  letter-spacing: 0.5px;
 }
 .color-swatch {
   width: 36px;
@@ -161,9 +192,19 @@ canvas#dotCanvas {
     <div id="gridContainer">
       <canvas id="dotCanvas" width="400" height="400"></canvas>
     </div>
-    <div class="palette">
-      <div class="palette-colors" id="paletteContainer">
-        <!-- 13色 上から順に -->
+    <div class="palette-area">
+      <!-- 塗りつぶし用パレット (左側) -->
+      <div class="fill-palette">
+        <div class="palette-label">▼塗りつぶし</div>
+        <div class="palette-colors" id="fillPaletteContainer">
+          <!-- 13色 上から順に -->
+        </div>
+      </div>
+      <!-- 通常パレット (右側) -->
+      <div class="palette">
+        <div class="palette-colors" id="paletteContainer">
+          <!-- 13色 上から順に -->
+        </div>
       </div>
     </div>
   </div>
@@ -187,7 +228,7 @@ canvas#dotCanvas {
   var canvas = document.getElementById('dotCanvas');
   var ctx = canvas.getContext('2d');
 
-  // デフォルト 20x20 (変更点)
+  // デフォルト 20x20
   var rows = 20;
   var cols = 20;
   var cellSize = 400 / rows; // キャンバスは400x400固定
@@ -312,6 +353,23 @@ canvas#dotCanvas {
     drawCanvas(); // 全描画 (シンプル)
   }
 
+  // ---- 塗りつぶし機能 ----
+  function fillAllCells(color) {
+    // 二重確認
+    var confirm1 = confirm('全てのセルをこの色で塗りつぶしますか？');
+    if (!confirm1) return;
+    var confirm2 = confirm('本当に全てのセルを塗りつぶしますか？ (元に戻せません)');
+    if (!confirm2) return;
+
+    // 実行
+    for (var r = 0; r < rows; r++) {
+      for (var c = 0; c < cols; c++) {
+        gridData[r][c] = color;
+      }
+    }
+    drawCanvas();
+  }
+
   // イベント処理 (マウス)
   function handleCanvasMouse(e) {
     var coord = getCellIndexFromCoord(e.clientX, e.clientY);
@@ -346,8 +404,9 @@ canvas#dotCanvas {
     isMouseDown = false;
   }
 
-  // パレット作成
-  function buildPalette() {
+  // パレット作成 (通常用 + 塗りつぶし用)
+  function buildPalettes() {
+    // 通常パレット (右側)
     var container = document.getElementById('paletteContainer');
     container.innerHTML = '';
     for (var i = 0; i < paletteColors.length; i++) {
@@ -362,14 +421,47 @@ canvas#dotCanvas {
       swatch.addEventListener('click', function(e) {
         var c = this.dataset.color;
         selectedColor = c;
-        // アクティブ表示更新
-        var allSwatches = document.querySelectorAll('.color-swatch');
+        // アクティブ表示更新 (通常パレットのみ)
+        var allSwatches = document.querySelectorAll('#paletteContainer .color-swatch');
         for (var s = 0; s < allSwatches.length; s++) {
           allSwatches[s].classList.remove('active');
         }
         this.classList.add('active');
+        // 塗りつぶしパレットのアクティブは外す
+        var fillSwatches = document.querySelectorAll('#fillPaletteContainer .color-swatch');
+        for (var f = 0; f < fillSwatches.length; f++) {
+          fillSwatches[f].classList.remove('active');
+        }
       });
       container.appendChild(swatch);
+    }
+
+    // 塗りつぶし用パレット (左側)
+    var fillContainer = document.getElementById('fillPaletteContainer');
+    fillContainer.innerHTML = '';
+    for (var j = 0; j < paletteColors.length; j++) {
+      var color2 = paletteColors[j];
+      var swatch2 = document.createElement('div');
+      swatch2.className = 'color-swatch';
+      swatch2.style.backgroundColor = color2;
+      swatch2.dataset.color = color2;
+      swatch2.addEventListener('click', function(e) {
+        var c = this.dataset.color;
+        // 塗りつぶし実行 (二重確認付き)
+        fillAllCells(c);
+        // アクティブ表示更新 (塗りつぶしパレットのみ)
+        var allSwatches = document.querySelectorAll('#fillPaletteContainer .color-swatch');
+        for (var s = 0; s < allSwatches.length; s++) {
+          allSwatches[s].classList.remove('active');
+        }
+        this.classList.add('active');
+        // 通常パレットのアクティブは外す
+        var normalSwatches = document.querySelectorAll('#paletteContainer .color-swatch');
+        for (var n = 0; n < normalSwatches.length; n++) {
+          normalSwatches[n].classList.remove('active');
+        }
+      });
+      fillContainer.appendChild(swatch2);
     }
   }
 
@@ -507,7 +599,7 @@ canvas#dotCanvas {
 
   // 初期化処理
   function init() {
-    // デフォルト 20x20 (変更点)
+    // デフォルト 20x20
     rows = 20; cols = 20;
     var cellSizeX = 400 / cols;
     var cellSizeY = 400 / rows;
@@ -563,8 +655,8 @@ canvas#dotCanvas {
       return { row: row, col: col };
     };
 
-    // パレット作成
-    buildPalette();
+    // パレット作成 (通常 + 塗りつぶし)
+    buildPalettes();
     // 描画
     drawCanvas();
     updateSizeDisplay();
