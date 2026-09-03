@@ -325,20 +325,29 @@
             border-radius: 16px;
         }
         #resultScreen h1 { font-size: 40px; margin-bottom: 8px; }
-        #resultScreen .sub { font-size: 20px; color: #aaa; }
+        #resultScreen .sub { font-size: 20px; color: #aaa; margin-bottom: 15px; }
         #resultScreen .btn {
             padding: 10px 35px;
             font-size: 18px;
-            background: #ffdd44;
-            color: #222;
             border: none;
             border-radius: 30px;
             cursor: pointer;
             font-weight: bold;
-            margin-top: 20px;
             transition: 0.2s;
         }
-        #resultScreen .btn:hover { background: #ffcc22; transform: scale(1.02); }
+        #resultScreen .btn:hover { transform: scale(1.02); }
+        #resultScreen .btn-oomph {
+            background: #ffdd44;
+            color: #222;
+        }
+        #resultScreen .btn-oomph:hover { background: #ffcc22; }
+        #resultScreen .btn-back {
+            background: #666;
+            color: #fff;
+            margin-top: 10px;
+        }
+        #resultScreen .btn-back:hover { background: #777; }
+        .hidden { display: none !important; }
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: #111; }
         ::-webkit-scrollbar-thumb { background: #444; border-radius: 10px; }
@@ -438,14 +447,15 @@
         <div id="resultScreen">
             <h1 id="resultTitle">🏆 結果</h1>
             <div class="sub" id="resultSub">詳細</div>
-            <button class="btn" id="goToOomph">➡ oomph.html へ</button>
+            <button class="btn btn-oomph" id="goToOomph">🎉 味方勝利！ oomph.htmlへ</button>
+            <button class="btn btn-back" id="goBackBtn">🔙 メニューに戻る</button>
         </div>
     </div>
 </div>
 
 <script>
 // ============================================================
-// サッカー観戦ゲーム - 背番号・情報パネル対応版
+// サッカー観戦ゲーム - フォーメーション完全修正版
 // ============================================================
 
 // ---------- 定数 ----------
@@ -453,70 +463,61 @@ const PLAYER_RADIUS = 15;
 const BALL_RADIUS = 5;
 const FIELD_W = 700;
 const FIELD_H = 600;
-const GOAL_TOP_Y = 3;
-const GOAL_BOTTOM_Y = FIELD_H - 3;
 const GOAL_WIDTH = 50;
 const GOAL_CENTER_X = FIELD_W / 2;
 
-// 背番号マッピング (ポジション→背番号)
-const SHIRT_NUMBERS = {
-    'GK': 1, 'RSB': 2, 'CB': 3, 'CB2': 4, 'LSB': 5,
-    'CMF': 6, 'CMF2': 7, 'OMF': 8, 'RWG': 9, 'ST': 10, 'CF': 11,
-    // フォーメーションB用
-    'LWG': 9, 'CF': 11
-};
-
-// ポジション名表示 (情報パネル用)
-const POS_NAME = {
-    'GK': 'GK', 'RSB': 'RSB', 'CB': 'CB', 'CB2': 'CB', 'LSB': 'LSB',
-    'CMF': 'CMF', 'CMF2': 'CMF', 'OMF': 'OMF',
-    'RWG': 'RWG', 'LWG': 'LWG', 'ST': 'ST', 'CF': 'CF'
-};
-
-// フォーメーション定義 (背番号順に表示するための順序)
-const POS_ORDER_BLUE_A = ['GK','LSB','CB','CB2','RSB','CMF','CMF2','OMF','LWG','ST','RWG'];
-const POS_ORDER_BLUE_B = ['GK','LSB','CB','CB2','RSB','CMF','CMF2','LWG','OMF','RWG','CF'];
-const POS_ORDER_RED_A = ['GK','RSB','CB','CB2','LSB','CMF','CMF2','OMF','RWG','ST','LWG'];
-const POS_ORDER_RED_B = ['GK','RSB','CB','CB2','LSB','CMF','CMF2','RWG','OMF','LWG','CF'];
-
+// ★★★ 完全修正: フォーメーションAとBの正しい座標 ★★★
 const FORMATIONS = {
+    // フォーメーションA (4-3-3)
+    //          CF (0.42)
+    // LWG(0.18)   ST(0.58)    RWG(0.82)
+    //          OMF(0.50)
+    //     CMF(0.38)   CMF(0.62)
+    // LSB(0.22)   CB(0.50)    RSB(0.78)
+    //          GK(0.50)
     0: {
         blue: {
             GK:  { x: 0.50, y: 0.93 },
-            LSB: { x: 0.20, y: 0.78 },
-            CB:  { x: 0.40, y: 0.85 },
-            CB2: { x: 0.60, y: 0.85 },
-            RSB: { x: 0.80, y: 0.78 },
-            CMF: { x: 0.35, y: 0.60 },
-            CMF2:{ x: 0.65, y: 0.60 },
+            LSB: { x: 0.22, y: 0.78 },
+            CB:  { x: 0.50, y: 0.85 },
+            RSB: { x: 0.78, y: 0.78 },
+            CMF: { x: 0.38, y: 0.60 },
+            CMF2:{ x: 0.62, y: 0.60 },
             OMF: { x: 0.50, y: 0.42 },
-            LWG: { x: 0.20, y: 0.30 },
-            ST:  { x: 0.50, y: 0.18 },
-            RWG: { x: 0.80, y: 0.30 },
+            LWG: { x: 0.18, y: 0.28 },
+            ST:  { x: 0.58, y: 0.18 },
+            RWG: { x: 0.82, y: 0.28 },
+            CF:  { x: 0.42, y: 0.12 },
         },
         red: {
             GK:  { x: 0.50, y: 0.07 },
-            RSB: { x: 0.80, y: 0.22 },
-            CB:  { x: 0.60, y: 0.15 },
-            CB2: { x: 0.40, y: 0.15 },
-            LSB: { x: 0.20, y: 0.22 },
-            CMF: { x: 0.65, y: 0.40 },
-            CMF2:{ x: 0.35, y: 0.40 },
+            RSB: { x: 0.78, y: 0.22 },
+            CB:  { x: 0.50, y: 0.15 },
+            LSB: { x: 0.22, y: 0.22 },
+            CMF: { x: 0.62, y: 0.40 },
+            CMF2:{ x: 0.38, y: 0.40 },
             OMF: { x: 0.50, y: 0.58 },
-            RWG: { x: 0.80, y: 0.70 },
-            ST:  { x: 0.50, y: 0.82 },
-            LWG: { x: 0.20, y: 0.70 },
+            RWG: { x: 0.82, y: 0.72 },
+            ST:  { x: 0.58, y: 0.82 },
+            LWG: { x: 0.18, y: 0.72 },
+            CF:  { x: 0.42, y: 0.88 },
         }
     },
+    // フォーメーションB (4-4-2)
+    //          CF (0.50)
+    // LWG(0.15)   OMF(0.50)   RWG(0.85)
+    //     CMF(0.62)   CMF(0.38)
+    // LSB(0.18)   CB(0.38) CB(0.62)   RSB(0.82)
+    //          GK(0.50)
     1: {
         blue: {
             GK:  { x: 0.50, y: 0.93 },
             LSB: { x: 0.18, y: 0.78 },
-            CB:  { x: 0.35, y: 0.85 },
-            CB2: { x: 0.65, y: 0.85 },
+            CB2: { x: 0.38, y: 0.85 },
+            CB:  { x: 0.62, y: 0.85 },
             RSB: { x: 0.82, y: 0.78 },
-            CMF: { x: 0.35, y: 0.62 },
-            CMF2:{ x: 0.65, y: 0.62 },
+            CMF2:{ x: 0.38, y: 0.62 },
+            CMF: { x: 0.62, y: 0.62 },
             LWG: { x: 0.15, y: 0.40 },
             OMF: { x: 0.50, y: 0.45 },
             RWG: { x: 0.85, y: 0.40 },
@@ -525,17 +526,61 @@ const FORMATIONS = {
         red: {
             GK:  { x: 0.50, y: 0.07 },
             RSB: { x: 0.82, y: 0.22 },
-            CB:  { x: 0.65, y: 0.15 },
-            CB2: { x: 0.35, y: 0.15 },
+            CB:  { x: 0.62, y: 0.15 },
+            CB2: { x: 0.38, y: 0.15 },
             LSB: { x: 0.18, y: 0.22 },
-            CMF: { x: 0.65, y: 0.38 },
-            CMF2:{ x: 0.35, y: 0.38 },
+            CMF2:{ x: 0.38, y: 0.38 },
+            CMF: { x: 0.62, y: 0.38 },
             RWG: { x: 0.85, y: 0.60 },
             OMF: { x: 0.50, y: 0.55 },
             LWG: { x: 0.15, y: 0.60 },
             CF:  { x: 0.50, y: 0.82 },
         }
     }
+};
+
+// ★★★ 背番号マッピング ★★★
+// フォーメーションA: GK1, RSB2, CB3, LSB4, CMF5, CMF6, OMF7, RWG8, LWG9, ST10, CF11
+// フォーメーションB: GK1, RSB2, CB3, CB4, LSB5, CMF6, CMF7, RWG8, LWG9, OMF10, CF11
+function getShirtNumber(posKey, formation) {
+    if (formation === 0) { // フォーメーションA
+        if (posKey === 'GK') return 1;
+        if (posKey === 'RSB') return 2;
+        if (posKey === 'CB') return 3;
+        if (posKey === 'LSB') return 4;
+        if (posKey === 'CMF') return 5;
+        if (posKey === 'CMF2') return 6;
+        if (posKey === 'OMF') return 7;
+        if (posKey === 'RWG') return 8;
+        if (posKey === 'LWG') return 9;
+        if (posKey === 'ST') return 10;
+        if (posKey === 'CF') return 11;
+    } else { // フォーメーションB
+        if (posKey === 'GK') return 1;
+        if (posKey === 'RSB') return 2;
+        if (posKey === 'CB') return 3;
+        if (posKey === 'CB2') return 4;
+        if (posKey === 'LSB') return 5;
+        if (posKey === 'CMF2') return 6;
+        if (posKey === 'CMF') return 7;
+        if (posKey === 'RWG') return 8;
+        if (posKey === 'LWG') return 9;
+        if (posKey === 'OMF') return 10;
+        if (posKey === 'CF') return 11;
+    }
+    return 99;
+}
+
+// ★★★ ポジション表示順序 ★★★
+const POS_ORDER_BLUE_A = ['GK','LSB','CB','RSB','CMF','CMF2','OMF','LWG','ST','RWG'];
+const POS_ORDER_BLUE_B = ['GK','LSB','CB2','CB','RSB','CMF2','CMF','LWG','OMF','RWG','CF'];
+const POS_ORDER_RED_A = ['GK','RSB','CB','LSB','CMF','CMF2','OMF','RWG','ST','LWG'];
+const POS_ORDER_RED_B = ['GK','RSB','CB','CB2','LSB','CMF2','CMF','RWG','OMF','LWG','CF'];
+
+const POS_NAME = {
+    'GK': 'GK', 'RSB': 'RSB', 'CB': 'CB', 'CB2': 'CB', 'LSB': 'LSB',
+    'CMF': 'CMF', 'CMF2': 'CMF', 'OMF': 'OMF',
+    'RWG': 'RWG', 'LWG': 'LWG', 'ST': 'ST', 'CF': 'CF'
 };
 
 // ---------- 状態 ----------
@@ -569,6 +614,8 @@ const setupPanel = document.getElementById('setupPanel');
 const resultScreen = document.getElementById('resultScreen');
 const resultTitle = document.getElementById('resultTitle');
 const resultSub = document.getElementById('resultSub');
+const goToOomphBtn = document.getElementById('goToOomph');
+const goBackBtn = document.getElementById('goBackBtn');
 
 // ---------- ユーティリティ ----------
 function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
@@ -591,10 +638,6 @@ function getPositions(formationKey, team) {
     return f[team];
 }
 
-function getShirtNumber(posKey) {
-    return SHIRT_NUMBERS[posKey] || 99;
-}
-
 // ---------- 情報パネル更新 ----------
 function updateInfoPanel() {
     const blueInfo = document.getElementById('blueInfoList');
@@ -602,7 +645,6 @@ function updateInfoPanel() {
     const redInfo = document.getElementById('redInfoList');
     const redParam = document.getElementById('redParamList');
     
-    // 青情報
     let blueInfoHTML = '';
     let blueParamHTML = '';
     const bluePlayers = gameState.players.filter(p => p.team === 'blue');
@@ -610,16 +652,14 @@ function updateInfoPanel() {
     for (const pos of blueOrder) {
         const p = bluePlayers.find(pl => pl.id === pos);
         if (p) {
-            const num = getShirtNumber(pos);
             const isGK = pos === 'GK';
-            blueInfoHTML += `<div class="player-row blue-row"><span class="pos">${POS_NAME[pos]||pos}</span><span class="num ${isGK?'gk':''}">${num}</span></div>`;
-            blueParamHTML += `<div class="player-row blue-row"><span class="pos">${num}</span><span class="param">${p.param}</span></div>`;
+            blueInfoHTML += `<div class="player-row blue-row"><span class="pos">${POS_NAME[pos]||pos}</span><span class="num ${isGK?'gk':''}">${p.shirtNum}</span></div>`;
+            blueParamHTML += `<div class="player-row blue-row"><span class="pos">${p.shirtNum}</span><span class="param">${p.param}</span></div>`;
         }
     }
     blueInfo.innerHTML = blueInfoHTML;
     blueParam.innerHTML = blueParamHTML;
     
-    // 赤情報
     let redInfoHTML = '';
     let redParamHTML = '';
     const redPlayers = gameState.players.filter(p => p.team === 'red');
@@ -627,10 +667,9 @@ function updateInfoPanel() {
     for (const pos of redOrder) {
         const p = redPlayers.find(pl => pl.id === pos);
         if (p) {
-            const num = getShirtNumber(pos);
             const isGK = pos === 'GK';
-            redInfoHTML += `<div class="player-row red-row"><span class="pos">${POS_NAME[pos]||pos}</span><span class="num ${isGK?'gk':''}">${num}</span></div>`;
-            redParamHTML += `<div class="player-row red-row"><span class="pos">${num}</span><span class="param">${p.param}</span></div>`;
+            redInfoHTML += `<div class="player-row red-row"><span class="pos">${POS_NAME[pos]||pos}</span><span class="num ${isGK?'gk':''}">${p.shirtNum}</span></div>`;
+            redParamHTML += `<div class="player-row red-row"><span class="pos">${p.shirtNum}</span><span class="param">${p.param}</span></div>`;
         }
     }
     redInfo.innerHTML = redInfoHTML;
@@ -648,7 +687,7 @@ function createPlayers(formationKey, team, params, isRed) {
         const pos = posMap[key];
         const isGK = (key === 'GK');
         const param = params[idx] !== undefined ? params[idx] : (isGK ? 50 : 50);
-        const num = getShirtNumber(key);
+        const num = getShirtNumber(key, formationKey);
         players.push({
             id: key,
             x: pos.x * FIELD_W,
@@ -680,12 +719,8 @@ function createPlayers(formationKey, team, params, isRed) {
 function initMatch(blueForm, redForm, blueParams, redParams) {
     document.querySelectorAll('.player').forEach(el => el.remove());
     
-    // ポジション順序設定
     gameState.posOrderBlue = (blueForm === 0) ? POS_ORDER_BLUE_A : POS_ORDER_BLUE_B;
     gameState.posOrderRed = (redForm === 0) ? POS_ORDER_RED_A : POS_ORDER_RED_B;
-    
-    const firstAttack = Math.random() < 0.5 ? 'blue' : 'red';
-    gameState.firstAttack = firstAttack;
     
     const redPlayers = createPlayers(redForm, 'red', redParams, true);
     const bluePlayers = createPlayers(blueForm, 'blue', blueParams, false);
@@ -711,7 +746,6 @@ function initMatch(blueForm, redForm, blueParams, redParams) {
     scoreBlueEl.textContent = '0';
     timerEl.textContent = '2:00';
     
-    // 選手DOM追加
     for (const p of gameState.players) {
         const el = document.createElement('div');
         el.className = `player ${p.color}`;
@@ -724,7 +758,6 @@ function initMatch(blueForm, redForm, blueParams, redParams) {
         p.el = el;
     }
     
-    // 情報パネル更新
     updateInfoPanel();
     
     ballEl.style.left = (gameState.ball.x - BALL_RADIUS) + 'px';
@@ -805,7 +838,6 @@ function updatePhysics() {
     const ballTarget = { x: ball.x, y: ball.y };
     for (const p of players) {
         const isRed = (p.color === 'red');
-        const isBlue = (p.color === 'blue');
         let targetX = p.targetX;
         let targetY = p.targetY;
         
@@ -833,15 +865,6 @@ function updatePhysics() {
         } else {
             const isForward = p.isForward;
             const isDef = p.isDefender;
-            
-            let attackBias = 0.5;
-            if (isRed) {
-                attackBias = 0.6 + Math.random() * 0.2;
-                if (isDef) attackBias = 0.4;
-            } else {
-                attackBias = 0.5 + (isForward ? 0.3 : 0);
-                if (isDef) attackBias = 0.3;
-            }
             
             if (ballDist < 130 && Math.random() < 0.7) {
                 const dx = ball.x - p.x;
@@ -876,7 +899,7 @@ function updatePhysics() {
                     const gd = Math.hypot(gdx, gdy) || 1;
                     ball.vx += (gdx / gd) * 5.5 * power;
                     ball.vy += (gdy / gd) * 5.5 * power;
-                } else if (isBlue && p.y > 420 && Math.random() < 0.12) {
+                } else if (!isRed && p.y > 420 && Math.random() < 0.12) {
                     const goalX = GOAL_CENTER_X + (Math.random() - 0.5) * 35;
                     const goalY = FIELD_H - 8;
                     const gdx = goalX - ball.x;
@@ -1002,24 +1025,39 @@ function endMatch() {
     const b = gameState.scoreBlue;
     let winner = '';
     let message = '';
+    let isBlueWin = false;
+    
     if (r > b) {
         winner = '🔴 赤 (敵) の勝利！';
         message = `赤 ${r} - ${b} 青`;
+        isBlueWin = false;
     } else if (b > r) {
-        winner = '🔵 青 (味方) の勝利！';
+        winner = '🔵 青 (味方) の勝利！ 🎉';
         message = `青 ${b} - ${r} 赤`;
+        isBlueWin = true;
     } else {
         const coin = Math.random() < 0.5 ? 'red' : 'blue';
         if (coin === 'red') {
             winner = '🪙 コイントス: 🔴 赤 (敵) の勝ち！';
             message = `引き分け ${r}-${b} → 赤勝利`;
+            isBlueWin = false;
         } else {
-            winner = '🪙 コイントス: 🔵 青 (味方) の勝ち！';
+            winner = '🪙 コイントス: 🔵 青 (味方) の勝ち！ 🎉';
             message = `引き分け ${r}-${b} → 青勝利`;
+            isBlueWin = true;
         }
     }
+    
     resultTitle.textContent = `🏁 試合終了`;
     resultSub.textContent = `${winner} (${message})`;
+    
+    if (isBlueWin) {
+        goToOomphBtn.classList.remove('hidden');
+        resultSub.textContent += ' 🎊 おめでとう！';
+    } else {
+        goToOomphBtn.classList.add('hidden');
+    }
+    
     resultScreen.style.display = 'flex';
     pitch.style.opacity = '0.3';
 }
@@ -1027,6 +1065,24 @@ function endMatch() {
 // ---------- oomph.htmlへ ----------
 document.getElementById('goToOomph').addEventListener('click', function() {
     window.location.href = 'oomph.html';
+});
+
+// ---------- メニューに戻る ----------
+document.getElementById('goBackBtn').addEventListener('click', function() {
+    resultScreen.style.display = 'none';
+    setupPanel.style.display = 'flex';
+    pitch.style.opacity = '1';
+    gameState.gameActive = false;
+    gameState.gameEnded = false;
+    if (gameState.intervalId) {
+        clearInterval(gameState.intervalId);
+        gameState.intervalId = null;
+    }
+    if (gameState.animFrameId) {
+        cancelAnimationFrame(gameState.animFrameId);
+        gameState.animFrameId = null;
+    }
+    document.querySelectorAll('.player').forEach(el => el.remove());
 });
 
 // ---------- セットアップUI ----------
@@ -1040,17 +1096,17 @@ function setupUI() {
     const blueEditContainer = document.getElementById('blueEditContainer');
     const redEditContainer = document.getElementById('redEditContainer');
     
-    const posListBlueA = ['GK','LSB','CB','CB2','RSB','CMF','CMF2','OMF','LWG','ST','RWG'];
-    const posListBlueB = ['GK','LSB','CB','CB2','RSB','CMF','CMF2','LWG','OMF','RWG','CF'];
-    const posListRedA = ['GK','RSB','CB','CB2','LSB','CMF','CMF2','OMF','RWG','ST','LWG'];
-    const posListRedB = ['GK','RSB','CB','CB2','LSB','CMF','CMF2','RWG','OMF','LWG','CF'];
+    const posListBlueA = ['GK','LSB','CB','RSB','CMF','CMF2','OMF','LWG','ST','RWG'];
+    const posListBlueB = ['GK','LSB','CB2','CB','RSB','CMF2','CMF','LWG','OMF','RWG','CF'];
+    const posListRedA = ['GK','RSB','CB','LSB','CMF','CMF2','OMF','RWG','ST','LWG'];
+    const posListRedB = ['GK','RSB','CB','CB2','LSB','CMF2','CMF','RWG','OMF','LWG','CF'];
     
-    function buildEditFields(container, posList, prefix, defaultParams) {
+    function buildEditFields(container, posList, prefix, defaultParams, formation) {
         container.innerHTML = '';
         for (let i = 0; i < posList.length; i++) {
             const div = document.createElement('div');
             div.className = 'player-stat';
-            const num = getShirtNumber(posList[i]);
+            const num = getShirtNumber(posList[i], formation);
             const val = defaultParams && defaultParams[i] !== undefined ? defaultParams[i] : 50;
             div.innerHTML = `<span>${num}</span><input type="number" min="0" max="100" value="${val}" data-idx="${i}" data-prefix="${prefix}">`;
             container.appendChild(div);
@@ -1062,8 +1118,8 @@ function setupUI() {
     defaultBlueParams[0] = 50;
     defaultRedParams[0] = 50;
     
-    buildEditFields(blueEditContainer, posListBlueA, 'blue', defaultBlueParams);
-    buildEditFields(redEditContainer, posListRedA, 'red', defaultRedParams);
+    buildEditFields(blueEditContainer, posListBlueA, 'blue', defaultBlueParams, 0);
+    buildEditFields(redEditContainer, posListRedA, 'red', defaultRedParams, 0);
     
     blueParamMode.addEventListener('change', function() {
         blueEditArea.style.display = (this.value === 'edit') ? 'block' : 'none';
@@ -1078,7 +1134,7 @@ function setupUI() {
         const inputs = blueEditContainer.querySelectorAll('input');
         const vals = [];
         inputs.forEach(inp => vals.push(parseInt(inp.value) || 50));
-        buildEditFields(blueEditContainer, list, 'blue', vals);
+        buildEditFields(blueEditContainer, list, 'blue', vals, val);
     });
     redFormSel.addEventListener('change', function() {
         const val = parseInt(this.value);
@@ -1086,7 +1142,7 @@ function setupUI() {
         const inputs = redEditContainer.querySelectorAll('input');
         const vals = [];
         inputs.forEach(inp => vals.push(parseInt(inp.value) || 50));
-        buildEditFields(redEditContainer, list, 'red', vals);
+        buildEditFields(redEditContainer, list, 'red', vals, val);
     });
     
     document.getElementById('startGameBtn').addEventListener('click', function() {
@@ -1094,6 +1150,8 @@ function setupUI() {
         let redParams = [];
         const blueMode = blueParamMode.value;
         const redMode = redParamMode.value;
+        const blueForm = parseInt(blueFormSel.value);
+        const redForm = parseInt(redFormSel.value);
         
         if (blueMode === 'random') {
             blueParams = generateParams(11);
@@ -1123,14 +1181,14 @@ function setupUI() {
             redParams[0] = 50;
         }
         
-        let blueForm = parseInt(blueFormSel.value);
-        let redForm = parseInt(redFormSel.value);
-        if (isNaN(blueForm)) blueForm = 0;
-        if (isNaN(redForm) || redFormSel.value === 'random') {
-            redForm = Math.random() < 0.5 ? 0 : 1;
+        let blueFormFinal = blueForm;
+        let redFormFinal = redForm;
+        if (isNaN(blueFormFinal)) blueFormFinal = 0;
+        if (isNaN(redFormFinal) || redFormSel.value === 'random') {
+            redFormFinal = Math.random() < 0.5 ? 0 : 1;
         }
         
-        initMatch(blueForm, redForm, blueParams, redParams);
+        initMatch(blueFormFinal, redFormFinal, blueParams, redParams);
     });
 }
 
@@ -1139,6 +1197,7 @@ window.onload = function() {
     setupUI();
     document.getElementById('blueEditArea').style.display = 'none';
     document.getElementById('redEditArea').style.display = 'none';
+    goToOomphBtn.classList.add('hidden');
 };
 
 window.addEventListener('beforeunload', function() {
