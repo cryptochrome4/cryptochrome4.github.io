@@ -428,6 +428,8 @@
                     <select id="redParamMode">
                         <option value="random">ランダム (0〜100)</option>
                         <option value="edit">手動編集</option>
+                        <option value="50">全員50 (GK含む)</option>
+                        <option value="10">全員10 (GKは50)</option>
                     </select>
                 </div>
             </div>
@@ -455,7 +457,7 @@
 
 <script>
 // ============================================================
-// サッカー観戦ゲーム - 情報パネル背番号順修正版
+// サッカー観戦ゲーム - 赤チーム「全員50」「全員10」モード追加版
 // ============================================================
 
 // ---------- 定数 ----------
@@ -468,13 +470,6 @@ const GOAL_CENTER_X = FIELD_W / 2;
 
 // ★★★ フォーメーションAとBの正しい座標 ★★★
 const FORMATIONS = {
-    // フォーメーションA (4-3-3)
-    //          CF (0.42)
-    // LWG(0.18)   ST(0.58)    RWG(0.82)
-    //          OMF(0.50)
-    //     CMF(0.38)   CMF(0.62)
-    // LSB(0.22)   CB(0.50)    RSB(0.78)
-    //          GK(0.50)
     0: {
         blue: {
             GK:  { x: 0.50, y: 0.93 },
@@ -503,12 +498,6 @@ const FORMATIONS = {
             CF:  { x: 0.42, y: 0.88 },
         }
     },
-    // フォーメーションB (4-4-2)
-    //          CF (0.50)
-    // LWG(0.15)   OMF(0.50)   RWG(0.85)
-    //     CMF(0.62)   CMF(0.38)
-    // LSB(0.18)   CB(0.38) CB(0.62)   RSB(0.82)
-    //          GK(0.50)
     1: {
         blue: {
             GK:  { x: 0.50, y: 0.93 },
@@ -541,7 +530,7 @@ const FORMATIONS = {
 
 // ★★★ 背番号マッピング ★★★
 function getShirtNumber(posKey, formation) {
-    if (formation === 0) { // フォーメーションA
+    if (formation === 0) {
         if (posKey === 'GK') return 1;
         if (posKey === 'RSB') return 2;
         if (posKey === 'CB') return 3;
@@ -553,7 +542,7 @@ function getShirtNumber(posKey, formation) {
         if (posKey === 'LWG') return 9;
         if (posKey === 'ST') return 10;
         if (posKey === 'CF') return 11;
-    } else { // フォーメーションB
+    } else {
         if (posKey === 'GK') return 1;
         if (posKey === 'RSB') return 2;
         if (posKey === 'CB') return 3;
@@ -569,7 +558,7 @@ function getShirtNumber(posKey, formation) {
     return 99;
 }
 
-// ★★★ ポジション表示順序（背番号順に修正）★★★
+// ★★★ ポジション表示順序（背番号順）★★★
 const POS_ORDER_BLUE_A = ['GK','RSB','CB','LSB','CMF','CMF2','OMF','RWG','LWG','ST','CF'];
 const POS_ORDER_BLUE_B = ['GK','RSB','CB','CB2','LSB','CMF2','CMF','RWG','LWG','OMF','CF'];
 const POS_ORDER_RED_A = ['GK','RSB','CB','LSB','CMF','CMF2','OMF','RWG','LWG','ST','CF'];
@@ -621,8 +610,25 @@ function randf(min, max) { return Math.random() * (max - min) + min; }
 function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
 function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
 
-function generateParams(count, isGK = false) {
+// ★★★ パラメータ生成（モード対応）★★★
+function generateParams(count, isGK = false, mode = 'random') {
     const p = [];
+    if (mode === '50') {
+        // 全員50（GKも50）
+        for (let i = 0; i < count; i++) {
+            p.push(50);
+        }
+        return p;
+    }
+    if (mode === '10') {
+        // GKは50、残りは10
+        for (let i = 0; i < count; i++) {
+            if (isGK && i === 0) p.push(50);
+            else p.push(10);
+        }
+        return p;
+    }
+    // random または edit の場合
     for (let i = 0; i < count; i++) {
         if (isGK) p.push(50);
         else p.push(rand(0, 100));
@@ -861,9 +867,6 @@ function updatePhysics() {
                 }
             }
         } else {
-            const isForward = p.isForward;
-            const isDef = p.isDefender;
-            
             if (ballDist < 130 && Math.random() < 0.7) {
                 const dx = ball.x - p.x;
                 const dy = ball.y - p.y;
@@ -1094,7 +1097,6 @@ function setupUI() {
     const blueEditContainer = document.getElementById('blueEditContainer');
     const redEditContainer = document.getElementById('redEditContainer');
     
-    // ★ 背番号順に修正
     const posListBlueA = ['GK','RSB','CB','LSB','CMF','CMF2','OMF','RWG','LWG','ST','CF'];
     const posListBlueB = ['GK','RSB','CB','CB2','LSB','CMF2','CMF','RWG','LWG','OMF','CF'];
     const posListRedA = ['GK','RSB','CB','LSB','CMF','CMF2','OMF','RWG','LWG','ST','CF'];
@@ -1112,19 +1114,46 @@ function setupUI() {
         }
     }
     
-    let defaultBlueParams = generateParams(11);
-    let defaultRedParams = generateParams(11);
+    // デフォルトパラメータ
+    let defaultBlueParams = generateParams(11, false, 'random');
+    let defaultRedParams = generateParams(11, false, 'random');
     defaultBlueParams[0] = 50;
     defaultRedParams[0] = 50;
     
     buildEditFields(blueEditContainer, posListBlueA, 'blue', defaultBlueParams, 0);
     buildEditFields(redEditContainer, posListRedA, 'red', defaultRedParams, 0);
     
+    // ★★★ 青のパラメータモード切り替え ★★★
     blueParamMode.addEventListener('change', function() {
         blueEditArea.style.display = (this.value === 'edit') ? 'block' : 'none';
     });
+    
+    // ★★★ 赤のパラメータモード切り替え（「全員50」「全員10」モード追加）★★★
     redParamMode.addEventListener('change', function() {
-        redEditArea.style.display = (this.value === 'edit') ? 'block' : 'none';
+        const val = this.value;
+        const redForm = parseInt(redFormSel.value) || 0;
+        const list = (redForm === 0) ? posListRedA : posListRedB;
+        
+        if (val === '50') {
+            redEditArea.style.display = 'none';
+            const params = generateParams(11, false, '50');
+            buildEditFields(redEditContainer, list, 'red', params, redForm);
+            redEditContainer.querySelectorAll('input').forEach(inp => inp.readOnly = true);
+        } else if (val === '10') {
+            redEditArea.style.display = 'none';
+            const params = generateParams(11, false, '10');
+            buildEditFields(redEditContainer, list, 'red', params, redForm);
+            redEditContainer.querySelectorAll('input').forEach(inp => inp.readOnly = true);
+        } else {
+            redEditArea.style.display = (val === 'edit') ? 'block' : 'none';
+            redEditContainer.querySelectorAll('input').forEach(inp => inp.readOnly = false);
+            if (val === 'edit') {
+                const inputs = redEditContainer.querySelectorAll('input');
+                const vals = [];
+                inputs.forEach(inp => vals.push(parseInt(inp.value) || 50));
+                buildEditFields(redEditContainer, list, 'red', vals, redForm);
+            }
+        }
     });
     
     blueFormSel.addEventListener('change', function() {
@@ -1142,6 +1171,10 @@ function setupUI() {
         const vals = [];
         inputs.forEach(inp => vals.push(parseInt(inp.value) || 50));
         buildEditFields(redEditContainer, list, 'red', vals, val);
+        // 「全員50」または「全員10」モードならreadonlyを維持
+        if (redParamMode.value === '50' || redParamMode.value === '10') {
+            redEditContainer.querySelectorAll('input').forEach(inp => inp.readOnly = true);
+        }
     });
     
     document.getElementById('startGameBtn').addEventListener('click', function() {
@@ -1152,8 +1185,9 @@ function setupUI() {
         const blueForm = parseInt(blueFormSel.value);
         const redForm = parseInt(redFormSel.value);
         
+        // 青のパラメータ生成
         if (blueMode === 'random') {
-            blueParams = generateParams(11);
+            blueParams = generateParams(11, false, 'random');
             blueParams[0] = 50;
         } else {
             const inputs = blueEditContainer.querySelectorAll('input');
@@ -1166,8 +1200,13 @@ function setupUI() {
             blueParams[0] = 50;
         }
         
-        if (redMode === 'random') {
-            redParams = generateParams(11);
+        // 赤のパラメータ生成（「全員50」「全員10」モード対応）
+        if (redMode === '50') {
+            redParams = generateParams(11, false, '50');
+        } else if (redMode === '10') {
+            redParams = generateParams(11, false, '10');
+        } else if (redMode === 'random') {
+            redParams = generateParams(11, false, 'random');
             redParams[0] = 50;
         } else {
             const inputs = redEditContainer.querySelectorAll('input');
