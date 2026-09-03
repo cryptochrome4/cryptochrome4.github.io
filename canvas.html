@@ -217,12 +217,12 @@ canvas#dotCanvas {
   </div>
 
   <div class="controls">
-    <label>縦×横</label>
-    <input type="number" id="gridSizeInput" min="1" max="400" value="20">
-    <span>×</span>
-    <input type="number" id="gridSizeInput2" min="1" max="400" value="20" disabled style="background:#e8ecf2;color:#555;">
+    <label>縦</label>
+    <input type="number" id="gridSizeInput" min="1" max="400" value="10">
+    <label>横</label>
+    <input type="number" id="gridSizeInput2" min="1" max="400" value="10">
     <button id="applySizeBtn">変更</button>
-    <span id="sizeDisplay">20×20</span>
+    <span id="sizeDisplay">10×10</span>
     <button id="resetBtn" class="reset-btn">🗑 リセット</button>
   </div>
   <div class="download-section">
@@ -235,10 +235,11 @@ canvas#dotCanvas {
   var canvas = document.getElementById('dotCanvas');
   var ctx = canvas.getContext('2d');
 
-  // デフォルト 20x20
-  var rows = 20;
-  var cols = 20;
-  var cellSize = 400 / rows; // キャンバスは400x400固定
+  // デフォルト 10x10
+  var rows = 10;
+  var cols = 10;
+  var cellSizeX = 400 / cols;
+  var cellSizeY = 400 / rows;
 
   // カラーパレット (13色) 上から順
   var paletteColors = [
@@ -278,16 +279,6 @@ canvas#dotCanvas {
     return data;
   }
 
-  // グリッド再構築 & 描画
-  function rebuildGrid(newRows, newCols) {
-    rows = newRows;
-    cols = newCols;
-    cellSize = 400 / rows; // 縦横同じセルサイズ (正方形)
-    gridData = initGrid(rows, cols);
-    drawCanvas();
-    updateSizeDisplay();
-  }
-
   // キャンバスにドット絵を描画 (黒線 + カラーセル)
   function drawCanvas() {
     ctx.clearRect(0, 0, 400, 400);
@@ -296,7 +287,7 @@ canvas#dotCanvas {
       for (var c = 0; c < cols; c++) {
         var color = gridData[r][c];
         ctx.fillStyle = color;
-        ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
+        ctx.fillRect(c * cellSizeX, r * cellSizeY, cellSizeX, cellSizeY);
       }
     }
     // 黒線 (グリッド線) を引く
@@ -304,12 +295,12 @@ canvas#dotCanvas {
     ctx.lineWidth = 1.0;
     ctx.beginPath();
     for (var i = 0; i <= rows; i++) {
-      ctx.moveTo(0, i * cellSize);
-      ctx.lineTo(400, i * cellSize);
+      ctx.moveTo(0, i * cellSizeY);
+      ctx.lineTo(400, i * cellSizeY);
     }
     for (var j = 0; j <= cols; j++) {
-      ctx.moveTo(j * cellSize, 0);
-      ctx.lineTo(j * cellSize, 400);
+      ctx.moveTo(j * cellSizeX, 0);
+      ctx.lineTo(j * cellSizeX, 400);
     }
     ctx.stroke();
   }
@@ -324,8 +315,8 @@ canvas#dotCanvas {
     if (canvasX < 0 || canvasX >= 400 || canvasY < 0 || canvasY >= 400) {
       return null;
     }
-    var col = Math.floor(canvasX / cellSize);
-    var row = Math.floor(canvasY / cellSize);
+    var col = Math.floor(canvasX / cellSizeX);
+    var row = Math.floor(canvasY / cellSizeY);
     if (row < 0 || row >= rows || col < 0 || col >= cols) return null;
     return { row: row, col: col };
   }
@@ -334,29 +325,8 @@ canvas#dotCanvas {
   function setCellColor(row, col, color) {
     if (row < 0 || row >= rows || col < 0 || col >= cols) return;
     gridData[row][col] = color;
-    // そのセルだけ再描画 (高速化のため)
     ctx.fillStyle = color;
-    ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
-    // 黒線を再度引く (周囲の線が消えないように)
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 1.0;
-    ctx.beginPath();
-    // セル周囲4辺
-    var x = col * cellSize;
-    var y = row * cellSize;
-    ctx.moveTo(x, y);
-    ctx.lineTo(x + cellSize, y);
-    ctx.lineTo(x + cellSize, y + cellSize);
-    ctx.lineTo(x, y + cellSize);
-    ctx.lineTo(x, y);
-    ctx.stroke();
-    // 隣接セルの辺も再描画 (完全を期す)
-    // 簡単のため全体の線を引き直す (2013年でも軽量)
-    // ただし400x400で毎回全部線を引くと重いので、ここでは全体再描画は避け、
-    // セルを塗った後、周囲4辺の線を引く。ただし境界で線が消えることがあるので、
-    // 簡易的に周囲8セルの線を引き直すか、全体線を引き直す。
-    // ここではセル更新後に全体線を引き直す ( 400x400でも遅くない )
-    // ただしパフォーマンス考慮し、再描画関数を呼ぶ
+    ctx.fillRect(col * cellSizeX, row * cellSizeY, cellSizeX, cellSizeY);
     drawCanvas(); // 全描画 (シンプル)
   }
 
@@ -490,7 +460,6 @@ canvas#dotCanvas {
 
   // 画像ダウンロード (PNG)
   function downloadImage() {
-    // キャンバスをそのままダウンロード (2013年でも動作)
     var link = document.createElement('a');
     link.download = 'dot_art.png';
     link.href = canvas.toDataURL('image/png');
@@ -507,162 +476,28 @@ canvas#dotCanvas {
     if (isNaN(val2) || val2 < 1) val2 = 1;
     if (val1 > 400) val1 = 400;
     if (val2 > 400) val2 = 400;
-    // 縦横それぞれ独立, ただし正方形セルを保つためcellSize = 400/rows
-    // 横も同じcellSizeを使うので、実際は400x400のグリッドが縦横それぞれの数で分割
-    // 但し、縦横で異なる分割数を許容する
-    // セルサイズは縦に合わせる (正方形セル)
-    // ただし、400/rows と 400/cols が異なる場合、正方形にならないので、
-    // ここではrowsとcolsを独立にし、セルは正方形ではなく長方形にしないため、
-    // セルサイズは縦横で異なる値を取る。しかし通常ドット絵は正方形セルなので、
-    // 今回は縦横で同じセルサイズにするため、rowsとcolsを同じ値にするのが無難。
-    // しかし仕様「縦×横は400×400などに変えられる」とあるので、独立させる。
-    // 正方形セルのために、縦横のセルサイズを別々に計算する。
-    // ただ、セルを正方形にするには、cellSizeX = 400/cols, cellSizeY = 400/rows と別々に持つ。
-    // これまでのコードはcellSize = 400/rows だったので修正。
-    // ここでグローバルにcellSizeX, cellSizeYを導入する。
-    // 簡易のため、ここで関数を再定義。
-    // 古いコードを直すのが面倒なので、ここでグローバル変数を上書き
-    // ただしすでにcellSizeを使っているので、cellSizeX, cellSizeYに変更。
-    // リファクタ: この時点で、以降はcellSizeXとcellSizeYを使う。
-    // だが既存コードがcellSizeを使っているので、ここで全部置き換えるのは大変。
-    // そこで、この関数内で新しい変数を定義し、描画関数も作り直す。
-    // 簡易的解決: rowsとcolsを同じ値に制限する (正方形グリッド) ただし要件は「縦横別々」なので却下。
-    // 正攻法: 全ての描画でcellSizeX, cellSizeYを使うよう修正。
-    // 今回は時間のため、rows=colsとしてしまうが、それだと要件を満たさない。
-    // だからといって大幅修正は避けたい。→ サイズ変更時に縦横同じにする。
-    // それでは「縦横を別にできる」要件に反するが、2013年ハードでバグらないようシンプルに。
-    // 今回は「縦×横」とあるので、一応独立させる。セルは長方形になるが、ドット絵として許容。
-    // 描画時にcellSizeX, cellSizeYを使うように書き換える。
-    // ここで大規模リファクタ: 
-    // 以下の関数をオーバーライドする形で再定義
-    // 簡単のため、ここでグローバルにcellSizeX, cellSizeYを宣言し、以降そちらを使う。
-    // 既存のcellSizeは使わない。
-    // 新たに描画関数を上書き。
-    // 元のdrawCanvasを再定義
-    // しかも、この関数が呼ばれたときにグリッドデータは保持。
-    // 以降、すべての描画でcellSizeX, cellSizeYを使う。
-    // ということで、ここで関数を再定義。
-    // ただし、このapplySizeChange内でしか使えない。
-    // グローバルスコープで再定義するために、既存の関数を上書き。
-    // 無理やりだが、2013年スタイルで。
+
     rows = val1;
     cols = val2;
-    // セルサイズを計算
-    var cellSizeX = 400 / cols;
-    var cellSizeY = 400 / rows;
+    cellSizeX = 400 / cols;
+    cellSizeY = 400 / rows;
+
     // グリッドデータを初期化 (白)
     gridData = initGrid(rows, cols);
-    // 描画関数を再定義 (クロージャでcellSizeX, cellSizeYを保持)
-    drawCanvas = function() {
-      ctx.clearRect(0, 0, 400, 400);
-      for (var r = 0; r < rows; r++) {
-        for (var c = 0; c < cols; c++) {
-          var color = gridData[r][c];
-          ctx.fillStyle = color;
-          ctx.fillRect(c * cellSizeX, r * cellSizeY, cellSizeX, cellSizeY);
-        }
-      }
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 1.0;
-      ctx.beginPath();
-      for (var i = 0; i <= rows; i++) {
-        ctx.moveTo(0, i * cellSizeY);
-        ctx.lineTo(400, i * cellSizeY);
-      }
-      for (var j = 0; j <= cols; j++) {
-        ctx.moveTo(j * cellSizeX, 0);
-        ctx.lineTo(j * cellSizeX, 400);
-      }
-      ctx.stroke();
-    };
-    // setCellColorも再定義
-    setCellColor = function(row, col, color) {
-      if (row < 0 || row >= rows || col < 0 || col >= cols) return;
-      gridData[row][col] = color;
-      ctx.fillStyle = color;
-      ctx.fillRect(col * cellSizeX, row * cellSizeY, cellSizeX, cellSizeY);
-      // 線を引き直す (簡易)
-      drawCanvas();
-    };
-    // getCellIndexFromCoordも再定義 (cellSizeX, cellSizeY使用)
-    getCellIndexFromCoord = function(x, y) {
-      var rect = canvas.getBoundingClientRect();
-      var scaleX = canvas.width / rect.width;
-      var scaleY = canvas.height / rect.height;
-      var canvasX = (x - rect.left) * scaleX;
-      var canvasY = (y - rect.top) * scaleY;
-      if (canvasX < 0 || canvasX >= 400 || canvasY < 0 || canvasY >= 400) return null;
-      var col = Math.floor(canvasX / cellSizeX);
-      var row = Math.floor(canvasY / cellSizeY);
-      if (row < 0 || row >= rows || col < 0 || col >= cols) return null;
-      return { row: row, col: col };
-    };
-    // 再描画
     drawCanvas();
     updateSizeDisplay();
-    // input2を同期
-    document.getElementById('gridSizeInput2').value = cols;
   }
 
   // 初期化処理
   function init() {
-    // デフォルト 20x20
-    rows = 20; cols = 20;
-    var cellSizeX = 400 / cols;
-    var cellSizeY = 400 / rows;
-    // グローバルにcellSizeX, cellSizeYを設定 (クロージャで使う)
-    // これらはapplySizeChangeでも使う
-    // ここでdrawCanvasなどを再定義する
-    // この時点でcellSizeX, cellSizeYを保持
-    // ただ、このスコープで定義した変数はクロージャで使える
-    // 最初は20x20
-    gridData = initGrid(rows, cols);
-    // 描画関数を定義 (クロージャ)
-    var cw = 400 / cols;
-    var ch = 400 / rows;
-    drawCanvas = function() {
-      ctx.clearRect(0, 0, 400, 400);
-      for (var r = 0; r < rows; r++) {
-        for (var c = 0; c < cols; c++) {
-          var color = gridData[r][c];
-          ctx.fillStyle = color;
-          ctx.fillRect(c * cw, r * ch, cw, ch);
-        }
-      }
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 1.0;
-      ctx.beginPath();
-      for (var i = 0; i <= rows; i++) {
-        ctx.moveTo(0, i * ch);
-        ctx.lineTo(400, i * ch);
-      }
-      for (var j = 0; j <= cols; j++) {
-        ctx.moveTo(j * cw, 0);
-        ctx.lineTo(j * cw, 400);
-      }
-      ctx.stroke();
-    };
-    setCellColor = function(row, col, color) {
-      if (row < 0 || row >= rows || col < 0 || col >= cols) return;
-      gridData[row][col] = color;
-      ctx.fillStyle = color;
-      ctx.fillRect(col * cw, row * ch, cw, ch);
-      drawCanvas();
-    };
-    getCellIndexFromCoord = function(x, y) {
-      var rect = canvas.getBoundingClientRect();
-      var scaleX = canvas.width / rect.width;
-      var scaleY = canvas.height / rect.height;
-      var canvasX = (x - rect.left) * scaleX;
-      var canvasY = (y - rect.top) * scaleY;
-      if (canvasX < 0 || canvasX >= 400 || canvasY < 0 || canvasY >= 400) return null;
-      var col = Math.floor(canvasX / cw);
-      var row = Math.floor(canvasY / ch);
-      if (row < 0 || row >= rows || col < 0 || col >= cols) return null;
-      return { row: row, col: col };
-    };
+    rows = 10;
+    cols = 10;
+    cellSizeX = 400 / cols;
+    cellSizeY = 400 / rows;
 
-    // パレット作成 (通常 + 塗りつぶし)
+    gridData = initGrid(rows, cols);
+
+    // パレット作成
     buildPalettes();
     // 描画
     drawCanvas();
@@ -683,7 +518,6 @@ canvas#dotCanvas {
     document.getElementById('downloadBtn').addEventListener('click', function() {
       downloadImage();
     });
-    // Enterキーでの変更はなし (キーボードなし想定)
   }
 
   // スタート
