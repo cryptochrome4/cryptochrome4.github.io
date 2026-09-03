@@ -325,29 +325,20 @@
             border-radius: 16px;
         }
         #resultScreen h1 { font-size: 40px; margin-bottom: 8px; }
-        #resultScreen .sub { font-size: 20px; color: #aaa; margin-bottom: 15px; }
+        #resultScreen .sub { font-size: 20px; color: #aaa; }
         #resultScreen .btn {
             padding: 10px 35px;
             font-size: 18px;
+            background: #ffdd44;
+            color: #222;
             border: none;
             border-radius: 30px;
             cursor: pointer;
             font-weight: bold;
+            margin-top: 20px;
             transition: 0.2s;
         }
-        #resultScreen .btn:hover { transform: scale(1.02); }
-        #resultScreen .btn-oomph {
-            background: #ffdd44;
-            color: #222;
-        }
-        #resultScreen .btn-oomph:hover { background: #ffcc22; }
-        #resultScreen .btn-back {
-            background: #666;
-            color: #fff;
-            margin-top: 10px;
-        }
-        #resultScreen .btn-back:hover { background: #777; }
-        .hidden { display: none !important; }
+        #resultScreen .btn:hover { background: #ffcc22; transform: scale(1.02); }
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: #111; }
         ::-webkit-scrollbar-thumb { background: #444; border-radius: 10px; }
@@ -447,15 +438,14 @@
         <div id="resultScreen">
             <h1 id="resultTitle">🏆 結果</h1>
             <div class="sub" id="resultSub">詳細</div>
-            <button class="btn btn-oomph" id="goToOomph">🎉 味方勝利！ oomph.htmlへ</button>
-            <button class="btn btn-back" id="goBackBtn">🔙 メニューに戻る</button>
+            <button class="btn" id="goToOomph">➡ oomph.html へ</button>
         </div>
     </div>
 </div>
 
 <script>
 // ============================================================
-// サッカー観戦ゲーム - 味方勝利時のみoomph.html遷移版
+// サッカー観戦ゲーム - 背番号・情報パネル対応版
 // ============================================================
 
 // ---------- 定数 ----------
@@ -472,6 +462,7 @@ const GOAL_CENTER_X = FIELD_W / 2;
 const SHIRT_NUMBERS = {
     'GK': 1, 'RSB': 2, 'CB': 3, 'CB2': 4, 'LSB': 5,
     'CMF': 6, 'CMF2': 7, 'OMF': 8, 'RWG': 9, 'ST': 10, 'CF': 11,
+    // フォーメーションB用
     'LWG': 9, 'CF': 11
 };
 
@@ -578,8 +569,6 @@ const setupPanel = document.getElementById('setupPanel');
 const resultScreen = document.getElementById('resultScreen');
 const resultTitle = document.getElementById('resultTitle');
 const resultSub = document.getElementById('resultSub');
-const goToOomphBtn = document.getElementById('goToOomph');
-const goBackBtn = document.getElementById('goBackBtn');
 
 // ---------- ユーティリティ ----------
 function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
@@ -1013,69 +1002,31 @@ function endMatch() {
     const b = gameState.scoreBlue;
     let winner = '';
     let message = '';
-    let isBlueWin = false;
-    
     if (r > b) {
         winner = '🔴 赤 (敵) の勝利！';
         message = `赤 ${r} - ${b} 青`;
-        isBlueWin = false;
     } else if (b > r) {
-        winner = '🔵 青 (味方) の勝利！ 🎉';
+        winner = '🔵 青 (味方) の勝利！';
         message = `青 ${b} - ${r} 赤`;
-        isBlueWin = true;
     } else {
-        // 引き分け: コイントス
         const coin = Math.random() < 0.5 ? 'red' : 'blue';
         if (coin === 'red') {
             winner = '🪙 コイントス: 🔴 赤 (敵) の勝ち！';
             message = `引き分け ${r}-${b} → 赤勝利`;
-            isBlueWin = false;
         } else {
-            winner = '🪙 コイントス: 🔵 青 (味方) の勝ち！ 🎉';
+            winner = '🪙 コイントス: 🔵 青 (味方) の勝ち！';
             message = `引き分け ${r}-${b} → 青勝利`;
-            isBlueWin = true;
         }
     }
-    
     resultTitle.textContent = `🏁 試合終了`;
     resultSub.textContent = `${winner} (${message})`;
-    
-    // ★ 味方勝利時のみoomph.htmlボタンを表示 ★
-    if (isBlueWin) {
-        goToOomphBtn.classList.remove('hidden');
-        resultSub.textContent += ' 🎊 おめでとう！';
-    } else {
-        goToOomphBtn.classList.add('hidden');
-    }
-    
     resultScreen.style.display = 'flex';
     pitch.style.opacity = '0.3';
 }
 
-// ---------- oomph.htmlへ (味方勝利時のみ) ----------
+// ---------- oomph.htmlへ ----------
 document.getElementById('goToOomph').addEventListener('click', function() {
     window.location.href = 'oomph.html';
-});
-
-// ---------- メニューに戻る ----------
-document.getElementById('goBackBtn').addEventListener('click', function() {
-    // 結果画面を閉じてセットアップに戻る
-    resultScreen.style.display = 'none';
-    setupPanel.style.display = 'flex';
-    pitch.style.opacity = '1';
-    // ゲーム状態をリセット
-    gameState.gameActive = false;
-    gameState.gameEnded = false;
-    if (gameState.intervalId) {
-        clearInterval(gameState.intervalId);
-        gameState.intervalId = null;
-    }
-    if (gameState.animFrameId) {
-        cancelAnimationFrame(gameState.animFrameId);
-        gameState.animFrameId = null;
-    }
-    // 選手を削除
-    document.querySelectorAll('.player').forEach(el => el.remove());
 });
 
 // ---------- セットアップUI ----------
@@ -1188,8 +1139,6 @@ window.onload = function() {
     setupUI();
     document.getElementById('blueEditArea').style.display = 'none';
     document.getElementById('redEditArea').style.display = 'none';
-    // 初期状態ではoomphボタンを非表示
-    goToOomphBtn.classList.add('hidden');
 };
 
 window.addEventListener('beforeunload', function() {
