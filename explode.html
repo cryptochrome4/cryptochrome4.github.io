@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>元素生命体 - エレメンタルバトル</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #1a1a2e;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Courier New', monospace;
+            color: #eee;
+        }
+        .container {
+            background: #16213e;
+            padding: 20px;
+            border-radius: 16px;
+            box-shadow: 0 0 40px rgba(0, 200, 255, 0.15);
+            border: 2px solid #0f3460;
+        }
+        canvas {
+            display: block;
+            margin: 0 auto;
+            background: #0a0a1a;
+            border-radius: 8px;
+            box-shadow: inset 0 0 60px rgba(0, 100, 200, 0.1);
+            width: 900px;
+            height: 500px;
+            image-rendering: pixelated;
+        }
+        .info {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 14px;
+            padding: 10px 16px;
+            background: #0d1b2a;
+            border-radius: 30px;
+            border: 1px solid #1b3a5c;
+            font-size: 14px;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .info span {
+            background: #1a2f44;
+            padding: 4px 14px;
+            border-radius: 30px;
+            color: #8ad0ff;
+        }
+        .info .highlight {
+            color: #ffd700;
+            font-weight: bold;
+        }
+        .legend {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .dot {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .status {
+            color: #aaa;
+            font-size: 13px;
+        }
+        button {
+            background: #0f3460;
+            border: none;
+            color: #fff;
+            padding: 4px 18px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 13px;
+            transition: 0.2s;
+        }
+        button:hover {
+            background: #1a4f7a;
+            box-shadow: 0 0 16px rgba(0,150,255,0.3);
+        }
+        @media (max-width: 940px) {
+            canvas { width: 100%; height: auto; aspect-ratio: 900/500; }
+            .info { flex-direction: column; align-items: center; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <canvas id="gameCanvas" width="900" height="500"></canvas>
+    <div class="info">
+        <div class="legend">
+            <span class="legend-item"><span class="dot" style="background:#aaccff;"></span> H (水素)</span>
+            <span class="legend-item"><span class="dot" style="background:#ff8844;"></span> O (酸素)</span>
+            <span class="legend-item"><span class="dot" style="background:#cc8844;"></span> Fe (鉄)</span>
+            <span class="legend-item"><span class="dot" style="background:#ffd700;"></span> Au (金)</span>
+            <span class="legend-item"><span class="dot" style="background:#44ddff;"></span> H₂O (水)</span>
+        </div>
+        <div>
+            <span id="countDisplay">⚛ 元素: 32</span>
+            <span id="reactionLog" class="status">⚡ 反応待機...</span>
+            <button id="resetBtn">↺ リセット</button>
+        </div>
+    </div>
+</div>
+<script>
+    (function() {
+        // ---------- 2013年風 シンプル物理 + 元素AI ----------
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const countSpan = document.getElementById('countDisplay');
+        const logSpan = document.getElementById('reactionLog');
+
+        // フィールドサイズ
+        const W = 900, H = 500;
+        // 物理パラメータ (マリオ風 2D物理)
+        const GRAVITY = 0.25;
+        const FRICTION = 0.98;
+        const BOUNCE = 0.5;
+        const MAX_SPEED = 5.5;
+
+        // 元素定義 (118種から厳選)
+        const ELEMENTS = {
+            H: { symbol: 'H', color: '#aaccff', mass: 1, attack: 1, radius: 8, label: '水素' },
+            O: { symbol: 'O', color: '#ff8844', mass: 3, attack: 2, radius: 10, label: '酸素' },
+            Fe: { symbol: 'Fe', color: '#cc8844', mass: 8, attack: 5, radius: 14, label: '鉄' },
+            Au: { symbol: 'Au', color: '#ffd700', mass: 10, attack: 3, radius: 12, label: '金' },
+            H2O: { symbol: 'H₂O', color: '#44ddff', mass: 6, attack: 4, radius: 22, label: '水' }
+        };
+
+        // 元素リスト (出現種)
+        const SPAWN_TYPES = ['H', 'O', 'Fe', 'Au'];
+
+        // ---------- エンティティクラス ----------
+        class Elemental {
+            constructor(type, x, y) {
+                const def = ELEMENTS[type];
+                this.type = type;
+                this.symbol = def.symbol;
+                this.color = def.color;
+                this.mass = def.mass;
+                this.attack = def.attack;
+                this.radius = def.radius;
+                this.label = def.label;
+
+                this.x = x || Math.random() * (W - 40) + 20;
+                this.y = y || Math.random() * (H - 40) + 20;
+                this.vx = (Math.random() - 0.5) * 1.8;
+                this.vy = (Math.random() - 0.5) * 1.8 - 0.5;
+
+                // 自律AI用
+                this.wanderTimer = 0;
+                this.wanderAngle = Math.random() * Math.PI * 2;
+                // バトルクールダウン
+                this.battleCooldown = 0;
+
+                // 進化フラグ (反応で変化)
+                this.isEvolved = false;
+                // 寿命 (進化後など)
+                this.life = 9999;
+            }
+
+            // サッカーAIライクな自律移動 (ウネウネ)
+            updateAI() {
+                this.wanderTimer -= 1;
+                if (this.wanderTimer <= 0) {
+                    this.wanderTimer = 30 + Math.floor(Math.random() * 40);
+                    this.wanderAngle += (Math.random() - 0.5) * 1.2;
+                    // 壁回避
+                    if (this.x < 30) this.wanderAngle = 0;
+                    if (this.x > W - 30) this.wanderAngle = Math.PI;
+                    if (this.y < 30) this.wanderAngle = Math.PI / 2;
+                    if (this.y > H - 30) this.wanderAngle = -Math.PI / 2;
+                }
+                // 加速度 (ランダムウォーク + 壁反発)
+                const accel = 0.12;
+                const targetVx = Math.cos(this.wanderAngle) * 0.8;
+                const targetVy = Math.sin(this.wanderAngle) * 0.8;
+                this.vx += (targetVx - this.vx * 0.1) * accel;
+                this.vy += (targetVy - this.vy * 0.1) * accel;
+
+                // 質量による浮き沈み効果 (水素は浮く、鉄は沈む)
+                if (this.type === 'H') {
+                    this.vy -= 0.06; // 浮力
+                } else if (this.type === 'Fe' || this.type === 'Au') {
+                    this.vy += 0.08; // 重い
+                } else if (this.type === 'O') {
+                    this.vy -= 0.02;
+                } else if (this.type === 'H2O') {
+                    this.vy -= 0.03;
+                }
+
+                // 速度リミット
+                const sp = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+                if (sp > MAX_SPEED) {
+                    this.vx = (this.vx / sp) * MAX_SPEED;
+                    this.vy = (this.vy / sp) * MAX_SPEED;
+                }
+            }
+
+            // 物理更新 (マリオ風)
+            updatePhysics() {
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // 重力
+                this.vy += GRAVITY * (this.mass * 0.12);
+
+                // 摩擦
+                this.vx *= FRICTION;
+                this.vy *= FRICTION;
+
+                // 壁反射 (バウンド)
+                if (this.x - this.radius < 0) {
+                    this.x = this.radius;
+                    this.vx = Math.abs(this.vx) * BOUNCE;
+                } else if (this.x + this.radius > W) {
+                    this.x = W - this.radius;
+                    this.vx = -Math.abs(this.vx) * BOUNCE;
+                }
+                if (this.y - this.radius < 0) {
+                    this.y = this.radius;
+                    this.vy = Math.abs(this.vy) * BOUNCE;
+                } else if (this.y + this.radius > H) {
+                    this.y = H - this.radius;
+                    this.vy = -Math.abs(this.vy) * BOUNCE;
+                }
+
+                // バトルクールダウン
+                if (this.battleCooldown > 0) this.battleCooldown--;
+            }
+
+            // 描画 (ドット絵風 〇)
+            draw(ctx) {
+                // グロー
+                ctx.shadowColor = this.color;
+                ctx.shadowBlur = 18;
+
+                // 本体
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+
+                // 縁取り (ピクセル風)
+                ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+
+                // 元素記号 (中央)
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold ' + (this.radius * 0.9) + 'px "Courier New", monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(this.symbol, this.x, this.y + 1);
+
+                // 質量インジケータ (小ドット)
+                if (this.mass > 6) {
+                    ctx.fillStyle = 'rgba(255,200,50,0.6)';
+                    ctx.beginPath();
+                    ctx.arc(this.x - this.radius * 0.6, this.y - this.radius * 0.6, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            // 衝突判定 (サッカー的)
+            collidesWith(other) {
+                const dx = this.x - other.x;
+                const dy = this.y - other.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                return dist < this.radius + other.radius;
+            }
+
+            // 化学反応 (バトル) 進化ロジック
+            reactWith(other, elements) {
+                if (this.battleCooldown > 0 || other.battleCooldown > 0) return false;
+                if (this.isEvolved || other.isEvolved) return false;
+
+                // 反応ペア
+                const pair = [this.type, other.type].sort();
+                let newType = null;
+                let logMsg = '';
+
+                // H + O → H2O
+                if (pair[0] === 'H' && pair[1] === 'O') {
+                    newType = 'H2O';
+                    logMsg = '💧 H + O → H₂O 誕生！';
+                }
+                // Fe + O → 酸化鉄 (今回はFeとして強化)
+                else if (pair[0] === 'Fe' && pair[1] === 'O') {
+                    newType = 'Fe';
+                    logMsg = '🔥 Fe + O → 酸化鉄 (攻撃強化)';
+                }
+                // Au + Fe → 合金 (Auとして強化)
+                else if (pair[0] === 'Au' && pair[1] === 'Fe') {
+                    newType = 'Au';
+                    logMsg = '✨ Au + Fe → 合金 (金剛)';
+                }
+                // H + H → 水素分子 (Hとして強化)
+                else if (pair[0] === 'H' && pair[1] === 'H') {
+                    newType = 'H';
+                    logMsg = '⚡ H + H → 水素分子 (活性化)';
+                }
+                // その他: 攻撃バトル (弱い方が消える)
+                else {
+                    // 攻撃力勝負
+                    if (this.attack > other.attack) {
+                        other.life = 0;
+                        logMsg = `⚔️ ${this.symbol} が ${other.symbol} を撃破！`;
+                    } else if (other.attack > this.attack) {
+                        this.life = 0;
+                        logMsg = `⚔️ ${other.symbol} が ${this.symbol} を撃破！`;
+                    } else {
+                        // 同士討ち
+                        this.life = 0;
+                        other.life = 0;
+                        logMsg = `💥 ${this.symbol} ⇔ ${other.symbol} 相打ち！`;
+                    }
+                    // ログ表示
+                    if (logMsg) logSpan.textContent = logMsg;
+                    // クールダウン
+                    this.battleCooldown = 20;
+                    other.battleCooldown = 20;
+                    return true;
+                }
+
+                // 進化が発生した場合
+                if (newType) {
+                    // 新しい元素に置き換え (thisを進化させる)
+                    const def = ELEMENTS[newType];
+                    // 位置は中間
+                    const mx = (this.x + other.x) / 2;
+                    const my = (this.y + other.y) / 2;
+
+                    // 片方を進化、もう一方を削除
+                    this.type = newType;
+                    this.symbol = def.symbol;
+                    this.color = def.color;
+                    this.mass = def.mass;
+                    this.attack = def.attack;
+                    this.radius = def.radius;
+                    this.label = def.label;
+                    this.isEvolved = true;
+                    this.x = mx;
+                    this.y = my;
+                    this.vx = (this.vx + other.vx) * 0.3;
+                    this.vy = (this.vy + other.vy) * 0.3 - 1.2;
+                    this.battleCooldown = 30;
+
+                    // 相手を削除
+                    other.life = 0;
+
+                    logSpan.textContent = logMsg;
+                    return true;
+                }
+                return false;
+            }
+        }
+
+        // ---------- ゲーム状態 ----------
+        let elements = [];
+        let frameCount = 0;
+        let spawnCounter = 0;
+
+        // 初期生成
+        function initGame() {
+            elements = [];
+            const types = ['H', 'H', 'H', 'O', 'O', 'Fe', 'Au', 'H']; // 8体スタート
+            types.forEach((t, i) => {
+                const x = 80 + i * 100 + Math.random() * 60;
+                const y = 100 + Math.random() * 280;
+                elements.push(new Elemental(t, x, y));
+            });
+            // 追加で数体
+            for (let i = 0; i < 12; i++) {
+                const t = SPAWN_TYPES[Math.floor(Math.random() * SPAWN_TYPES.length)];
+                elements.push(new Elemental(t));
+            }
+            logSpan.textContent = '⚡ 元素が目覚めた！';
+            updateCount();
+        }
+
+        // カウント更新
+        function updateCount() {
+            const alive = elements.filter(e => e.life > 0);
+            countSpan.textContent = `⚛ 元素: ${alive.length}`;
+        }
+
+        // スポーン (自然発生)
+        function spawnElement() {
+            if (elements.length > 70) return;
+            const type = SPAWN_TYPES[Math.floor(Math.random() * SPAWN_TYPES.length)];
+            const x = 20 + Math.random() * (W - 40);
+            const y = 20 + Math.random() * (H - 40);
+            const el = new Elemental(type, x, y);
+            el.vx = (Math.random() - 0.5) * 1.5;
+            el.vy = (Math.random() - 0.5) * 1.5;
+            elements.push(el);
+        }
+
+        // ---------- メインループ ----------
+        function update() {
+            frameCount++;
+            // スポーン
+            if (frameCount % 40 === 0) {
+                spawnElement();
+            }
+
+            // 生存者フィルタ
+            elements = elements.filter(e => e.life > 0);
+
+            // ---- AI + 物理 ----
+            for (let e of elements) {
+                e.updateAI();
+                e.updatePhysics();
+            }
+
+            // ---- 衝突判定 + 化学反応 (サッカーチェック) ----
+            for (let i = 0; i < elements.length; i++) {
+                for (let j = i + 1; j < elements.length; j++) {
+                    const a = elements[i];
+                    const b = elements[j];
+                    if (a.life <= 0 || b.life <= 0) continue;
+                    if (a.collidesWith(b)) {
+                        // 衝突反応
+                        const reacted = a.reactWith(b, elements);
+                        if (reacted) {
+                            // 反応後は処理をスキップ (バトル済)
+                            // しかしループ継続のため、削除フラグをチェック
+                            // 要素削除はフィルタで後処理
+                        } else {
+                            // 物理的反発 (サッカー衝突)
+                            const dx = a.x - b.x;
+                            const dy = a.y - b.y;
+                            const dist = Math.sqrt(dx * dx + dy * dy);
+                            if (dist === 0) continue;
+                            const overlap = (a.radius + b.radius - dist) / 2;
+                            const nx = dx / dist;
+                            const ny = dy / dist;
+                            a.x += nx * overlap;
+                            a.y += ny * overlap;
+                            b.x -= nx * overlap;
+                            b.y -= ny * overlap;
+                            // 反発速度
+                            const relV = (a.vx - b.vx) * nx + (a.vy - b.vy) * ny;
+                            if (relV < 0) {
+                                const impulse = -relV * 0.3;
+                                a.vx += impulse * nx / a.mass;
+                                a.vy += impulse * ny / a.mass;
+                                b.vx -= impulse * nx / b.mass;
+                                b.vy -= impulse * ny / b.mass;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 死亡除去
+            elements = elements.filter(e => e.life > 0);
+            updateCount();
+        }
+
+        // ---------- 描画 ----------
+        function draw() {
+            ctx.clearRect(0, 0, W, H);
+
+            // 背景グリッド (ピクセル風)
+            ctx.fillStyle = '#0a0a1a';
+            ctx.fillRect(0, 0, W, H);
+            ctx.strokeStyle = 'rgba(50,80,120,0.08)';
+            ctx.lineWidth = 0.5;
+            for (let x = 0; x < W; x += 40) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, H);
+                ctx.stroke();
+            }
+            for (let y = 0; y < H; y += 40) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(W, y);
+                ctx.stroke();
+            }
+
+            // 元素描画
+            for (let e of elements) {
+                e.draw(ctx);
+            }
+
+            // フィールド境界 (光)
+            ctx.strokeStyle = 'rgba(100,180,255,0.08)';
+            ctx.lineWidth = 4;
+            ctx.strokeRect(2, 2, W - 4, H - 4);
+        }
+
+        // ---------- アニメーションループ ----------
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        // ---------- リセット ----------
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            initGame();
+            logSpan.textContent = '🔄 リセットしました';
+        });
+
+        // 起動
+        initGame();
+        loop();
+
+        // ウィンドウリサイズ対応 (キャンバス固定)
+        window.addEventListener('resize', () => {
+            // 固定サイズのため何もしない
+        });
+
+        // ログ表示のための補助 (反応表示はreactionLogで)
+        // 定期的にログをクリア (邪魔にならないように)
+        setInterval(() => {
+            if (logSpan.textContent.includes('⚔️') || logSpan.textContent.includes('💧')) {
+                // 3秒後に戻す
+                setTimeout(() => {
+                    if (logSpan.textContent !== '⚡ 反応待機...') {
+                        logSpan.textContent = '⚡ 反応待機...';
+                    }
+                }, 3000);
+            }
+        }, 1000);
+
+    })();
+</script>
+</body>
+</html>
