@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🔒 サイバーセキュリティ・ニュースダッシュボード</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background-color: #0b0f0b;
+      color: #00ffaa;
+      font-family: 'Courier New', Courier, monospace;
+      padding: 2rem 1.5rem;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .dashboard {
+      max-width: 1200px;
+      width: 100%;
+    }
+
+    /* サイバーパンク風ヘッダー */
+    .glitch-header {
+      border-bottom: 2px solid #00ffaa;
+      padding-bottom: 1rem;
+      margin-bottom: 2.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .glitch-header h1 {
+      font-size: 2.2rem;
+      font-weight: normal;
+      letter-spacing: 4px;
+      text-shadow: 0 0 8px #00ffaa55, 0 0 20px #00ffaa22;
+    }
+
+    .glitch-header .badge {
+      font-size: 0.9rem;
+      color: #88ffbb;
+      background: #0f1f1a;
+      padding: 0.4rem 1rem;
+      border: 1px solid #00ffaa55;
+      border-radius: 30px;
+      letter-spacing: 1px;
+    }
+
+    /* ステータスバー / フェッチ情報 */
+    .status-bar {
+      background: #0f1a14;
+      border-left: 6px solid #00ffaa;
+      padding: 0.8rem 1.5rem;
+      margin-bottom: 2.5rem;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      border-radius: 0 12px 12px 0;
+      box-shadow: 0 0 12px #00ffaa22;
+      font-size: 0.9rem;
+    }
+
+    .status-bar .dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      background: #00ffaa;
+      border-radius: 50%;
+      margin-right: 10px;
+      box-shadow: 0 0 12px #00ffaa;
+      animation: pulse-dot 1.8s infinite;
+    }
+
+    @keyframes pulse-dot {
+      0% { opacity: 0.3; transform: scale(0.9); }
+      50% { opacity: 1; transform: scale(1.2); }
+      100% { opacity: 0.3; transform: scale(0.9); }
+    }
+
+    .status-text {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .refresh-btn {
+      background: transparent;
+      border: 1px solid #00ffaa66;
+      color: #00ffaa;
+      padding: 0.3rem 1.2rem;
+      border-radius: 30px;
+      font-family: inherit;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: #0f1a14;
+      letter-spacing: 1px;
+    }
+
+    .refresh-btn:hover {
+      background: #00ffaa22;
+      border-color: #00ffaa;
+      box-shadow: 0 0 20px #00ffaa33;
+    }
+
+    /* ニュースカード一覧 */
+    .news-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .news-card {
+      background: #0e1612;
+      border: 1px solid #1a332a;
+      border-radius: 12px;
+      padding: 1.2rem 1.8rem;
+      transition: all 0.15s ease;
+      box-shadow: 0 0 8px #00ffaa0a;
+      border-left: 6px solid #00ffaa77;
+    }
+
+    .news-card:hover {
+      background: #121f1a;
+      border-color: #00ffaa88;
+      box-shadow: 0 0 24px #00ffaa18;
+    }
+
+    .news-title {
+      font-size: 1.25rem;
+      font-weight: bold;
+      color: #b5ffd9;
+      margin-bottom: 0.4rem;
+      letter-spacing: 0.3px;
+      word-break: break-word;
+    }
+
+    .news-title a {
+      color: #b5ffd9;
+      text-decoration: none;
+      border-bottom: 1px dotted #00ffaa44;
+      transition: color 0.2s;
+    }
+
+    .news-title a:hover {
+      color: #ffffff;
+      border-bottom-color: #00ffaa;
+    }
+
+    .news-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.8rem 1.8rem;
+      font-size: 0.8rem;
+      color: #5ea783;
+      margin: 0.3rem 0 0.6rem 0;
+    }
+
+    .news-meta .source {
+      background: #0f1f1a;
+      padding: 0.1rem 0.8rem;
+      border-radius: 30px;
+      border: 1px solid #1a3a2e;
+      color: #7cccaa;
+    }
+
+    .news-description {
+      color: #aadbc2;
+      line-height: 1.5;
+      font-size: 0.95rem;
+      margin-top: 0.3rem;
+      opacity: 0.9;
+      word-break: break-word;
+    }
+
+    .empty-message {
+      text-align: center;
+      padding: 3rem 1rem;
+      border: 1px dashed #2a4a3a;
+      border-radius: 24px;
+      color: #4a8a72;
+      background: #0a120e;
+      font-size: 1.2rem;
+    }
+
+    .footer-note {
+      margin-top: 3rem;
+      font-size: 0.75rem;
+      color: #1f4d3a;
+      border-top: 1px solid #1a332a;
+      padding-top: 2rem;
+      text-align: center;
+      width: 100%;
+      letter-spacing: 1px;
+    }
+
+    .footer-note span {
+      color: #3a7a5a;
+    }
+
+    /* ローディングアニメーション */
+    .loading {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 12px;
+      color: #5ea783;
+      font-size: 1.1rem;
+      padding: 2rem 0;
+    }
+
+    .loading .spinner {
+      width: 20px;
+      height: 20px;
+      border: 3px solid #1a332a;
+      border-top: 3px solid #00ffaa;
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* レスポンシブ */
+    @media (max-width: 600px) {
+      body { padding: 1.2rem 0.8rem; }
+      .glitch-header h1 { font-size: 1.6rem; }
+      .news-card { padding: 1rem; }
+      .news-title { font-size: 1rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard">
+    <!-- ヘッダー -->
+    <header class="glitch-header">
+      <h1>⛓️ CYBER·NEWS</h1>
+      <div class="badge">🔍 #cybersecurity #databreach</div>
+    </header>
+
+    <!-- ステータスバー -->
+    <div class="status-bar">
+      <div class="status-text">
+        <span class="dot"></span>
+        <span id="statusMessage">🔄 最新のセキュリティニュースを取得中...</span>
+      </div>
+      <button class="refresh-btn" id="refreshButton">⟳ 更新</button>
+    </div>
+
+    <!-- ニュースリスト -->
+    <div id="newsContainer" class="news-grid">
+      <!-- 動的に挿入 -->
+      <div class="loading">
+        <div class="spinner"></div>
+        <span>ローディング</span>
+      </div>
+    </div>
+
+    <div class="footer-note">
+      <span>⚡ NewsAPI ｜ 個人学習用ダッシュボード ｜ フロントエンドのみ</span>
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      // ---------- 設定 ----------
+      // NewsAPI のエンドポイント (フロントエンドから叩ける無料枠)
+      const API_BASE = 'https://newsapi.org/v2/everything';
+      // ⚠️ ここにあなたのAPIキーを入れてください（無料枠: https://newsapi.org/register）
+      // このコードはGitHub Pagesで公開する場合、キーが露出することに注意してください。
+      // 個人学習用として、キーを直書きします。（公開リポジトリでは避けてください）
+      const API_KEY = 'YOUR_NEWSAPI_KEY';  // ← あなたのAPIキーに置き換えてください
+
+      // 検索キーワード（サイバーセキュリティ関連）
+      const QUERY = 'cybersecurity OR "data breach" OR hacking';
+      // 取得件数
+      const PAGE_SIZE = 10;
+      // 言語: 英語 (en) / 日本語 (ja) など。ここではen（多くの記事）
+      const LANGUAGE = 'en';
+      // ソート: 最新順
+      const SORT_BY = 'publishedAt';
+
+      // DOM 要素
+      const newsContainer = document.getElementById('newsContainer');
+      const statusMessage = document.getElementById('statusMessage');
+
+      // ---------- ヘルパー: 日付フォーマット (簡易) ----------
+      function formatDate(dateString) {
+        if (!dateString) return '日付不明';
+        try {
+          const d = new Date(dateString);
+          return d.toLocaleDateString('ja-JP', { year: 'numeric', month: 'short', day: 'numeric' }) 
+            + ' ' + d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+        } catch (_) {
+          return dateString;
+        }
+      }
+
+      // ---------- ニュースを描画 ----------
+      function renderNews(articles) {
+        // コンテナをクリア
+        newsContainer.innerHTML = '';
+
+        if (!articles || articles.length === 0) {
+          newsContainer.innerHTML = `
+            <div class="empty-message">
+              ⚡ ニュースが見つかりませんでした。<br>
+              <span style="font-size:0.8rem; opacity:0.6;">キーワードを変えてみるか、しばらくしてから再読み込みしてください。</span>
+            </div>
+          `;
+          return;
+        }
+
+        // 各記事をカードとしてレンダリング
+        let html = '';
+        articles.forEach((article, index) => {
+          const title = article.title || 'タイトルなし';
+          const description = article.description || '概要はありません。';
+          const url = article.url || '#';
+          const sourceName = article.source?.name || 'Unknown';
+          const publishedAt = article.publishedAt ? formatDate(article.publishedAt) : '';
+
+          // 記事タイトルが長い場合の省略はCSSに任せる (word-break)
+          html += `
+            <div class="news-card">
+              <div class="news-title">
+                <a href="${url}" target="_blank" rel="noopener noreferrer">${escapeHtml(title)}</a>
+              </div>
+              <div class="news-meta">
+                <span class="source">📰 ${escapeHtml(sourceName)}</span>
+                <span>🕒 ${publishedAt}</span>
+                <span>#${index + 1}</span>
+              </div>
+              <div class="news-description">${escapeHtml(description)}</div>
+            </div>
+          `;
+        });
+
+        newsContainer.innerHTML = html;
+      }
+
+      // 簡易的なXSS対策 (テキストのみ想定)
+      function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+      }
+
+      // ---------- APIからニュースをフェッチ ----------
+      async function fetchCybersecurityNews() {
+        // ステータス更新
+        statusMessage.innerHTML = '🔄 フェッチ中...';
+        newsContainer.innerHTML = `
+          <div class="loading">
+            <div class="spinner"></div>
+            <span>最新ニュースを取得中</span>
+          </div>
+        `;
+
+        // URL パラメータ構築
+        const params = new URLSearchParams({
+          q: QUERY,
+          language: LANGUAGE,
+          sortBy: SORT_BY,
+          pageSize: PAGE_SIZE,
+          apiKey: API_KEY,
+        });
+
+        // もしAPI_KEYがプレースホルダーのままならエラー表示
+        if (API_KEY === 'YOUR_NEWSAPI_KEY') {
+          statusMessage.innerHTML = '⚠️ APIキーが設定されていません。コード内のAPI_KEYを設定してください。';
+          newsContainer.innerHTML = `
+            <div class="empty-message" style="border-color: #aa5533;">
+              ❗ NewsAPIのキーが必要です。<br>
+              <span style="font-size:0.8rem;">https://newsapi.org/register で取得し、コード内のAPI_KEYを書き換えてください。</span>
+            </div>
+          `;
+          return;
+        }
+
+        const url = `${API_BASE}?${params.toString()}`;
+
+        try {
+          const response = await fetch(url);
+
+          // レスポンスチェック
+          if (!response.ok) {
+            let errorMsg = `HTTP ${response.status}`;
+            try {
+              const errorData = await response.json();
+              if (errorData.message) errorMsg += `: ${errorData.message}`;
+            } catch (_) {}
+            throw new Error(`APIエラー (${errorMsg})`);
+          }
+
+          const data = await response.json();
+
+          // status チェック (NewsAPI は status: "ok" または "error")
+          if (data.status === 'error') {
+            throw new Error(data.message || 'APIからエラー応答がありました');
+          }
+
+          // 記事リスト
+          const articles = data.articles || [];
+          // ステータス更新
+          statusMessage.innerHTML = `✅ ${articles.length}件のニュースを取得 (${new Date().toLocaleTimeString()})`;
+          renderNews(articles);
+
+        } catch (error) {
+          console.error('ニュース取得エラー:', error);
+          statusMessage.innerHTML = `❌ エラー: ${error.message || '不明なエラー'}`;
+          newsContainer.innerHTML = `
+            <div class="empty-message" style="border-color: #aa5533;">
+              ⚠️ データの取得に失敗しました。<br>
+              <span style="font-size:0.8rem;">${escapeHtml(error.message)}</span><br>
+              <span style="font-size:0.7rem; opacity:0.5;">ネットワーク接続とAPIキーを確認してください。</span>
+            </div>
+          `;
+        }
+      }
+
+      // ---------- 初期ロード & 更新ボタン ----------
+      document.addEventListener('DOMContentLoaded', () => {
+        // 初回フェッチ
+        fetchCybersecurityNews();
+
+        // 更新ボタン
+        const refreshBtn = document.getElementById('refreshButton');
+        refreshBtn.addEventListener('click', () => {
+          fetchCybersecurityNews();
+        });
+      });
+
+    })();
+  </script>
+</body>
+</html>
