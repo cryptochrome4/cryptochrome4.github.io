@@ -63,22 +63,20 @@ body { background:#1a1a2e; display:flex; justify-content:center; align-items:cen
 
 <script>
 // ============================================================
-// 2013年互換 7日間サバイバルゲーム
+// 7日間サバイバルゲーム (画像表示版)
 // ============================================================
 
 (function(){
 "use strict";
 
-// ---- 定数 ----
-var BLOCK_SIZE = 32;        // 1マス32px
-var GRID_SIZE = 10;         // 10x10
+var BLOCK_SIZE = 32;
+var GRID_SIZE = 10;
 var CANVAS_SIZE = 320;
-var DAY_DURATION = 30;      // 30秒
+var DAY_DURATION = 30;
 var MAX_DAYS = 7;
-var TOTAL_BLOCKS = 9;       // 森1〜森8 + 小屋(中央)
 
-// ---- 画像ファイル名 (実際の画像URLに差し替え可能) ----
-var IMG_MAP = {
+// ★ 画像ファイル名マッピング
+var IMG_FILES = {
   '加藤': 'img154streamer.jpg',
   '松本': 'img155streamer.jpg',
   '坪池': 'img156streamer.jpg',
@@ -90,10 +88,11 @@ var IMG_MAP = {
   '紅葉': 'img162feat.jpg',
   'ジェイソン': 'img163enemy.jpg',
   '熊': 'img164bear.jpg',
-  '狼': 'img165wolf.jpg'
+  '狼': 'img165wolf.jpg',
+  '斧': 'img166axe.jpg',
+  '銃': 'img167gun.jpg'
 };
 
-// ---- キャラクター定義 ----
 var CHARACTERS = {
   '加藤': { speed: 40, img: '加藤' },
   '松本': { speed: 60, img: '松本' },
@@ -109,14 +108,79 @@ var CHARACTERS = {
   '狼': { speed: 40, img: '狼' }
 };
 
-// ---- モブ名リスト ----
 var MOB_NAMES = ['加藤','松本','坪池','市川','青笹','角田','木元','山崎'];
 var HERO_NAME = '紅葉';
 
-// ---- 状態 ----
+// ★ 画像キャッシュ
+var imageCache = {};
+var imagesLoaded = 0;
+var totalImages = 0;
+
+function loadImages(callback) {
+  var names = [];
+  for (var key in IMG_FILES) {
+    if (IMG_FILES.hasOwnProperty(key)) {
+      names.push(key);
+    }
+  }
+  totalImages = names.length;
+  imagesLoaded = 0;
+  
+  for (var i = 0; i < names.length; i++) {
+    var name = names[i];
+    var img = new Image();
+    img.onload = function() {
+      imagesLoaded++;
+      if (imagesLoaded >= totalImages) {
+        callback();
+      }
+    };
+    img.onerror = function() {
+      // 画像が読み込めなくても続行（文字で代用）
+      imagesLoaded++;
+      if (imagesLoaded >= totalImages) {
+        callback();
+      }
+    };
+    img.src = IMG_FILES[name];
+    imageCache[name] = img;
+  }
+}
+
+function getImage(name) {
+  if (imageCache[name] && imageCache[name].complete && imageCache[name].naturalWidth > 0) {
+    return imageCache[name];
+  }
+  return null;
+}
+
+// ★ 画像または文字を描画
+function drawImageOrText(ctx, name, x, y, size, color) {
+  var img = getImage(name);
+  if (img) {
+    ctx.drawImage(img, x, y, size, size);
+    return true;
+  } else {
+    // フォールバック：文字で表示
+    ctx.fillStyle = color || '#888';
+    ctx.fillRect(x + 2, y + 2, size - 4, size - 4);
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 2, y + 2, size - 4, size - 4);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 12px "MS Gothic"';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    var label = name;
+    if (label.length > 2) label = label.substring(0, 2);
+    ctx.fillText(label, x + size/2, y + size/2);
+    return false;
+  }
+}
+
 var state = {
   day: 1,
-  dayElapsed: 0,          // 秒
+  dayElapsed: 0,
   points: 0,
   gameOver: false,
   gameWon: false,
@@ -127,12 +191,12 @@ var state = {
   jason: null,
   bear: null,
   wolf: null,
-  items: [],              // 地面アイテム {name, x, y, blockId}
-  objects: [],            // 固定オブジェクト {type, x, y, blockId, used}
-  heroItem: null,         // 持ってるアイテム名
+  items: [],
+  objects: [],
+  heroItem: null,
   mobAlive: 8,
-  blockMap: [],           // 9ブロックのグリッド (3x3)
-  currentBlock: 4,        // 0〜8, 4が小屋(中央)
+  blockMap: [],
+  currentBlock: 4,
   logs: [],
   jasonPoints: 0,
   bearAttackDays: [],
@@ -141,16 +205,16 @@ var state = {
   gameLoopInterval: null,
   dayTimerInterval: null,
   mobTaskDone: [false,false,false,false,false,false,false,false],
-  mobAssigned: [],        // モブ名 → タスク番号(0〜7)
+  mobAssigned: [],
   itemSpawned: false,
   frameCount: 0,
   jasonKillCooldown: 0,
   bearKillCooldown: 0,
   moveCounter: 0,
-  refinedShown: false
+  refinedShown: false,
+  isGameLoopRunning: false
 };
 
-// ---- DOM参照 ----
 var canvas = document.getElementById('mapCanvas');
 var ctx = canvas.getContext('2d');
 var nightOverlay = document.getElementById('nightOverlay');
@@ -166,10 +230,7 @@ var logArea = document.getElementById('logArea');
 var dayDisplay = document.getElementById('dayDisplay');
 var btnDrop = document.getElementById('btnDrop');
 
-// ---- ユーティリティ ----
 function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
-
-function randf(min, max) { return Math.random() * (max - min) + min; }
 
 function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
 
@@ -191,8 +252,6 @@ function renderLog() {
   logArea.innerHTML = html;
 }
 
-// ---- ブロックIDと座標の変換 ----
-// 0:左上,1:上中央,2:右上,3:左,4:中央(小屋),5:右,6:左下,7:下中央,8:右下
 var BLOCK_NAMES = ['森8','森7','森6','森5','小屋','森4','森3','森2','森1'];
 
 function blockToGrid(blockId) {
@@ -211,8 +270,94 @@ function getBlockOffset(blockId) {
   return { x: g.col * GRID_SIZE, y: g.row * GRID_SIZE };
 }
 
-// ---- 初期化 ----
+function canMoveTo(blockId, x, y, entity) {
+  if (x < 0 || x >= GRID_SIZE || y < 0 || y >= GRID_SIZE) {
+    var g = blockToGrid(blockId);
+    var newRow = g.row;
+    var newCol = g.col;
+    var newX = x;
+    var newY = y;
+    
+    if (x < 0) { newCol--; newX = GRID_SIZE - 1; }
+    else if (x >= GRID_SIZE) { newCol++; newX = 0; }
+    else if (y < 0) { newRow--; newY = GRID_SIZE - 1; }
+    else if (y >= GRID_SIZE) { newRow++; newY = 0; }
+    
+    var newBlock = gridToBlock(newRow, newCol);
+    if (newBlock < 0 || newBlock > 8) return false;
+    
+    if (state.blockMap[newBlock] && state.blockMap[newBlock][newY] && 
+        state.blockMap[newBlock][newY][newX] === 'tree') {
+      return false;
+    }
+    
+    if (entity) {
+      entity.blockId = newBlock;
+      entity.x = newX;
+      entity.y = newY;
+    }
+    return true;
+  }
+  
+  if (state.blockMap[blockId] && state.blockMap[blockId][y] && 
+      state.blockMap[blockId][y][x] === 'tree') {
+    return false;
+  }
+  
+  return true;
+}
+
+function moveCharacter(entity, dx, dy) {
+  if (!entity || !entity.alive) return false;
+  
+  var nx = entity.x + dx;
+  var ny = entity.y + dy;
+  
+  if (nx >= 0 && nx < GRID_SIZE && ny >= 0 && ny < GRID_SIZE) {
+    if (state.blockMap[entity.blockId] && state.blockMap[entity.blockId][ny] && 
+        state.blockMap[entity.blockId][ny][nx] === 'tree') {
+      return false;
+    }
+    entity.x = nx;
+    entity.y = ny;
+    return true;
+  }
+  
+  var g = blockToGrid(entity.blockId);
+  var newRow = g.row;
+  var newCol = g.col;
+  var newX = nx;
+  var newY = ny;
+  
+  if (nx < 0) { newCol--; newX = GRID_SIZE - 1; }
+  else if (nx >= GRID_SIZE) { newCol++; newX = 0; }
+  else if (ny < 0) { newRow--; newY = GRID_SIZE - 1; }
+  else if (ny >= GRID_SIZE) { newRow++; newY = 0; }
+  
+  var newBlock = gridToBlock(newRow, newCol);
+  if (newBlock < 0 || newBlock > 8) return false;
+  
+  if (state.blockMap[newBlock] && state.blockMap[newBlock][newY] && 
+      state.blockMap[newBlock][newY][newX] === 'tree') {
+    return false;
+  }
+  
+  entity.blockId = newBlock;
+  entity.x = newX;
+  entity.y = newY;
+  return true;
+}
+
 function initGame() {
+  if (state.animFrame) {
+    cancelAnimationFrame(state.animFrame);
+    state.animFrame = null;
+  }
+  if (state.dayTimerInterval) {
+    clearInterval(state.dayTimerInterval);
+    state.dayTimerInterval = null;
+  }
+  
   state.day = 1;
   state.dayElapsed = 0;
   state.points = 0;
@@ -232,13 +377,9 @@ function initGame() {
   state.jasonKillCooldown = 0;
   state.bearKillCooldown = 0;
   state.moveCounter = 0;
-  state.hero = null;
-  state.jason = null;
-  state.bear = null;
-  state.wolf = null;
-  state.mobs = [];
+  state.currentBlock = 4;
+  state.isGameLoopRunning = true;
 
-  // 熊の襲撃日 (2日間ランダム)
   var days = [1,2,3,4,5,6,7];
   state.bearAttackDays = [];
   var shuffled = days.slice();
@@ -251,11 +392,9 @@ function initGame() {
   state.bearAttackDays = shuffled.slice(0, 2);
   addLog('🐻 熊の襲撃日: ' + state.bearAttackDays.join(', ') + '日目');
 
-  // ジェイソンポイント (15〜20)
   state.jasonPoints = rand(15, 20);
   addLog('🔪 ジェイソンポイント: ' + state.jasonPoints);
 
-  // ブロックマップ初期化
   state.blockMap = [];
   for (var b = 0; b < 9; b++) {
     state.blockMap[b] = [];
@@ -267,9 +406,8 @@ function initGame() {
     }
   }
 
-  // 森の木を生成 (各森ブロックに3つの木、縦2×横1)
   for (var b2 = 0; b2 < 9; b2++) {
-    if (b2 === 4) continue; // 小屋は木なし
+    if (b2 === 4) continue;
     for (var t = 0; t < 3; t++) {
       var tx, ty;
       var attempts = 0;
@@ -280,7 +418,6 @@ function initGame() {
       } while (attempts < 50 && state.blockMap[b2][ty][tx] !== null);
       if (state.blockMap[b2][ty][tx] === null) {
         state.blockMap[b2][ty][tx] = 'tree';
-        // 縦2×横1: もう一つ下に木
         if (ty + 1 < GRID_SIZE && state.blockMap[b2][ty+1][tx] === null) {
           state.blockMap[b2][ty+1][tx] = 'tree';
         }
@@ -288,21 +425,16 @@ function initGame() {
     }
   }
 
-  // ---- キャラクター生成 ----
-  // 主人公 (小屋の中)
-  var heroX = rand(3, 6);
-  var heroY = rand(3, 6);
   state.hero = {
     name: HERO_NAME,
-    x: heroX,
-    y: heroY,
+    x: rand(3, 6),
+    y: rand(3, 6),
     blockId: 4,
     speed: CHARACTERS[HERO_NAME].speed,
     img: CHARACTERS[HERO_NAME].img,
     alive: true
   };
 
-  // モブキャラ (小屋の中、周囲に配置)
   var mobPositions = [
     {x:1,y:1},{x:8,y:1},{x:1,y:8},{x:8,y:8},
     {x:2,y:0},{x:7,y:0},{x:0,y:2},{x:0,y:7}
@@ -326,20 +458,20 @@ function initGame() {
       speed: CHARACTERS[shuffledMobs[mi2]].speed,
       img: CHARACTERS[shuffledMobs[mi2]].img,
       alive: true,
-      taskId: mi2,          // 0〜7
+      taskId: mi2,
       hasDelivered: false,
       targetX: null,
       targetY: null,
       targetBlock: null,
       moving: false,
       moveTimer: 0,
-      state: 'idle'         // idle, moving_to_item, moving_to_hut, delivered
+      state: 'idle',
+      moveCooldown: 0
     };
     state.mobs.push(mob);
     state.mobAssigned.push(mob.taskId);
   }
 
-  // ジェイソン (森1〜森8のどこか)
   var jasonBlock = rand(0, 8);
   if (jasonBlock === 4) jasonBlock = 0;
   state.jason = {
@@ -350,10 +482,10 @@ function initGame() {
     speed: 10,
     img: 'ジェイソン',
     alive: true,
-    moveTimer: 0
+    moveTimer: 0,
+    moveCooldown: 0
   };
 
-  // 熊 (森1〜森8のどこか)
   var bearBlock = rand(0, 8);
   if (bearBlock === 4) bearBlock = 1;
   state.bear = {
@@ -365,10 +497,10 @@ function initGame() {
     img: '熊',
     alive: true,
     moveTimer: 0,
-    attacking: false
+    attacking: false,
+    moveCooldown: 0
   };
 
-  // 狼 (森1〜森8のどこか)
   var wolfBlock = rand(0, 8);
   if (wolfBlock === 4) wolfBlock = 2;
   state.wolf = {
@@ -379,62 +511,51 @@ function initGame() {
     speed: 40,
     img: '狼',
     alive: true,
-    moveTimer: 0
+    moveTimer: 0,
+    moveCooldown: 0
   };
 
-  // ---- 固定オブジェクト (小屋の中) ----
-  // レイアウト:
-  //       樽 箱
-  // 品 窓
-  //       穴
-  var hutObjects = [
+  state.objects = [
     { type: '樽', x: 6, y: 4, blockId: 4, used: false },
     { type: '箱', x: 7, y: 4, blockId: 4, used: false },
     { type: '品', x: 3, y: 5, blockId: 4, used: false },
     { type: '窓', x: 5, y: 5, blockId: 4, used: false },
     { type: '穴', x: 7, y: 7, blockId: 4, used: false }
   ];
-  state.objects = hutObjects;
 
-  // ---- アイテム配置 (森1〜森8 + 小屋にランダム) ----
   spawnItems();
 
-  // ---- モブの初期タスク設定 ----
   for (var m = 0; m < state.mobs.length; m++) {
     assignMobTask(state.mobs[m]);
   }
 
-  // ---- UI更新 ----
   updateUI();
   renderLog();
   addLog('🌅 ゲーム開始！ 7日間逃げ切れ！');
 
-  // ---- タイマー開始 ----
   state.dayStartTime = Date.now();
   startDayTimer();
 
-  // ---- 描画ループ ----
   if (state.animFrame) cancelAnimationFrame(state.animFrame);
+  state.isGameLoopRunning = true;
   gameLoop();
 }
 
-// ---- アイテム配置 ----
 function spawnItems() {
   state.items = [];
   var itemTypes = ['材','斧','銃','餌','堀'];
-  // 品10〜品80 (森1〜森8に各1つ)
+  
   for (var i = 0; i < 8; i++) {
     var blockId = i;
-    if (blockId >= 4) blockId = i + 1; // 4をスキップ
-    var itemName = '品' + ((i + 1) * 10);
+    if (blockId >= 4) blockId = i + 1;
     state.items.push({
-      name: itemName,
+      name: '品' + ((i + 1) * 10),
       x: rand(0, 9),
       y: rand(0, 9),
       blockId: blockId
     });
   }
-  // 材、斧、銃、餌、堀 (森1〜森8 + 小屋のどこか)
+  
   var allBlocks = [0,1,2,3,4,5,6,7,8];
   for (var ti = 0; ti < itemTypes.length; ti++) {
     var bid = allBlocks[rand(0, allBlocks.length - 1)];
@@ -448,13 +569,12 @@ function spawnItems() {
   state.itemSpawned = true;
 }
 
-// ---- モブにタスクを割り当て ----
 function assignMobTask(mob) {
   if (!mob.alive) return;
   var taskId = mob.taskId;
-  var blockId = taskId; // 0→森1, 1→森2, ...
+  var blockId = taskId;
   if (blockId >= 4) blockId = taskId + 1;
-  // 森ブロックに品(taskId+1)があるはず
+  
   var targetItem = null;
   for (var i = 0; i < state.items.length; i++) {
     var it = state.items[i];
@@ -474,42 +594,30 @@ function assignMobTask(mob) {
   }
 }
 
-// ---- モブAI更新 ----
 function updateMobs() {
   for (var i = 0; i < state.mobs.length; i++) {
     var mob = state.mobs[i];
     if (!mob.alive) continue;
     if (mob.hasDelivered) {
-      // 納品済み → 逃げるだけ (ランダム移動)
-      if (state.frameCount % 20 === 0) {
+      if (state.frameCount % 10 === 0) {
         var dirs = [[0,-1],[0,1],[-1,0],[1,0]];
         var d = dirs[rand(0, 3)];
-        var nx = mob.x + d[0];
-        var ny = mob.y + d[1];
-        if (canMoveTo(mob.blockId, nx, ny, mob)) {
-          mob.x = nx;
-          mob.y = ny;
-        }
-        // ブロック移動
-        checkBlockTransition(mob);
+        moveCharacter(mob, d[0], d[1]);
       }
       continue;
     }
 
-    // タスク実行中
-    if (mob.state === 'moving_to_item') {
-      // アイテムに向かって移動
-      var targetBlock = mob.targetBlock;
-      var targetX = mob.targetX;
-      var targetY = mob.targetY;
+    if (mob.moveCooldown > 0) {
+      mob.moveCooldown--;
+      continue;
+    }
+    mob.moveCooldown = 2;
 
-      // 同じブロックにいるか？
-      if (mob.blockId === targetBlock) {
-        // アイテムに近づく
-        var dx = targetX - mob.x;
-        var dy = targetY - mob.y;
+    if (mob.state === 'moving_to_item') {
+      if (mob.blockId === mob.targetBlock) {
+        var dx = mob.targetX - mob.x;
+        var dy = mob.targetY - mob.y;
         if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) {
-          // アイテムを取得 (品を取る)
           var itemIdx = -1;
           for (var idx = 0; idx < state.items.length; idx++) {
             var it = state.items[idx];
@@ -521,45 +629,50 @@ function updateMobs() {
             }
           }
           if (itemIdx >= 0) {
-            // アイテムを取得して小屋へ
             state.items.splice(itemIdx, 1);
             mob.state = 'moving_to_hut';
-            mob.targetX = 3; // 小屋の品の位置
+            mob.targetX = 3;
             mob.targetY = 5;
             mob.targetBlock = 4;
-            addLog('📦 ' + mob.name + ' が 品' + (mob.taskId + 1) + ' を入手しました');
+            addLog('📦 ' + mob.name + ' が 品' + (mob.taskId + 1) + ' を入手');
           } else {
-            // アイテムが既になければ次の行動
             mob.state = 'idle';
           }
         } else {
-          // 近づく
-          moveToward(mob, targetX, targetY);
+          var moveX = 0, moveY = 0;
+          if (mob.targetX > mob.x) moveX = 1;
+          else if (mob.targetX < mob.x) moveX = -1;
+          else if (mob.targetY > mob.y) moveY = 1;
+          else if (mob.targetY < mob.y) moveY = -1;
+          if (moveX !== 0 || moveY !== 0) {
+            moveCharacter(mob, moveX, moveY);
+          }
         }
       } else {
-        // 別のブロック → 移動
-        moveTowardBlock(mob, targetBlock);
+        moveTowardBlock(mob, mob.targetBlock);
       }
     } else if (mob.state === 'moving_to_hut') {
-      // 小屋の「品」に納品
       if (mob.blockId === 4) {
         var hutItem = getObjectAt(4, 3, 5, '品');
         if (hutItem && !hutItem.used) {
-          var ddx = 3 - mob.x;
-          var ddy = 5 - mob.y;
-          if (Math.abs(ddx) <= 1 && Math.abs(ddy) <= 1) {
-            // 納品！
+          if (Math.abs(3 - mob.x) <= 1 && Math.abs(5 - mob.y) <= 1) {
             hutItem.used = true;
             mob.hasDelivered = true;
             state.points += 1;
-            addLog('✅ ' + mob.name + ' が納品完了！ +1ポイント');
+            addLog('✅ ' + mob.name + ' 納品完了！ +1ポイント');
             updateUI();
             mob.state = 'delivered';
           } else {
-            moveToward(mob, 3, 5);
+            var mx = 0, my = 0;
+            if (3 > mob.x) mx = 1;
+            else if (3 < mob.x) mx = -1;
+            else if (5 > mob.y) my = 1;
+            else if (5 < mob.y) my = -1;
+            if (mx !== 0 || my !== 0) {
+              moveCharacter(mob, mx, my);
+            }
           }
         } else {
-          // 品が既に使われてる→諦める
           mob.hasDelivered = true;
           mob.state = 'delivered';
         }
@@ -570,143 +683,50 @@ function updateMobs() {
   }
 }
 
-// ---- 移動ヘルパー ----
-function moveToward(entity, tx, ty) {
-  var dx = tx - entity.x;
-  var dy = ty - entity.y;
-  if (dx === 0 && dy === 0) return;
-  var nx = entity.x;
-  var ny = entity.y;
-  if (Math.abs(dx) >= Math.abs(dy)) {
-    nx += (dx > 0 ? 1 : -1);
-  } else {
-    ny += (dy > 0 ? 1 : -1);
-  }
-  if (canMoveTo(entity.blockId, nx, ny, entity)) {
-    entity.x = nx;
-    entity.y = ny;
-  } else {
-    // 他の方向を試す
-    var attempts = [
-      [0, dy > 0 ? 1 : -1],
-      [dx > 0 ? 1 : -1, 0],
-      [0, dy > 0 ? -1 : 1],
-      [dx > 0 ? -1 : 1, 0]
-    ];
-    for (var i = 0; i < attempts.length; i++) {
-      var ax = entity.x + attempts[i][0];
-      var ay = entity.y + attempts[i][1];
-      if (canMoveTo(entity.blockId, ax, ay, entity)) {
-        entity.x = ax;
-        entity.y = ay;
-        return;
-      }
-    }
-  }
-  checkBlockTransition(entity);
-}
-
 function moveTowardBlock(entity, targetBlock) {
   var current = blockToGrid(entity.blockId);
   var target = blockToGrid(targetBlock);
   var dr = target.row - current.row;
   var dc = target.col - current.col;
+  
   if (dr === 0 && dc === 0) return;
-  // 端にいるかチェック
+  
   if (dc < 0 && entity.x === 0) {
-    // 左に移動
-    var newBlock = gridToBlock(current.row, current.col - 1);
-    if (newBlock >= 0 && newBlock !== entity.blockId) {
-      entity.blockId = newBlock;
-      entity.x = GRID_SIZE - 1;
-    }
-  } else if (dc > 0 && entity.x === GRID_SIZE - 1) {
-    var newBlock2 = gridToBlock(current.row, current.col + 1);
-    if (newBlock2 >= 0 && newBlock2 !== entity.blockId) {
-      entity.blockId = newBlock2;
-      entity.x = 0;
-    }
-  } else if (dr < 0 && entity.y === 0) {
-    var newBlock3 = gridToBlock(current.row - 1, current.col);
-    if (newBlock3 >= 0 && newBlock3 !== entity.blockId) {
-      entity.blockId = newBlock3;
-      entity.y = GRID_SIZE - 1;
-    }
-  } else if (dr > 0 && entity.y === GRID_SIZE - 1) {
-    var newBlock4 = gridToBlock(current.row + 1, current.col);
-    if (newBlock4 >= 0 && newBlock4 !== entity.blockId) {
-      entity.blockId = newBlock4;
-      entity.y = 0;
-    }
-  } else {
-    // 端にいないなら普通に移動
-    moveToward(entity, entity.x + (dc > 0 ? 1 : -1) * 5, entity.y + (dr > 0 ? 1 : -1) * 5);
-  }
-}
-
-function canMoveTo(blockId, x, y, entity) {
-  if (x < 0 || x >= GRID_SIZE || y < 0 || y >= GRID_SIZE) {
-    // 端の外 → 隣ブロックに移動できるかチェック
-    var g = blockToGrid(blockId);
-    var nx = x;
-    var ny = y;
-    var ng = { row: g.row, col: g.col };
-    if (x < 0) { ng.col--; nx = GRID_SIZE - 1; }
-    else if (x >= GRID_SIZE) { ng.col++; nx = 0; }
-    else if (y < 0) { ng.row--; ny = GRID_SIZE - 1; }
-    else if (y >= GRID_SIZE) { ng.row++; ny = 0; }
-    var newBlock = gridToBlock(ng.row, ng.col);
-    if (newBlock < 0 || newBlock > 8) return false;
-    // 隣ブロックに移動可能
-    return true;
-  }
-  // 木チェック
-  if (state.blockMap[blockId] && state.blockMap[blockId][y] && state.blockMap[blockId][y][x] === 'tree') {
-    return false;
-  }
-  // 他のキャラと重ならない (主人公以外)
-  if (entity && entity.name !== HERO_NAME) {
-    // チェック
-  }
-  return true;
-}
-
-function checkBlockTransition(entity) {
-  if (entity.x < 0) {
-    var g = blockToGrid(entity.blockId);
-    var nb = gridToBlock(g.row, g.col - 1);
+    var nb = gridToBlock(current.row, current.col - 1);
     if (nb >= 0 && nb <= 8) {
       entity.blockId = nb;
       entity.x = GRID_SIZE - 1;
-    } else {
-      entity.x = 0;
+      return;
     }
-  } else if (entity.x >= GRID_SIZE) {
-    var g2 = blockToGrid(entity.blockId);
-    var nb2 = gridToBlock(g2.row, g2.col + 1);
+  } else if (dc > 0 && entity.x === GRID_SIZE - 1) {
+    var nb2 = gridToBlock(current.row, current.col + 1);
     if (nb2 >= 0 && nb2 <= 8) {
       entity.blockId = nb2;
       entity.x = 0;
-    } else {
-      entity.x = GRID_SIZE - 1;
+      return;
     }
-  } else if (entity.y < 0) {
-    var g3 = blockToGrid(entity.blockId);
-    var nb3 = gridToBlock(g3.row - 1, g3.col);
+  } else if (dr < 0 && entity.y === 0) {
+    var nb3 = gridToBlock(current.row - 1, current.col);
     if (nb3 >= 0 && nb3 <= 8) {
       entity.blockId = nb3;
       entity.y = GRID_SIZE - 1;
-    } else {
-      entity.y = 0;
+      return;
     }
-  } else if (entity.y >= GRID_SIZE) {
-    var g4 = blockToGrid(entity.blockId);
-    var nb4 = gridToBlock(g4.row + 1, g4.col);
+  } else if (dr > 0 && entity.y === GRID_SIZE - 1) {
+    var nb4 = gridToBlock(current.row + 1, current.col);
     if (nb4 >= 0 && nb4 <= 8) {
       entity.blockId = nb4;
       entity.y = 0;
-    } else {
-      entity.y = GRID_SIZE - 1;
+      return;
+    }
+  } else {
+    var ddx = 0, ddy = 0;
+    if (dc > 0) ddx = 1;
+    else if (dc < 0) ddx = -1;
+    else if (dr > 0) ddy = 1;
+    else if (dr < 0) ddy = -1;
+    if (ddx !== 0 || ddy !== 0) {
+      moveCharacter(entity, ddx, ddy);
     }
   }
 }
@@ -721,30 +741,38 @@ function getObjectAt(blockId, x, y, type) {
   return null;
 }
 
-// ---- 敵AI ----
 function updateEnemies() {
-  // ジェイソン
   if (state.jason && state.jason.alive) {
-    var jSpeed = 10 + (state.day - 1) * 10; // 1日目10, 7日目70
+    var jSpeed = 10 + (state.day - 1) * 10;
     if (state.jason.speed !== jSpeed) state.jason.speed = jSpeed;
-
-    // 主人公を追跡
-    var hero = state.hero;
-    if (hero && hero.alive) {
-      // 同じブロックか？
-      if (state.jason.blockId === hero.blockId) {
-        moveToward(state.jason, hero.x, hero.y);
-        // 接触チェック
-        if (Math.abs(state.jason.x - hero.x) <= 0.8 && Math.abs(state.jason.y - hero.y) <= 0.8) {
-          killHero('ジェイソン');
+    
+    if (state.jason.moveCooldown > 0) {
+      state.jason.moveCooldown--;
+    } else {
+      state.jason.moveCooldown = Math.max(1, Math.floor(10 / (state.jason.speed / 10)));
+      
+      var hero = state.hero;
+      if (hero && hero.alive) {
+        if (state.jason.blockId === hero.blockId) {
+          var jdx = hero.x - state.jason.x;
+          var jdy = hero.y - state.jason.y;
+          var jmx = 0, jmy = 0;
+          if (Math.abs(jdx) > Math.abs(jdy)) {
+            jmx = jdx > 0 ? 1 : -1;
+          } else {
+            jmy = jdy > 0 ? 1 : -1;
+          }
+          moveCharacter(state.jason, jmx, jmy);
+          
+          if (Math.abs(state.jason.x - hero.x) <= 0.8 && Math.abs(state.jason.y - hero.y) <= 0.8) {
+            killHero('ジェイソン');
+          }
+        } else {
+          moveTowardBlock(state.jason, hero.blockId);
         }
-      } else {
-        // 主人公のブロックに向かう
-        moveTowardBlock(state.jason, hero.blockId);
       }
     }
-
-    // モブを殺す
+    
     for (var m = 0; m < state.mobs.length; m++) {
       var mob = state.mobs[m];
       if (!mob.alive) continue;
@@ -752,7 +780,7 @@ function updateEnemies() {
         if (Math.abs(state.jason.x - mob.x) <= 0.8 && Math.abs(state.jason.y - mob.y) <= 0.8) {
           if (state.jasonKillCooldown <= 0) {
             killMob(mob, 'ジェイソン');
-            state.jasonKillCooldown = 30;
+            state.jasonKillCooldown = 20;
           }
         }
       }
@@ -760,35 +788,50 @@ function updateEnemies() {
     if (state.jasonKillCooldown > 0) state.jasonKillCooldown--;
   }
 
-  // 熊 (襲撃日のみ攻撃)
   var isBearAttackDay = false;
   for (var d = 0; d < state.bearAttackDays.length; d++) {
     if (state.bearAttackDays[d] === state.day) isBearAttackDay = true;
   }
 
   if (state.bear && state.bear.alive) {
-    if (isBearAttackDay) {
+    if (state.bear.moveCooldown > 0) {
+      state.bear.moveCooldown--;
+    } else {
+      state.bear.moveCooldown = 2;
+      
       var hero2 = state.hero;
-      if (hero2 && hero2.alive) {
+      if (hero2 && hero2.alive && isBearAttackDay) {
         if (state.bear.blockId === hero2.blockId) {
-          moveToward(state.bear, hero2.x, hero2.y);
+          var bdx = hero2.x - state.bear.x;
+          var bdy = hero2.y - state.bear.y;
+          var bmx = 0, bmy = 0;
+          if (Math.abs(bdx) > Math.abs(bdy)) {
+            bmx = bdx > 0 ? 1 : -1;
+          } else {
+            bmy = bdy > 0 ? 1 : -1;
+          }
+          moveCharacter(state.bear, bmx, bmy);
           if (Math.abs(state.bear.x - hero2.x) <= 0.8 && Math.abs(state.bear.y - hero2.y) <= 0.8) {
             killHero('熊');
           }
         } else {
           moveTowardBlock(state.bear, hero2.blockId);
         }
+      } else {
+        var dirs = [[0,-1],[0,1],[-1,0],[1,0]];
+        var d2 = dirs[rand(0, 3)];
+        moveCharacter(state.bear, d2[0], d2[1]);
       }
-      // モブも襲う
-      for (var m2 = 0; m2 < state.mobs.length; m2++) {
-        var mob2 = state.mobs[m2];
-        if (!mob2.alive) continue;
-        if (state.bear.blockId === mob2.blockId) {
-          if (Math.abs(state.bear.x - mob2.x) <= 0.8 && Math.abs(state.bear.y - mob2.y) <= 0.8) {
-            if (state.bearKillCooldown <= 0) {
-              killMob(mob2, '熊');
-              state.bearKillCooldown = 30;
-            }
+    }
+    
+    for (var m2 = 0; m2 < state.mobs.length; m2++) {
+      var mob2 = state.mobs[m2];
+      if (!mob2.alive) continue;
+      if (state.bear.blockId === mob2.blockId && isBearAttackDay) {
+        if (Math.abs(state.bear.x - mob2.x) <= 0.8 && Math.abs(state.bear.y - mob2.y) <= 0.8) {
+          if (state.bearKillCooldown <= 0) {
+            killMob(mob2, '熊');
+            state.bearKillCooldown = 20;
           }
         }
       }
@@ -796,27 +839,27 @@ function updateEnemies() {
     if (state.bearKillCooldown > 0) state.bearKillCooldown--;
   }
 
-  // 狼 (動くだけ、攻撃しない)
   if (state.wolf && state.wolf.alive) {
-    if (state.frameCount % 15 === 0) {
-      var dirs = [[0,-1],[0,1],[-1,0],[1,0]];
-      var d2 = dirs[rand(0, 3)];
-      var nx2 = state.wolf.x + d2[0];
-      var ny2 = state.wolf.y + d2[1];
-      if (canMoveTo(state.wolf.blockId, nx2, ny2, state.wolf)) {
-        state.wolf.x = nx2;
-        state.wolf.y = ny2;
-      }
-      checkBlockTransition(state.wolf);
+    if (state.wolf.moveCooldown > 0) {
+      state.wolf.moveCooldown--;
+    } else {
+      state.wolf.moveCooldown = 3;
+      var dirs2 = [[0,-1],[0,1],[-1,0],[1,0]];
+      var d3 = dirs2[rand(0, 3)];
+      moveCharacter(state.wolf, d3[0], d3[1]);
     }
   }
 }
 
-// ---- 殺害処理 ----
 function killHero(killer) {
   if (!state.hero || !state.hero.alive) return;
   state.hero.alive = false;
   state.gameOver = true;
+  state.isGameLoopRunning = false;
+  if (state.dayTimerInterval) {
+    clearInterval(state.dayTimerInterval);
+    state.dayTimerInterval = null;
+  }
   addLog('💀 主人公が ' + killer + ' に殺された... ゲームオーバー');
   showPopup('ゲームオーバー', '主人公が ' + killer + ' に殺されました...', '再挑戦', function() {
     hidePopup();
@@ -832,41 +875,27 @@ function killMob(mob, killer) {
   updateUI();
 }
 
-// ---- 主人公の移動 ----
 function moveHero(dx, dy) {
   if (state.gameOver || state.paused) return;
   var hero = state.hero;
   if (!hero || !hero.alive) return;
-
-  var speed = hero.speed;
-  var step = 1;
-  var nx = hero.x + dx * step;
-  var ny = hero.y + dy * step;
-
-  // 移動チェック
-  if (canMoveTo(hero.blockId, nx, ny, hero)) {
-    hero.x = nx;
-    hero.y = ny;
-    checkBlockTransition(hero);
+  
+  var moved = moveCharacter(hero, dx, dy);
+  if (moved) {
     state.moveCounter++;
+    pickupItem(hero);
+    updateUI();
   }
-
-  // アイテム拾い (近くにあれば)
-  pickupItem(hero);
-
-  updateUI();
 }
 
-// ---- アイテム拾い ----
 function pickupItem(entity) {
   if (entity.name !== HERO_NAME) return;
-  if (state.heroItem) return; // 既に持ってる
+  if (state.heroItem) return;
 
   for (var i = 0; i < state.items.length; i++) {
     var item = state.items[i];
     if (item.blockId !== entity.blockId) continue;
     if (Math.abs(item.x - entity.x) <= 1 && Math.abs(item.y - entity.y) <= 1) {
-      // 拾う
       state.heroItem = item.name;
       state.items.splice(i, 1);
       addLog('📦 ' + item.name + ' を拾った');
@@ -876,7 +905,6 @@ function pickupItem(entity) {
   }
 }
 
-// ---- アイテム使用 (クリック) ----
 function useItemOnObject(objType) {
   if (!state.hero || !state.hero.alive) return;
   if (!state.heroItem) {
@@ -887,7 +915,25 @@ function useItemOnObject(objType) {
   var hero = state.hero;
   var itemName = state.heroItem;
 
-  // 対応するオブジェクトを探す
+  if (itemName === '餌' && objType === '狼') {
+    if (state.wolf && state.wolf.alive && state.wolf.blockId === hero.blockId) {
+      if (Math.abs(state.wolf.x - hero.x) <= 1 && Math.abs(state.wolf.y - hero.y) <= 1) {
+        state.points += 1;
+        state.heroItem = null;
+        state.wolf.alive = false;
+        addLog('✅ 餌で狼を懐かせた！ +1ポイント');
+        updateUI();
+        return;
+      } else {
+        addLog('⚠️ 狼が近くにいない');
+        return;
+      }
+    } else {
+      addLog('⚠️ 狼が近くにいない');
+      return;
+    }
+  }
+
   var obj = null;
   for (var i = 0; i < state.objects.length; i++) {
     var o = state.objects[i];
@@ -909,7 +955,6 @@ function useItemOnObject(objType) {
     return;
   }
 
-  // 正しいアイテムかチェック
   var valid = false;
   if (objType === '窓' && itemName === '材') valid = true;
   else if (objType === '穴' && itemName === '堀') valid = true;
@@ -922,7 +967,6 @@ function useItemOnObject(objType) {
     return;
   }
 
-  // 使用
   obj.used = true;
   state.points += 1;
   state.heroItem = null;
@@ -930,7 +974,6 @@ function useItemOnObject(objType) {
   updateUI();
 }
 
-// ---- アイテムを落とす ----
 function dropItem() {
   if (!state.heroItem) {
     addLog('⚠️ 持っているアイテムがない');
@@ -948,20 +991,23 @@ function dropItem() {
   updateUI();
 }
 
-// ---- 日付処理 ----
 function startDayTimer() {
-  if (state.dayTimerInterval) clearInterval(state.dayTimerInterval);
+  if (state.dayTimerInterval) {
+    clearInterval(state.dayTimerInterval);
+    state.dayTimerInterval = null;
+  }
   state.dayElapsed = 0;
   state.night = false;
   nightOverlay.style.display = 'none';
 
   state.dayTimerInterval = setInterval(function() {
-    if (state.gameOver || state.paused) return;
+    if (state.gameOver || state.paused) {
+      return;
+    }
     state.dayElapsed++;
     var remaining = DAY_DURATION - state.dayElapsed;
-    dayDisplay.textContent = '🌅 ' + state.day + '日目 (' + remaining + '秒)';
+    dayDisplay.textContent = '🌅 ' + state.day + '日目 (' + Math.max(0, remaining) + '秒)';
 
-    // 夜 (残り10秒で暗く)
     if (remaining <= 10 && !state.night) {
       state.night = true;
       nightOverlay.style.display = 'block';
@@ -975,7 +1021,10 @@ function startDayTimer() {
 }
 
 function nextDay() {
-  if (state.dayTimerInterval) clearInterval(state.dayTimerInterval);
+  if (state.dayTimerInterval) {
+    clearInterval(state.dayTimerInterval);
+    state.dayTimerInterval = null;
+  }
   state.day++;
 
   if (state.day > MAX_DAYS) {
@@ -983,11 +1032,9 @@ function nextDay() {
     return;
   }
 
-  // ジェイソン速度アップのメッセージ
   var jSpeed = 10 + (state.day - 1) * 10;
   addLog('📈 ' + state.day + '日目: ジェイソンの速度が ' + jSpeed + ' になった');
 
-  // モブが生きていればタスク再開
   for (var i = 0; i < state.mobs.length; i++) {
     var mob = state.mobs[i];
     if (mob.alive && !mob.hasDelivered) {
@@ -995,15 +1042,16 @@ function nextDay() {
     }
   }
 
-  // アイテム補充 (品10〜品80を再配置)
-  // ただし既にある品はそのまま
   for (var b = 0; b < 8; b++) {
     var blockId = b;
     if (blockId >= 4) blockId = b + 1;
     var itemName = '品' + ((b + 1) * 10);
     var exists = false;
     for (var it = 0; it < state.items.length; it++) {
-      if (state.items[it].name === itemName) { exists = true; break; }
+      if (state.items[it].name === itemName) {
+        exists = true;
+        break;
+      }
     }
     if (!exists) {
       state.items.push({
@@ -1015,7 +1063,10 @@ function nextDay() {
     }
   }
 
-  // 日付表示更新
+  for (var oi = 0; oi < state.objects.length; oi++) {
+    state.objects[oi].used = false;
+  }
+
   state.dayElapsed = 0;
   state.night = false;
   nightOverlay.style.display = 'none';
@@ -1025,7 +1076,12 @@ function nextDay() {
 
 function endGame() {
   if (state.gameOver) return;
-  // ポイント判定
+  state.isGameLoopRunning = false;
+  if (state.dayTimerInterval) {
+    clearInterval(state.dayTimerInterval);
+    state.dayTimerInterval = null;
+  }
+  
   var totalPoints = state.points;
   var jasonPts = state.jasonPoints;
 
@@ -1033,7 +1089,7 @@ function endGame() {
 
   if (totalPoints > jasonPts) {
     state.gameWon = true;
-    addLog('🎉 勝利！ 補強ポイントが上回った！');
+    addLog('🎉 勝利！');
     showPopup('🎉 勝利！', '補強ポイント ' + totalPoints + ' で ジェイソンポイント ' + jasonPts + ' を上回った！\nrefined.html に移動します', '移動する', function() {
       hidePopup();
       window.location.href = 'refined.html';
@@ -1047,7 +1103,7 @@ function endGame() {
     });
   } else {
     state.gameOver = true;
-    addLog('💀 敗北... ポイントが足りなかった');
+    addLog('💀 敗北...');
     showPopup('💀 敗北', '補強ポイント ' + totalPoints + ' で ジェイソンポイント ' + jasonPts + ' に届かなかった...', '再挑戦', function() {
       hidePopup();
       initGame();
@@ -1055,7 +1111,6 @@ function endGame() {
   }
 }
 
-// ---- ポップアップ ----
 function showPopup(title, desc, btnText, callback) {
   popupTitle.textContent = title;
   popupDesc.textContent = desc;
@@ -1068,7 +1123,6 @@ function hidePopup() {
   popup.style.display = 'none';
 }
 
-// ---- UI更新 ----
 function updateUI() {
   dispDay.textContent = state.day + ' / 7';
   dispPoints.textContent = state.points;
@@ -1080,9 +1134,8 @@ function updateUI() {
   }
 }
 
-// ---- メインループ ----
 function gameLoop() {
-  if (state.gameOver) {
+  if (!state.isGameLoopRunning && state.gameOver) {
     render();
     state.animFrame = requestAnimationFrame(gameLoop);
     return;
@@ -1090,39 +1143,31 @@ function gameLoop() {
 
   state.frameCount++;
 
-  // モブAI更新 (1フレームごと)
-  if (state.frameCount % 2 === 0) {
-    updateMobs();
+  if (!state.gameOver) {
+    if (state.frameCount % 3 === 0) {
+      updateMobs();
+    }
+    if (state.frameCount % 4 === 0) {
+      updateEnemies();
+    }
   }
 
-  // 敵AI更新 (2フレームごと)
-  if (state.frameCount % 3 === 0) {
-    updateEnemies();
-  }
-
-  // 描画
   render();
-
   state.animFrame = requestAnimationFrame(gameLoop);
 }
 
-// ---- 描画 ----
 function render() {
   ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
-  // 背景 (森 or 小屋)
   var blockId = state.currentBlock;
-  var offset = getBlockOffset(blockId);
 
-  // 背景色
   if (blockId === 4) {
-    ctx.fillStyle = '#8B7D6B'; // 小屋の床
+    ctx.fillStyle = '#8B7D6B';
   } else {
-    ctx.fillStyle = '#2d5a27'; // 森
+    ctx.fillStyle = '#2d5a27';
   }
   ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
-  // グリッド線
   ctx.strokeStyle = 'rgba(0,0,0,0.15)';
   ctx.lineWidth = 0.5;
   for (var gx = 0; gx <= GRID_SIZE; gx++) {
@@ -1138,7 +1183,6 @@ function render() {
     ctx.stroke();
   }
 
-  // 木を描画 (森のみ)
   if (blockId !== 4) {
     for (var y = 0; y < GRID_SIZE; y++) {
       for (var x = 0; x < GRID_SIZE; x++) {
@@ -1147,7 +1191,6 @@ function render() {
           ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
           ctx.fillStyle = '#2a5a2a';
           ctx.fillRect(x * BLOCK_SIZE + 4, y * BLOCK_SIZE + 4, BLOCK_SIZE - 8, BLOCK_SIZE - 8);
-          // 木のマーク
           ctx.fillStyle = '#3a7a3a';
           ctx.font = '14px "MS Gothic"';
           ctx.textAlign = 'center';
@@ -1158,20 +1201,17 @@ function render() {
     }
   }
 
-  // 固定オブジェクトを描画 (小屋のみ)
   if (blockId === 4) {
     for (var oi = 0; oi < state.objects.length; oi++) {
       var obj = state.objects[oi];
       if (obj.blockId !== blockId) continue;
       var px = obj.x * BLOCK_SIZE;
       var py = obj.y * BLOCK_SIZE;
-      // 背景
       ctx.fillStyle = obj.used ? '#555' : '#3a3a5a';
       ctx.fillRect(px + 2, py + 2, BLOCK_SIZE - 4, BLOCK_SIZE - 4);
       ctx.strokeStyle = obj.used ? '#777' : '#88aaff';
       ctx.lineWidth = 1;
       ctx.strokeRect(px + 2, py + 2, BLOCK_SIZE - 4, BLOCK_SIZE - 4);
-      // 文字
       ctx.fillStyle = obj.used ? '#888' : '#ffffff';
       ctx.font = '12px "MS Gothic"';
       ctx.textAlign = 'center';
@@ -1183,7 +1223,7 @@ function render() {
     }
   }
 
-  // アイテムを描画
+  // ★ アイテム描画（アイテム名を表示）
   for (var ii = 0; ii < state.items.length; ii++) {
     var item = state.items[ii];
     if (item.blockId !== blockId) continue;
@@ -1200,57 +1240,74 @@ function render() {
     ctx.fillText(label2, px2 + BLOCK_SIZE/2, py2 + BLOCK_SIZE/2);
   }
 
-  // キャラクターを描画
+  // ★ キャラクター描画（画像または文字）
   var allChars = [];
 
-  // 主人公
   if (state.hero && state.hero.alive && state.hero.blockId === blockId) {
-    allChars.push({ name: '主', x: state.hero.x, y: state.hero.y, color: '#aa44ff', isHero: true });
+    allChars.push({ name: state.hero.img, x: state.hero.x, y: state.hero.y, isHero: true });
   }
 
-  // モブ
   for (var mi3 = 0; mi3 < state.mobs.length; mi3++) {
     var mob3 = state.mobs[mi3];
     if (mob3.alive && mob3.blockId === blockId) {
-      allChars.push({ name: mob3.name.substring(0, 2), x: mob3.x, y: mob3.y, color: '#ff6644', isHero: false });
+      allChars.push({ name: mob3.img, x: mob3.x, y: mob3.y, isHero: false });
     }
   }
 
-  // ジェイソン
   if (state.jason && state.jason.alive && state.jason.blockId === blockId) {
-    allChars.push({ name: 'J', x: state.jason.x, y: state.jason.y, color: '#ff0000', isHero: false });
+    allChars.push({ name: state.jason.img, x: state.jason.x, y: state.jason.y, isHero: false });
   }
 
-  // 熊
   if (state.bear && state.bear.alive && state.bear.blockId === blockId) {
-    allChars.push({ name: '熊', x: state.bear.x, y: state.bear.y, color: '#8B4513', isHero: false });
+    allChars.push({ name: state.bear.img, x: state.bear.x, y: state.bear.y, isHero: false });
   }
 
-  // 狼
   if (state.wolf && state.wolf.alive && state.wolf.blockId === blockId) {
-    allChars.push({ name: '狼', x: state.wolf.x, y: state.wolf.y, color: '#888888', isHero: false });
+    allChars.push({ name: state.wolf.img, x: state.wolf.x, y: state.wolf.y, isHero: false });
   }
 
-  // 描画 (重なり順: 後ろから前に)
   for (var ci = 0; ci < allChars.length; ci++) {
     var ch = allChars[ci];
     var px3 = ch.x * BLOCK_SIZE;
     var py3 = ch.y * BLOCK_SIZE;
-    // 背景
-    ctx.fillStyle = ch.color;
-    ctx.fillRect(px3 + 2, py3 + 2, BLOCK_SIZE - 4, BLOCK_SIZE - 4);
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(px3 + 2, py3 + 2, BLOCK_SIZE - 4, BLOCK_SIZE - 4);
-    // 文字
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 14px "MS Gothic"';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(ch.name, px3 + BLOCK_SIZE/2, py3 + BLOCK_SIZE/2);
+    
+    // ★ 画像表示を試みる
+    var imgName = ch.name;
+    var img = getImage(imgName);
+    if (img) {
+      ctx.drawImage(img, px3, py3, BLOCK_SIZE, BLOCK_SIZE);
+    } else {
+      // フォールバック: 色付き四角＋文字
+      var colors = {
+        '紅葉': '#aa44ff',
+        '加藤': '#ff6644',
+        '松本': '#ff6644',
+        '坪池': '#ff6644',
+        '市川': '#ff6644',
+        '青笹': '#ff6644',
+        '角田': '#ff6644',
+        '木元': '#ff6644',
+        '山崎': '#ff6644',
+        'ジェイソン': '#ff0000',
+        '熊': '#8B4513',
+        '狼': '#888888'
+      };
+      var color = colors[imgName] || '#888';
+      ctx.fillStyle = color;
+      ctx.fillRect(px3 + 2, py3 + 2, BLOCK_SIZE - 4, BLOCK_SIZE - 4);
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(px3 + 2, py3 + 2, BLOCK_SIZE - 4, BLOCK_SIZE - 4);
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 12px "MS Gothic"';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      var label3 = imgName;
+      if (label3.length > 2) label3 = label3.substring(0, 2);
+      ctx.fillText(label3, px3 + BLOCK_SIZE/2, py3 + BLOCK_SIZE/2);
+    }
   }
 
-  // ブロック名表示
   ctx.fillStyle = 'rgba(255,255,255,0.3)';
   ctx.font = '10px "MS Gothic"';
   ctx.textAlign = 'left';
@@ -1258,7 +1315,6 @@ function render() {
   ctx.fillText(BLOCK_NAMES[blockId], 4, 4);
 }
 
-// ---- キーボード入力 ----
 document.addEventListener('keydown', function(e) {
   var key = e.key;
   var arrowKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
@@ -1273,7 +1329,6 @@ document.addEventListener('keydown', function(e) {
   }
 });
 
-// ---- マウスクリック (アイテム使用) ----
 canvas.addEventListener('click', function(e) {
   if (state.gameOver) return;
   var rect = canvas.getBoundingClientRect();
@@ -1288,13 +1343,8 @@ canvas.addEventListener('click', function(e) {
   var hero = state.hero;
   if (!hero || !hero.alive) return;
 
-  // クリックした位置が主人公の範囲内か？
-  if (Math.abs(gx - hero.x) > 1 || Math.abs(gy - hero.y) > 1) {
-    addLog('⚠️ 範囲外です');
-    return;
-  }
+  if (hero.blockId !== state.currentBlock) return;
 
-  // クリックした位置のオブジェクトをチェック
   var clickedObj = null;
   for (var oi2 = 0; oi2 < state.objects.length; oi2++) {
     var obj2 = state.objects[oi2];
@@ -1305,6 +1355,13 @@ canvas.addEventListener('click', function(e) {
     }
   }
 
+  if (state.wolf && state.wolf.alive && state.wolf.blockId === hero.blockId) {
+    if (state.wolf.x === gx && state.wolf.y === gy) {
+      useItemOnObject('狼');
+      return;
+    }
+  }
+
   if (clickedObj) {
     useItemOnObject(clickedObj.type);
   } else {
@@ -1312,11 +1369,12 @@ canvas.addEventListener('click', function(e) {
   }
 });
 
-// ---- ボタン ----
 btnDrop.addEventListener('click', dropItem);
 
-// ---- ゲーム開始 ----
-initGame();
+// ★ 画像読み込み後にゲーム開始
+loadImages(function() {
+  initGame();
+});
 
 })();
 </script>
