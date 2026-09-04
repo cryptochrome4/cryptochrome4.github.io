@@ -63,7 +63,7 @@ body { background:#1a1a2e; display:flex; justify-content:center; align-items:cen
 
 <script>
 // ============================================================
-// 7日間サバイバルゲーム (修正版)
+// 7日間サバイバルゲーム (完全版 - 品クールダウン5秒実装)
 // ============================================================
 
 (function(){
@@ -226,14 +226,12 @@ function gridToBlock(row, col) {
   return row * 3 + col;
 }
 
-// ★ 移動関数（主人公・モブ・敵すべて共通）
 function moveCharacter(entity, dx, dy) {
   if (!entity || !entity.alive) return false;
   
   var nx = entity.x + dx;
   var ny = entity.y + dy;
   
-  // 範囲内
   if (nx >= 0 && nx < GRID_SIZE && ny >= 0 && ny < GRID_SIZE) {
     if (state.blockMap[entity.blockId] && state.blockMap[entity.blockId][ny] && 
         state.blockMap[entity.blockId][ny][nx] === 'tree') {
@@ -244,7 +242,6 @@ function moveCharacter(entity, dx, dy) {
     return true;
   }
   
-  // ★ ブロック移動（端を超えたら隣のブロックへ）
   var g = blockToGrid(entity.blockId);
   var newRow = g.row;
   var newCol = g.col;
@@ -318,7 +315,6 @@ function initGame() {
   state.jasonPoints = rand(15, 20);
   addLog('🔪 ジェイソンポイント: ' + state.jasonPoints);
 
-  // マップ初期化
   state.blockMap = [];
   for (var b = 0; b < 9; b++) {
     state.blockMap[b] = [];
@@ -349,7 +345,6 @@ function initGame() {
     }
   }
 
-  // 主人公
   state.hero = {
     name: HERO_NAME,
     x: rand(3, 6),
@@ -360,7 +355,6 @@ function initGame() {
     alive: true
   };
 
-  // モブ
   var mobPositions = [
     {x:1,y:1},{x:8,y:1},{x:1,y:8},{x:8,y:8},
     {x:2,y:0},{x:7,y:0},{x:0,y:2},{x:0,y:7}
@@ -394,7 +388,6 @@ function initGame() {
     state.mobs.push(mob);
   }
 
-  // ジェイソン
   var jasonBlock = rand(0, 8);
   if (jasonBlock === 4) jasonBlock = 0;
   state.jason = {
@@ -408,7 +401,6 @@ function initGame() {
     moveCooldown: 0
   };
 
-  // 熊
   var bearBlock = rand(0, 8);
   if (bearBlock === 4) bearBlock = 1;
   state.bear = {
@@ -422,7 +414,6 @@ function initGame() {
     moveCooldown: 0
   };
 
-  // 狼
   var wolfBlock = rand(0, 8);
   if (wolfBlock === 4) wolfBlock = 2;
   state.wolf = {
@@ -436,18 +427,17 @@ function initGame() {
     moveCooldown: 0
   };
 
-  // 小屋オブジェクト
+  // ★ 小屋オブジェクト (cooldown を追加)
   state.objects = [
-    { type: '樽', x: 6, y: 4, blockId: 4, used: false },
-    { type: '箱', x: 7, y: 4, blockId: 4, used: false },
-    { type: '品', x: 3, y: 5, blockId: 4, used: false },
-    { type: '窓', x: 5, y: 5, blockId: 4, used: false },
-    { type: '穴', x: 7, y: 7, blockId: 4, used: false }
+    { type: '樽', x: 6, y: 4, blockId: 4, used: false, cooldown: 0 },
+    { type: '箱', x: 7, y: 4, blockId: 4, used: false, cooldown: 0 },
+    { type: '品', x: 3, y: 5, blockId: 4, used: false, cooldown: 0 },
+    { type: '窓', x: 5, y: 5, blockId: 4, used: false, cooldown: 0 },
+    { type: '穴', x: 7, y: 7, blockId: 4, used: false, cooldown: 0 }
   ];
 
   spawnItems();
 
-  // モブタスク割り当て
   for (var m = 0; m < state.mobs.length; m++) {
     assignMobTask(state.mobs[m]);
   }
@@ -464,18 +454,13 @@ function initGame() {
   gameLoop();
 }
 
-// ★ アイテム生成（品1〜品8 と 品10〜品80 と 材・斧・銃・餌・堀）
 function spawnItems() {
   state.items = [];
   var itemTypes = ['材','斧','銃','餌','堀'];
   
-  // ★ 品1〜品8 (モブ用) … 森1に品1、森2に品2、…森8に品8
+  // 品1〜品8 (モブ用)
+  var blockMap = [8,7,6,5,3,2,1,0];
   for (var i = 0; i < 8; i++) {
-    var blockId = i;
-    // 森のブロックID: 0=森8, 1=森7, 2=森6, 3=森5, 5=森4, 6=森3, 7=森2, 8=森1
-    // i=0 → 森1(blockId=8), i=1 → 森2(blockId=7), i=2 → 森3(blockId=6), i=3 → 森4(blockId=5),
-    // i=4 → 森5(blockId=3), i=5 → 森6(blockId=2), i=6 → 森7(blockId=1), i=7 → 森8(blockId=0)
-    var blockMap = [8,7,6,5,3,2,1,0];
     var bid = blockMap[i];
     state.items.push({
       name: '品' + (i + 1),
@@ -485,10 +470,9 @@ function spawnItems() {
     });
   }
   
-  // 品10〜品80 (主人公用) … 森1に品10、森2に品20、…森8に品80
+  // 品10〜品80 (主人公用)
   for (var i = 0; i < 8; i++) {
-    var blockMap2 = [8,7,6,5,3,2,1,0];
-    var bid2 = blockMap2[i];
+    var bid2 = blockMap[i];
     state.items.push({
       name: '品' + ((i + 1) * 10),
       x: rand(0, 9),
@@ -497,7 +481,7 @@ function spawnItems() {
     });
   }
   
-  // 材・斧・銃・餌・堀 (全ブロックにランダム)
+  // 材・斧・銃・餌・堀
   var allBlocks = [0,1,2,3,4,5,6,7,8];
   for (var ti = 0; ti < itemTypes.length; ti++) {
     var bid3 = allBlocks[rand(0, allBlocks.length - 1)];
@@ -514,8 +498,7 @@ function assignMobTask(mob) {
   if (!mob.alive) return;
   if (mob.hasDelivered) return;
   
-  var taskId = mob.taskId; // 0〜7
-  // taskId=0 → 品1, taskId=1 → 品2, …
+  var taskId = mob.taskId;
   var targetName = '品' + (taskId + 1);
   
   var targetItem = null;
@@ -541,7 +524,6 @@ function updateMobs() {
     var mob = state.mobs[i];
     if (!mob.alive) continue;
     
-    // 納品済み → ランダム移動
     if (mob.hasDelivered) {
       if (state.frameCount % 8 === 0) {
         var dirs = [[0,-1],[0,1],[-1,0],[1,0]];
@@ -558,9 +540,7 @@ function updateMobs() {
     mob.moveCooldown = 3;
 
     if (mob.state === 'moving_to_item') {
-      // アイテムのあるブロックに移動
       if (mob.blockId !== mob.targetBlock) {
-        // 端に移動するように誘導
         var targetDir = getDirectionToBlock(mob, mob.targetBlock);
         if (targetDir) {
           moveCharacter(mob, targetDir.dx, targetDir.dy);
@@ -568,12 +548,10 @@ function updateMobs() {
         continue;
       }
       
-      // 同じブロック内でアイテムに近づく
       var dx = mob.targetX - mob.x;
       var dy = mob.targetY - mob.y;
       
       if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) {
-        // アイテムを取得
         var itemIdx = -1;
         for (var idx = 0; idx < state.items.length; idx++) {
           var it = state.items[idx];
@@ -617,7 +595,9 @@ function updateMobs() {
       var hutItem = getObjectAt(4, 3, 5, '品');
       if (hutItem && !hutItem.used) {
         if (Math.abs(3 - mob.x) <= 1 && Math.abs(5 - mob.y) <= 1) {
+          // ★ 品を使用 (クールダウン5秒)
           hutItem.used = true;
+          hutItem.cooldown = 5;
           mob.hasDelivered = true;
           state.points += 1;
           addLog('✅ ' + mob.name + ' 納品完了！ +1ポイント');
@@ -643,7 +623,6 @@ function updateMobs() {
   }
 }
 
-// ★ ブロック移動のための方向を取得
 function getDirectionToBlock(entity, targetBlock) {
   var current = blockToGrid(entity.blockId);
   var target = blockToGrid(targetBlock);
@@ -652,7 +631,6 @@ function getDirectionToBlock(entity, targetBlock) {
   
   if (dr === 0 && dc === 0) return null;
   
-  // 端にいるかチェック
   if (dc < 0 && entity.x === 0) {
     return { dx: -1, dy: 0 };
   } else if (dc > 0 && entity.x === GRID_SIZE - 1) {
@@ -663,7 +641,6 @@ function getDirectionToBlock(entity, targetBlock) {
     return { dx: 0, dy: 1 };
   }
   
-  // 端にいない場合は端に向かう
   if (dc < 0) return { dx: -1, dy: 0 };
   if (dc > 0) return { dx: 1, dy: 0 };
   if (dr < 0) return { dx: 0, dy: -1 };
@@ -683,7 +660,6 @@ function getObjectAt(blockId, x, y, type) {
 }
 
 function updateEnemies() {
-  // ジェイソン
   if (state.jason && state.jason.alive) {
     var jSpeed = 10 + (state.day - 1) * 10;
     if (state.jason.speed !== jSpeed) state.jason.speed = jSpeed;
@@ -731,7 +707,6 @@ function updateEnemies() {
     if (state.jasonKillCooldown > 0) state.jasonKillCooldown--;
   }
 
-  // 熊
   var isBearAttackDay = false;
   for (var d = 0; d < state.bearAttackDays.length; d++) {
     if (state.bearAttackDays[d] === state.day) isBearAttackDay = true;
@@ -784,7 +759,6 @@ function updateEnemies() {
     if (state.bearKillCooldown > 0) state.bearKillCooldown--;
   }
 
-  // 狼
   if (state.wolf && state.wolf.alive) {
     if (state.wolf.moveCooldown > 0) {
       state.wolf.moveCooldown--;
@@ -821,7 +795,6 @@ function killMob(mob, killer) {
   updateUI();
 }
 
-// ★ 主人公移動（自動回収なし）
 function moveHero(dx, dy) {
   if (state.gameOver || state.paused) return;
   var hero = state.hero;
@@ -831,7 +804,6 @@ function moveHero(dx, dy) {
   updateUI();
 }
 
-// ★ クリックでアイテムを拾う（自動回収はなし）
 function pickupItemByClick(gx, gy) {
   var hero = state.hero;
   if (!hero || !hero.alive) return;
@@ -840,7 +812,6 @@ function pickupItemByClick(gx, gy) {
     return;
   }
   
-  // 王将の範囲（周囲1マス）
   if (Math.abs(gx - hero.x) > 1 || Math.abs(gy - hero.y) > 1) {
     addLog('⚠️ 範囲外です');
     return;
@@ -906,7 +877,7 @@ function useItemOnObject(objType) {
   }
 
   if (obj.used) {
-    addLog('⚠️ この' + objType + 'はもう使われている');
+    addLog('⚠️ この' + objType + 'はクールダウン中です (残り ' + obj.cooldown + '秒)');
     return;
   }
 
@@ -922,10 +893,12 @@ function useItemOnObject(objType) {
     return;
   }
 
+  // ★ 使用: クールダウン5秒
   obj.used = true;
+  obj.cooldown = 5;
   state.points += 1;
   state.heroItem = null;
-  addLog('✅ ' + itemName + ' を使って +1ポイント！');
+  addLog('✅ ' + itemName + ' を使って +1ポイント！ (クールダウン5秒)');
   updateUI();
 }
 
@@ -969,6 +942,17 @@ function startDayTimer() {
       addLog('🌙 夜になった...');
     }
 
+    // ★ オブジェクトのクールダウン更新 (毎秒)
+    for (var i = 0; i < state.objects.length; i++) {
+      var obj = state.objects[i];
+      if (obj.cooldown > 0) {
+        obj.cooldown--;
+        if (obj.cooldown === 0) {
+          obj.used = false;
+        }
+      }
+    }
+
     if (state.dayElapsed >= DAY_DURATION) {
       nextDay();
     }
@@ -990,7 +974,6 @@ function nextDay() {
   var jSpeed = 10 + (state.day - 1) * 10;
   addLog('📈 ' + state.day + '日目: ジェイソンの速度が ' + jSpeed + ' になった');
 
-  // モブ再割り当て
   for (var i = 0; i < state.mobs.length; i++) {
     var mob = state.mobs[i];
     if (mob.alive && !mob.hasDelivered) {
@@ -998,9 +981,8 @@ function nextDay() {
     }
   }
 
-  // 品10〜品80 を再補充（品1〜品8は再補充しない）
+  var blockMap = [8,7,6,5,3,2,1,0];
   for (var b = 0; b < 8; b++) {
-    var blockMap = [8,7,6,5,3,2,1,0];
     var bid = blockMap[b];
     var itemName = '品' + ((b + 1) * 10);
     var exists = false;
@@ -1020,9 +1002,10 @@ function nextDay() {
     }
   }
 
-  // 小屋オブジェクトリセット
+  // ★ 翌日は全オブジェクトリセット
   for (var oi = 0; oi < state.objects.length; oi++) {
     state.objects[oi].used = false;
+    state.objects[oi].cooldown = 0;
   }
 
   state.dayElapsed = 0;
@@ -1165,12 +1148,15 @@ function render() {
       if (obj.blockId !== blockId) continue;
       var px = obj.x * BLOCK_SIZE;
       var py = obj.y * BLOCK_SIZE;
-      ctx.fillStyle = obj.used ? '#555' : '#3a3a5a';
+      
+      // ★ クールダウン中は色を変えて表示
+      var isCooling = obj.cooldown > 0;
+      ctx.fillStyle = obj.used ? (isCooling ? '#664444' : '#555') : '#3a3a5a';
       ctx.fillRect(px + 2, py + 2, BLOCK_SIZE - 4, BLOCK_SIZE - 4);
-      ctx.strokeStyle = obj.used ? '#777' : '#88aaff';
+      ctx.strokeStyle = obj.used ? (isCooling ? '#884444' : '#777') : '#88aaff';
       ctx.lineWidth = 1;
       ctx.strokeRect(px + 2, py + 2, BLOCK_SIZE - 4, BLOCK_SIZE - 4);
-      ctx.fillStyle = obj.used ? '#888' : '#ffffff';
+      ctx.fillStyle = obj.used ? (isCooling ? '#aa6666' : '#888') : '#ffffff';
       ctx.font = '12px "MS Gothic"';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -1178,6 +1164,15 @@ function render() {
       if (obj.type === '窓') label = '密';
       if (obj.type === '樽') label = '椅';
       ctx.fillText(label, px + BLOCK_SIZE/2, py + BLOCK_SIZE/2);
+      
+      // ★ クールダウン表示
+      if (isCooling) {
+        ctx.fillStyle = '#ff6644';
+        ctx.font = '8px "MS Gothic"';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(obj.cooldown + 's', px + BLOCK_SIZE/2, py + BLOCK_SIZE);
+      }
     }
   }
 
@@ -1297,10 +1292,8 @@ canvas.addEventListener('click', function(e) {
   if (!hero || !hero.alive) return;
   if (hero.blockId !== state.currentBlock) return;
 
-  // クリックでアイテムを拾う
   pickupItemByClick(gx, gy);
 
-  // オブジェクト使用チェック
   var clickedObj = null;
   for (var oi2 = 0; oi2 < state.objects.length; oi2++) {
     var obj2 = state.objects[oi2];
