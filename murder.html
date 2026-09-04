@@ -63,7 +63,7 @@ body { background:#1a1a2e; display:flex; justify-content:center; align-items:cen
 
 <script>
 // ============================================================
-// 7日間サバイバルゲーム (完全修正版)
+// 7日間サバイバルゲーム (完成版)
 // ============================================================
 
 (function(){
@@ -176,16 +176,10 @@ var state = {
   dayStartTime: 0,
   animFrame: null,
   dayTimerInterval: null,
-  mobTaskDone: [false,false,false,false,false,false,false,false],
-  mobAssigned: [],
-  itemSpawned: false,
   frameCount: 0,
   jasonKillCooldown: 0,
   bearKillCooldown: 0,
-  moveCounter: 0,
-  refinedShown: false,
-  isGameLoopRunning: false,
-  imagesReady: false
+  isGameLoopRunning: false
 };
 
 var canvas = document.getElementById('mapCanvas');
@@ -232,7 +226,6 @@ function gridToBlock(row, col) {
   return row * 3 + col;
 }
 
-// ★ 修正: キャラクター移動（主人公のcurrentBlock更新）
 function moveCharacter(entity, dx, dy) {
   if (!entity || !entity.alive) return false;
   
@@ -272,7 +265,6 @@ function moveCharacter(entity, dx, dy) {
   entity.x = newX;
   entity.y = newY;
   
-  // ★ 主人公なら state.currentBlock を更新
   if (entity === state.hero) {
     state.currentBlock = newBlock;
   }
@@ -280,7 +272,6 @@ function moveCharacter(entity, dx, dy) {
   return true;
 }
 
-// ★ 強制ブロック移動（モブ用）
 function moveEntityToBlock(entity, targetBlock) {
   if (!entity || !entity.alive) return false;
   if (targetBlock < 0 || targetBlock > 8) return false;
@@ -291,7 +282,6 @@ function moveEntityToBlock(entity, targetBlock) {
   var dr = target.row - current.row;
   var dc = target.col - current.col;
   
-  // 端にいるかチェック
   if (dc < 0 && entity.x === 0) {
     entity.blockId = targetBlock;
     entity.x = GRID_SIZE - 1;
@@ -332,17 +322,13 @@ function initGame() {
   state.mobAlive = 8;
   state.logs = [];
   state.jasonPoints = 0;
-  state.mobTaskDone = [false,false,false,false,false,false,false,false];
-  state.mobAssigned = [];
   state.items = [];
   state.objects = [];
-  state.itemSpawned = false;
-  state.refinedShown = false;
   state.jasonKillCooldown = 0;
   state.bearKillCooldown = 0;
-  state.moveCounter = 0;
   state.currentBlock = 4;
   state.isGameLoopRunning = true;
+  state.frameCount = 0;
 
   var days = [1,2,3,4,5,6,7];
   state.bearAttackDays = [];
@@ -404,7 +390,6 @@ function initGame() {
     {x:2,y:0},{x:7,y:0},{x:0,y:2},{x:0,y:7}
   ];
   state.mobs = [];
-  state.mobAssigned = [];
   var shuffledMobs = MOB_NAMES.slice();
   for (var mi = shuffledMobs.length - 1; mi > 0; mi--) {
     var mj = rand(0, mi);
@@ -427,13 +412,10 @@ function initGame() {
       targetX: null,
       targetY: null,
       targetBlock: null,
-      moving: false,
-      moveTimer: 0,
       state: 'idle',
       moveCooldown: 0
     };
     state.mobs.push(mob);
-    state.mobAssigned.push(mob.taskId);
   }
 
   var jasonBlock = rand(0, 8);
@@ -446,7 +428,6 @@ function initGame() {
     speed: 10,
     img: 'ジェイソン',
     alive: true,
-    moveTimer: 0,
     moveCooldown: 0
   };
 
@@ -460,8 +441,6 @@ function initGame() {
     speed: 50,
     img: '熊',
     alive: true,
-    moveTimer: 0,
-    attacking: false,
     moveCooldown: 0
   };
 
@@ -475,7 +454,6 @@ function initGame() {
     speed: 40,
     img: '狼',
     alive: true,
-    moveTimer: 0,
     moveCooldown: 0
   };
 
@@ -489,6 +467,7 @@ function initGame() {
 
   spawnItems();
 
+  // モブにタスクを割り当て
   for (var m = 0; m < state.mobs.length; m++) {
     assignMobTask(state.mobs[m]);
   }
@@ -530,11 +509,12 @@ function spawnItems() {
       blockId: bid
     });
   }
-  state.itemSpawned = true;
 }
 
 function assignMobTask(mob) {
   if (!mob.alive) return;
+  if (mob.hasDelivered) return;
+  
   var taskId = mob.taskId;
   var blockId = taskId;
   if (blockId >= 4) blockId = taskId + 1;
@@ -552,7 +532,6 @@ function assignMobTask(mob) {
     mob.targetY = targetItem.y;
     mob.targetBlock = targetItem.blockId;
     mob.state = 'moving_to_item';
-    mob.moving = true;
   } else {
     mob.state = 'idle';
   }
@@ -562,8 +541,10 @@ function updateMobs() {
   for (var i = 0; i < state.mobs.length; i++) {
     var mob = state.mobs[i];
     if (!mob.alive) continue;
+    
+    // 納品済みはランダム移動
     if (mob.hasDelivered) {
-      if (state.frameCount % 10 === 0) {
+      if (state.frameCount % 8 === 0) {
         var dirs = [[0,-1],[0,1],[-1,0],[1,0]];
         var d = dirs[rand(0, 3)];
         moveCharacter(mob, d[0], d[1]);
@@ -575,74 +556,85 @@ function updateMobs() {
       mob.moveCooldown--;
       continue;
     }
-    mob.moveCooldown = 2;
+    mob.moveCooldown = 3;
 
     if (mob.state === 'moving_to_item') {
-      if (mob.blockId === mob.targetBlock) {
-        var dx = mob.targetX - mob.x;
-        var dy = mob.targetY - mob.y;
-        if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) {
-          var itemIdx = -1;
-          for (var idx = 0; idx < state.items.length; idx++) {
-            var it = state.items[idx];
-            if (it.name === '品' + (mob.taskId + 1) && it.blockId === mob.blockId) {
-              if (Math.abs(it.x - mob.x) <= 1 && Math.abs(it.y - mob.y) <= 1) {
-                itemIdx = idx;
-                break;
-              }
+      // アイテムのあるブロックに移動
+      if (mob.blockId !== mob.targetBlock) {
+        moveEntityToBlock(mob, mob.targetBlock);
+        continue;
+      }
+      
+      // 同じブロック内でアイテムに近づく
+      var dx = mob.targetX - mob.x;
+      var dy = mob.targetY - mob.y;
+      
+      if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) {
+        // アイテムを取得
+        var itemIdx = -1;
+        for (var idx = 0; idx < state.items.length; idx++) {
+          var it = state.items[idx];
+          if (it.name === '品' + (mob.taskId + 1) && it.blockId === mob.blockId) {
+            if (Math.abs(it.x - mob.x) <= 1 && Math.abs(it.y - mob.y) <= 1) {
+              itemIdx = idx;
+              break;
             }
           }
-          if (itemIdx >= 0) {
-            state.items.splice(itemIdx, 1);
-            mob.state = 'moving_to_hut';
-            mob.targetX = 3;
-            mob.targetY = 5;
-            mob.targetBlock = 4;
-            addLog('📦 ' + mob.name + ' が 品' + (mob.taskId + 1) + ' を入手');
-          } else {
-            mob.state = 'idle';
-          }
+        }
+        if (itemIdx >= 0) {
+          state.items.splice(itemIdx, 1);
+          mob.state = 'moving_to_hut';
+          mob.targetX = 3;
+          mob.targetY = 5;
+          mob.targetBlock = 4;
+          addLog('📦 ' + mob.name + ' が 品' + (mob.taskId + 1) + ' を入手');
         } else {
-          var moveX = 0, moveY = 0;
-          if (mob.targetX > mob.x) moveX = 1;
-          else if (mob.targetX < mob.x) moveX = -1;
-          else if (mob.targetY > mob.y) moveY = 1;
-          else if (mob.targetY < mob.y) moveY = -1;
-          if (moveX !== 0 || moveY !== 0) {
-            moveCharacter(mob, moveX, moveY);
-          }
+          mob.state = 'idle';
+          assignMobTask(mob);
         }
       } else {
-        moveEntityToBlock(mob, mob.targetBlock);
+        var mx = 0, my = 0;
+        if (mob.targetX > mob.x) mx = 1;
+        else if (mob.targetX < mob.x) mx = -1;
+        else if (mob.targetY > mob.y) my = 1;
+        else if (mob.targetY < mob.y) my = -1;
+        if (mx !== 0 || my !== 0) {
+          moveCharacter(mob, mx, my);
+        }
       }
     } else if (mob.state === 'moving_to_hut') {
-      if (mob.blockId === 4) {
-        var hutItem = getObjectAt(4, 3, 5, '品');
-        if (hutItem && !hutItem.used) {
-          if (Math.abs(3 - mob.x) <= 1 && Math.abs(5 - mob.y) <= 1) {
-            hutItem.used = true;
-            mob.hasDelivered = true;
-            state.points += 1;
-            addLog('✅ ' + mob.name + ' 納品完了！ +1ポイント');
-            updateUI();
-            mob.state = 'delivered';
-          } else {
-            var mx = 0, my = 0;
-            if (3 > mob.x) mx = 1;
-            else if (3 < mob.x) mx = -1;
-            else if (5 > mob.y) my = 1;
-            else if (5 < mob.y) my = -1;
-            if (mx !== 0 || my !== 0) {
-              moveCharacter(mob, mx, my);
-            }
-          }
-        } else {
+      if (mob.blockId !== 4) {
+        moveEntityToBlock(mob, 4);
+        continue;
+      }
+      
+      var hutItem = getObjectAt(4, 3, 5, '品');
+      if (hutItem && !hutItem.used) {
+        if (Math.abs(3 - mob.x) <= 1 && Math.abs(5 - mob.y) <= 1) {
+          hutItem.used = true;
           mob.hasDelivered = true;
+          state.points += 1;
+          addLog('✅ ' + mob.name + ' 納品完了！ +1ポイント');
+          updateUI();
           mob.state = 'delivered';
+        } else {
+          var mx2 = 0, my2 = 0;
+          if (3 > mob.x) mx2 = 1;
+          else if (3 < mob.x) mx2 = -1;
+          else if (5 > mob.y) my2 = 1;
+          else if (5 < mob.y) my2 = -1;
+          if (mx2 !== 0 || my2 !== 0) {
+            moveCharacter(mob, mx2, my2);
+          }
         }
       } else {
-        moveEntityToBlock(mob, 4);
+        // 品がもう使われている → 諦める
+        mob.hasDelivered = true;
+        mob.state = 'delivered';
       }
+    } else {
+      // idle → 再割り当て
+      assignMobTask(mob);
     }
   }
 }
@@ -658,6 +650,7 @@ function getObjectAt(blockId, x, y, type) {
 }
 
 function updateEnemies() {
+  // ジェイソン
   if (state.jason && state.jason.alive) {
     var jSpeed = 10 + (state.day - 1) * 10;
     if (state.jason.speed !== jSpeed) state.jason.speed = jSpeed;
@@ -665,7 +658,7 @@ function updateEnemies() {
     if (state.jason.moveCooldown > 0) {
       state.jason.moveCooldown--;
     } else {
-      state.jason.moveCooldown = Math.max(1, Math.floor(15 / (state.jason.speed / 10)));
+      state.jason.moveCooldown = Math.max(1, Math.floor(12 / (state.jason.speed / 10)));
       
       var hero = state.hero;
       if (hero && hero.alive) {
@@ -704,6 +697,7 @@ function updateEnemies() {
     if (state.jasonKillCooldown > 0) state.jasonKillCooldown--;
   }
 
+  // 熊
   var isBearAttackDay = false;
   for (var d = 0; d < state.bearAttackDays.length; d++) {
     if (state.bearAttackDays[d] === state.day) isBearAttackDay = true;
@@ -755,6 +749,7 @@ function updateEnemies() {
     if (state.bearKillCooldown > 0) state.bearKillCooldown--;
   }
 
+  // 狼
   if (state.wolf && state.wolf.alive) {
     if (state.wolf.moveCooldown > 0) {
       state.wolf.moveCooldown--;
@@ -798,7 +793,6 @@ function moveHero(dx, dy) {
   
   var moved = moveCharacter(hero, dx, dy);
   if (moved) {
-    state.moveCounter++;
     pickupItem(hero);
     updateUI();
   }
@@ -819,6 +813,35 @@ function pickupItem(entity) {
       return;
     }
   }
+}
+
+// ★ クリックでアイテムを拾う
+function pickupItemByClick(gx, gy) {
+  var hero = state.hero;
+  if (!hero || !hero.alive) return;
+  if (state.heroItem) {
+    addLog('⚠️ すでにアイテムを持っている');
+    return;
+  }
+  
+  // 主人公の範囲内かチェック (王将の範囲 = 周囲1マス)
+  if (Math.abs(gx - hero.x) > 1 || Math.abs(gy - hero.y) > 1) {
+    addLog('⚠️ 範囲外です');
+    return;
+  }
+  
+  for (var i = 0; i < state.items.length; i++) {
+    var item = state.items[i];
+    if (item.blockId !== hero.blockId) continue;
+    if (item.x === gx && item.y === gy) {
+      state.heroItem = item.name;
+      state.items.splice(i, 1);
+      addLog('📦 ' + item.name + ' を拾った');
+      updateUI();
+      return;
+    }
+  }
+  addLog('⚠️ そこにアイテムはありません');
 }
 
 function useItemOnObject(objType) {
@@ -951,6 +974,7 @@ function nextDay() {
   var jSpeed = 10 + (state.day - 1) * 10;
   addLog('📈 ' + state.day + '日目: ジェイソンの速度が ' + jSpeed + ' になった');
 
+  // モブにタスク再割り当て
   for (var i = 0; i < state.mobs.length; i++) {
     var mob = state.mobs[i];
     if (mob.alive && !mob.hasDelivered) {
@@ -958,6 +982,7 @@ function nextDay() {
     }
   }
 
+  // 品10〜品80 を再補充
   for (var b = 0; b < 8; b++) {
     var blockId = b;
     if (blockId >= 4) blockId = b + 1;
@@ -979,6 +1004,7 @@ function nextDay() {
     }
   }
 
+  // 小屋のオブジェクトをリセット
   for (var oi = 0; oi < state.objects.length; oi++) {
     state.objects[oi].used = false;
   }
@@ -1051,12 +1077,6 @@ function updateUI() {
 }
 
 function gameLoop() {
-  if (!state.isGameLoopRunning && state.gameOver) {
-    render();
-    state.animFrame = requestAnimationFrame(gameLoop);
-    return;
-  }
-
   state.frameCount++;
 
   if (!state.gameOver) {
@@ -1253,9 +1273,12 @@ canvas.addEventListener('click', function(e) {
 
   var hero = state.hero;
   if (!hero || !hero.alive) return;
-
   if (hero.blockId !== state.currentBlock) return;
 
+  // ★ クリックでアイテムを拾う
+  pickupItemByClick(gx, gy);
+
+  // オブジェクト使用チェック
   var clickedObj = null;
   for (var oi2 = 0; oi2 < state.objects.length; oi2++) {
     var obj2 = state.objects[oi2];
@@ -1275,8 +1298,6 @@ canvas.addEventListener('click', function(e) {
 
   if (clickedObj) {
     useItemOnObject(clickedObj.type);
-  } else {
-    addLog('⚠️ そこには使えるものがありません');
   }
 });
 
