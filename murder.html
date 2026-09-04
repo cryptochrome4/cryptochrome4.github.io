@@ -2,517 +2,1321 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>森のサバイバル - 7日間</title>
+<title>7日間サバイバル</title>
 <style>
-* { margin:0; padding:0; box-sizing:border-box; }
-body { background:#1a1a2e; display:flex; justify-content:center; align-items:center; height:100vh; font-family:'MS Gothic',monospace; }
-#gameWrapper { background:#2d2d44; padding:10px; border-radius:8px; box-shadow:0 0 20px rgba(0,0,0,0.8); }
-#mainCanvas { display:block; margin:0 auto; background:#3d5a3d; cursor:default; border:2px solid #5a4a3a; }
-#ui { background:#1a1a2e; color:#c0c0c0; padding:6px 12px; display:flex; justify-content:space-between; font-size:14px; border-top:1px solid #444; }
-#ui span { background:#2a2a44; padding:2px 10px; border-radius:4px; }
-#infoPanel { background:#222; color:#ddd; padding:8px 12px; font-size:13px; border-bottom:1px solid #444; display:flex; justify-content:space-between; }
-#message { color:#ffcc88; }
+* { margin:0; padding:0; box-sizing:border-box; user-select:none; }
+body { background:#1a1a2e; display:flex; justify-content:center; align-items:center; min-height:100vh; font-family:'MS Gothic',monospace; }
+#gameContainer { background:#2d2d44; padding:15px; border-radius:10px; box-shadow:0 0 30px rgba(0,0,0,0.8); }
+#mainArea { display:flex; gap:12px; }
+#mapWrap { background:#1a1a2e; border:3px solid #444; border-radius:5px; padding:4px; position:relative; }
+#mapCanvas { display:block; background:#2d5a27; image-rendering:pixelated; cursor:default; }
+#infoPanel { width:220px; background:#1a1a2e; border:2px solid #444; border-radius:5px; padding:12px; color:#aaf; font-size:13px; line-height:1.7; }
+#infoPanel .title { color:#ffcc66; font-size:15px; font-weight:bold; text-align:center; border-bottom:1px solid #444; padding-bottom:6px; margin-bottom:8px; }
+#infoPanel .stat { display:flex; justify-content:space-between; padding:2px 0; border-bottom:1px solid #333; }
+#infoPanel .stat .label { color:#99bbdd; }
+#infoPanel .stat .value { color:#ffdd99; font-weight:bold; }
+#logArea { background:#0d0d1a; border:1px solid #333; border-radius:3px; padding:4px 6px; height:90px; overflow-y:auto; font-size:12px; color:#88cc88; margin-top:6px; }
+#logArea .log-entry { border-bottom:1px solid #222; padding:1px 0; }
+#controls { display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; }
+#controls button { background:#333366; border:1px solid #555599; color:#ccd; padding:4px 12px; border-radius:3px; font-size:12px; cursor:pointer; font-family:inherit; }
+#controls button:hover { background:#444488; }
+#controls button:active { background:#222255; }
+#bottomBar { display:flex; justify-content:space-between; margin-top:10px; color:#88aacc; font-size:13px; padding:0 4px; }
+#dayDisplay { color:#ffaa66; font-weight:bold; }
+#msgPopup { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:rgba(0,0,0,0.85); border:3px solid #ffcc44; border-radius:12px; padding:25px 40px; color:#fff; text-align:center; display:none; z-index:100; pointer-events:auto; }
+#msgPopup h2 { color:#ffcc44; font-size:28px; margin-bottom:10px; }
+#msgPopup p { font-size:16px; color:#ddd; }
+#msgPopup .btn { margin-top:16px; padding:8px 30px; background:#ffcc44; color:#1a1a2e; border:none; border-radius:6px; font-size:18px; font-weight:bold; cursor:pointer; }
+#msgPopup .btn:hover { background:#ffdd66; }
+.night-overlay { position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,20,0.55); pointer-events:none; display:none; border-radius:3px; }
 </style>
 </head>
 <body>
-<div id="gameWrapper">
+<div id="gameContainer">
+<div id="mainArea">
+<div id="mapWrap">
+<canvas id="mapCanvas" width="320" height="320"></canvas>
+<div class="night-overlay" id="nightOverlay"></div>
+<div id="msgPopup">
+<h2 id="popupTitle"></h2>
+<p id="popupDesc"></p>
+<button class="btn" id="popupBtn">OK</button>
+</div>
+</div>
 <div id="infoPanel">
-<span>主人公: 紅葉</span>
-<span id="dayDisplay">1日目</span>
-<span id="timeDisplay">朝</span>
-<span id="bearAlert"></span>
+<div class="title">📋 情報パネル</div>
+<div class="stat"><span class="label">📅 日数</span><span class="value" id="dispDay">1 / 7</span></div>
+<div class="stat"><span class="label">🔰 補強ポイント</span><span class="value" id="dispPoints">0</span></div>
+<div class="stat"><span class="label">📦 所持アイテム</span><span class="value" id="dispItem">なし</span></div>
+<div class="stat"><span class="label">👥 生存モブ</span><span class="value" id="dispMobAlive">8 / 8</span></div>
+<div id="logArea"><div style="color:#667;font-size:11px;">— ログ —</div></div>
+<div id="controls">
+<button id="btnDrop">📤 アイテムを落とす</button>
 </div>
-<canvas id="mainCanvas" width="560" height="560"></canvas>
-<div id="ui">
-<span id="statusMsg">▶ 小屋からスタート</span>
-<span id="enemyStatus">青鬼: 森の中</span>
 </div>
 </div>
+<div id="bottomBar">
+<span id="dayDisplay">🌅 1日目 (30秒)</span>
+<span>⬆⬇⬅➡ 移動</span>
+</div>
+</div>
+
 <script>
-(function() {
-// ---- 2013年対応: 厳密モード、IE対策 ----
+// ============================================================
+// 2013年互換 7日間サバイバルゲーム
+// ============================================================
+
+(function(){
 "use strict";
 
-// ---------- 定数 ----------
-const SIZE = 560;
-const CELL = 40;        // 1マス40px
-const COLS = 14;        // 14x14グリッド
-const ROWS = 14;
+// ---- 定数 ----
+var BLOCK_SIZE = 32;        // 1マス32px
+var GRID_SIZE = 10;         // 10x10
+var CANVAS_SIZE = 320;
+var DAY_DURATION = 30;      // 30秒
+var MAX_DAYS = 7;
+var TOTAL_BLOCKS = 9;       // 森1〜森8 + 小屋(中央)
 
-// マップチップ
-const T_FLOOR = 0;
-const T_WALL = 1;
-const T_TREE = 2;
-const T_HOUSE = 3;      // 小屋の床（内部）
-const T_HOUSE_WALL = 4; // 小屋の壁（外からは入れないが、内部は通れる）
-const T_BED = 5;
-const T_CHEST = 6;
+// ---- 画像ファイル名 (実際の画像URLに差し替え可能) ----
+var IMG_MAP = {
+  '加藤': 'img154streamer.jpg',
+  '松本': 'img155streamer.jpg',
+  '坪池': 'img156streamer.jpg',
+  '市川': 'img157youtuber.jpg',
+  '青笹': 'img158nontitle.jpg',
+  '角田': 'img159streamer.jpg',
+  '木元': 'img160artist.jpg',
+  '山崎': 'img161streamer.jpg',
+  '紅葉': 'img162feat.jpg',
+  'ジェイソン': 'img163enemy.jpg',
+  '熊': 'img164bear.jpg',
+  '狼': 'img165wolf.jpg'
+};
 
-// 方角
-const DIR = [
-    {dx:0, dy:-1}, // 上
-    {dx:1, dy:0},  // 右
-    {dx:0, dy:1},  // 下
-    {dx:-1, dy:0}  // 左
-];
+// ---- キャラクター定義 ----
+var CHARACTERS = {
+  '加藤': { speed: 40, img: '加藤' },
+  '松本': { speed: 60, img: '松本' },
+  '坪池': { speed: 70, img: '坪池' },
+  '市川': { speed: 30, img: '市川' },
+  '青笹': { speed: 80, img: '青笹' },
+  '角田': { speed: 20, img: '角田' },
+  '木元': { speed: 50, img: '木元' },
+  '山崎': { speed: 10, img: '山崎' },
+  '紅葉': { speed: 70, img: '紅葉' },
+  'ジェイソン': { speed: 10, img: 'ジェイソン' },
+  '熊': { speed: 50, img: '熊' },
+  '狼': { speed: 40, img: '狼' }
+};
 
-// ---------- 状態 ----------
-let map = [];           // 二次元配列 [y][x]
-let player = { x:0, y:0 };
-let enemy = { x:0, y:0 };
-let bear = { x:0, y:0, active:false, day:0 };
+// ---- モブ名リスト ----
+var MOB_NAMES = ['加藤','松本','坪池','市川','青笹','角田','木元','山崎'];
+var HERO_NAME = '紅葉';
 
-let day = 1;
-let timeState = 0;      // 0=朝, 1=昼, 2=夜
-let timeCounter = 0;    // 秒カウント（30秒で1日）
-let gameOver = false;
-let gameWin = false;
-let enemyActive = true;
+// ---- 状態 ----
+var state = {
+  day: 1,
+  dayElapsed: 0,          // 秒
+  points: 0,
+  gameOver: false,
+  gameWon: false,
+  paused: false,
+  night: false,
+  hero: null,
+  mobs: [],
+  jason: null,
+  bear: null,
+  wolf: null,
+  items: [],              // 地面アイテム {name, x, y, blockId}
+  objects: [],            // 固定オブジェクト {type, x, y, blockId, used}
+  heroItem: null,         // 持ってるアイテム名
+  mobAlive: 8,
+  blockMap: [],           // 9ブロックのグリッド (3x3)
+  currentBlock: 4,        // 0〜8, 4が小屋(中央)
+  logs: [],
+  jasonPoints: 0,
+  bearAttackDays: [],
+  dayStartTime: 0,
+  animFrame: null,
+  gameLoopInterval: null,
+  dayTimerInterval: null,
+  mobTaskDone: [false,false,false,false,false,false,false,false],
+  mobAssigned: [],        // モブ名 → タスク番号(0〜7)
+  itemSpawned: false,
+  frameCount: 0,
+  jasonKillCooldown: 0,
+  bearKillCooldown: 0,
+  moveCounter: 0,
+  refinedShown: false
+};
 
-// 熊の襲撃日（2日間をランダム設定）
-let bearDays = [];
+// ---- DOM参照 ----
+var canvas = document.getElementById('mapCanvas');
+var ctx = canvas.getContext('2d');
+var nightOverlay = document.getElementById('nightOverlay');
+var popup = document.getElementById('msgPopup');
+var popupTitle = document.getElementById('popupTitle');
+var popupDesc = document.getElementById('popupDesc');
+var popupBtn = document.getElementById('popupBtn');
+var dispDay = document.getElementById('dispDay');
+var dispPoints = document.getElementById('dispPoints');
+var dispItem = document.getElementById('dispItem');
+var dispMobAlive = document.getElementById('dispMobAlive');
+var logArea = document.getElementById('logArea');
+var dayDisplay = document.getElementById('dayDisplay');
+var btnDrop = document.getElementById('btnDrop');
 
-// Canvas
-const canvas = document.getElementById('mainCanvas');
-const ctx = canvas.getContext('2d');
+// ---- ユーティリティ ----
+function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
 
-// UI要素
-const dayDisplay = document.getElementById('dayDisplay');
-const timeDisplay = document.getElementById('timeDisplay');
-const statusMsg = document.getElementById('statusMsg');
-const enemyStatus = document.getElementById('enemyStatus');
-const bearAlert = document.getElementById('bearAlert');
+function randf(min, max) { return Math.random() * (max - min) + min; }
 
-// ---------- マップ生成 ----------
-function generateMap() {
-    // 14x14 全て森（床）
-    map = [];
-    for (let y=0; y<ROWS; y++) {
-        map[y] = [];
-        for (let x=0; x<COLS; x++) {
-            map[y][x] = T_FLOOR;
-        }
+function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+function dist(a, b) {
+  return Math.sqrt((a.x - b.x)*(a.x - b.x) + (a.y - b.y)*(a.y - b.y));
+}
+
+function addLog(msg) {
+  state.logs.unshift(msg);
+  if (state.logs.length > 50) state.logs.pop();
+  renderLog();
+}
+
+function renderLog() {
+  var html = '<div style="color:#667;font-size:11px;">— ログ —</div>';
+  for (var i = 0; i < Math.min(state.logs.length, 12); i++) {
+    html += '<div class="log-entry">' + state.logs[i] + '</div>';
+  }
+  logArea.innerHTML = html;
+}
+
+// ---- ブロックIDと座標の変換 ----
+// 0:左上,1:上中央,2:右上,3:左,4:中央(小屋),5:右,6:左下,7:下中央,8:右下
+var BLOCK_NAMES = ['森8','森7','森6','森5','小屋','森4','森3','森2','森1'];
+
+function blockToGrid(blockId) {
+  var row = Math.floor(blockId / 3);
+  var col = blockId % 3;
+  return { row: row, col: col };
+}
+
+function gridToBlock(row, col) {
+  if (row < 0 || row > 2 || col < 0 || col > 2) return -1;
+  return row * 3 + col;
+}
+
+function getBlockOffset(blockId) {
+  var g = blockToGrid(blockId);
+  return { x: g.col * GRID_SIZE, y: g.row * GRID_SIZE };
+}
+
+// ---- 初期化 ----
+function initGame() {
+  state.day = 1;
+  state.dayElapsed = 0;
+  state.points = 0;
+  state.gameOver = false;
+  state.gameWon = false;
+  state.night = false;
+  state.heroItem = null;
+  state.mobAlive = 8;
+  state.logs = [];
+  state.jasonPoints = 0;
+  state.mobTaskDone = [false,false,false,false,false,false,false,false];
+  state.mobAssigned = [];
+  state.items = [];
+  state.objects = [];
+  state.itemSpawned = false;
+  state.refinedShown = false;
+  state.jasonKillCooldown = 0;
+  state.bearKillCooldown = 0;
+  state.moveCounter = 0;
+  state.hero = null;
+  state.jason = null;
+  state.bear = null;
+  state.wolf = null;
+  state.mobs = [];
+
+  // 熊の襲撃日 (2日間ランダム)
+  var days = [1,2,3,4,5,6,7];
+  state.bearAttackDays = [];
+  var shuffled = days.slice();
+  for (var i = shuffled.length - 1; i > 0; i--) {
+    var j = rand(0, i);
+    var tmp = shuffled[i];
+    shuffled[i] = shuffled[j];
+    shuffled[j] = tmp;
+  }
+  state.bearAttackDays = shuffled.slice(0, 2);
+  addLog('🐻 熊の襲撃日: ' + state.bearAttackDays.join(', ') + '日目');
+
+  // ジェイソンポイント (15〜20)
+  state.jasonPoints = rand(15, 20);
+  addLog('🔪 ジェイソンポイント: ' + state.jasonPoints);
+
+  // ブロックマップ初期化
+  state.blockMap = [];
+  for (var b = 0; b < 9; b++) {
+    state.blockMap[b] = [];
+    for (var y = 0; y < GRID_SIZE; y++) {
+      state.blockMap[b][y] = [];
+      for (var x = 0; x < GRID_SIZE; x++) {
+        state.blockMap[b][y][x] = null;
+      }
     }
+  }
 
-    // 外周を壁（森の外）
-    for (let i=0; i<COLS; i++) {
-        map[0][i] = T_WALL;
-        map[ROWS-1][i] = T_WALL;
-    }
-    for (let i=0; i<ROWS; i++) {
-        map[i][0] = T_WALL;
-        map[i][COLS-1] = T_WALL;
-    }
-
-    // ---- 小屋を中央付近に設置 (4x4) ----
-    const hx = 5, hy = 5;
-    for (let dy=0; dy<4; dy++) {
-        for (let dx=0; dx<4; dx++) {
-            const gx = hx + dx;
-            const gy = hy + dy;
-            if (gx < COLS && gy < ROWS) {
-                if (dx===0 || dx===3 || dy===0 || dy===3) {
-                    map[gy][gx] = T_HOUSE_WALL; // 壁
-                } else {
-                    map[gy][gx] = T_HOUSE; // 床
-                }
-            }
-        }
-    }
-    // 小屋の中にベッドとタンス
-    map[hy+1][hx+1] = T_BED;
-    map[hy+2][hx+2] = T_CHEST;
-    // 入り口（南側の壁を開ける）
-    map[hy+3][hx+1] = T_HOUSE;
-    map[hy+3][hx+2] = T_HOUSE;
-
-    // ---- 木をランダムに配置（森一面に3本まで） ----
-    let treeCount = 0;
-    let attempts = 0;
-    while (treeCount < 3 && attempts < 200) {
+  // 森の木を生成 (各森ブロックに3つの木、縦2×横1)
+  for (var b2 = 0; b2 < 9; b2++) {
+    if (b2 === 4) continue; // 小屋は木なし
+    for (var t = 0; t < 3; t++) {
+      var tx, ty;
+      var attempts = 0;
+      do {
+        tx = rand(0, 8);
+        ty = rand(0, 8);
         attempts++;
-        const tx = 1 + Math.floor(Math.random() * (COLS-2));
-        const ty = 1 + Math.floor(Math.random() * (ROWS-2));
-        // 小屋の位置を避ける
-        if (tx >= hx && tx < hx+4 && ty >= hy && ty < hy+4) continue;
-        if (map[ty][tx] === T_FLOOR) {
-            map[ty][tx] = T_TREE;
-            treeCount++;
+      } while (attempts < 50 && state.blockMap[b2][ty][tx] !== null);
+      if (state.blockMap[b2][ty][tx] === null) {
+        state.blockMap[b2][ty][tx] = 'tree';
+        // 縦2×横1: もう一つ下に木
+        if (ty + 1 < GRID_SIZE && state.blockMap[b2][ty+1][tx] === null) {
+          state.blockMap[b2][ty+1][tx] = 'tree';
         }
+      }
+    }
+  }
+
+  // ---- キャラクター生成 ----
+  // 主人公 (小屋の中)
+  var heroX = rand(3, 6);
+  var heroY = rand(3, 6);
+  state.hero = {
+    name: HERO_NAME,
+    x: heroX,
+    y: heroY,
+    blockId: 4,
+    speed: CHARACTERS[HERO_NAME].speed,
+    img: CHARACTERS[HERO_NAME].img,
+    alive: true
+  };
+
+  // モブキャラ (小屋の中、周囲に配置)
+  var mobPositions = [
+    {x:1,y:1},{x:8,y:1},{x:1,y:8},{x:8,y:8},
+    {x:2,y:0},{x:7,y:0},{x:0,y:2},{x:0,y:7}
+  ];
+  state.mobs = [];
+  state.mobAssigned = [];
+  var shuffledMobs = MOB_NAMES.slice();
+  for (var mi = shuffledMobs.length - 1; mi > 0; mi--) {
+    var mj = rand(0, mi);
+    var mt = shuffledMobs[mi];
+    shuffledMobs[mi] = shuffledMobs[mj];
+    shuffledMobs[mj] = mt;
+  }
+  for (var mi2 = 0; mi2 < 8; mi2++) {
+    var pos = mobPositions[mi2 % mobPositions.length];
+    var mob = {
+      name: shuffledMobs[mi2],
+      x: pos.x,
+      y: pos.y,
+      blockId: 4,
+      speed: CHARACTERS[shuffledMobs[mi2]].speed,
+      img: CHARACTERS[shuffledMobs[mi2]].img,
+      alive: true,
+      taskId: mi2,          // 0〜7
+      hasDelivered: false,
+      targetX: null,
+      targetY: null,
+      targetBlock: null,
+      moving: false,
+      moveTimer: 0,
+      state: 'idle'         // idle, moving_to_item, moving_to_hut, delivered
+    };
+    state.mobs.push(mob);
+    state.mobAssigned.push(mob.taskId);
+  }
+
+  // ジェイソン (森1〜森8のどこか)
+  var jasonBlock = rand(0, 8);
+  if (jasonBlock === 4) jasonBlock = 0;
+  state.jason = {
+    name: 'ジェイソン',
+    x: rand(0, 9),
+    y: rand(0, 9),
+    blockId: jasonBlock,
+    speed: 10,
+    img: 'ジェイソン',
+    alive: true,
+    moveTimer: 0
+  };
+
+  // 熊 (森1〜森8のどこか)
+  var bearBlock = rand(0, 8);
+  if (bearBlock === 4) bearBlock = 1;
+  state.bear = {
+    name: '熊',
+    x: rand(0, 9),
+    y: rand(0, 9),
+    blockId: bearBlock,
+    speed: 50,
+    img: '熊',
+    alive: true,
+    moveTimer: 0,
+    attacking: false
+  };
+
+  // 狼 (森1〜森8のどこか)
+  var wolfBlock = rand(0, 8);
+  if (wolfBlock === 4) wolfBlock = 2;
+  state.wolf = {
+    name: '狼',
+    x: rand(0, 9),
+    y: rand(0, 9),
+    blockId: wolfBlock,
+    speed: 40,
+    img: '狼',
+    alive: true,
+    moveTimer: 0
+  };
+
+  // ---- 固定オブジェクト (小屋の中) ----
+  // レイアウト:
+  //       樽 箱
+  // 品 窓
+  //       穴
+  var hutObjects = [
+    { type: '樽', x: 6, y: 4, blockId: 4, used: false },
+    { type: '箱', x: 7, y: 4, blockId: 4, used: false },
+    { type: '品', x: 3, y: 5, blockId: 4, used: false },
+    { type: '窓', x: 5, y: 5, blockId: 4, used: false },
+    { type: '穴', x: 7, y: 7, blockId: 4, used: false }
+  ];
+  state.objects = hutObjects;
+
+  // ---- アイテム配置 (森1〜森8 + 小屋にランダム) ----
+  spawnItems();
+
+  // ---- モブの初期タスク設定 ----
+  for (var m = 0; m < state.mobs.length; m++) {
+    assignMobTask(state.mobs[m]);
+  }
+
+  // ---- UI更新 ----
+  updateUI();
+  renderLog();
+  addLog('🌅 ゲーム開始！ 7日間逃げ切れ！');
+
+  // ---- タイマー開始 ----
+  state.dayStartTime = Date.now();
+  startDayTimer();
+
+  // ---- 描画ループ ----
+  if (state.animFrame) cancelAnimationFrame(state.animFrame);
+  gameLoop();
+}
+
+// ---- アイテム配置 ----
+function spawnItems() {
+  state.items = [];
+  var itemTypes = ['材','斧','銃','餌','堀'];
+  // 品10〜品80 (森1〜森8に各1つ)
+  for (var i = 0; i < 8; i++) {
+    var blockId = i;
+    if (blockId >= 4) blockId = i + 1; // 4をスキップ
+    var itemName = '品' + ((i + 1) * 10);
+    state.items.push({
+      name: itemName,
+      x: rand(0, 9),
+      y: rand(0, 9),
+      blockId: blockId
+    });
+  }
+  // 材、斧、銃、餌、堀 (森1〜森8 + 小屋のどこか)
+  var allBlocks = [0,1,2,3,4,5,6,7,8];
+  for (var ti = 0; ti < itemTypes.length; ti++) {
+    var bid = allBlocks[rand(0, allBlocks.length - 1)];
+    state.items.push({
+      name: itemTypes[ti],
+      x: rand(0, 9),
+      y: rand(0, 9),
+      blockId: bid
+    });
+  }
+  state.itemSpawned = true;
+}
+
+// ---- モブにタスクを割り当て ----
+function assignMobTask(mob) {
+  if (!mob.alive) return;
+  var taskId = mob.taskId;
+  var blockId = taskId; // 0→森1, 1→森2, ...
+  if (blockId >= 4) blockId = taskId + 1;
+  // 森ブロックに品(taskId+1)があるはず
+  var targetItem = null;
+  for (var i = 0; i < state.items.length; i++) {
+    var it = state.items[i];
+    if (it.name === '品' + (taskId + 1)) {
+      targetItem = it;
+      break;
+    }
+  }
+  if (targetItem) {
+    mob.targetX = targetItem.x;
+    mob.targetY = targetItem.y;
+    mob.targetBlock = targetItem.blockId;
+    mob.state = 'moving_to_item';
+    mob.moving = true;
+  } else {
+    mob.state = 'idle';
+  }
+}
+
+// ---- モブAI更新 ----
+function updateMobs() {
+  for (var i = 0; i < state.mobs.length; i++) {
+    var mob = state.mobs[i];
+    if (!mob.alive) continue;
+    if (mob.hasDelivered) {
+      // 納品済み → 逃げるだけ (ランダム移動)
+      if (state.frameCount % 20 === 0) {
+        var dirs = [[0,-1],[0,1],[-1,0],[1,0]];
+        var d = dirs[rand(0, 3)];
+        var nx = mob.x + d[0];
+        var ny = mob.y + d[1];
+        if (canMoveTo(mob.blockId, nx, ny, mob)) {
+          mob.x = nx;
+          mob.y = ny;
+        }
+        // ブロック移動
+        checkBlockTransition(mob);
+      }
+      continue;
     }
 
-    // ---- プレイヤー初期位置: 小屋の中 ----
-    player.x = hx+1;
-    player.y = hy+1;
+    // タスク実行中
+    if (mob.state === 'moving_to_item') {
+      // アイテムに向かって移動
+      var targetBlock = mob.targetBlock;
+      var targetX = mob.targetX;
+      var targetY = mob.targetY;
 
-    // ---- 敵(青鬼)初期位置: 森のどこか（小屋外） ----
-    let ex, ey;
-    let found = false;
-    for (let tries=0; tries<500; tries++) {
-        ex = 1 + Math.floor(Math.random() * (COLS-2));
-        ey = 1 + Math.floor(Math.random() * (ROWS-2));
-        if (map[ey][ex] === T_FLOOR && !(ex>=hx && ex<hx+4 && ey>=hy && ey<hy+4)) {
-            found = true;
-            break;
-        }
-    }
-    if (!found) { ex=2; ey=2; }
-    enemy.x = ex;
-    enemy.y = ey;
-
-    // ---- 熊の初期位置 ----
-    let bx, by;
-    found = false;
-    for (let tries=0; tries<500; tries++) {
-        bx = 1 + Math.floor(Math.random() * (COLS-2));
-        by = 1 + Math.floor(Math.random() * (ROWS-2));
-        if (map[by][bx] === T_FLOOR && !(bx>=hx && bx<hx+4 && by>=hy && by<hy+4)) {
-            if (!(bx===enemy.x && by===enemy.y)) {
-                found = true;
+      // 同じブロックにいるか？
+      if (mob.blockId === targetBlock) {
+        // アイテムに近づく
+        var dx = targetX - mob.x;
+        var dy = targetY - mob.y;
+        if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) {
+          // アイテムを取得 (品を取る)
+          var itemIdx = -1;
+          for (var idx = 0; idx < state.items.length; idx++) {
+            var it = state.items[idx];
+            if (it.name === '品' + (mob.taskId + 1) && it.blockId === mob.blockId) {
+              if (Math.abs(it.x - mob.x) <= 1 && Math.abs(it.y - mob.y) <= 1) {
+                itemIdx = idx;
                 break;
+              }
             }
-        }
-    }
-    if (!found) { bx=3; by=3; }
-    bear.x = bx;
-    bear.y = by;
-    bear.active = false;
-}
-
-// ---------- 熊の襲撃日をランダム設定（2日間） ----------
-function setBearDays() {
-    bearDays = [];
-    const candidates = [1,2,3,4,5,6,7];
-    // シャッフルして先頭2つ
-    for (let i=candidates.length-1; i>0; i--) {
-        const j = Math.floor(Math.random() * (i+1));
-        [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
-    }
-    bearDays = candidates.slice(0, 2);
-    bearDays.sort((a,b)=>a-b);
-    // デバッグ用（表示はしない）
-    console.log('熊襲撃日:', bearDays);
-}
-
-// ---------- 時間更新 ----------
-function advanceTime() {
-    if (gameOver || gameWin) return;
-
-    timeCounter++;
-    // 1日 = 30秒（timeCounterは秒数）
-    if (timeCounter >= 30) {
-        timeCounter = 0;
-        day++;
-        if (day > 7) {
-            // 7日間生存！
-            gameWin = true;
-            enemyActive = false;
-            statusMsg.textContent = '🏆 7日間逃げ切った！ クリア！';
-            enemyStatus.textContent = '青鬼: 消滅';
-            return;
-        }
-        // 熊のアクティブ状態更新
-        bear.active = (bearDays.indexOf(day) !== -1);
-        if (bear.active) {
-            bearAlert.textContent = '⚠ 熊が活動中！';
+          }
+          if (itemIdx >= 0) {
+            // アイテムを取得して小屋へ
+            state.items.splice(itemIdx, 1);
+            mob.state = 'moving_to_hut';
+            mob.targetX = 3; // 小屋の品の位置
+            mob.targetY = 5;
+            mob.targetBlock = 4;
+            addLog('📦 ' + mob.name + ' が 品' + (mob.taskId + 1) + ' を入手しました');
+          } else {
+            // アイテムが既になければ次の行動
+            mob.state = 'idle';
+          }
         } else {
-            bearAlert.textContent = '';
+          // 近づく
+          moveToward(mob, targetX, targetY);
         }
-        // 日付表示
-        dayDisplay.textContent = day + '日目';
-    }
-
-    // 時間帯: 0-9秒 朝, 10-19秒 昼, 20-29秒 夜
-    const t = timeCounter % 30;
-    let timeName = '';
-    if (t < 10) { timeName = '朝'; }
-    else if (t < 20) { timeName = '昼'; }
-    else { timeName = '夜'; }
-    timeDisplay.textContent = timeName;
-
-    // 熊がアクティブで、かつプレイヤーと同じマスならゲームオーバー
-    if (bear.active) {
-        if (player.x === bear.x && player.y === bear.y) {
-            gameOver = true;
-            statusMsg.textContent = '💀 熊に襲われた... ゲームオーバー';
-            return;
+      } else {
+        // 別のブロック → 移動
+        moveTowardBlock(mob, targetBlock);
+      }
+    } else if (mob.state === 'moving_to_hut') {
+      // 小屋の「品」に納品
+      if (mob.blockId === 4) {
+        var hutItem = getObjectAt(4, 3, 5, '品');
+        if (hutItem && !hutItem.used) {
+          var ddx = 3 - mob.x;
+          var ddy = 5 - mob.y;
+          if (Math.abs(ddx) <= 1 && Math.abs(ddy) <= 1) {
+            // 納品！
+            hutItem.used = true;
+            mob.hasDelivered = true;
+            state.points += 1;
+            addLog('✅ ' + mob.name + ' が納品完了！ +1ポイント');
+            updateUI();
+            mob.state = 'delivered';
+          } else {
+            moveToward(mob, 3, 5);
+          }
+        } else {
+          // 品が既に使われてる→諦める
+          mob.hasDelivered = true;
+          mob.state = 'delivered';
         }
+      } else {
+        moveTowardBlock(mob, 4);
+      }
     }
-
-    // 青鬼の移動（1秒ごとに移動）
-    if (enemyActive && !gameOver && !gameWin) {
-        moveEnemy();
-    }
-
-    // 夜の暗さは描画で表現
+  }
 }
 
-// ---------- 青鬼の移動（単純追跡） ----------
-function moveEnemy() {
-    if (!enemyActive) return;
-    // プレイヤーとの差分
-    const dx = player.x - enemy.x;
-    const dy = player.y - enemy.y;
-    let moves = [];
-    if (dx !== 0) moves.push({dx: (dx>0?1:-1), dy:0});
-    if (dy !== 0) moves.push({dx:0, dy: (dy>0?1:-1)});
-    // シャッフルしてランダム性
-    for (let i=moves.length-1; i>0; i--) {
-        const j = Math.floor(Math.random() * (i+1));
-        [moves[i], moves[j]] = [moves[j], moves[i]];
-    }
-    for (let m of moves) {
-        const nx = enemy.x + m.dx;
-        const ny = enemy.y + m.dy;
-        if (nx<0 || nx>=COLS || ny<0 || ny>=ROWS) continue;
-        const cell = map[ny][nx];
-        // 小屋の壁は通れないが、小屋内部（T_HOUSE, T_BED, T_CHEST）は通れる
-        if (cell === T_WALL || cell === T_HOUSE_WALL) continue;
-        if (cell === T_TREE) continue;
-        // 熊の位置には移動しない（重ならないように）
-        if (bear.active && nx===bear.x && ny===bear.y) continue;
-        // 移動
-        enemy.x = nx;
-        enemy.y = ny;
-        break;
-    }
-
-    // 青鬼とプレイヤーが同じマスならゲームオーバー
-    if (enemy.x === player.x && enemy.y === player.y) {
-        gameOver = true;
-        statusMsg.textContent = '💀 青鬼に捕まった... ゲームオーバー';
-        enemyStatus.textContent = '青鬼: 捕獲';
-    }
-}
-
-// ---------- プレイヤー移動 ----------
-function movePlayer(dx, dy) {
-    if (gameOver || gameWin) return;
-    const nx = player.x + dx;
-    const ny = player.y + dy;
-    if (nx<0 || nx>=COLS || ny<0 || ny>=ROWS) return;
-    const cell = map[ny][nx];
-    // 壁と木は通れない
-    if (cell === T_WALL || cell === T_HOUSE_WALL) return;
-    if (cell === T_TREE) return;
-    // 熊がアクティブでそのマスに熊がいたらゲームオーバー（移動先チェック）
-    if (bear.active && nx===bear.x && ny===bear.y) {
-        // 熊がいるマスには移動できない（踏み込んだら死亡）
-        gameOver = true;
-        statusMsg.textContent = '💀 熊に襲われた... ゲームオーバー';
+// ---- 移動ヘルパー ----
+function moveToward(entity, tx, ty) {
+  var dx = tx - entity.x;
+  var dy = ty - entity.y;
+  if (dx === 0 && dy === 0) return;
+  var nx = entity.x;
+  var ny = entity.y;
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    nx += (dx > 0 ? 1 : -1);
+  } else {
+    ny += (dy > 0 ? 1 : -1);
+  }
+  if (canMoveTo(entity.blockId, nx, ny, entity)) {
+    entity.x = nx;
+    entity.y = ny;
+  } else {
+    // 他の方向を試す
+    var attempts = [
+      [0, dy > 0 ? 1 : -1],
+      [dx > 0 ? 1 : -1, 0],
+      [0, dy > 0 ? -1 : 1],
+      [dx > 0 ? -1 : 1, 0]
+    ];
+    for (var i = 0; i < attempts.length; i++) {
+      var ax = entity.x + attempts[i][0];
+      var ay = entity.y + attempts[i][1];
+      if (canMoveTo(entity.blockId, ax, ay, entity)) {
+        entity.x = ax;
+        entity.y = ay;
         return;
+      }
     }
-    // 移動
-    player.x = nx;
-    player.y = ny;
-
-    // 移動後、青鬼と重なったらゲームオーバー（敵が先に動くので通常は起きないが安全のため）
-    if (enemyActive && player.x===enemy.x && player.y===enemy.y) {
-        gameOver = true;
-        statusMsg.textContent = '💀 青鬼に捕まった... ゲームオーバー';
-    }
+  }
+  checkBlockTransition(entity);
 }
 
-// ---------- 描画 ----------
-function draw() {
-    ctx.clearRect(0, 0, SIZE, SIZE);
-
-    // 時間帯による明るさ
-    const t = timeCounter % 30;
-    let brightness = 1.0;
-    if (t >= 20) { // 夜 (20-29秒)
-        brightness = 0.5;
-    } else if (t >= 10) { // 昼
-        brightness = 1.0;
-    } else { // 朝
-        brightness = 0.85;
+function moveTowardBlock(entity, targetBlock) {
+  var current = blockToGrid(entity.blockId);
+  var target = blockToGrid(targetBlock);
+  var dr = target.row - current.row;
+  var dc = target.col - current.col;
+  if (dr === 0 && dc === 0) return;
+  // 端にいるかチェック
+  if (dc < 0 && entity.x === 0) {
+    // 左に移動
+    var newBlock = gridToBlock(current.row, current.col - 1);
+    if (newBlock >= 0 && newBlock !== entity.blockId) {
+      entity.blockId = newBlock;
+      entity.x = GRID_SIZE - 1;
     }
-
-    // マップ描画
-    for (let y=0; y<ROWS; y++) {
-        for (let x=0; x<COLS; x++) {
-            const cx = x * CELL;
-            const cy = y * CELL;
-            const cell = map[y][x];
-            let color = '#3d5a3d'; // デフォルト: 森の床
-            if (cell === T_WALL) color = '#2a3a2a';
-            else if (cell === T_TREE) color = '#1e4a1e';
-            else if (cell === T_HOUSE || cell === T_HOUSE_WALL) {
-                color = '#8b7a5a';
-            } else if (cell === T_BED) {
-                color = '#6a5a4a';
-            } else if (cell === T_CHEST) {
-                color = '#5a3a2a';
-            }
-            ctx.fillStyle = color;
-            ctx.fillRect(cx, cy, CELL, CELL);
-            // グリッド線
-            ctx.strokeStyle = 'rgba(0,0,0,0.15)';
-            ctx.lineWidth = 0.5;
-            ctx.strokeRect(cx, cy, CELL, CELL);
-        }
+  } else if (dc > 0 && entity.x === GRID_SIZE - 1) {
+    var newBlock2 = gridToBlock(current.row, current.col + 1);
+    if (newBlock2 >= 0 && newBlock2 !== entity.blockId) {
+      entity.blockId = newBlock2;
+      entity.x = 0;
     }
-
-    // 小屋の壁に屋根っぽい色
-    for (let y=0; y<ROWS; y++) {
-        for (let x=0; x<COLS; x++) {
-            if (map[y][x] === T_HOUSE_WALL) {
-                ctx.fillStyle = '#6a5a3a';
-                ctx.fillRect(x*CELL+2, y*CELL+2, CELL-4, CELL-4);
-            }
-        }
+  } else if (dr < 0 && entity.y === 0) {
+    var newBlock3 = gridToBlock(current.row - 1, current.col);
+    if (newBlock3 >= 0 && newBlock3 !== entity.blockId) {
+      entity.blockId = newBlock3;
+      entity.y = GRID_SIZE - 1;
     }
-
-    // ベッドとタンスのマーク（文字で表現）
-    for (let y=0; y<ROWS; y++) {
-        for (let x=0; x<COLS; x++) {
-            if (map[y][x] === T_BED) {
-                ctx.fillStyle = '#8a7a5a';
-                ctx.font = '20px "MS Gothic"';
-                ctx.fillText('🛏', x*CELL+6, y*CELL+30);
-            } else if (map[y][x] === T_CHEST) {
-                ctx.fillStyle = '#6a4a2a';
-                ctx.font = '20px "MS Gothic"';
-                ctx.fillText('📦', x*CELL+6, y*CELL+30);
-            }
-        }
+  } else if (dr > 0 && entity.y === GRID_SIZE - 1) {
+    var newBlock4 = gridToBlock(current.row + 1, current.col);
+    if (newBlock4 >= 0 && newBlock4 !== entity.blockId) {
+      entity.blockId = newBlock4;
+      entity.y = 0;
     }
-
-    // 熊（アクティブなときだけ）
-    if (bear.active) {
-        ctx.fillStyle = '#3a2a1a';
-        ctx.font = '28px "MS Gothic"';
-        ctx.fillText('🐻', bear.x*CELL+4, bear.y*CELL+34);
-    }
-
-    // 青鬼（敵）
-    if (enemyActive && !gameWin) {
-        ctx.fillStyle = '#2a5a8a';
-        ctx.font = '28px "MS Gothic"';
-        ctx.fillText('👻', enemy.x*CELL+4, enemy.y*CELL+34);
-        // 青鬼ラベル
-        ctx.fillStyle = '#88ccff';
-        ctx.font = '10px "MS Gothic"';
-        ctx.fillText('青鬼', enemy.x*CELL+2, enemy.y*CELL+10);
-    }
-
-    // プレイヤー（紅葉）
-    ctx.fillStyle = '#cc4444';
-    ctx.font = '28px "MS Gothic"';
-    ctx.fillText('🧑', player.x*CELL+4, player.y*CELL+34);
-    ctx.fillStyle = '#ffaa88';
-    ctx.font = '10px "MS Gothic"';
-    ctx.fillText('紅葉', player.x*CELL+2, player.y*CELL+10);
-
-    // 暗さオーバーレイ（夜）
-    if (brightness < 1.0) {
-        ctx.fillStyle = 'rgba(0,0,30,' + (1-brightness)*0.5 + ')';
-        ctx.fillRect(0, 0, SIZE, SIZE);
-    }
-
-    // ゲームオーバー/クリア表示
-    if (gameOver) {
-        ctx.fillStyle = 'rgba(0,0,0,0.6)';
-        ctx.fillRect(0, 240, SIZE, 80);
-        ctx.fillStyle = '#ff6666';
-        ctx.font = 'bold 32px "MS Gothic"';
-        ctx.textAlign = 'center';
-        ctx.fillText('GAME OVER', SIZE/2, 300);
-        ctx.textAlign = 'left';
-    } else if (gameWin) {
-        ctx.fillStyle = 'rgba(0,0,0,0.5)';
-        ctx.fillRect(0, 200, SIZE, 120);
-        ctx.fillStyle = '#ffdd44';
-        ctx.font = 'bold 36px "MS Gothic"';
-        ctx.textAlign = 'center';
-        ctx.fillText('★ 脱出成功 ★', SIZE/2, 260);
-        ctx.font = '20px "MS Gothic"';
-        ctx.fillStyle = '#aaddff';
-        ctx.fillText('refined.html へ移動', SIZE/2, 310);
-        ctx.textAlign = 'left';
-        // refined.htmlへの誘導
-        if (typeof refinedTrigger === 'undefined') {
-            // クリックで移動させる
-            canvas.style.cursor = 'pointer';
-        }
-    }
-
-    // 情報更新
-    if (!gameOver && !gameWin) {
-        let status = '';
-        if (bear.active) status += '🐻 熊注意！ ';
-        status += '移動: クリック';
-        statusMsg.textContent = status;
-        enemyStatus.textContent = '青鬼: ' + (enemyActive ? '追跡中' : '消滅');
-    }
+  } else {
+    // 端にいないなら普通に移動
+    moveToward(entity, entity.x + (dc > 0 ? 1 : -1) * 5, entity.y + (dr > 0 ? 1 : -1) * 5);
+  }
 }
 
-// ---------- マウス操作 ----------
-canvas.addEventListener('click', function(e) {
-    if (gameOver || gameWin) {
-        if (gameWin) {
-            // refined.htmlへ誘導（実際には遷移しないが、表示を変更）
-            statusMsg.textContent = '🎉 クリア！ refined.html へ移動してください';
+function canMoveTo(blockId, x, y, entity) {
+  if (x < 0 || x >= GRID_SIZE || y < 0 || y >= GRID_SIZE) {
+    // 端の外 → 隣ブロックに移動できるかチェック
+    var g = blockToGrid(blockId);
+    var nx = x;
+    var ny = y;
+    var ng = { row: g.row, col: g.col };
+    if (x < 0) { ng.col--; nx = GRID_SIZE - 1; }
+    else if (x >= GRID_SIZE) { ng.col++; nx = 0; }
+    else if (y < 0) { ng.row--; ny = GRID_SIZE - 1; }
+    else if (y >= GRID_SIZE) { ng.row++; ny = 0; }
+    var newBlock = gridToBlock(ng.row, ng.col);
+    if (newBlock < 0 || newBlock > 8) return false;
+    // 隣ブロックに移動可能
+    return true;
+  }
+  // 木チェック
+  if (state.blockMap[blockId] && state.blockMap[blockId][y] && state.blockMap[blockId][y][x] === 'tree') {
+    return false;
+  }
+  // 他のキャラと重ならない (主人公以外)
+  if (entity && entity.name !== HERO_NAME) {
+    // チェック
+  }
+  return true;
+}
+
+function checkBlockTransition(entity) {
+  if (entity.x < 0) {
+    var g = blockToGrid(entity.blockId);
+    var nb = gridToBlock(g.row, g.col - 1);
+    if (nb >= 0 && nb <= 8) {
+      entity.blockId = nb;
+      entity.x = GRID_SIZE - 1;
+    } else {
+      entity.x = 0;
+    }
+  } else if (entity.x >= GRID_SIZE) {
+    var g2 = blockToGrid(entity.blockId);
+    var nb2 = gridToBlock(g2.row, g2.col + 1);
+    if (nb2 >= 0 && nb2 <= 8) {
+      entity.blockId = nb2;
+      entity.x = 0;
+    } else {
+      entity.x = GRID_SIZE - 1;
+    }
+  } else if (entity.y < 0) {
+    var g3 = blockToGrid(entity.blockId);
+    var nb3 = gridToBlock(g3.row - 1, g3.col);
+    if (nb3 >= 0 && nb3 <= 8) {
+      entity.blockId = nb3;
+      entity.y = GRID_SIZE - 1;
+    } else {
+      entity.y = 0;
+    }
+  } else if (entity.y >= GRID_SIZE) {
+    var g4 = blockToGrid(entity.blockId);
+    var nb4 = gridToBlock(g4.row + 1, g4.col);
+    if (nb4 >= 0 && nb4 <= 8) {
+      entity.blockId = nb4;
+      entity.y = 0;
+    } else {
+      entity.y = GRID_SIZE - 1;
+    }
+  }
+}
+
+function getObjectAt(blockId, x, y, type) {
+  for (var i = 0; i < state.objects.length; i++) {
+    var o = state.objects[i];
+    if (o.blockId === blockId && o.x === x && o.y === y && o.type === type) {
+      return o;
+    }
+  }
+  return null;
+}
+
+// ---- 敵AI ----
+function updateEnemies() {
+  // ジェイソン
+  if (state.jason && state.jason.alive) {
+    var jSpeed = 10 + (state.day - 1) * 10; // 1日目10, 7日目70
+    if (state.jason.speed !== jSpeed) state.jason.speed = jSpeed;
+
+    // 主人公を追跡
+    var hero = state.hero;
+    if (hero && hero.alive) {
+      // 同じブロックか？
+      if (state.jason.blockId === hero.blockId) {
+        moveToward(state.jason, hero.x, hero.y);
+        // 接触チェック
+        if (Math.abs(state.jason.x - hero.x) <= 0.8 && Math.abs(state.jason.y - hero.y) <= 0.8) {
+          killHero('ジェイソン');
         }
-        return;
+      } else {
+        // 主人公のブロックに向かう
+        moveTowardBlock(state.jason, hero.blockId);
+      }
     }
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const mx = (e.clientX - rect.left) * scaleX;
-    const my = (e.clientY - rect.top) * scaleY;
-    const gx = Math.floor(mx / CELL);
-    const gy = Math.floor(my / CELL);
-    if (gx<0 || gx>=COLS || gy<0 || gy>=ROWS) return;
 
-    // クリックした方向に移動
-    const dx = gx - player.x;
-    const dy = gy - player.y;
-    if (Math.abs(dx) + Math.abs(dy) === 1) {
-        movePlayer(dx, dy);
-    } else if (Math.abs(dx) + Math.abs(dy) === 2 && dx!==0 && dy!==0) {
-        // 斜め移動は不可
+    // モブを殺す
+    for (var m = 0; m < state.mobs.length; m++) {
+      var mob = state.mobs[m];
+      if (!mob.alive) continue;
+      if (state.jason.blockId === mob.blockId) {
+        if (Math.abs(state.jason.x - mob.x) <= 0.8 && Math.abs(state.jason.y - mob.y) <= 0.8) {
+          if (state.jasonKillCooldown <= 0) {
+            killMob(mob, 'ジェイソン');
+            state.jasonKillCooldown = 30;
+          }
+        }
+      }
     }
-});
+    if (state.jasonKillCooldown > 0) state.jasonKillCooldown--;
+  }
 
-// ---------- ゲームループ ----------
+  // 熊 (襲撃日のみ攻撃)
+  var isBearAttackDay = false;
+  for (var d = 0; d < state.bearAttackDays.length; d++) {
+    if (state.bearAttackDays[d] === state.day) isBearAttackDay = true;
+  }
+
+  if (state.bear && state.bear.alive) {
+    if (isBearAttackDay) {
+      var hero2 = state.hero;
+      if (hero2 && hero2.alive) {
+        if (state.bear.blockId === hero2.blockId) {
+          moveToward(state.bear, hero2.x, hero2.y);
+          if (Math.abs(state.bear.x - hero2.x) <= 0.8 && Math.abs(state.bear.y - hero2.y) <= 0.8) {
+            killHero('熊');
+          }
+        } else {
+          moveTowardBlock(state.bear, hero2.blockId);
+        }
+      }
+      // モブも襲う
+      for (var m2 = 0; m2 < state.mobs.length; m2++) {
+        var mob2 = state.mobs[m2];
+        if (!mob2.alive) continue;
+        if (state.bear.blockId === mob2.blockId) {
+          if (Math.abs(state.bear.x - mob2.x) <= 0.8 && Math.abs(state.bear.y - mob2.y) <= 0.8) {
+            if (state.bearKillCooldown <= 0) {
+              killMob(mob2, '熊');
+              state.bearKillCooldown = 30;
+            }
+          }
+        }
+      }
+    }
+    if (state.bearKillCooldown > 0) state.bearKillCooldown--;
+  }
+
+  // 狼 (動くだけ、攻撃しない)
+  if (state.wolf && state.wolf.alive) {
+    if (state.frameCount % 15 === 0) {
+      var dirs = [[0,-1],[0,1],[-1,0],[1,0]];
+      var d2 = dirs[rand(0, 3)];
+      var nx2 = state.wolf.x + d2[0];
+      var ny2 = state.wolf.y + d2[1];
+      if (canMoveTo(state.wolf.blockId, nx2, ny2, state.wolf)) {
+        state.wolf.x = nx2;
+        state.wolf.y = ny2;
+      }
+      checkBlockTransition(state.wolf);
+    }
+  }
+}
+
+// ---- 殺害処理 ----
+function killHero(killer) {
+  if (!state.hero || !state.hero.alive) return;
+  state.hero.alive = false;
+  state.gameOver = true;
+  addLog('💀 主人公が ' + killer + ' に殺された... ゲームオーバー');
+  showPopup('ゲームオーバー', '主人公が ' + killer + ' に殺されました...', '再挑戦', function() {
+    hidePopup();
+    initGame();
+  });
+}
+
+function killMob(mob, killer) {
+  if (!mob.alive) return;
+  mob.alive = false;
+  state.mobAlive--;
+  addLog('💀 ' + mob.name + ' が ' + killer + ' に殺された (生存 ' + state.mobAlive + '/8)');
+  updateUI();
+}
+
+// ---- 主人公の移動 ----
+function moveHero(dx, dy) {
+  if (state.gameOver || state.paused) return;
+  var hero = state.hero;
+  if (!hero || !hero.alive) return;
+
+  var speed = hero.speed;
+  var step = 1;
+  var nx = hero.x + dx * step;
+  var ny = hero.y + dy * step;
+
+  // 移動チェック
+  if (canMoveTo(hero.blockId, nx, ny, hero)) {
+    hero.x = nx;
+    hero.y = ny;
+    checkBlockTransition(hero);
+    state.moveCounter++;
+  }
+
+  // アイテム拾い (近くにあれば)
+  pickupItem(hero);
+
+  updateUI();
+}
+
+// ---- アイテム拾い ----
+function pickupItem(entity) {
+  if (entity.name !== HERO_NAME) return;
+  if (state.heroItem) return; // 既に持ってる
+
+  for (var i = 0; i < state.items.length; i++) {
+    var item = state.items[i];
+    if (item.blockId !== entity.blockId) continue;
+    if (Math.abs(item.x - entity.x) <= 1 && Math.abs(item.y - entity.y) <= 1) {
+      // 拾う
+      state.heroItem = item.name;
+      state.items.splice(i, 1);
+      addLog('📦 ' + item.name + ' を拾った');
+      updateUI();
+      return;
+    }
+  }
+}
+
+// ---- アイテム使用 (クリック) ----
+function useItemOnObject(objType) {
+  if (!state.hero || !state.hero.alive) return;
+  if (!state.heroItem) {
+    addLog('⚠️ アイテムを持っていない');
+    return;
+  }
+
+  var hero = state.hero;
+  var itemName = state.heroItem;
+
+  // 対応するオブジェクトを探す
+  var obj = null;
+  for (var i = 0; i < state.objects.length; i++) {
+    var o = state.objects[i];
+    if (o.blockId !== hero.blockId) continue;
+    if (o.type !== objType) continue;
+    if (Math.abs(o.x - hero.x) <= 1 && Math.abs(o.y - hero.y) <= 1) {
+      obj = o;
+      break;
+    }
+  }
+
+  if (!obj) {
+    addLog('⚠️ ' + objType + ' が近くにない');
+    return;
+  }
+
+  if (obj.used) {
+    addLog('⚠️ この' + objType + 'はもう使われている');
+    return;
+  }
+
+  // 正しいアイテムかチェック
+  var valid = false;
+  if (objType === '窓' && itemName === '材') valid = true;
+  else if (objType === '穴' && itemName === '堀') valid = true;
+  else if (objType === '樽' && itemName === '斧') valid = true;
+  else if (objType === '箱' && itemName === '銃') valid = true;
+  else if (objType === '品' && itemName.indexOf('品') === 0) valid = true;
+
+  if (!valid) {
+    addLog('⚠️ ' + itemName + ' は ' + objType + ' に使えない');
+    return;
+  }
+
+  // 使用
+  obj.used = true;
+  state.points += 1;
+  state.heroItem = null;
+  addLog('✅ ' + itemName + ' を使って +1ポイント！');
+  updateUI();
+}
+
+// ---- アイテムを落とす ----
+function dropItem() {
+  if (!state.heroItem) {
+    addLog('⚠️ 持っているアイテムがない');
+    return;
+  }
+  var hero = state.hero;
+  state.items.push({
+    name: state.heroItem,
+    x: hero.x,
+    y: hero.y,
+    blockId: hero.blockId
+  });
+  addLog('📤 ' + state.heroItem + ' を落とした');
+  state.heroItem = null;
+  updateUI();
+}
+
+// ---- 日付処理 ----
+function startDayTimer() {
+  if (state.dayTimerInterval) clearInterval(state.dayTimerInterval);
+  state.dayElapsed = 0;
+  state.night = false;
+  nightOverlay.style.display = 'none';
+
+  state.dayTimerInterval = setInterval(function() {
+    if (state.gameOver || state.paused) return;
+    state.dayElapsed++;
+    var remaining = DAY_DURATION - state.dayElapsed;
+    dayDisplay.textContent = '🌅 ' + state.day + '日目 (' + remaining + '秒)';
+
+    // 夜 (残り10秒で暗く)
+    if (remaining <= 10 && !state.night) {
+      state.night = true;
+      nightOverlay.style.display = 'block';
+      addLog('🌙 夜になった...');
+    }
+
+    if (state.dayElapsed >= DAY_DURATION) {
+      nextDay();
+    }
+  }, 1000);
+}
+
+function nextDay() {
+  if (state.dayTimerInterval) clearInterval(state.dayTimerInterval);
+  state.day++;
+
+  if (state.day > MAX_DAYS) {
+    endGame();
+    return;
+  }
+
+  // ジェイソン速度アップのメッセージ
+  var jSpeed = 10 + (state.day - 1) * 10;
+  addLog('📈 ' + state.day + '日目: ジェイソンの速度が ' + jSpeed + ' になった');
+
+  // モブが生きていればタスク再開
+  for (var i = 0; i < state.mobs.length; i++) {
+    var mob = state.mobs[i];
+    if (mob.alive && !mob.hasDelivered) {
+      assignMobTask(mob);
+    }
+  }
+
+  // アイテム補充 (品10〜品80を再配置)
+  // ただし既にある品はそのまま
+  for (var b = 0; b < 8; b++) {
+    var blockId = b;
+    if (blockId >= 4) blockId = b + 1;
+    var itemName = '品' + ((b + 1) * 10);
+    var exists = false;
+    for (var it = 0; it < state.items.length; it++) {
+      if (state.items[it].name === itemName) { exists = true; break; }
+    }
+    if (!exists) {
+      state.items.push({
+        name: itemName,
+        x: rand(0, 9),
+        y: rand(0, 9),
+        blockId: blockId
+      });
+    }
+  }
+
+  // 日付表示更新
+  state.dayElapsed = 0;
+  state.night = false;
+  nightOverlay.style.display = 'none';
+  updateUI();
+  startDayTimer();
+}
+
+function endGame() {
+  if (state.gameOver) return;
+  // ポイント判定
+  var totalPoints = state.points;
+  var jasonPts = state.jasonPoints;
+
+  addLog('🏁 7日間終了！ 総ポイント: ' + totalPoints + ' / ジェイソンポイント: ' + jasonPts);
+
+  if (totalPoints > jasonPts) {
+    state.gameWon = true;
+    addLog('🎉 勝利！ 補強ポイントが上回った！');
+    showPopup('🎉 勝利！', '補強ポイント ' + totalPoints + ' で ジェイソンポイント ' + jasonPts + ' を上回った！\nrefined.html に移動します', '移動する', function() {
+      hidePopup();
+      window.location.href = 'refined.html';
+    });
+  } else if (totalPoints === jasonPts) {
+    state.gameOver = true;
+    addLog('⚖️ 引き分け... 負け');
+    showPopup('😵 引き分け', '補強ポイント ' + totalPoints + ' で ジェイソンポイント ' + jasonPts + ' と同点...\n負けです', '再挑戦', function() {
+      hidePopup();
+      initGame();
+    });
+  } else {
+    state.gameOver = true;
+    addLog('💀 敗北... ポイントが足りなかった');
+    showPopup('💀 敗北', '補強ポイント ' + totalPoints + ' で ジェイソンポイント ' + jasonPts + ' に届かなかった...', '再挑戦', function() {
+      hidePopup();
+      initGame();
+    });
+  }
+}
+
+// ---- ポップアップ ----
+function showPopup(title, desc, btnText, callback) {
+  popupTitle.textContent = title;
+  popupDesc.textContent = desc;
+  popupBtn.textContent = btnText;
+  popup.style.display = 'block';
+  popupBtn.onclick = callback;
+}
+
+function hidePopup() {
+  popup.style.display = 'none';
+}
+
+// ---- UI更新 ----
+function updateUI() {
+  dispDay.textContent = state.day + ' / 7';
+  dispPoints.textContent = state.points;
+  dispItem.textContent = state.heroItem || 'なし';
+  dispMobAlive.textContent = state.mobAlive + ' / 8';
+  if (!state.gameOver) {
+    var remaining = DAY_DURATION - state.dayElapsed;
+    dayDisplay.textContent = '🌅 ' + state.day + '日目 (' + Math.max(0, remaining) + '秒)';
+  }
+}
+
+// ---- メインループ ----
 function gameLoop() {
-    // 1秒ごとに時間更新
-    advanceTime();
-    draw();
-    // refined.html誘導表示のためのリンク処理
-    if (gameWin) {
-        // クリックで遷移できるように表示
+  if (state.gameOver) {
+    render();
+    state.animFrame = requestAnimationFrame(gameLoop);
+    return;
+  }
+
+  state.frameCount++;
+
+  // モブAI更新 (1フレームごと)
+  if (state.frameCount % 2 === 0) {
+    updateMobs();
+  }
+
+  // 敵AI更新 (2フレームごと)
+  if (state.frameCount % 3 === 0) {
+    updateEnemies();
+  }
+
+  // 描画
+  render();
+
+  state.animFrame = requestAnimationFrame(gameLoop);
+}
+
+// ---- 描画 ----
+function render() {
+  ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+  // 背景 (森 or 小屋)
+  var blockId = state.currentBlock;
+  var offset = getBlockOffset(blockId);
+
+  // 背景色
+  if (blockId === 4) {
+    ctx.fillStyle = '#8B7D6B'; // 小屋の床
+  } else {
+    ctx.fillStyle = '#2d5a27'; // 森
+  }
+  ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+  // グリッド線
+  ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+  ctx.lineWidth = 0.5;
+  for (var gx = 0; gx <= GRID_SIZE; gx++) {
+    ctx.beginPath();
+    ctx.moveTo(gx * BLOCK_SIZE, 0);
+    ctx.lineTo(gx * BLOCK_SIZE, CANVAS_SIZE);
+    ctx.stroke();
+  }
+  for (var gy = 0; gy <= GRID_SIZE; gy++) {
+    ctx.beginPath();
+    ctx.moveTo(0, gy * BLOCK_SIZE);
+    ctx.lineTo(CANVAS_SIZE, gy * BLOCK_SIZE);
+    ctx.stroke();
+  }
+
+  // 木を描画 (森のみ)
+  if (blockId !== 4) {
+    for (var y = 0; y < GRID_SIZE; y++) {
+      for (var x = 0; x < GRID_SIZE; x++) {
+        if (state.blockMap[blockId] && state.blockMap[blockId][y] && state.blockMap[blockId][y][x] === 'tree') {
+          ctx.fillStyle = '#1a3d1a';
+          ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+          ctx.fillStyle = '#2a5a2a';
+          ctx.fillRect(x * BLOCK_SIZE + 4, y * BLOCK_SIZE + 4, BLOCK_SIZE - 8, BLOCK_SIZE - 8);
+          // 木のマーク
+          ctx.fillStyle = '#3a7a3a';
+          ctx.font = '14px "MS Gothic"';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('木', x * BLOCK_SIZE + BLOCK_SIZE/2, y * BLOCK_SIZE + BLOCK_SIZE/2);
+        }
+      }
     }
+  }
+
+  // 固定オブジェクトを描画 (小屋のみ)
+  if (blockId === 4) {
+    for (var oi = 0; oi < state.objects.length; oi++) {
+      var obj = state.objects[oi];
+      if (obj.blockId !== blockId) continue;
+      var px = obj.x * BLOCK_SIZE;
+      var py = obj.y * BLOCK_SIZE;
+      // 背景
+      ctx.fillStyle = obj.used ? '#555' : '#3a3a5a';
+      ctx.fillRect(px + 2, py + 2, BLOCK_SIZE - 4, BLOCK_SIZE - 4);
+      ctx.strokeStyle = obj.used ? '#777' : '#88aaff';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(px + 2, py + 2, BLOCK_SIZE - 4, BLOCK_SIZE - 4);
+      // 文字
+      ctx.fillStyle = obj.used ? '#888' : '#ffffff';
+      ctx.font = '12px "MS Gothic"';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      var label = obj.type;
+      if (obj.type === '窓') label = '密';
+      if (obj.type === '樽') label = '椅';
+      ctx.fillText(label, px + BLOCK_SIZE/2, py + BLOCK_SIZE/2);
+    }
+  }
+
+  // アイテムを描画
+  for (var ii = 0; ii < state.items.length; ii++) {
+    var item = state.items[ii];
+    if (item.blockId !== blockId) continue;
+    var px2 = item.x * BLOCK_SIZE;
+    var py2 = item.y * BLOCK_SIZE;
+    ctx.fillStyle = '#ffdd44';
+    ctx.fillRect(px2 + 4, py2 + 4, BLOCK_SIZE - 8, BLOCK_SIZE - 8);
+    ctx.fillStyle = '#000';
+    ctx.font = '10px "MS Gothic"';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    var label2 = item.name;
+    if (label2.length > 4) label2 = label2.substring(0, 4);
+    ctx.fillText(label2, px2 + BLOCK_SIZE/2, py2 + BLOCK_SIZE/2);
+  }
+
+  // キャラクターを描画
+  var allChars = [];
+
+  // 主人公
+  if (state.hero && state.hero.alive && state.hero.blockId === blockId) {
+    allChars.push({ name: '主', x: state.hero.x, y: state.hero.y, color: '#aa44ff', isHero: true });
+  }
+
+  // モブ
+  for (var mi3 = 0; mi3 < state.mobs.length; mi3++) {
+    var mob3 = state.mobs[mi3];
+    if (mob3.alive && mob3.blockId === blockId) {
+      allChars.push({ name: mob3.name.substring(0, 2), x: mob3.x, y: mob3.y, color: '#ff6644', isHero: false });
+    }
+  }
+
+  // ジェイソン
+  if (state.jason && state.jason.alive && state.jason.blockId === blockId) {
+    allChars.push({ name: 'J', x: state.jason.x, y: state.jason.y, color: '#ff0000', isHero: false });
+  }
+
+  // 熊
+  if (state.bear && state.bear.alive && state.bear.blockId === blockId) {
+    allChars.push({ name: '熊', x: state.bear.x, y: state.bear.y, color: '#8B4513', isHero: false });
+  }
+
+  // 狼
+  if (state.wolf && state.wolf.alive && state.wolf.blockId === blockId) {
+    allChars.push({ name: '狼', x: state.wolf.x, y: state.wolf.y, color: '#888888', isHero: false });
+  }
+
+  // 描画 (重なり順: 後ろから前に)
+  for (var ci = 0; ci < allChars.length; ci++) {
+    var ch = allChars[ci];
+    var px3 = ch.x * BLOCK_SIZE;
+    var py3 = ch.y * BLOCK_SIZE;
+    // 背景
+    ctx.fillStyle = ch.color;
+    ctx.fillRect(px3 + 2, py3 + 2, BLOCK_SIZE - 4, BLOCK_SIZE - 4);
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(px3 + 2, py3 + 2, BLOCK_SIZE - 4, BLOCK_SIZE - 4);
+    // 文字
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 14px "MS Gothic"';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(ch.name, px3 + BLOCK_SIZE/2, py3 + BLOCK_SIZE/2);
+  }
+
+  // ブロック名表示
+  ctx.fillStyle = 'rgba(255,255,255,0.3)';
+  ctx.font = '10px "MS Gothic"';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText(BLOCK_NAMES[blockId], 4, 4);
 }
 
-// ---------- 初期化 ----------
-function init() {
-    generateMap();
-    setBearDays();
-    bear.active = (bearDays.indexOf(1) !== -1);
-    if (bear.active) bearAlert.textContent = '⚠ 熊が活動中！';
-    day = 1;
-    timeCounter = 0;
-    gameOver = false;
-    gameWin = false;
-    enemyActive = true;
-    dayDisplay.textContent = '1日目';
-    timeDisplay.textContent = '朝';
-    statusMsg.textContent = '▶ 小屋からスタート';
-    enemyStatus.textContent = '青鬼: 森の中';
-    canvas.style.cursor = 'default';
-    // タイマー開始
-    setInterval(gameLoop, 1000);
-    draw();
-}
-
-init();
-
-// ウィンドウリサイズ対応
-window.addEventListener('resize', function() {
-    // 何もしない
+// ---- キーボード入力 ----
+document.addEventListener('keydown', function(e) {
+  var key = e.key;
+  var arrowKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+  if (arrowKeys.indexOf(key) >= 0) {
+    e.preventDefault();
+    var dx = 0, dy = 0;
+    if (key === 'ArrowUp') dy = -1;
+    else if (key === 'ArrowDown') dy = 1;
+    else if (key === 'ArrowLeft') dx = -1;
+    else if (key === 'ArrowRight') dx = 1;
+    moveHero(dx, dy);
+  }
 });
+
+// ---- マウスクリック (アイテム使用) ----
+canvas.addEventListener('click', function(e) {
+  if (state.gameOver) return;
+  var rect = canvas.getBoundingClientRect();
+  var scaleX = canvas.width / rect.width;
+  var scaleY = canvas.height / rect.height;
+  var mx = (e.clientX - rect.left) * scaleX;
+  var my = (e.clientY - rect.top) * scaleY;
+  var gx = Math.floor(mx / BLOCK_SIZE);
+  var gy = Math.floor(my / BLOCK_SIZE);
+  if (gx < 0 || gx >= GRID_SIZE || gy < 0 || gy >= GRID_SIZE) return;
+
+  var hero = state.hero;
+  if (!hero || !hero.alive) return;
+
+  // クリックした位置が主人公の範囲内か？
+  if (Math.abs(gx - hero.x) > 1 || Math.abs(gy - hero.y) > 1) {
+    addLog('⚠️ 範囲外です');
+    return;
+  }
+
+  // クリックした位置のオブジェクトをチェック
+  var clickedObj = null;
+  for (var oi2 = 0; oi2 < state.objects.length; oi2++) {
+    var obj2 = state.objects[oi2];
+    if (obj2.blockId !== hero.blockId) continue;
+    if (obj2.x === gx && obj2.y === gy) {
+      clickedObj = obj2;
+      break;
+    }
+  }
+
+  if (clickedObj) {
+    useItemOnObject(clickedObj.type);
+  } else {
+    addLog('⚠️ そこには使えるものがありません');
+  }
+});
+
+// ---- ボタン ----
+btnDrop.addEventListener('click', dropItem);
+
+// ---- ゲーム開始 ----
+initGame();
 
 })();
 </script>
