@@ -63,7 +63,7 @@ body { background:#1a1a2e; display:flex; justify-content:center; align-items:cen
 
 <script>
 // ============================================================
-// 7日間サバイバルゲーム (画像表示版)
+// 7日間サバイバルゲーム (完全修正版)
 // ============================================================
 
 (function(){
@@ -75,7 +75,6 @@ var CANVAS_SIZE = 320;
 var DAY_DURATION = 30;
 var MAX_DAYS = 7;
 
-// ★ 画像ファイル名マッピング
 var IMG_FILES = {
   '加藤': 'img154streamer.jpg',
   '松本': 'img155streamer.jpg',
@@ -111,7 +110,6 @@ var CHARACTERS = {
 var MOB_NAMES = ['加藤','松本','坪池','市川','青笹','角田','木元','山崎'];
 var HERO_NAME = '紅葉';
 
-// ★ 画像キャッシュ
 var imageCache = {};
 var imagesLoaded = 0;
 var totalImages = 0;
@@ -136,7 +134,6 @@ function loadImages(callback) {
       }
     };
     img.onerror = function() {
-      // 画像が読み込めなくても続行（文字で代用）
       imagesLoaded++;
       if (imagesLoaded >= totalImages) {
         callback();
@@ -152,30 +149,6 @@ function getImage(name) {
     return imageCache[name];
   }
   return null;
-}
-
-// ★ 画像または文字を描画
-function drawImageOrText(ctx, name, x, y, size, color) {
-  var img = getImage(name);
-  if (img) {
-    ctx.drawImage(img, x, y, size, size);
-    return true;
-  } else {
-    // フォールバック：文字で表示
-    ctx.fillStyle = color || '#888';
-    ctx.fillRect(x + 2, y + 2, size - 4, size - 4);
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(x + 2, y + 2, size - 4, size - 4);
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 12px "MS Gothic"';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    var label = name;
-    if (label.length > 2) label = label.substring(0, 2);
-    ctx.fillText(label, x + size/2, y + size/2);
-    return false;
-  }
 }
 
 var state = {
@@ -202,7 +175,6 @@ var state = {
   bearAttackDays: [],
   dayStartTime: 0,
   animFrame: null,
-  gameLoopInterval: null,
   dayTimerInterval: null,
   mobTaskDone: [false,false,false,false,false,false,false,false],
   mobAssigned: [],
@@ -212,7 +184,8 @@ var state = {
   bearKillCooldown: 0,
   moveCounter: 0,
   refinedShown: false,
-  isGameLoopRunning: false
+  isGameLoopRunning: false,
+  imagesReady: false
 };
 
 var canvas = document.getElementById('mapCanvas');
@@ -231,12 +204,6 @@ var dayDisplay = document.getElementById('dayDisplay');
 var btnDrop = document.getElementById('btnDrop');
 
 function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
-
-function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
-
-function dist(a, b) {
-  return Math.sqrt((a.x - b.x)*(a.x - b.x) + (a.y - b.y)*(a.y - b.y));
-}
 
 function addLog(msg) {
   state.logs.unshift(msg);
@@ -265,48 +232,7 @@ function gridToBlock(row, col) {
   return row * 3 + col;
 }
 
-function getBlockOffset(blockId) {
-  var g = blockToGrid(blockId);
-  return { x: g.col * GRID_SIZE, y: g.row * GRID_SIZE };
-}
-
-function canMoveTo(blockId, x, y, entity) {
-  if (x < 0 || x >= GRID_SIZE || y < 0 || y >= GRID_SIZE) {
-    var g = blockToGrid(blockId);
-    var newRow = g.row;
-    var newCol = g.col;
-    var newX = x;
-    var newY = y;
-    
-    if (x < 0) { newCol--; newX = GRID_SIZE - 1; }
-    else if (x >= GRID_SIZE) { newCol++; newX = 0; }
-    else if (y < 0) { newRow--; newY = GRID_SIZE - 1; }
-    else if (y >= GRID_SIZE) { newRow++; newY = 0; }
-    
-    var newBlock = gridToBlock(newRow, newCol);
-    if (newBlock < 0 || newBlock > 8) return false;
-    
-    if (state.blockMap[newBlock] && state.blockMap[newBlock][newY] && 
-        state.blockMap[newBlock][newY][newX] === 'tree') {
-      return false;
-    }
-    
-    if (entity) {
-      entity.blockId = newBlock;
-      entity.x = newX;
-      entity.y = newY;
-    }
-    return true;
-  }
-  
-  if (state.blockMap[blockId] && state.blockMap[blockId][y] && 
-      state.blockMap[blockId][y][x] === 'tree') {
-    return false;
-  }
-  
-  return true;
-}
-
+// ★ 修正: キャラクター移動（主人公のcurrentBlock更新）
 function moveCharacter(entity, dx, dy) {
   if (!entity || !entity.alive) return false;
   
@@ -345,7 +271,45 @@ function moveCharacter(entity, dx, dy) {
   entity.blockId = newBlock;
   entity.x = newX;
   entity.y = newY;
+  
+  // ★ 主人公なら state.currentBlock を更新
+  if (entity === state.hero) {
+    state.currentBlock = newBlock;
+  }
+  
   return true;
+}
+
+// ★ 強制ブロック移動（モブ用）
+function moveEntityToBlock(entity, targetBlock) {
+  if (!entity || !entity.alive) return false;
+  if (targetBlock < 0 || targetBlock > 8) return false;
+  if (targetBlock === entity.blockId) return false;
+  
+  var current = blockToGrid(entity.blockId);
+  var target = blockToGrid(targetBlock);
+  var dr = target.row - current.row;
+  var dc = target.col - current.col;
+  
+  // 端にいるかチェック
+  if (dc < 0 && entity.x === 0) {
+    entity.blockId = targetBlock;
+    entity.x = GRID_SIZE - 1;
+    return true;
+  } else if (dc > 0 && entity.x === GRID_SIZE - 1) {
+    entity.blockId = targetBlock;
+    entity.x = 0;
+    return true;
+  } else if (dr < 0 && entity.y === 0) {
+    entity.blockId = targetBlock;
+    entity.y = GRID_SIZE - 1;
+    return true;
+  } else if (dr > 0 && entity.y === GRID_SIZE - 1) {
+    entity.blockId = targetBlock;
+    entity.y = 0;
+    return true;
+  }
+  return false;
 }
 
 function initGame() {
@@ -649,7 +613,7 @@ function updateMobs() {
           }
         }
       } else {
-        moveTowardBlock(mob, mob.targetBlock);
+        moveEntityToBlock(mob, mob.targetBlock);
       }
     } else if (mob.state === 'moving_to_hut') {
       if (mob.blockId === 4) {
@@ -677,56 +641,8 @@ function updateMobs() {
           mob.state = 'delivered';
         }
       } else {
-        moveTowardBlock(mob, 4);
+        moveEntityToBlock(mob, 4);
       }
-    }
-  }
-}
-
-function moveTowardBlock(entity, targetBlock) {
-  var current = blockToGrid(entity.blockId);
-  var target = blockToGrid(targetBlock);
-  var dr = target.row - current.row;
-  var dc = target.col - current.col;
-  
-  if (dr === 0 && dc === 0) return;
-  
-  if (dc < 0 && entity.x === 0) {
-    var nb = gridToBlock(current.row, current.col - 1);
-    if (nb >= 0 && nb <= 8) {
-      entity.blockId = nb;
-      entity.x = GRID_SIZE - 1;
-      return;
-    }
-  } else if (dc > 0 && entity.x === GRID_SIZE - 1) {
-    var nb2 = gridToBlock(current.row, current.col + 1);
-    if (nb2 >= 0 && nb2 <= 8) {
-      entity.blockId = nb2;
-      entity.x = 0;
-      return;
-    }
-  } else if (dr < 0 && entity.y === 0) {
-    var nb3 = gridToBlock(current.row - 1, current.col);
-    if (nb3 >= 0 && nb3 <= 8) {
-      entity.blockId = nb3;
-      entity.y = GRID_SIZE - 1;
-      return;
-    }
-  } else if (dr > 0 && entity.y === GRID_SIZE - 1) {
-    var nb4 = gridToBlock(current.row + 1, current.col);
-    if (nb4 >= 0 && nb4 <= 8) {
-      entity.blockId = nb4;
-      entity.y = 0;
-      return;
-    }
-  } else {
-    var ddx = 0, ddy = 0;
-    if (dc > 0) ddx = 1;
-    else if (dc < 0) ddx = -1;
-    else if (dr > 0) ddy = 1;
-    else if (dr < 0) ddy = -1;
-    if (ddx !== 0 || ddy !== 0) {
-      moveCharacter(entity, ddx, ddy);
     }
   }
 }
@@ -749,7 +665,7 @@ function updateEnemies() {
     if (state.jason.moveCooldown > 0) {
       state.jason.moveCooldown--;
     } else {
-      state.jason.moveCooldown = Math.max(1, Math.floor(10 / (state.jason.speed / 10)));
+      state.jason.moveCooldown = Math.max(1, Math.floor(15 / (state.jason.speed / 10)));
       
       var hero = state.hero;
       if (hero && hero.alive) {
@@ -764,11 +680,11 @@ function updateEnemies() {
           }
           moveCharacter(state.jason, jmx, jmy);
           
-          if (Math.abs(state.jason.x - hero.x) <= 0.8 && Math.abs(state.jason.y - hero.y) <= 0.8) {
+          if (Math.abs(state.jason.x - hero.x) <= 0.5 && Math.abs(state.jason.y - hero.y) <= 0.5) {
             killHero('ジェイソン');
           }
         } else {
-          moveTowardBlock(state.jason, hero.blockId);
+          moveEntityToBlock(state.jason, hero.blockId);
         }
       }
     }
@@ -777,7 +693,7 @@ function updateEnemies() {
       var mob = state.mobs[m];
       if (!mob.alive) continue;
       if (state.jason.blockId === mob.blockId) {
-        if (Math.abs(state.jason.x - mob.x) <= 0.8 && Math.abs(state.jason.y - mob.y) <= 0.8) {
+        if (Math.abs(state.jason.x - mob.x) <= 0.5 && Math.abs(state.jason.y - mob.y) <= 0.5) {
           if (state.jasonKillCooldown <= 0) {
             killMob(mob, 'ジェイソン');
             state.jasonKillCooldown = 20;
@@ -797,7 +713,7 @@ function updateEnemies() {
     if (state.bear.moveCooldown > 0) {
       state.bear.moveCooldown--;
     } else {
-      state.bear.moveCooldown = 2;
+      state.bear.moveCooldown = 3;
       
       var hero2 = state.hero;
       if (hero2 && hero2.alive && isBearAttackDay) {
@@ -811,11 +727,11 @@ function updateEnemies() {
             bmy = bdy > 0 ? 1 : -1;
           }
           moveCharacter(state.bear, bmx, bmy);
-          if (Math.abs(state.bear.x - hero2.x) <= 0.8 && Math.abs(state.bear.y - hero2.y) <= 0.8) {
+          if (Math.abs(state.bear.x - hero2.x) <= 0.5 && Math.abs(state.bear.y - hero2.y) <= 0.5) {
             killHero('熊');
           }
         } else {
-          moveTowardBlock(state.bear, hero2.blockId);
+          moveEntityToBlock(state.bear, hero2.blockId);
         }
       } else {
         var dirs = [[0,-1],[0,1],[-1,0],[1,0]];
@@ -828,7 +744,7 @@ function updateEnemies() {
       var mob2 = state.mobs[m2];
       if (!mob2.alive) continue;
       if (state.bear.blockId === mob2.blockId && isBearAttackDay) {
-        if (Math.abs(state.bear.x - mob2.x) <= 0.8 && Math.abs(state.bear.y - mob2.y) <= 0.8) {
+        if (Math.abs(state.bear.x - mob2.x) <= 0.5 && Math.abs(state.bear.y - mob2.y) <= 0.5) {
           if (state.bearKillCooldown <= 0) {
             killMob(mob2, '熊');
             state.bearKillCooldown = 20;
@@ -843,7 +759,7 @@ function updateEnemies() {
     if (state.wolf.moveCooldown > 0) {
       state.wolf.moveCooldown--;
     } else {
-      state.wolf.moveCooldown = 3;
+      state.wolf.moveCooldown = 4;
       var dirs2 = [[0,-1],[0,1],[-1,0],[1,0]];
       var d3 = dirs2[rand(0, 3)];
       moveCharacter(state.wolf, d3[0], d3[1]);
@@ -1223,7 +1139,6 @@ function render() {
     }
   }
 
-  // ★ アイテム描画（アイテム名を表示）
   for (var ii = 0; ii < state.items.length; ii++) {
     var item = state.items[ii];
     if (item.blockId !== blockId) continue;
@@ -1240,30 +1155,29 @@ function render() {
     ctx.fillText(label2, px2 + BLOCK_SIZE/2, py2 + BLOCK_SIZE/2);
   }
 
-  // ★ キャラクター描画（画像または文字）
   var allChars = [];
 
   if (state.hero && state.hero.alive && state.hero.blockId === blockId) {
-    allChars.push({ name: state.hero.img, x: state.hero.x, y: state.hero.y, isHero: true });
+    allChars.push({ name: state.hero.img, x: state.hero.x, y: state.hero.y });
   }
 
   for (var mi3 = 0; mi3 < state.mobs.length; mi3++) {
     var mob3 = state.mobs[mi3];
     if (mob3.alive && mob3.blockId === blockId) {
-      allChars.push({ name: mob3.img, x: mob3.x, y: mob3.y, isHero: false });
+      allChars.push({ name: mob3.img, x: mob3.x, y: mob3.y });
     }
   }
 
   if (state.jason && state.jason.alive && state.jason.blockId === blockId) {
-    allChars.push({ name: state.jason.img, x: state.jason.x, y: state.jason.y, isHero: false });
+    allChars.push({ name: state.jason.img, x: state.jason.x, y: state.jason.y });
   }
 
   if (state.bear && state.bear.alive && state.bear.blockId === blockId) {
-    allChars.push({ name: state.bear.img, x: state.bear.x, y: state.bear.y, isHero: false });
+    allChars.push({ name: state.bear.img, x: state.bear.x, y: state.bear.y });
   }
 
   if (state.wolf && state.wolf.alive && state.wolf.blockId === blockId) {
-    allChars.push({ name: state.wolf.img, x: state.wolf.x, y: state.wolf.y, isHero: false });
+    allChars.push({ name: state.wolf.img, x: state.wolf.x, y: state.wolf.y });
   }
 
   for (var ci = 0; ci < allChars.length; ci++) {
@@ -1271,13 +1185,10 @@ function render() {
     var px3 = ch.x * BLOCK_SIZE;
     var py3 = ch.y * BLOCK_SIZE;
     
-    // ★ 画像表示を試みる
-    var imgName = ch.name;
-    var img = getImage(imgName);
+    var img = getImage(ch.name);
     if (img) {
       ctx.drawImage(img, px3, py3, BLOCK_SIZE, BLOCK_SIZE);
     } else {
-      // フォールバック: 色付き四角＋文字
       var colors = {
         '紅葉': '#aa44ff',
         '加藤': '#ff6644',
@@ -1292,7 +1203,7 @@ function render() {
         '熊': '#8B4513',
         '狼': '#888888'
       };
-      var color = colors[imgName] || '#888';
+      var color = colors[ch.name] || '#888';
       ctx.fillStyle = color;
       ctx.fillRect(px3 + 2, py3 + 2, BLOCK_SIZE - 4, BLOCK_SIZE - 4);
       ctx.strokeStyle = '#fff';
@@ -1302,7 +1213,7 @@ function render() {
       ctx.font = 'bold 12px "MS Gothic"';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      var label3 = imgName;
+      var label3 = ch.name;
       if (label3.length > 2) label3 = label3.substring(0, 2);
       ctx.fillText(label3, px3 + BLOCK_SIZE/2, py3 + BLOCK_SIZE/2);
     }
@@ -1371,7 +1282,6 @@ canvas.addEventListener('click', function(e) {
 
 btnDrop.addEventListener('click', dropItem);
 
-// ★ 画像読み込み後にゲーム開始
 loadImages(function() {
   initGame();
 });
