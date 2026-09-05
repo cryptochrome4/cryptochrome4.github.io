@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>科学者118人 Wikipediaリンク集</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: #f0f4fa;
+            padding: 20px;
+            color: #1e293b;
+        }
+        .app {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 32px;
+            box-shadow: 0 20px 40px -12px rgba(0,0,0,0.15);
+            padding: 28px 24px;
+        }
+        h1 {
+            font-size: 2rem;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .sub {
+            color: #64748b;
+            font-weight: 400;
+            font-size: 0.95rem;
+            margin-left: 8px;
+        }
+        .search-box {
+            margin: 20px 0 24px 0;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .search-box input {
+            flex: 1;
+            min-width: 200px;
+            padding: 12px 18px;
+            border: 1px solid #d1d9e6;
+            border-radius: 40px;
+            font-size: 1rem;
+            background: #f8fafc;
+            transition: 0.2s;
+        }
+        .search-box input:focus {
+            outline: 2px solid #3b82f6;
+            border-color: transparent;
+            background: white;
+        }
+        .stats {
+            font-size: 0.95rem;
+            color: #475569;
+            margin-bottom: 16px;
+            padding: 8px 16px;
+            background: #f1f5f9;
+            border-radius: 30px;
+            display: inline-block;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 12px;
+        }
+        .card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            background: #f8fafc;
+            border-radius: 14px;
+            border: 1px solid #e9eef3;
+            transition: 0.15s;
+            text-decoration: none;
+            color: #1e293b;
+        }
+        .card:hover {
+            background: #eef2f6;
+            border-color: #94a3b8;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+        }
+        .card .name {
+            font-weight: 500;
+            font-size: 1rem;
+            flex: 1;
+        }
+        .card .badge {
+            font-size: 0.7rem;
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .badge.has-wiki {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+        .badge.no-wiki {
+            background: #f1f5f9;
+            color: #64748b;
+        }
+        .badge.wiki-en {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        .badge.wiki-ja {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        .badge.wiki-other {
+            background: #f3e8ff;
+            color: #6b21a8;
+        }
+        .card .link-icon {
+            font-size: 1.1rem;
+            opacity: 0.6;
+        }
+        .no-result {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 40px 0;
+            color: #94a3b8;
+            font-size: 1.1rem;
+        }
+        .footer-note {
+            margin-top: 28px;
+            color: #94a3b8;
+            font-size: 0.85rem;
+            text-align: right;
+            border-top: 1px solid #e9eef3;
+            padding-top: 20px;
+        }
+        @media (max-width: 600px) {
+            .app { padding: 16px; }
+            .grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+<div class="app" id="app">
+    <h1>🔗 科学者118人 <span class="sub">Wikipediaリンク集</span></h1>
+    <p style="color: #64748b; margin-bottom: 8px;">各科学者のWikipediaページへのリンクです。英語版・日本語版・他言語版を優先して表示。</p>
+
+    <div class="search-box">
+        <input type="text" id="searchInput" placeholder="科学者名で検索..." oninput="filterCards()">
+    </div>
+
+    <div class="stats" id="stats"></div>
+
+    <div class="grid" id="gridContainer"></div>
+
+    <div class="footer-note">
+        ※ Wikipediaが存在しない人物は「Wikipediaなし」と表示。リンク先は可能な限り日本語版→英語版→他言語版の優先順位で設定。
+    </div>
+</div>
+
+<script>
+    // ============================================================
+    // 118人の科学者リスト（名前とWikipediaリンク情報）
+    // 各人物に「日本語版」「英語版」「他言語版」の優先順位でURLを付与
+    // 存在しない場合は null
+    // ============================================================
+    const scientists = [
+        // ---- 古代〜中世 ----
+        { name: "Thales", ja: null, en: "https://en.wikipedia.org/wiki/Thales", other: null },
+        { name: "Democritus", ja: null, en: "https://en.wikipedia.org/wiki/Democritus", other: null },
+        { name: "Heraclides", ja: null, en: "https://en.wikipedia.org/wiki/Heraclides_Ponticus", other: null },
+        { name: "Aristotle", ja: "https://ja.wikipedia.org/wiki/%E3%82%A2%E3%83%AA%E3%82%B9%E3%83%88%E3%83%86%E3%83%AC%E3%82%B9", en: "https://en.wikipedia.org/wiki/Aristotle", other: null },
+        { name: "Archimedes", ja: "https://ja.wikipedia.org/wiki/%E3%82%A2%E3%83%AB%E3%82%AD%E3%83%A1%E3%83%87%E3%82%B9", en: "https://en.wikipedia.org/wiki/Archimedes", other: null },
+        { name: "Zhang", ja: null, en: "https://en.wikipedia.org/wiki/Zhang_Heng", other: null },
+        { name: "Sahl", ja: null, en: "https://en.wikipedia.org/wiki/Ibn_Sahl_(mathematician)", other: null },
+        { name: "Ibn Yunus", ja: null, en: "https://en.wikipedia.org/wiki/Ibn_Yunus", other: null },
+        { name: "Haytham", ja: "https://ja.wikipedia.org/wiki/%E3%82%A4%E3%83%96%E3%83%B3%E3%83%BB%E3%83%8F%E3%82%A4%E3%82%B5%E3%83%A0", en: "https://en.wikipedia.org/wiki/Ibn_al-Haytham", other: null },
+        { name: "Biruni", ja: null, en: "https://en.wikipedia.org/wiki/Al-Biruni", other: null },
+
+        // ---- 15〜17世紀 ----
+        { name: "Copernicus", ja: "https://ja.wikipedia.org/wiki/%E3%83%8B%E3%82%B3%E3%83%A9%E3%82%A6%E3%82%B9%E3%83%BB%E3%82%B3%E3%83%9A%E3%83%AB%E3%83%8B%E3%82%AF%E3%82%B9", en: "https://en.wikipedia.org/wiki/Nicolaus_Copernicus", other: null },
+        { name: "Gilbert", ja: null, en: "https://en.wikipedia.org/wiki/William_Gilbert_(physicist)", other: null },
+        { name: "Galileo", ja: "https://ja.wikipedia.org/wiki/%E3%82%AC%E3%83%AA%E3%83%AC%E3%82%AA%E3%83%BB%E3%82%AC%E3%83%AA%E3%83%AC%E3%82%A4", en: "https://en.wikipedia.org/wiki/Galileo_Galilei", other: null },
+        { name: "Kepler", ja: "https://ja.wikipedia.org/wiki/%E3%83%A8%E3%83%8F%E3%83%8D%E3%82%B9%E3%83%BB%E3%82%B1%E3%83%97%E3%83%A9%E3%83%BC", en: "https://en.wikipedia.org/wiki/Johannes_Kepler", other: null },
+        { name: "Beeckman", ja: null, en: "https://en.wikipedia.org/wiki/Isaac_Beeckman", other: null },
+        { name: "Pascal", ja: "https://ja.wikipedia.org/wiki/%E3%83%96%E3%83%AC%E3%83%BC%E3%82%BA%E3%83%BB%E3%83%91%E3%82%B9%E3%82%AB%E3%83%AB", en: "https://en.wikipedia.org/wiki/Blaise_Pascal", other: null },
+        { name: "Evangelista", ja: null, en: "https://en.wikipedia.org/wiki/Evangelista_Torricelli", other: null },
+        { name: "Otto von Guericke", ja: null, en: "https://en.wikipedia.org/wiki/Otto_von_Guericke", other: null },
+        { name: "Christiaan Huygens", ja: null, en: "https://en.wikipedia.org/wiki/Christiaan_Huygens", other: null },
+        { name: "Boyle", ja: "https://ja.wikipedia.org/wiki/%E3%83%AD%E3%83%90%E3%83%BC%E3%83%88%E3%83%BB%E3%83%9C%E3%82%A4%E3%83%AB", en: "https://en.wikipedia.org/wiki/Robert_Boyle", other: null },
+        { name: "Hooke", ja: "https://ja.wikipedia.org/wiki/%E3%83%AD%E3%83%90%E3%83%BC%E3%83%88%E3%83%BB%E3%83%95%E3%83%83%E3%82%AF", en: "https://en.wikipedia.org/wiki/Robert_Hooke", other: null },
+        { name: "Newton", ja: "https://ja.wikipedia.org/wiki/%E3%82%A2%E3%82%A4%E3%82%B6%E3%83%83%E3%82%AF%E3%83%BB%E3%83%8B%E3%83%A5%E3%83%BC%E3%83%88%E3%83%B3", en: "https://en.wikipedia.org/wiki/Isaac_Newton", other: null },
+
+        // ---- 18世紀 ----
+        { name: "Bernoulli", ja: null, en: "https://en.wikipedia.org/wiki/Daniel_Bernoulli", other: null },
+        { name: "Amontons", ja: null, en: "https://en.wikipedia.org/wiki/Guillaume_Amontons", other: null },
+        { name: "Maupertuis", ja: null, en: "https://en.wikipedia.org/wiki/Pierre_Louis_Maupertuis", other: null },
+        { name: "Franklin", ja: "https://ja.wikipedia.org/wiki/%E3%83%99%E3%83%B3%E3%82%B8%E3%83%A3%E3%83%9F%E3%83%B3%E3%83%BB%E3%83%95%E3%83%A9%E3%83%B3%E3%82%AF%E3%83%AA%E3%83%B3", en: "https://en.wikipedia.org/wiki/Benjamin_Franklin", other: null },
+        { name: "Boscovich", ja: null, en: "https://en.wikipedia.org/wiki/Roger_Joseph_Boscovich", other: null },
+        { name: "Jean le Rond d'Alembert", ja: "https://ja.wikipedia.org/wiki/%E3%82%B8%E3%83%A3%E3%83%B3%E3%83%BB%E3%83%AB%E3%83%BB%E3%83%AD%E3%83%B3%E3%83%BB%E3%83%80%E3%83%A9%E3%83%B3%E3%83%99%E3%83%BC%E3%83%AB", en: "https://en.wikipedia.org/wiki/Jean_le_Rond_d%27Alembert", other: null },
+        { name: "Priestley", ja: null, en: "https://en.wikipedia.org/wiki/Joseph_Priestley", other: null },
+        { name: "Cavendish", ja: null, en: "https://en.wikipedia.org/wiki/Henry_Cavendish", other: null },
+        { name: "Laplace", ja: "https://ja.wikipedia.org/wiki/%E3%83%94%E3%82%A8%E3%83%BC%E3%83%AB%E3%83%BB%E3%82%B7%E3%83%A2%E3%83%B3%E3%83%BB%E3%83%A9%E3%83%97%E3%83%A9%E3%82%B9", en: "https://en.wikipedia.org/wiki/Pierre-Simon_Laplace", other: null },
+        { name: "Benjamin Thompson", ja: null, en: "https://en.wikipedia.org/wiki/Benjamin_Thompson", other: null },
+        { name: "Coulomb", ja: null, en: "https://en.wikipedia.org/wiki/Charles-Augustin_de_Coulomb", other: null },
+        { name: "Lagrange", ja: null, en: "https://en.wikipedia.org/wiki/Joseph-Louis_Lagrange", other: null },
+        { name: "Volta", ja: "https://ja.wikipedia.org/wiki/%E3%82%A2%E3%83%AC%E3%83%83%E3%82%B5%E3%83%B3%E3%83%89%E3%83%AD%E3%83%BB%E3%83%9C%E3%83%AB%E3%82%BF", en: "https://en.wikipedia.org/wiki/Alessandro_Volta", other: null },
+        { name: "Young", ja: "https://ja.wikipedia.org/wiki/%E3%83%88%E3%83%BC%E3%83%9E%E3%82%B9%E3%83%BB%E3%83%A4%E3%83%B3%E3%82%B0", en: "https://en.wikipedia.org/wiki/Thomas_Young_(scientist)", other: null },
+        { name: "Davy", ja: null, en: "https://en.wikipedia.org/wiki/Humphry_Davy", other: null },
+
+        // ---- 19世紀 ----
+        { name: "Fraunhofer", ja: null, en: "https://en.wikipedia.org/wiki/Joseph_von_Fraunhofer", other: null },
+        { name: "Gustave-Gaspard Coriolis", ja: null, en: "https://en.wikipedia.org/wiki/Gaspard-Gustave_Coriolis", other: null },
+        { name: "Augustin-Jean Fresnel", ja: null, en: "https://en.wikipedia.org/wiki/Augustin-Jean_Fresnel", other: null },
+        { name: "Orsted", ja: null, en: "https://en.wikipedia.org/wiki/Hans_Christian_%C3%98rsted", other: null },
+        { name: "Fourier", ja: "https://ja.wikipedia.org/wiki/%E3%82%B8%E3%83%A7%E3%82%BC%E3%83%95%E3%83%BB%E3%83%95%E3%83%BC%E3%83%AA%E3%82%A8", en: "https://en.wikipedia.org/wiki/Joseph_Fourier", other: null },
+        { name: "Carnot", ja: null, en: "https://en.wikipedia.org/wiki/Nicolas_L%C3%A9onard_Sadi_Carnot", other: null },
+        { name: "Ohm", ja: "https://ja.wikipedia.org/wiki/%E3%82%B2%E3%82%AA%E3%83%AB%E3%82%AF%E3%83%BB%E3%82%B7%E3%83%BC%E3%83%A2%E3%83%B3%E3%83%BB%E3%82%AA%E3%83%BC%E3%83%A0", en: "https://en.wikipedia.org/wiki/Georg_Ohm", other: null },
+        { name: "Green", ja: null, en: "https://en.wikipedia.org/wiki/George_Green_(mathematician)", other: null },
+        { name: "Faraday", ja: "https://ja.wikipedia.org/wiki/%E3%83%9E%E3%82%A4%E3%82%B1%E3%83%AB%E3%83%BB%E3%83%95%E3%82%A1%E3%83%A9%E3%83%87%E3%83%BC", en: "https://en.wikipedia.org/wiki/Michael_Faraday", other: null },
+        { name: "Weber", ja: null, en: "https://en.wikipedia.org/wiki/Wilhelm_Weber", other: null },
+        { name: "J.Henry", ja: null, en: "https://en.wikipedia.org/wiki/Joseph_Henry", other: null },
+        { name: "Joule", ja: "https://ja.wikipedia.org/wiki/%E3%82%B8%E3%82%A7%E3%83%BC%E3%83%A0%E3%82%BA%E3%83%BB%E3%83%97%E3%83%AC%E3%82%B9%E3%82%B3%E3%83%83%E3%83%88%E3%83%BB%E3%82%B8%E3%83%A5%E3%83%BC%E3%83%AB", en: "https://en.wikipedia.org/wiki/James_Prescott_Joule", other: null },
+        { name: "Mayer", ja: null, en: "https://en.wikipedia.org/wiki/Julius_Robert_von_Mayer", other: null },
+        { name: "Doppler", ja: null, en: "https://en.wikipedia.org/wiki/Christian_Doppler", other: null },
+        { name: "Hamilton", ja: null, en: "https://en.wikipedia.org/wiki/William_Rowan_Hamilton", other: null },
+        { name: "W.Thomson", ja: null, en: "https://en.wikipedia.org/wiki/William_Thomson,_1st_Baron_Kelvin", other: null },
+        { name: "Kirchhoff", ja: null, en: "https://en.wikipedia.org/wiki/Gustav_Kirchhoff", other: null },
+        { name: "Maxwell", ja: "https://ja.wikipedia.org/wiki/%E3%82%B8%E3%82%A7%E3%83%BC%E3%83%A0%E3%82%BA%E3%83%BB%E3%82%AF%E3%83%A9%E3%83%BC%E3%82%AF%E3%83%BB%E3%83%9E%E3%82%AF%E3%82%B9%E3%82%A6%E3%82%A7%E3%83%AB", en: "https://en.wikipedia.org/wiki/James_Clerk_Maxwell", other: null },
+        { name: "Siemens", ja: null, en: "https://en.wikipedia.org/wiki/Werner_von_Siemens", other: null },
+        { name: "Strutt", ja: null, en: "https://en.wikipedia.org/wiki/John_William_Strutt,_3rd_Baron_Rayleigh", other: null },
+        { name: "Umov", ja: null, en: "https://en.wikipedia.org/wiki/Nikolay_Umov", other: null },
+        { name: "Gibbs", ja: null, en: "https://en.wikipedia.org/wiki/Josiah_Willard_Gibbs", other: null },
+        { name: "Osborne", ja: null, en: "https://en.wikipedia.org/wiki/Osborne_Reynolds", other: null },
+        { name: "Hertz", ja: "https://ja.wikipedia.org/wiki/%E3%83%8F%E3%82%A4%E3%83%B3%E3%83%AA%E3%83%92%E3%83%BB%E3%83%98%E3%83%AB%E3%83%84", en: "https://en.wikipedia.org/wiki/Heinrich_Hertz", other: null },
+        { name: "Mach", ja: null, en: "https://en.wikipedia.org/wiki/Ernst_Mach", other: null },
+
+        // ---- 19-20世紀（ノーベル賞世代） ----
+        { name: "Nernst", ja: null, en: "https://en.wikipedia.org/wiki/Walther_Nernst", other: null },
+        { name: "Tesla", ja: "https://ja.wikipedia.org/wiki/%E3%83%8B%E3%82%B3%E3%83%A9%E3%83%BB%E3%83%86%E3%82%B9%E3%83%A9", en: "https://en.wikipedia.org/wiki/Nikola_Tesla", other: null },
+        { name: "Lodge", ja: null, en: "https://en.wikipedia.org/wiki/Oliver_Lodge", other: null },
+        { name: "Rontgen", ja: "https://ja.wikipedia.org/wiki/%E3%83%B4%E3%82%A3%E3%83%AB%E3%83%98%E3%83%AB%E3%83%A0%E3%83%BB%E3%83%AC%E3%83%B3%E3%83%88%E3%82%B2%E3%83%B3", en: "https://en.wikipedia.org/wiki/Wilhelm_R%C3%B6ntgen", other: null },
+        { name: "Zeeman", ja: null, en: "https://en.wikipedia.org/wiki/Pieter_Zeeman", other: null },
+        { name: "JJ.Thomson", ja: null, en: "https://en.wikipedia.org/wiki/J._J._Thomson", other: null },
+        { name: "M.Curie", ja: "https://ja.wikipedia.org/wiki/%E3%83%9E%E3%83%AA%E3%83%BC%E3%83%BB%E3%82%AD%E3%83%A5%E3%83%AA%E3%83%BC", en: "https://en.wikipedia.org/wiki/Marie_Curie", other: null },
+        { name: "P.Curie", ja: null, en: "https://en.wikipedia.org/wiki/Pierre_Curie", other: null },
+        { name: "Lyapunov", ja: null, en: "https://en.wikipedia.org/wiki/Aleksandr_Lyapunov", other: null },
+        { name: "Planck", ja: "https://ja.wikipedia.org/wiki/%E3%83%9E%E3%83%83%E3%82%AF%E3%82%B9%E3%83%BB%E3%83%97%E3%83%A9%E3%83%B3%E3%82%AF", en: "https://en.wikipedia.org/wiki/Max_Planck", other: null },
+        { name: "Lorentz", ja: null, en: "https://en.wikipedia.org/wiki/Hendrik_Lorentz", other: null },
+        { name: "Boltzmann", ja: null, en: "https://en.wikipedia.org/wiki/Ludwig_Boltzmann", other: null },
+        { name: "Becquerel", ja: null, en: "https://en.wikipedia.org/wiki/Henri_Becquerel", other: null },
+        { name: "Einstein", ja: "https://ja.wikipedia.org/wiki/%E3%82%A2%E3%83%AB%E3%83%99%E3%83%AB%E3%83%88%E3%83%BB%E3%82%A2%E3%82%A4%E3%83%B3%E3%82%B7%E3%83%A5%E3%82%BF%E3%82%A4%E3%83%B3", en: "https://en.wikipedia.org/wiki/Albert_Einstein", other: null },
+        { name: "Poincare", ja: null, en: "https://en.wikipedia.org/wiki/Henri_Poincar%C3%A9", other: null },
+        { name: "Rutherford", ja: "https://ja.wikipedia.org/wiki/%E3%82%A2%E3%83%BC%E3%83%8D%E3%82%B9%E3%83%88%E3%83%BB%E3%83%A9%E3%82%B6%E3%83%95%E3%82%A9%E3%83%BC%E3%83%89", en: "https://en.wikipedia.org/wiki/Ernest_Rutherford", other: null },
+        { name: "Marconi", ja: null, en: "https://en.wikipedia.org/wiki/Guglielmo_Marconi", other: null },
+        { name: "Millikan", ja: null, en: "https://en.wikipedia.org/wiki/Robert_Andrews_Millikan", other: null },
+        { name: "Onnes", ja: null, en: "https://en.wikipedia.org/wiki/Heike_Kamerlingh_Onnes", other: null },
+        { name: "Bohr", ja: "https://ja.wikipedia.org/wiki/%E3%83%8B%E3%83%BC%E3%83%AB%E3%82%B9%E3%83%BB%E3%83%9C%E3%83%BC%E3%82%A2", en: "https://en.wikipedia.org/wiki/Niels_Bohr", other: null },
+        { name: "Moseley", ja: null, en: "https://en.wikipedia.org/wiki/Henry_Moseley", other: null },
+        { name: "Laue", ja: null, en: "https://en.wikipedia.org/wiki/Max_von_Laue", other: null },
+        { name: "Schwarzschild", ja: null, en: "https://en.wikipedia.org/wiki/Karl_Schwarzschild", other: null },
+        { name: "Bragg", ja: null, en: "https://en.wikipedia.org/wiki/William_Lawrence_Bragg", other: null },
+        { name: "Eddington", ja: null, en: "https://en.wikipedia.org/wiki/Arthur_Eddington", other: null },
+        { name: "Friedmann", ja: null, en: "https://en.wikipedia.org/wiki/Alexander_Friedmann", other: null },
+        { name: "Hubble", ja: "https://ja.wikipedia.org/wiki/%E3%82%A8%E3%83%89%E3%82%A6%E3%82%A3%E3%83%B3%E3%83%BB%E3%83%8F%E3%83%83%E3%83%96%E3%83%AB", en: "https://en.wikipedia.org/wiki/Edwin_Hubble", other: null },
+        { name: "Compton", ja: null, en: "https://en.wikipedia.org/wiki/Arthur_Compton", other: null },
+        { name: "Broglie", ja: null, en: "https://en.wikipedia.org/wiki/Louis_de_Broglie", other: null },
+        { name: "Bose", ja: null, en: "https://en.wikipedia.org/wiki/Satyendra_Nath_Bose", other: null },
+
+        // ---- 20世紀（量子力学・原子物理学） ----
+        { name: "Heisenberg", ja: "https://ja.wikipedia.org/wiki/%E3%83%B4%E3%82%A7%E3%83%AB%E3%83%8A%E3%83%BC%E3%83%BB%E3%83%8F%E3%82%A4%E3%82%BC%E3%83%B3%E3%83%99%E3%83%AB%E3%82%AF", en: "https://en.wikipedia.org/wiki/Werner_Heisenberg", other: null },
+        { name: "Pauli", ja: null, en: "https://en.wikipedia.org/wiki/Wolfgang_Pauli", other: null },
+        { name: "Schrodinger", ja: "https://ja.wikipedia.org/wiki/%E3%82%A8%E3%83%AB%E3%83%B4%E3%82%A3%E3%83%B3%E3%83%BB%E3%82%B7%E3%83%A5%E3%83%AC%E3%83%BC%E3%83%87%E3%82%A3%E3%83%B3%E3%82%AC%E3%83%BC", en: "https://en.wikipedia.org/wiki/Erwin_Schr%C3%B6dinger", other: null },
+        { name: "Georges Lemaître", ja: null, en: "https://en.wikipedia.org/wiki/Georges_Lema%C3%AEtre", other: null },
+        { name: "Heitler", ja: null, en: "https://en.wikipedia.org/wiki/Walter_Heitler", other: null },
+
+        // ---- 霧箱・チャンドラセカール・ミュラーなど ----
+        { name: "Charles Thomson Rees Wilson", ja: null, en: "https://en.wikipedia.org/wiki/Charles_Thomson_Rees_Wilson", other: null },
+        { name: "Dirac", ja: "https://ja.wikipedia.org/wiki/%E3%83%9D%E3%83%BC%E3%83%AB%E3%83%BB%E3%83%87%E3%82%A3%E3%83%A9%E3%83%83%E3%82%AF", en: "https://en.wikipedia.org/wiki/Paul_Dirac", other: null },
+        { name: "Raman", ja: null, en: "https://en.wikipedia.org/wiki/C._V._Raman", other: null },
+        { name: "Subrahmanyan Chandrasekhar", ja: null, en: "https://en.wikipedia.org/wiki/Subrahmanyan_Chandrasekhar", other: null },
+        { name: "Chadwick", ja: null, en: "https://en.wikipedia.org/wiki/James_Chadwick", other: null },
+        { name: "Szilard", ja: null, en: "https://en.wikipedia.org/wiki/Le%C3%B3_Szil%C3%A1rd", other: null },
+        { name: "Gamow", ja: null, en: "https://en.wikipedia.org/wiki/George_Gamow", other: null },
+        { name: "Yukawa", ja: "https://ja.wikipedia.org/wiki/%E6%B9%AF%E5%B7%9D%E7%A7%80%E6%A8%B9", en: "https://en.wikipedia.org/wiki/Hideki_Yukawa", other: null },
+        { name: "Erwin Wilhelm Müller", ja: null, en: "https://en.wikipedia.org/wiki/Erwin_Wilhelm_M%C3%BCller", other: null },
+        { name: "Carl David Anderson", ja: null, en: "https://en.wikipedia.org/wiki/Carl_David_Anderson", other: null },
+        { name: "Lev Landau", ja: null, en: "https://en.wikipedia.org/wiki/Lev_Landau", other: null },
+        { name: "Bethe", ja: null, en: "https://en.wikipedia.org/wiki/Hans_Bethe", other: null },
+        { name: "Wheeler", ja: null, en: "https://en.wikipedia.org/wiki/John_Archibald_Wheeler", other: null },
+        { name: "Fermi", ja: "https://ja.wikipedia.org/wiki/%E3%82%A8%E3%83%B3%E3%83%AA%E3%82%B3%E3%83%BB%E3%83%95%E3%82%A7%E3%83%AB%E3%83%9F", en: "https://en.wikipedia.org/wiki/Enrico_Fermi", other: null },
+        { name: "Oppenheimer", ja: "https://ja.wikipedia.org/wiki/%E3%83%AD%E3%83%90%E3%83%BC%E3%83%88%E3%83%BB%E3%82%AA%E3%83%83%E3%83%9A%E3%83%B3%E3%83%8F%E3%82%A4%E3%83%9E%E3%83%BC", en: "https://en.wikipedia.org/wiki/J._Robert_Oppenheimer", other: null },
+        { name: "Gabor", ja: null, en: "https://en.wikipedia.org/wiki/Dennis_Gabor", other: null },
+        { name: "Richard Feynman", ja: "https://ja.wikipedia.org/wiki/%E3%83%AA%E3%83%81%E3%83%A3%E3%83%BC%E3%83%89%E3%83%BB%E3%83%95%E3%82%A1%E3%82%A4%E3%83%B3%E3%83%9E%E3%83%B3", en: "https://en.wikipedia.org/wiki/Richard_Feynman", other: null },
+        { name: "Bardeen", ja: null, en: "https://en.wikipedia.org/wiki/John_Bardeen", other: null },
+        { name: "Abdus Salam", ja: null, en: "https://en.wikipedia.org/wiki/Abdus_Salam", other: null },
+        { name: "Hawking", ja: "https://ja.wikipedia.org/wiki/%E3%82%B9%E3%83%86%E3%82%A3%E3%83%BC%E3%83%96%E3%83%B3%E3%83%BB%E3%83%9B%E3%83%BC%E3%82%AD%E3%83%B3%E3%82%B0", en: "https://en.wikipedia.org/wiki/Stephen_Hawking", other: null }
+    ];
+
+    // ============================================================
+    // レンダリング
+    // ============================================================
+    function getLinkInfo(s) {
+        // 優先順位: 日本語版 > 英語版 > 他言語版
+        if (s.ja) return { url: s.ja, label: "日本語版" };
+        if (s.en) return { url: s.en, label: "英語版" };
+        if (s.other) return { url: s.other, label: "他言語版" };
+        return { url: null, label: "Wikipediaなし" };
+    }
+
+    function getBadgeClass(info) {
+        if (!info.url) return "no-wiki";
+        if (info.label === "日本語版") return "wiki-ja";
+        if (info.label === "英語版") return "wiki-en";
+        return "wiki-other";
+    }
+
+    function renderCards(filter = "") {
+        const grid = document.getElementById('gridContainer');
+        const stats = document.getElementById('stats');
+        const q = filter.trim().toLowerCase();
+
+        let filtered = scientists;
+        if (q) {
+            filtered = scientists.filter(s => s.name.toLowerCase().includes(q));
+        }
+
+        const total = scientists.length;
+        const shown = filtered.length;
+
+        stats.textContent = `全 ${total} 人中 ${shown} 人を表示`;
+
+        if (shown === 0) {
+            grid.innerHTML = `<div class="no-result">🔍 「${filter}」に一致する科学者が見つかりませんでした</div>`;
+            return;
+        }
+
+        let html = '';
+        filtered.forEach(s => {
+            const info = getLinkInfo(s);
+            const badgeClass = getBadgeClass(info);
+            const linkIcon = info.url ? '🔗' : '🚫';
+            const nameDisplay = s.name;
+
+            html += `
+                <a class="card" href="${info.url || '#'}" target="${info.url ? '_blank' : ''}" 
+                   style="${!info.url ? 'cursor: default; opacity: 0.7;' : ''}"
+                   onclick="${!info.url ? 'return false;' : ''}">
+                    <span class="name">${nameDisplay}</span>
+                    <span class="badge ${badgeClass}">${info.label}</span>
+                    <span class="link-icon">${linkIcon}</span>
+                </a>
+            `;
+        });
+
+        grid.innerHTML = html;
+    }
+
+    function filterCards() {
+        const input = document.getElementById('searchInput');
+        renderCards(input.value);
+    }
+
+    // 初期描画
+    renderCards();
+</script>
+</body>
+</html>
