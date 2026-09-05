@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>科学者TIERリスト with 感想 & 記号</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'Segoe UI', Roboto, system-ui, sans-serif;
+            background: #f5f7fc;
+            padding: 20px;
+            color: #1e293b;
+        }
+        .app {
+            max-width: 1300px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 32px;
+            box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.2);
+            padding: 28px 24px;
+        }
+        h1 {
+            font-size: 2rem;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .sub {
+            color: #64748b;
+            font-weight: 400;
+            font-size: 0.95rem;
+            margin-left: 8px;
+        }
+        .nav-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px 14px;
+            margin: 22px 0 18px 0;
+            border-bottom: 2px solid #e9eef3;
+            padding-bottom: 16px;
+        }
+        .nav-btn {
+            background: transparent;
+            border: none;
+            font-size: 1rem;
+            font-weight: 500;
+            padding: 8px 18px;
+            border-radius: 40px;
+            cursor: pointer;
+            transition: 0.2s;
+            color: #334155;
+            background: #f1f5f9;
+        }
+        .nav-btn.active {
+            background: #1e293b;
+            color: white;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+        }
+        .nav-btn:hover {
+            background: #cbd5e1;
+        }
+        .view {
+            display: none;
+            animation: fade 0.2s ease;
+        }
+        .view.active {
+            display: block;
+        }
+        @keyframes fade {
+            from {
+                opacity: 0.4;
+                transform: translateY(6px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* 科学者カード (詳細・感想) */
+        .scientist-card {
+            background: #f8fafc;
+            border-radius: 18px;
+            padding: 16px 20px;
+            margin-bottom: 16px;
+            border-left: 6px solid #94a3b8;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+            transition: 0.1s;
+        }
+        .scientist-card .name {
+            font-size: 1.2rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .scientist-card .theory {
+            margin: 8px 0 6px 0;
+            color: #1e293b;
+            background: #eef2f6;
+            padding: 8px 14px;
+            border-radius: 30px;
+            display: inline-block;
+            font-size: 0.95rem;
+        }
+        .scientist-card .comment-area {
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .scientist-card .comment-area input {
+            flex: 1;
+            min-width: 200px;
+            padding: 10px 16px;
+            border: 1px solid #d1d9e6;
+            border-radius: 40px;
+            font-size: 0.95rem;
+            background: white;
+            transition: 0.2s;
+        }
+        .scientist-card .comment-area input:focus {
+            outline: 2px solid #3b82f6;
+            border-color: transparent;
+        }
+        .tier-select {
+            padding: 8px 14px;
+            border-radius: 40px;
+            border: 1px solid #cbd5e1;
+            background: white;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        /* 記号ビュー */
+        .symbol-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 16px;
+            margin: 20px 0;
+        }
+        .symbol-item {
+            background: #f1f5f9;
+            border-radius: 60px;
+            padding: 10px 18px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 500;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.02);
+        }
+        .symbol-item .sym {
+            font-size: 1.6rem;
+            letter-spacing: 2px;
+            font-weight: 400;
+        }
+
+        /* TIER 表 */
+        .tier-block {
+            border-radius: 20px;
+            padding: 16px 20px;
+            margin-bottom: 18px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 12px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+        }
+        .tier-label {
+            font-weight: 700;
+            font-size: 1.6rem;
+            min-width: 70px;
+            letter-spacing: 1px;
+        }
+        .tier-names {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 14px;
+        }
+        .tier-names span {
+            background: rgba(255,255,255,0.5);
+            padding: 4px 16px;
+            border-radius: 40px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            backdrop-filter: blur(2px);
+        }
+        /* TIER カラー */
+        .tier-S { background: #9b59b6; color: white; }
+        .tier-A { background: #e74c3c; color: white; }
+        .tier-B { background: #f1c40f; color: #1e293b; }
+        .tier-C { background: #111111; color: white; }
+        .tier-D { background: #3498db; color: white; }
+        .tier-E { background: #a8e44a; color: #1e293b; }
+        .tier-F { background: #a0522d; color: white; }
+        .tier-G { background: #2c3e50; color: white; }
+
+        .tier-S .tier-names span { background: rgba(255,255,255,0.2); }
+        .tier-A .tier-names span { background: rgba(255,255,255,0.2); }
+        .tier-B .tier-names span { background: rgba(0,0,0,0.05); }
+        .tier-D .tier-names span { background: rgba(255,255,255,0.2); }
+        .tier-E .tier-names span { background: rgba(0,0,0,0.05); }
+        .tier-F .tier-names span { background: rgba(255,255,255,0.2); }
+        .tier-G .tier-names span { background: rgba(255,255,255,0.1); }
+
+        .reset-area {
+            margin-top: 30px;
+            display: flex;
+            justify-content: flex-end;
+            border-top: 2px dashed #e2e8f0;
+            padding-top: 24px;
+        }
+        .reset-btn {
+            background: #dc2626;
+            color: white;
+            border: none;
+            padding: 12px 32px;
+            border-radius: 60px;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: 0.2s;
+            box-shadow: 0 4px 12px rgba(220, 38, 38, 0.2);
+        }
+        .reset-btn:hover {
+            background: #b91c1c;
+            transform: scale(1.02);
+        }
+
+        .footer-note {
+            margin-top: 24px;
+            color: #94a3b8;
+            font-size: 0.85rem;
+            text-align: right;
+        }
+        @media (max-width: 600px) {
+            .app { padding: 16px; }
+            .scientist-card .comment-area { flex-direction: column; align-items: stretch; }
+        }
+    </style>
+</head>
+<body>
+<div class="app" id="app">
+    <h1>⚛️ 科学者TIERリスト <span class="sub">with 感想 & 記号</span></h1>
+    <div class="nav-bar">
+        <button class="nav-btn active" data-view="view-detail">📖 理論 + 感想</button>
+        <button class="nav-btn" data-view="view-symbols">🔣 代表記号×3</button>
+        <button class="nav-btn" data-view="view-tier1">🏆 TIER 表 1</button>
+        <button class="nav-btn" data-view="view-tier2">🏆 TIER 表 2</button>
+        <button class="nav-btn" data-view="view-tier3">🏆 TIER 表 3</button>
+    </div>
+
+    <!-- VIEW: 詳細 + 感想 -->
+    <div id="view-detail" class="view active"></div>
+
+    <!-- VIEW: 記号 -->
+    <div id="view-symbols" class="view"></div>
+
+    <!-- VIEW: TIER 1,2,3 -->
+    <div id="view-tier1" class="view"></div>
+    <div id="view-tier2" class="view"></div>
+    <div id="view-tier3" class="view"></div>
+
+    <div class="reset-area">
+        <button class="reset-btn" id="resetButton">🗑 全リセット</button>
+    </div>
+    <div class="footer-note">※ TIER・感想はブラウザに保存されます (localStorage)</div>
+</div>
+
+<script>
+    (function() {
+        // ----- 科学者データ (150名) -----
+        const scientists = [
+            { name: "Thales", theory: "万物の根源は水", symbols: ["⊿", "Φ", "Ψ"] },
+            { name: "Democritus", theory: "原子論の提唱", symbols: ["⚛", "⨁", "·"] },
+            { name: "Heraclides", theory: "地球の自転と水星・金星の太陽周回説", symbols: ["⊕", "☿", "♀"] },
+            { name: "Aristotle", theory: "四元素説・形而上学", symbols: ["✧", "🌍", "🔥"] },
+            { name: "Archimedes", theory: "浮力の原理・てこ", symbols: ["⚖", "π", "∫"] },
+            { name: "Zhang", theory: "張衡（地震計・渾天儀）", symbols: ["〓", "🌏", "⚡"] },
+            { name: "Sahl", theory: "イブン・サフル（光学・屈折の法則の先駆）", symbols: ["🔦", "◈", "⬡"] },
+            { name: "Ynu", theory: "（仮）ヤング率に関連", symbols: ["Y", "ε", "σ"] },
+            { name: "Yunus", theory: "（仮）ユヌス（気象・海洋）", symbols: ["🌊", "☁", "🌀"] },
+            { name: "Haytham", theory: "光学・視覚論（イブン・ハイサム）", symbols: ["👁", "☀", "◑"] },
+            { name: "Biruni", theory: "地球の半径測定・数学", symbols: ["🌐", "📐", "π"] },
+            { name: "Copernicus", theory: "地動説（太陽中心説）", symbols: ["☀", "🌍", "↺"] },
+            { name: "Gilbert", theory: "磁気学（地球は磁石）", symbols: ["🧲", "N", "S"] },
+            { name: "Galileo", theory: "慣性・自由落下・天体観測", symbols: ["🔭", "⬇", "🌙"] },
+            { name: "Kepler", theory: "惑星運動の法則", symbols: ["🪐", "⌭", "⏣"] },
+            { name: "Beeckman", theory: "機械論・原子論の先駆", symbols: ["⚙", "·", "⬛"] },
+            { name: "Pascal", theory: "パスカルの原理・圧力", symbols: ["💧", "⬛", "➗"] },
+            { name: "Evangelista", theory: "トリチェリ（気圧計・真空）", symbols: ["⬜", "🌬", "⬇"] },
+            { name: "Otto", theory: "ゲーリケ（マグデブルクの半球）", symbols: ["⚗", "🟤", "⭕"] },
+            { name: "Christiaan", theory: "ホイヘンス（波動説・振り子時計）", symbols: ["⏱", "⊛", "⌛"] },
+            { name: "Boyle", theory: "ボイルの法則（気体）", symbols: ["🧪", "⬡", "P"] },
+            { name: "Hooke", theory: "フックの法則（弾性）", symbols: ["↗", "F", "k"] },
+            { name: "Newton", theory: "万有引力・運動の3法則", symbols: ["🍎", "F", "G"] },
+            { name: "Bernoulli", theory: "ベルヌーイの定理（流体）", symbols: ["💨", "P", "v"] },
+            { name: "Amontons", theory: "摩擦の法則（アモントン）", symbols: ["👆", "μ", "N"] },
+            { name: "Maupertuis", theory: "最小作用の原理", symbols: ["⚡", "S", "∫"] },
+            { name: "Franklin", theory: "電気（雷・正負電荷）", symbols: ["⚡", "＋", "－"] },
+            { name: "Boscovich", theory: "原子間力（点原子）", symbols: ["⚛", "∷", "⬤"] },
+            { name: "Rond", theory: "（仮）ロンド（光学）", symbols: ["◯", "◍", "⚪"] },
+            { name: "Priestley", theory: "酸素の発見", symbols: ["O₂", "🔥", "⬡"] },
+            { name: "Ampere", theory: "アンペールの法則（電流）", symbols: ["A", "I", "⊡"] },
+            { name: "Cavendish", theory: "万有引力定数の測定", symbols: ["⚖", "G", "⊕"] },
+            { name: "Laplace", theory: "ラプラス変換・天体力学", symbols: ["∫", "▽", "Δ"] },
+            { name: "Thompson", theory: "ジュール＝トムソン効果（熱）", symbols: ["⊡", "T", "⬇"] },
+            { name: "Coulomb", theory: "クーロンの法則（静電気）", symbols: ["⚡", "q", "r"] },
+            { name: "Lagrange", theory: "解析力学・ラグランジアン", symbols: ["L", "∂", "∫"] },
+            { name: "Volta", theory: "ボルタ電池（化学電池）", symbols: ["🔋", "Zn", "Cu"] },
+            { name: "Young", theory: "ヤング率・二重スリット実験", symbols: ["Y", "λ", "⊜"] },
+            { name: "Davy", theory: "電気分解・新元素発見", symbols: ["⚡", "Na", "K"] },
+            { name: "Fraunhofer", theory: "フラウンホーファー線（分光）", symbols: ["☀", "⚡", "⊟"] },
+            { name: "Gaspard", theory: "コリオリ（転向力）", symbols: ["🌀", "ω", "F"] },
+            { name: "Augustin", theory: "フレネル（波動光学）", symbols: ["🌊", "λ", "⊞"] },
+            { name: "Orsted", theory: "電流の磁気作用", symbols: ["⚡", "🧲", "↺"] },
+            { name: "Fourier", theory: "フーリエ級数・熱伝導", symbols: ["∫", "📈", "Δ"] },
+            { name: "Carnot", theory: "カルノーサイクル（熱力学）", symbols: ["🔥", "❄", "W"] },
+            { name: "Ohm", theory: "オームの法則 (V=IR)", symbols: ["V", "I", "R"] },
+            { name: "Green", theory: "グリーン関数", symbols: ["G", "∇", "∫"] },
+            { name: "Faraday", theory: "電磁誘導", symbols: ["🧲", "⚡", "⊡"] },
+            { name: "Weber", theory: "磁束の単位・電磁気", symbols: ["Wb", "Φ", "⊡"] },
+            { name: "J.Henry", theory: "自己インダクタンス", symbols: ["H", "L", "⚡"] },
+            { name: "Joule", theory: "熱の仕事当量", symbols: ["J", "W", "🔥"] },
+            { name: "Mayer", theory: "エネルギー保存則（熱力学）", symbols: ["E", "Q", "W"] },
+            { name: "Doppler", theory: "ドップラー効果", symbols: ["🌊", "△", "f"] },
+            { name: "Hamilton", theory: "ハミルトン力学", symbols: ["H", "∇", "∫"] },
+            { name: "W.Thomson", theory: "ケルビン（熱力学絶対温度）", symbols: ["K", "T", "❄"] },
+            { name: "Kirchhoff", theory: "キルヒホッフの法則（回路・熱放射）", symbols: ["⚡", "∑", "⊜"] },
+            { name: "Maxwell", theory: "マクスウェル方程式", symbols: ["∇", "E", "B"] },
+            { name: "Siemens", theory: "電気伝導率", symbols: ["S", "Ω", "⬡"] },
+            { name: "Strutt", theory: "レイリー（レイリー散乱）", symbols: ["☀", "⬡", "λ"] },
+            { name: "Umov", theory: "ウモフ（光圧・エネルギー）", symbols: ["E", "c", "⬡"] },
+            { name: "Gibbs", theory: "ギブズ自由エネルギー", symbols: ["G", "H", "S"] },
+            { name: "Osborne", theory: "レイノルズ（流体）", symbols: ["Re", "ρ", "v"] },
+            { name: "Hertz", theory: "電磁波の発見", symbols: ["Hz", "λ", "⚡"] },
+            { name: "Mach", theory: "マッハ数・衝撃波", symbols: ["M", "v", "c"] },
+            { name: "Nernst", theory: "ネルンストの熱定理", symbols: ["N", "T", "S"] },
+            { name: "Tesla", theory: "交流電気", symbols: ["⚡", "⊡", "T"] },
+            { name: "Lodge", theory: "ロッジ（無線・電磁気）", symbols: ["📡", "λ", "⚡"] },
+            { name: "Rontgen", theory: "X線の発見", symbols: ["⚡", "☢", "⊡"] },
+            { name: "Zeeman", theory: "ゼーマン効果", symbols: ["B", "λ", "∇"] },
+            { name: "JJ.Thomson", theory: "電子の発見", symbols: ["e⁻", "⚛", "⊡"] },
+            { name: "M.Curie", theory: "放射能・ポロニウム・ラジウム", symbols: ["☢", "Po", "Ra"] },
+            { name: "P.Curie", theory: "圧電効果・磁性", symbols: ["⚡", "⊡", "T"] },
+            { name: "Lyapunov", theory: "リアプノフ安定性", symbols: ["L", "∇", "∫"] },
+            { name: "Planck", theory: "量子仮説 (h)", symbols: ["h", "E", "ν"] },
+            { name: "Lorentz", theory: "ローレンツ力・変換", symbols: ["F", "q", "B"] },
+            { name: "Boltzmann", theory: "統計力学・エントロピー", symbols: ["S", "k", "Ω"] },
+            { name: "Becquerel", theory: "放射能の発見", symbols: ["☢", "U", "⊡"] },
+            { name: "Einstein", theory: "相対性理論・光電効果", symbols: ["E", "mc²", "⊗"] },
+            { name: "Poincare", theory: "ポアンカレ予想・相対論先駆", symbols: ["⊡", "∇", "∫"] },
+            { name: "Rutherford", theory: "原子核の発見", symbols: ["⚛", "α", "⊡"] },
+            { name: "Marconi", theory: "無線通信", symbols: ["📡", "λ", "⚡"] },
+            { name: "Millikan", theory: "電子の電荷測定", symbols: ["e⁻", "q", "⚡"] },
+            { name: "Onnes", theory: "超伝導の発見", symbols: ["⊡", "T", "R"] },
+            { name: "Bohr", theory: "原子モデル（量子条件）", symbols: ["h", "e⁻", "⊕"] },
+            { name: "Moseley", theory: "原子番号とX線", symbols: ["Z", "λ", "⚛"] },
+            { name: "Laue", theory: "X線回折", symbols: ["λ", "⊡", "⚛"] },
+            { name: "Schwarzschild", theory: "シュワルツシルト解（ブラックホール）", symbols: ["BH", "r", "c"] },
+            { name: "Bragg", theory: "ブラッグの法則", symbols: ["λ", "θ", "d"] },
+            { name: "Eddington", theory: "恒星内部構造", symbols: ["☀", "L", "M"] },
+            { name: "Friedmann", theory: "膨張宇宙モデル", symbols: ["🌌", "a", "H"] },
+            { name: "Hubble", theory: "ハッブル則（宇宙膨張）", symbols: ["🌌", "v", "H"] },
+            { name: "Compton", theory: "コンプトン効果", symbols: ["λ", "h", "⊡"] },
+            { name: "Broglie", theory: "物質波 (λ = h/p)", symbols: ["λ", "h", "p"] },
+            { name: "Bose", theory: "ボーズ＝アインシュタイン凝縮", symbols: ["B", "E", "⊡"] },
+            { name: "Heisenberg", theory: "不確定性原理", symbols: ["Δx", "Δp", "h"] },
+            { name: "Pauli", theory: "パウリの排他律", symbols: ["⤴", "⤵", "⚛"] },
+            { name: "Schrodinger", theory: "シュレーディンガー方程式", symbols: ["ψ", "H", "∫"] },
+            { name: "Georges", theory: "ルメートル（ビッグバン）", symbols: ["🌌", "H", "a"] },
+            { name: "Heitler", theory: "ハイトラー（結合理論）", symbols: ["⚛", "⊡", "ψ"] },
+            { name: "Ress", theory: "リース（宇宙論）", symbols: ["🌌", "Ω", "Λ"] },
+            { name: "Dirac", theory: "ディラック方程式（反物質）", symbols: ["ψ", "γ", "e⁺"] },
+            { name: "Raman", theory: "ラマン効果", symbols: ["λ", "⊡", "ν"] },
+            { name: "Subrahmanyan", theory: "チャンドラセカール限界", symbols: ["M", "☀", "c"] },
+            { name: "Chadwick", theory: "中性子の発見", symbols: ["n", "⚛", "⊡"] },
+            { name: "Szilard", theory: "核連鎖反応", symbols: ["n", "U", "⚡"] },
+            { name: "Gamow", theory: "ビッグバン元素合成", symbols: ["🌌", "H", "He"] },
+            { name: "Yukawa", theory: "中間子理論", symbols: ["π", "p", "n"] },
+            { name: "Muller", theory: "ミラー（遺伝子突然変異）", symbols: ["🧬", "X", "⊡"] },
+            { name: "Carl", theory: "カール（磁気）", symbols: ["B", "H", "⊡"] },
+            { name: "Lev", theory: "ランダウ（超流動・相転移）", symbols: ["L", "T", "⊡"] },
+            { name: "Bethe", theory: "ベーテ（核融合・恒星エネルギー）", symbols: ["☀", "p", "c"] },
+            { name: "Wheeler", theory: "ブラックホール・ワームホール", symbols: ["BH", "g", "c"] },
+            { name: "Fermi", theory: "フェルミ統計・核反応", symbols: ["F", "n", "e"] },
+            { name: "Oppenheimer", theory: "ブラックホール崩壊", symbols: ["BH", "r", "c"] },
+            { name: "Gabor", theory: "ホログラフィー", symbols: ["H", "λ", "⊡"] },
+            { name: "Geynman", theory: "ファインマン（量子電磁力学・経路積分）", symbols: ["F", "ψ", "∫"] },
+            { name: "Bardeen", theory: "BCS理論（超伝導）", symbols: ["B", "C", "S"] },
+            { name: "Abdus", theory: "サラーム（電弱統一理論）", symbols: ["W", "Z", "γ"] },
+            { name: "Hawking", theory: "ホーキング放射", symbols: ["BH", "T", "S"] }
+        ];
+
+        // ----- 保存キー -----
+        const STORAGE_KEY = 'scientist_tier_data_150';
+
+        // ----- デフォルトデータ生成 -----
+        function getDefaultData() {
+            const d = {};
+            scientists.forEach(s => {
+                d[s.name] = { tier: 'D', comment: '' };
+            });
+            return d;
+        }
+
+        // ----- 読み込み -----
+        function loadAllData() {
+            let raw = localStorage.getItem(STORAGE_KEY);
+            if (!raw) {
+                const def = getDefaultData();
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(def));
+                return def;
+            }
+            try {
+                const parsed = JSON.parse(raw);
+                // 万一足りない科学者がいたら補完
+                let needSave = false;
+                scientists.forEach(s => {
+                    if (!parsed[s.name]) {
+                        parsed[s.name] = { tier: 'D', comment: '' };
+                        needSave = true;
+                    }
+                });
+                if (needSave) localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+                return parsed;
+            } catch (e) {
+                const def = getDefaultData();
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(def));
+                return def;
+            }
+        }
+
+        let tierData = loadAllData();
+
+        function saveData() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(tierData));
+        }
+
+        // ----- 更新関数 (感想・TIER) -----
+        function updateComment(name, val) {
+            if (!tierData[name]) tierData[name] = { tier: 'D', comment: '' };
+            tierData[name].comment = val;
+            saveData();
+        }
+
+        function updateTier(name, val) {
+            if (!tierData[name]) tierData[name] = { tier: 'D', comment: '' };
+            tierData[name].tier = val;
+            saveData();
+            // 現在のビューを再描画
+            const active = document.querySelector('.view.active');
+            if (active) renderView(active.id);
+        }
+
+        // ----- レンダリングエンジン -----
+        function renderView(viewId) {
+            const container = document.getElementById(viewId);
+            if (!container) return;
+            if (viewId === 'view-detail') {
+                renderDetail(container);
+            } else if (viewId === 'view-symbols') {
+                renderSymbols(container);
+            } else if (viewId.startsWith('view-tier')) {
+                renderTier(container, viewId);
+            }
+        }
+
+        function renderDetail(container) {
+            let html = '';
+            scientists.forEach(s => {
+                const data = tierData[s.name] || { tier: 'D', comment: '' };
+                const tier = data.tier || 'D';
+                const comment = data.comment || '';
+                html += `
+                    <div class="scientist-card">
+                        <div class="name">
+                            ${s.name}
+                            <span style="font-weight:400; font-size:0.85rem; background:#e9eef3; padding:2px 14px; border-radius:30px;">
+                                TIER: 
+                                <select class="tier-select" onchange="window.updateTier('${s.name}', this.value)">
+                                    ${['S','A','B','C','D','E','F','G'].map(t => 
+                                        `<option value="${t}" ${t===tier?'selected':''}>${t}</option>`
+                                    ).join('')}
+                                </select>
+                            </span>
+                        </div>
+                        <div class="theory">📌 ${s.theory}</div>
+                        <div class="comment-area">
+                            <input type="text" placeholder="この科学者への感想を入力" 
+                                   value="${comment.replace(/"/g,'&quot;')}" 
+                                   onchange="window.updateComment('${s.name}', this.value)">
+                        </div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        function renderSymbols(container) {
+            let html = '<div class="symbol-grid">';
+            scientists.forEach(s => {
+                const syms = s.symbols || ['⊡','⊡','⊡'];
+                html += `<div class="symbol-item"><strong>${s.name}</strong> <span class="sym">${syms.join(' ')}</span></div>`;
+            });
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        function renderTier(container, viewId) {
+            // 同じデータを3つの表で共有
+            const tierOrder = ['S','A','B','C','D','E','F','G'];
+            let html = '';
+            tierOrder.forEach(t => {
+                const members = scientists.filter(s => {
+                    const d = tierData[s.name] || { tier: 'D' };
+                    return (d.tier || 'D') === t;
+                });
+                if (members.length === 0) return;
+                const names = members.map(s => s.name);
+                html += `
+                    <div class="tier-block tier-${t}">
+                        <div class="tier-label">TIER ${t}</div>
+                        <div class="tier-names">
+                            ${names.map(n => `<span>${n}</span>`).join('')}
+                        </div>
+                    </div>
+                `;
+            });
+            if (!html) html = '<p style="padding:20px;">まだ誰もTIER分けされていません</p>';
+            container.innerHTML = html;
+        }
+
+        // ----- ビュー切り替え + レンダリング -----
+        function switchView(viewId) {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.getElementById(viewId).classList.add('active');
+            // nav ボタン active
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector(`.nav-btn[data-view="${viewId}"]`)?.classList.add('active');
+            renderView(viewId);
+        }
+
+        // ----- リセット（4回確認） -----
+        let resetCounter = 0;
+        function handleReset() {
+            resetCounter++;
+            if (resetCounter === 1) alert("⚠️ 本当にリセットしますか？ (あと3回)");
+            else if (resetCounter === 2) alert("⚠️ 本当に？ (あと2回)");
+            else if (resetCounter === 3) alert("⚠️ 最後の確認です (あと1回)");
+            else if (resetCounter === 4) {
+                if (confirm("⚠️ 最終確認：全てのTIERと感想を削除します。よろしいですか？")) {
+                    localStorage.removeItem(STORAGE_KEY);
+                    tierData = loadAllData();
+                    // 全画面再描画
+                    const active = document.querySelector('.view.active');
+                    if (active) renderView(active.id);
+                    alert("✅ リセット完了しました。");
+                    resetCounter = 0;
+                } else {
+                    resetCounter = 0;
+                }
+            }
+        }
+
+        // ----- グローバル公開 (HTML内onclickから呼ばれる) -----
+        window.updateComment = updateComment;
+        window.updateTier = updateTier;
+        window.switchView = switchView;
+        window.handleReset = handleReset;
+
+        // ----- イベントバインド -----
+        document.addEventListener('DOMContentLoaded', function() {
+            // nav ボタン
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const viewId = this.dataset.view;
+                    if (viewId) switchView(viewId);
+                });
+            });
+            // リセットボタン
+            document.getElementById('resetButton').addEventListener('click', handleReset);
+            // 初期表示
+            switchView('view-detail');
+        });
+
+    })();
+</script>
+</body>
+</html>
