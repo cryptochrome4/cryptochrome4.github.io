@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ギリシャ文字仮想通貨投資ゲーム</title>
+    <style>
+        /* 全体スタイル */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'Segoe UI', 'Helvetica Neue', sans-serif;
+            background: #0b0e17;
+            color: #e0e6f0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .game-container {
+            max-width: 1300px;
+            width: 100%;
+            background: #141a28;
+            padding: 25px 30px;
+            border-radius: 28px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8);
+            border: 1px solid #2a3346;
+        }
+        h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, #f0b34b, #f7d875);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: inline-block;
+        }
+        .status-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px 40px;
+            background: #1d2538;
+            padding: 18px 25px;
+            border-radius: 18px;
+            margin: 12px 0 20px 0;
+            border-left: 6px solid #f5b342;
+        }
+        .status-item {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            font-size: 17px;
+            flex-wrap: wrap;
+        }
+        .status-item span:first-child {
+            color: #98a9c7;
+            font-weight: 300;
+        }
+        .status-item .val {
+            font-weight: 700;
+            color: #f2f6ff;
+            font-size: 19px;
+        }
+        .val.gold {
+            color: #f5c542;
+        }
+        .val.danger {
+            color: #ff7a7a;
+        }
+        .val.success {
+            color: #6fcf97;
+        }
+        .flex-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 25px;
+            margin: 20px 0 10px 0;
+        }
+        .panel {
+            background: #1a2233;
+            border-radius: 20px;
+            padding: 18px 20px;
+            flex: 1 1 300px;
+            border: 1px solid #2e3a52;
+        }
+        .panel h3 {
+            font-weight: 400;
+            letter-spacing: 1px;
+            color: #bcc9e6;
+            border-bottom: 1px solid #2e3a52;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        .coin-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            gap: 12px;
+            max-height: 340px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+        .coin-item {
+            background: #0f1625;
+            border-radius: 14px;
+            padding: 8px 12px;
+            border: 1px solid #2b354b;
+            transition: 0.15s;
+            font-size: 14px;
+            cursor: default;
+        }
+        .coin-item .name {
+            font-weight: 600;
+            color: #d6e0f5;
+        }
+        .coin-item .price {
+            float: right;
+            color: #a0b5dd;
+        }
+        .coin-item .change-up {
+            color: #4cd964;
+        }
+        .coin-item .change-down {
+            color: #ff6b6b;
+        }
+        .btn-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin: 15px 0 10px 0;
+        }
+        .btn {
+            background: #28334a;
+            border: none;
+            color: #f0f4ff;
+            padding: 10px 22px;
+            border-radius: 40px;
+            font-weight: 600;
+            font-size: 15px;
+            cursor: pointer;
+            transition: 0.2s;
+            border: 1px solid #3e4b66;
+            flex: 1 0 auto;
+        }
+        .btn-primary {
+            background: #f5b342;
+            color: #0b0e17;
+            border-color: #f5b342;
+        }
+        .btn-primary:hover {
+            background: #ffc55a;
+            transform: scale(1.02);
+        }
+        .btn-danger {
+            background: #b33f3f;
+            border-color: #b33f3f;
+        }
+        .btn-danger:hover {
+            background: #d14545;
+        }
+        .btn-success {
+            background: #2f8f5b;
+            border-color: #2f8f5b;
+        }
+        .btn-success:hover {
+            background: #3aaf70;
+        }
+        .btn:disabled {
+            opacity: 0.4;
+            pointer-events: none;
+        }
+        .input-group {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 12px;
+            margin: 8px 0;
+        }
+        .input-group label {
+            min-width: 70px;
+            color: #b0c2e0;
+        }
+        .input-group input, .input-group select {
+            background: #0d1422;
+            border: 1px solid #31405a;
+            border-radius: 30px;
+            padding: 10px 16px;
+            color: #f0f4ff;
+            font-size: 15px;
+            flex: 1 1 140px;
+            outline: none;
+        }
+        .input-group input:focus, .input-group select:focus {
+            border-color: #f5b342;
+        }
+        .log-box {
+            background: #0b111e;
+            border-radius: 16px;
+            padding: 12px 16px;
+            max-height: 130px;
+            overflow-y: auto;
+            font-size: 14px;
+            font-family: monospace;
+            border: 1px solid #29344b;
+            margin-top: 12px;
+            color: #b3c7e5;
+        }
+        .log-box div {
+            border-bottom: 1px solid #1f2940;
+            padding: 4px 0;
+        }
+        .msg {
+            background: #1e2a3f;
+            padding: 10px 16px;
+            border-radius: 30px;
+            margin: 10px 0;
+            border-left: 6px solid #f5b342;
+        }
+        .footer-note {
+            font-size: 13px;
+            color: #7185aa;
+            margin-top: 12px;
+            text-align: right;
+        }
+        .hidden {
+            display: none !important;
+        }
+        .win-screen {
+            background: #0f1a1f;
+            padding: 30px;
+            border-radius: 28px;
+            text-align: center;
+            border: 2px solid #f5b342;
+        }
+    </style>
+</head>
+<body>
+<div class="game-container" id="app">
+    <h1>🏛️ ギリシャ投資</h1>
+    <div class="status-grid">
+        <div class="status-item"><span>📅 日付</span><span class="val" id="displayDate">2026/01</span></div>
+        <div class="status-item"><span>🏦 通帳残高</span><span class="val gold" id="displayBank">200.0</span><span>万円</span></div>
+        <div class="status-item"><span>💰 アプリ残高</span><span class="val" id="displayApp">30.0</span><span>万円</span></div>
+        <div class="status-item"><span>📈 総資産</span><span class="val gold" id="displayTotal">230.0</span><span>万円</span></div>
+    </div>
+
+    <!-- メインパネル -->
+    <div class="flex-row">
+        <!-- コイン一覧 -->
+        <div class="panel" style="flex: 2;">
+            <h3>💱 コイン一覧（価格・前月比）</h3>
+            <div class="coin-list" id="coinList"></div>
+            <div class="btn-group">
+                <button class="btn btn-primary" id="btnNextMonth">▶ 次の月へ</button>
+                <button class="btn" id="btnReset">🔄 リセット</button>
+            </div>
+        </div>
+
+        <!-- 取引パネル -->
+        <div class="panel" style="flex: 1.2;">
+            <h3>📊 取引（成行）</h3>
+            <div class="input-group">
+                <label>コイン</label>
+                <select id="tradeCoinSelect"></select>
+            </div>
+            <div class="input-group">
+                <label>数量</label>
+                <input type="number" id="tradeAmount" value="1" min="0.001" step="0.001" />
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-success" id="btnBuy">🟢 買う</button>
+                <button class="btn btn-danger" id="btnSell">🔴 売る</button>
+            </div>
+            <div class="input-group">
+                <label>入金</label>
+                <input type="number" id="depositAmount" value="1" min="0.1" step="0.1" />
+                <button class="btn" id="btnDeposit">入金</button>
+            </div>
+            <div class="input-group">
+                <label>出金</label>
+                <input type="number" id="withdrawAmount" value="1" min="0.1" step="0.1" />
+                <button class="btn" id="btnWithdraw">出金</button>
+            </div>
+            <div class="msg" id="tradeMsg">取引メッセージ</div>
+        </div>
+    </div>
+
+    <!-- ログ -->
+    <div class="log-box" id="logBox">
+        <div>▶ ゲーム開始 2026/01</div>
+    </div>
+    <div class="footer-note">※ 手数料: 買い/売り コイン別・入出金 3万円未満550円 / 以上770円</div>
+</div>
+
+<script>
+    (function() {
+        // ---------- ギリシャ文字24種 ----------
+        const GREEK_COINS = [
+            { symbol: 'Α', name: 'Alpha' }, { symbol: 'Β', name: 'Beta' }, { symbol: 'Γ', name: 'Gamma' },
+            { symbol: 'Δ', name: 'Delta' }, { symbol: 'Ε', name: 'Epsilon' }, { symbol: 'Ζ', name: 'Zeta' },
+            { symbol: 'Η', name: 'Eta' }, { symbol: 'Θ', name: 'Theta' }, { symbol: 'Ι', name: 'Iota' },
+            { symbol: 'Κ', name: 'Kappa' }, { symbol: 'Λ', name: 'Lambda' }, { symbol: 'Μ', name: 'Mu' },
+            { symbol: 'Ν', name: 'Nu' }, { symbol: 'Ξ', name: 'Xi' }, { symbol: 'Ο', name: 'Omicron' },
+            { symbol: 'Π', name: 'Pi' }, { symbol: 'Ρ', name: 'Rho' }, { symbol: 'Σ', name: 'Sigma' },
+            { symbol: 'Τ', name: 'Tau' }, { symbol: 'Υ', name: 'Upsilon' }, { symbol: 'Φ', name: 'Phi' },
+            { symbol: 'Χ', name: 'Chi' }, { symbol: 'Ψ', name: 'Psi' }, { symbol: 'Ω', name: 'Omega' }
+        ];
+
+        // コイン固有手数料 (買い/売り 片道 %)
+        const FEE_MAP = {
+            'Α': 0.0020, 'Β': 0.0015, 'Γ': 0.0030, 'Δ': 0.0018, 'Ε': 0.0025,
+            'Ζ': 0.0035, 'Η': 0.0012, 'Θ': 0.0022, 'Ι': 0.0040, 'Κ': 0.0010,
+            'Λ': 0.0028, 'Μ': 0.0014, 'Ν': 0.0032, 'Ξ': 0.0050, 'Ο': 0.0016,
+            'Π': 0.0019, 'Ρ': 0.0026, 'Σ': 0.0013, 'Τ': 0.0029, 'Υ': 0.0038,
+            'Φ': 0.0021, 'Χ': 0.0045, 'Ψ': 0.0033, 'Ω': 0.0017
+        };
+
+        // ---------- ゲーム状態 ----------
+        let state = {
+            // 日付 (年, 月) 2026/01 開始
+            year: 2026,
+            month: 1,
+            // 通帳残高 (万円)
+            bank: 200,
+            // アプリ残高 (万円)
+            app: 30,
+            // 保有コイン: { symbol: 数量 }
+            holdings: {},
+            // コイン価格 (万円 / 1コイン) 初期値は 0.5〜5.0 万円
+            prices: {},
+            // 前月価格 (変化率表示用)
+            prevPrices: {},
+            // イベントフラグ (今月発生済み)
+            eventOccurred: false,
+            // ガソリンカウンタ (3ヶ月)
+            gasCounter: 0,
+            // ログ
+            logs: [],
+            // 勝敗フラグ
+            gameOver: false,
+            result: null // 'win', 'lose', 'semiwin', 'semilose'
+        };
+
+        // コインシンボル配列
+        const SYMBOLS = GREEK_COINS.map(c => c.symbol);
+
+        // DOM 参照
+        const $ = id => document.getElementById(id);
+        const displayDate = $('displayDate');
+        const displayBank = $('displayBank');
+        const displayApp = $('displayApp');
+        const displayTotal = $('displayTotal');
+        const coinList = $('coinList');
+        const tradeCoinSelect = $('tradeCoinSelect');
+        const tradeAmount = $('tradeAmount');
+        const tradeMsg = $('tradeMsg');
+        const logBox = $('logBox');
+        const btnNext = $('btnNextMonth');
+        const btnReset = $('btnReset');
+        const btnBuy = $('btnBuy');
+        const btnSell = $('btnSell');
+        const btnDeposit = $('btnDeposit');
+        const btnWithdraw = $('btnWithdraw');
+        const depositAmount = $('depositAmount');
+        const withdrawAmount = $('withdrawAmount');
+
+        // ---------- 初期化 / リセット ----------
+        function initGame() {
+            state.year = 2026;
+            state.month = 1;
+            state.bank = 200;
+            state.app = 30;
+            state.holdings = {};
+            state.eventOccurred = false;
+            state.gasCounter = 0;
+            state.logs = [];
+            state.gameOver = false;
+            state.result = null;
+
+            // 価格初期化 (0.5〜5.0)
+            const prices = {};
+            const prev = {};
+            SYMBOLS.forEach(sym => {
+                const base = 1.0 + Math.random() * 4.0;
+                prices[sym] = Math.round((base + Math.random() * 0.5) * 100) / 100;
+                prev[sym] = prices[sym];
+            });
+            state.prices = prices;
+            state.prevPrices = { ...prices };
+
+            // 保有コインは空
+            SYMBOLS.forEach(sym => state.holdings[sym] = 0);
+
+            // ガソリンカウンタリセット
+            state.gasCounter = 0;
+
+            // ログ初期
+            addLog('🔄 ゲームをリセットしました (2026/01)');
+
+            // 表示更新
+            updateAllUI();
+            updateCoinSelect();
+            tradeMsg.innerText = '取引準備完了';
+            checkGameEnd();
+        }
+
+        // ---------- ログ追加 ----------
+        function addLog(msg) {
+            state.logs.unshift(msg);
+            if (state.logs.length > 50) state.logs.pop();
+            renderLogs();
+        }
+
+        function renderLogs() {
+            logBox.innerHTML = state.logs.map(m => `<div>${m}</div>`).join('');
+        }
+
+        // ---------- UI更新 ----------
+        function updateAllUI() {
+            const dateStr = `${state.year}/${String(state.month).padStart(2, '0')}`;
+            displayDate.innerText = dateStr;
+            displayBank.innerText = state.bank.toFixed(1);
+            displayApp.innerText = state.app.toFixed(1);
+            const total = state.bank + state.app + getHoldingsValue();
+            displayTotal.innerText = total.toFixed(1);
+            renderCoinList();
+            updateCoinSelect();
+        }
+
+        // 保有資産評価額 (万円)
+        function getHoldingsValue() {
+            let val = 0;
+            for (const sym in state.holdings) {
+                val += state.holdings[sym] * (state.prices[sym] || 0);
+            }
+            return val;
+        }
+
+        // コイン一覧描画
+        function renderCoinList() {
+            let html = '';
+            SYMBOLS.forEach(sym => {
+                const price = state.prices[sym] || 0;
+                const prev = state.prevPrices[sym] || price;
+                const change = prev !== 0 ? ((price - prev) / prev * 100) : 0;
+                const changeClass = change >= 0 ? 'change-up' : 'change-down';
+                const arrow = change >= 0 ? '▲' : '▼';
+                const name = GREEK_COINS.find(c => c.symbol === sym)?.name || sym;
+                const hold = state.holdings[sym] || 0;
+                html += `<div class="coin-item">
+                    <span class="name">${sym} ${name}</span>
+                    <span class="price">${price.toFixed(2)}</span><br>
+                    <span style="font-size:12px;">${arrow} ${Math.abs(change).toFixed(1)}%</span>
+                    <span style="font-size:12px; margin-left:8px; color:#8fa3c9;">持${hold.toFixed(3)}</span>
+                </div>`;
+            });
+            coinList.innerHTML = html;
+        }
+
+        // コインセレクト更新
+        function updateCoinSelect() {
+            const current = tradeCoinSelect.value;
+            tradeCoinSelect.innerHTML = SYMBOLS.map(sym => {
+                const name = GREEK_COINS.find(c => c.symbol === sym)?.name || sym;
+                return `<option value="${sym}">${sym} ${name}</option>`;
+            }).join('');
+            if (SYMBOLS.includes(current)) tradeCoinSelect.value = current;
+        }
+
+        // ---------- 次の月へ (イベント・価格変動・生活費) ----------
+        function advanceMonth() {
+            if (state.gameOver) {
+                tradeMsg.innerText = '⚠️ ゲームは終了しています。リセットしてください。';
+                return;
+            }
+
+            // ガソリンカウンタ増加
+            state.gasCounter += 1;
+            // ガソリンイベント (3ヶ月に必ず)
+            if (state.gasCounter % 3 === 0) {
+                state.bank -= 0.3; // 3000円 = 0.3万円
+                addLog(`⛽ ガソリン代 -0.3万円 (残高 ${state.bank.toFixed(1)})`);
+            }
+
+            // ランダムイベント (次の月に進むとき)
+            const rand = Math.random();
+            // 国支給 +10万円 (1/100)
+            if (rand < 0.01) {
+                state.bank += 10;
+                addLog(`🎉 国からの支給 +10万円 (残高 ${state.bank.toFixed(1)})`);
+            }
+            // 車整備 -5万円 (1/11)
+            else if (rand < 0.01 + 1/11) {
+                state.bank -= 5;
+                addLog(`🔧 車整備 -5万円 (残高 ${state.bank.toFixed(1)})`);
+            }
+            // 交通事故 -50万円 (1/100)
+            else if (rand < 0.01 + 1/11 + 0.01) {
+                state.bank -= 50;
+                addLog(`💥 交通事故 -50万円 (残高 ${state.bank.toFixed(1)})`);
+            }
+
+            // 生活費: 家賃2万 + その他4万 = 6万円 (0.6万円)
+            state.bank -= 0.6;
+            // 給料 +7万円 (0.7万円)
+            state.bank += 0.7;
+            // 正味: +0.1万円 (なにもしなければ+1万円)
+
+            // ----- 仮想通貨価格変動 -----
+            // 1ヶ月ごとにランダム上下 (±20% 程度)
+            const newPrices = { ...state.prices };
+            // BTC的な牽引役: コイン「Β」をBTC扱い (ベータ)
+            const btcSym = 'Β';
+            const btcChange = (Math.random() * 0.3) - 0.1; // -10% ~ +20%
+            const btcFactor = 1 + btcChange;
+            // 他のコインはBTCに連動 + 個別ノイズ
+            SYMBOLS.forEach(sym => {
+                let change = (Math.random() * 0.4) - 0.15; // -15% ~ +25%
+                // BTC連動 (50% 連動)
+                if (sym !== btcSym) {
+                    change = change * 0.6 + btcChange * 0.4;
+                }
+                const factor = 1 + change;
+                let newPrice = state.prices[sym] * factor;
+                // 下限0.2 上限20
+                newPrice = Math.min(Math.max(newPrice, 0.2), 20);
+                newPrices[sym] = Math.round(newPrice * 100) / 100;
+            });
+
+            // 保存
+            state.prevPrices = { ...state.prices };
+            state.prices = newPrices;
+
+            // 月を進める
+            state.month += 1;
+            if (state.month > 12) {
+                state.month = 1;
+                state.year += 1;
+            }
+
+            // ゲーム終了チェック (2030/12 超えたら)
+            if (state.year > 2030 || (state.year === 2030 && state.month > 12)) {
+                // 終了処理
+                state.gameOver = true;
+                // 勝敗判定 (通帳ベース)
+                const totalAssets = state.bank + state.app + getHoldingsValue();
+                // ただし勝利条件は通帳1000万円 (出金後)
+                // ここでは通帳残高で判定
+                if (state.bank >= 1000) {
+                    state.result = 'win';
+                } else if (state.bank < 30) {
+                    state.result = 'lose';
+                } else if (state.bank >= 350 && state.bank < 1000) {
+                    state.result = 'semiwin';
+                } else if (state.bank >= 31 && state.bank < 350) {
+                    state.result = 'semilose';
+                } else {
+                    state.result = 'semilose';
+                }
+                addLog(`🏁 ゲーム終了 (${state.year}/${state.month}) 結果: ${state.result}`);
+                updateAllUI();
+                checkGameEnd();
+                return;
+            }
+
+            // 通常更新
+            addLog(`📅 ${state.year}/${String(state.month).padStart(2,'0')} に進みました (残高 ${state.bank.toFixed(1)})`);
+            updateAllUI();
+            tradeMsg.innerText = '月が進みました。取引できます。';
+            checkGameEnd();
+        }
+
+        // ---------- 取引処理 (買い/売り) ----------
+        function executeTrade(type) {
+            if (state.gameOver) {
+                tradeMsg.innerText = '⚠️ ゲーム終了後は取引できません。';
+                return;
+            }
+            const sym = tradeCoinSelect.value;
+            if (!sym) return;
+            const amount = parseFloat(tradeAmount.value);
+            if (!amount || amount <= 0) {
+                tradeMsg.innerText = '❌ 数量は正の値を入力してください。';
+                return;
+            }
+            const price = state.prices[sym] || 0;
+            if (price <= 0) {
+                tradeMsg.innerText = '❌ 価格エラー';
+                return;
+            }
+            const feeRate = FEE_MAP[sym] || 0.002;
+            let cost = amount * price;
+            let fee = cost * feeRate;
+            // 手数料最小0.0001万円
+            fee = Math.max(fee, 0.0001);
+            const totalCost = cost + fee;
+
+            if (type === 'buy') {
+                if (state.app < totalCost) {
+                    tradeMsg.innerText = `❌ アプリ残高不足 (必要 ${totalCost.toFixed(2)} 万円)`;
+                    return;
+                }
+                state.app -= totalCost;
+                state.holdings[sym] = (state.holdings[sym] || 0) + amount;
+                addLog(`🟢 買い ${sym} ${amount.toFixed(3)}枚 @${price.toFixed(2)} 手数料${fee.toFixed(4)}万円`);
+                tradeMsg.innerText = `✅ ${sym} を ${amount.toFixed(3)} 枚購入しました。`;
+            } else if (type === 'sell') {
+                const hold = state.holdings[sym] || 0;
+                if (hold < amount) {
+                    tradeMsg.innerText = `❌ 保有量不足 (保有 ${hold.toFixed(3)})`;
+                    return;
+                }
+                const revenue = amount * price;
+                fee = revenue * feeRate;
+                fee = Math.max(fee, 0.0001);
+                const net = revenue - fee;
+                state.holdings[sym] = hold - amount;
+                state.app += net;
+                addLog(`🔴 売り ${sym} ${amount.toFixed(3)}枚 @${price.toFixed(2)} 手数料${fee.toFixed(4)}万円`);
+                tradeMsg.innerText = `✅ ${sym} を ${amount.toFixed(3)} 枚売却しました。`;
+            }
+            updateAllUI();
+            checkGameEnd();
+        }
+
+        // ---------- 入金 / 出金 ----------
+        function deposit() {
+            if (state.gameOver) return;
+            let val = parseFloat(depositAmount.value);
+            if (!val || val <= 0) { tradeMsg.innerText = '入金額を正しく入力'; return; }
+            if (state.bank < val) { tradeMsg.innerText = '通帳残高不足'; return; }
+            // 手数料
+            const fee = val < 3 ? 0.055 : 0.077; // 万円
+            if (state.bank < val + fee) { tradeMsg.innerText = '手数料を含めると残高不足'; return; }
+            state.bank -= (val + fee);
+            state.app += val;
+            addLog(`🏦 入金 ${val.toFixed(1)}万円 (手数料 ${fee.toFixed(3)}万円)`);
+            tradeMsg.innerText = `入金完了 (手数料 ${fee.toFixed(2)}万円)`;
+            updateAllUI();
+            checkGameEnd();
+        }
+
+        function withdraw() {
+            if (state.gameOver) return;
+            let val = parseFloat(withdrawAmount.value);
+            if (!val || val <= 0) { tradeMsg.innerText = '出金額を正しく入力'; return; }
+            if (state.app < val) { tradeMsg.innerText = 'アプリ残高不足'; return; }
+            const fee = val < 3 ? 0.055 : 0.077;
+            if (state.app < val + fee) { tradeMsg.innerText = '手数料込みで不足'; return; }
+            state.app -= (val + fee);
+            state.bank += val;
+            addLog(`🏦 出金 ${val.toFixed(1)}万円 (手数料 ${fee.toFixed(3)}万円)`);
+            tradeMsg.innerText = `出金完了 (手数料 ${fee.toFixed(2)}万円)`;
+            updateAllUI();
+            checkGameEnd();
+        }
+
+        // ---------- ゲーム終了判定 & 画面遷移 (擬似) ----------
+        function checkGameEnd() {
+            if (state.gameOver) return;
+            // 勝利条件: 通帳が1000万円以上
+            if (state.bank >= 1000) {
+                state.gameOver = true;
+                state.result = 'win';
+                addLog('🏆 勝利！ 通帳が1000万円に到達しました！');
+                tradeMsg.innerText = '🎉 勝利！ おめでとうございます！';
+                updateAllUI();
+                showResultScreen();
+                return;
+            }
+            // 負け条件: 通帳が30万円未満 (ただし入金制限あり)
+            if (state.bank < 30) {
+                state.gameOver = true;
+                state.result = 'lose';
+                addLog('💀 敗北... 通帳が30万円を下回りました。');
+                tradeMsg.innerText = '💀 ゲームオーバー...';
+                updateAllUI();
+                showResultScreen();
+                return;
+            }
+            // 日付終了は advanceMonth 内で処理
+        }
+
+        function showResultScreen() {
+            // 勝利 or やや勝利 → doll.html に誘導 (非表示は実際には遷移)
+            if (state.result === 'win' || state.result === 'semiwin') {
+                // 実際には window.location.href = 'doll.html'; にするが、デモではアラート
+                alert('🎉 勝利またはやや勝利！ doll.html へ誘導します。 (実際は遷移)');
+                // window.location.href = 'doll.html';
+            } else {
+                alert('😞 敗北またはやや敗北... ゲーム終了');
+            }
+            // ゲームコンテナを非表示にする (疑似)
+            document.querySelector('.game-container').style.opacity = '0.4';
+            document.querySelector('.game-container').style.pointerEvents = 'none';
+        }
+
+        // ---------- リセット ----------
+        function resetGame() {
+            if (confirm('ゲームをリセットしますか？')) {
+                initGame();
+                document.querySelector('.game-container').style.opacity = '1';
+                document.querySelector('.game-container').style.pointerEvents = 'auto';
+            }
+        }
+
+        // ---------- イベントバインド ----------
+        btnNext.addEventListener('click', advanceMonth);
+        btnReset.addEventListener('click', resetGame);
+        btnBuy.addEventListener('click', () => executeTrade('buy'));
+        btnSell.addEventListener('click', () => executeTrade('sell'));
+        btnDeposit.addEventListener('click', deposit);
+        btnWithdraw.addEventListener('click', withdraw);
+
+        // ---------- スタート ----------
+        initGame();
+
+        // 補助: 取引手数料表示
+        tradeCoinSelect.addEventListener('change', () => {
+            const sym = tradeCoinSelect.value;
+            const fee = (FEE_MAP[sym] || 0) * 100;
+            tradeMsg.innerText = `手数料: ${fee.toFixed(2)}% (売買片道)`;
+        });
+
+        // 初期メッセージ
+        setTimeout(() => {
+            tradeMsg.innerText = '取引するコインを選んで数量を入力。';
+        }, 300);
+
+    })();
+</script>
+</body>
+</html>
