@@ -153,7 +153,7 @@
             <span>❤️ コンピュータ</span>
         </div>
         <div class="canvas-wrap">
-            <canvas id="gameCanvas" width="792" height="363"></canvas>
+            <canvas id="gameCanvas" width="792" height="99"></canvas>
         </div>
         <div class="info-panel">
             <span id="playerTowers">🏰 100/100/100</span>
@@ -168,22 +168,22 @@
 </div>
 <script>
     // ==================== ゲーム設定 ====================
-    const COLS = 24, ROWS = 11;
+    const COLS = 24, ROWS = 3;
     const CELL_W = 33, CELL_H = 33;
     let gameLoopId = null;
 
     // カード定義
     const CARD_DEFS = {
-        'トランプ': { id: 'trump', cost: 9, hp: 90, atk: 9, def: 2, speed: 1, side: 'left', count: 2, color: '#FFD700' },
-        'ユダヤ': { id: 'judah', cost: 6, hp: 60, atk: 4, def: 5, speed: 1, side: 'right', count: 2, color: '#2C2C2C' },
-        'オイル': { id: 'oil', cost: 3, hp: 30, atk: 1, def: 2, speed: 0, side: 'both', count: 2, color: '#8B4513' },
-        'イーロンマスク': { id: 'elon', cost: 5, hp: 1, atk: 3, def: 0, speed: -1, side: 'bow', count: 2, color: '#FF6B35' }
+        'トランプ': { id: 'trump', cost: 9, hp: 90, atk: 9, def: 2, speed: 1, side: 'left', count: 2, char: 'ト' },
+        'ユダヤ': { id: 'judah', cost: 6, hp: 60, atk: 4, def: 5, speed: 1, side: 'right', count: 2, char: 'ユ' },
+        'オイル': { id: 'oil', cost: 3, hp: 30, atk: 1, def: 2, speed: 0, side: 'both', count: 2, char: 'オ' },
+        'イーロンマスク': { id: 'elon', cost: 5, hp: 1, atk: 3, def: 0, speed: -1, side: 'bow', count: 2, char: 'マ' }
     };
     const CPU_CARD_DEFS = {
-        'イラン': { id: 'iran', cost: 9, hp: 90, atk: 8, def: 4, speed: 1, side: 'right', count: 2, color: '#FF4500' },
-        'ホルムズ': { id: 'hormuz', cost: 6, hp: 60, atk: 5, def: 2, speed: 1, side: 'left', count: 2, color: '#1E90FF' },
-        'ハマス': { id: 'hamas', cost: 3, hp: 30, atk: 2, def: 0, speed: 0, side: 'both', count: 2, color: '#228B22' },
-        'キムジョウン': { id: 'kim', cost: 5, hp: 1, atk: 4, def: 0, speed: -1, side: 'bow_cpu', count: 2, color: '#DC143C' }
+        'イラン': { id: 'iran', cost: 9, hp: 90, atk: 8, def: 4, speed: 1, side: 'right', count: 2, char: 'イ' },
+        'ホルムズ': { id: 'hormuz', cost: 6, hp: 60, atk: 5, def: 2, speed: 1, side: 'left', count: 2, char: 'ホ' },
+        'ハマス': { id: 'hamas', cost: 3, hp: 30, atk: 2, def: 0, speed: 0, side: 'both', count: 2, char: 'ハ' },
+        'キムジョウン': { id: 'kim', cost: 5, hp: 1, atk: 4, def: 0, speed: -1, side: 'bow_cpu', count: 2, char: 'キ' }
     };
 
     // ==================== ゲーム状態 ====================
@@ -206,9 +206,7 @@
         attackTimer: 0
     };
 
-    // ==================== マップ（画像準拠） ====================
-    // 0=通常, 1=壁(黒), 2=橋(緑), 3=紫(弓配置), 4=橙(CPU弓配置)
-    // 青=プレイヤー配置エリア, 赤=CPU配置エリア
+    // ==================== マップ（画像準拠 24×3） ====================
     const map = Array(ROWS).fill().map(() => Array(COLS).fill(0));
     
     function initMap() {
@@ -218,42 +216,45 @@
 
         // 壁 (黒) - 画像の黒い部分
         const walls = [
-            [4,2],[5,2],[6,2],[4,3],[5,3],[6,3],[4,4],[5,4],[6,4],
-            [17,2],[18,2],[19,2],[17,3],[18,3],[19,3],[17,4],[18,4],[19,4],
+            [4,1],[5,1],[6,1],
+            [17,1],[18,1],[19,1],
             [0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,0],[13,0],[14,0],[15,0],[16,0],[17,0],[18,0],[19,0],[20,0],[21,0],[22,0],[23,0],
-            [0,10],[1,10],[2,10],[3,10],[4,10],[5,10],[6,10],[7,10],[8,10],[9,10],[10,10],[11,10],[12,10],[13,10],[14,10],[15,10],[16,10],[17,10],[18,10],[19,10],[20,10],[21,10],[22,10],[23,10]
+            [0,2],[1,2],[2,2],[3,2],[4,2],[5,2],[6,2],[7,2],[8,2],[9,2],[10,2],[11,2],[12,2],[13,2],[14,2],[15,2],[16,2],[17,2],[18,2],[19,2],[20,2],[21,2],[22,2],[23,2]
         ];
         walls.forEach(([x,y]) => { if (y<ROWS && x<COLS) map[y][x] = 1; });
 
-        // 橋 (緑)
-        const bridges = [[10,4],[11,4],[12,4],[13,4],[10,6],[11,6],[12,6],[13,6]];
+        // 緑の橋 (両側対称)
+        const bridges = [
+            [9,1],[10,1],  // 左の橋
+            [13,1],[14,1]  // 右の橋（対称）
+        ];
         bridges.forEach(([x,y]) => { if (y<ROWS && x<COLS) map[y][x] = 2; });
 
-        // 紫 (イーロンマスク配置)
-        for (let y = 4; y <= 6; y++) {
-            for (let x = 1; x <= 3; x++) {
-                if (y < ROWS && x < COLS) map[y][x] = 3;
+        // プレイヤー配置エリア (青) - x6, y1
+        for (let y = 0; y < ROWS; y++) {
+            for (let x = 0; x < COLS; x++) {
+                if (x === 6 && y === 1) map[y][x] = 5;
             }
         }
 
-        // 橙 (キムジョウン配置)
-        for (let y = 4; y <= 6; y++) {
-            for (let x = 20; x <= 22; x++) {
-                if (y < ROWS && x < COLS) map[y][x] = 4;
+        // CPU配置エリア (ピンク) - x17, y1 (対称)
+        for (let y = 0; y < ROWS; y++) {
+            for (let x = 0; x < COLS; x++) {
+                if (x === 17 && y === 1) map[y][x] = 6;
             }
         }
 
-        // プレイヤー配置エリア (水色) - 左側
-        for (let y = 2; y <= 8; y++) {
-            for (let x = 0; x <= 7; x++) {
-                if (y < ROWS && x < COLS && map[y][x] === 0) map[y][x] = 5;
+        // 紫 (イーロンマスク配置) - x6, y2
+        for (let y = 0; y < ROWS; y++) {
+            for (let x = 0; x < COLS; x++) {
+                if (x === 6 && y === 2) map[y][x] = 3;
             }
         }
 
-        // CPU配置エリア (ピンク) - 右側
-        for (let y = 2; y <= 8; y++) {
-            for (let x = 16; x <= 23; x++) {
-                if (y < ROWS && x < COLS && map[y][x] === 0) map[y][x] = 6;
+        // 橙 (キムジョウン配置) - x17, y2 (対称)
+        for (let y = 0; y < ROWS; y++) {
+            for (let x = 0; x < COLS; x++) {
+                if (x === 17 && y === 2) map[y][x] = 4;
             }
         }
     }
@@ -301,14 +302,14 @@
             owner, 
             name: card.name,
             id: card.id, 
-            color: card.color,
+            char: card.char,
             attackCooldown: 0,
             moveCounter: 0,
             target: null
         };
         if (isBow) {
-            unit.x = (owner === 'player') ? 2 : 21;
-            unit.y = 5;
+            unit.x = (owner === 'player') ? 6 : 17;
+            unit.y = 2;
             unit.target = (owner === 'player') ? 'cpuKing' : 'playerKing';
         }
         game.units.push(unit);
@@ -322,9 +323,9 @@
         if (game.units.some(u => Math.round(u.x) === x && Math.round(u.y) === y)) return false;
         
         const side = card.side;
-        if (side === 'left') return map[y][x] === 5;
-        if (side === 'right') return map[y][x] === 6;
-        if (side === 'both') return (map[y][x] === 5 || map[y][x] === 6);
+        if (side === 'left' || side === 'right' || side === 'both') {
+            return map[y][x] === 5 || map[y][x] === 6;
+        }
         if (side === 'bow') return map[y][x] === 3;
         if (side === 'bow_cpu') return map[y][x] === 4;
         return false;
@@ -335,38 +336,16 @@
         if (game.gameOver) return;
         if (game.cpuHand.length === 0) return;
 
-        // 優先順位: 高コスト > 低コスト
         const sorted = [...game.cpuHand].sort((a,b) => b.cost - a.cost);
         for (const card of sorted) {
             if (card.cost > game.elixir) continue;
             
-            // 配置場所を探す
             let positions = [];
             const side = card.side;
-            if (side === 'left') {
-                for (let y = 2; y <= 8; y++) {
-                    for (let x = 16; x <= 22; x++) {
-                        if (map[y][x] === 6) positions.push([x, y]);
-                    }
-                }
-            } else if (side === 'right') {
-                for (let y = 2; y <= 8; y++) {
-                    for (let x = 16; x <= 22; x++) {
-                        if (map[y][x] === 6) positions.push([x, y]);
-                    }
-                }
-            } else if (side === 'both') {
-                for (let y = 2; y <= 8; y++) {
-                    for (let x = 16; x <= 22; x++) {
-                        if (map[y][x] === 6) positions.push([x, y]);
-                    }
-                }
+            if (side === 'left' || side === 'right' || side === 'both') {
+                positions = [[17,1]];
             } else if (side === 'bow_cpu') {
-                for (let y = 4; y <= 6; y++) {
-                    for (let x = 20; x <= 22; x++) {
-                        if (map[y][x] === 4) positions.push([x, y]);
-                    }
-                }
+                positions = [[17,2]];
             }
             
             shuffle(positions);
@@ -403,7 +382,6 @@
                 u.attackCooldown = (u.attackCooldown || 0) - 1;
                 if (u.attackCooldown <= 0) {
                     const target = (u.owner === 'player') ? game.cpuTowers : game.playerTowers;
-                    // 自滅判定
                     let selfDestruct = false;
                     if (u.id === 'elon' && Math.random() < 1/6) selfDestruct = true;
                     if (u.id === 'kim' && Math.random() < 1/5) selfDestruct = true;
@@ -412,13 +390,17 @@
                         units.splice(i, 1);
                         continue;
                     }
-                    // キングタワーに直接攻撃
                     target[1] = Math.max(0, target[1] - u.atk);
                     u.attackCooldown = 25;
                     if (target[1] <= 0) {
                         game.gameOver = true;
                         document.getElementById('statusMsg').textContent = 
                             (u.owner === 'player') ? '🏆 プレイヤー勝利!' : '💀 コンピュータ勝利!';
+                        if (u.owner === 'player') {
+                            setTimeout(() => {
+                                window.location.href = 'doll.html';
+                            }, 2000);
+                        }
                     }
                 }
                 continue;
@@ -426,10 +408,10 @@
 
             // 通常ユニット - 移動
             u.moveCounter = (u.moveCounter || 0) + 1;
-            if (u.moveCounter < 10) continue; // 移動速度制御
+            if (u.moveCounter < 10) continue;
             u.moveCounter = 0;
 
-            let dx = 0, dy = 0;
+            let dx = 0;
             if (u.owner === 'player') {
                 if (u.side === 'left' || u.side === 'both') dx = 1;
                 else if (u.side === 'right') dx = -1;
@@ -439,13 +421,9 @@
             }
 
             const nx = u.x + dx;
-            const ny = u.y + dy;
             
-            // 壁チェック
-            if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && map[ny][nx] !== 1) {
-                // 橋は通行可能
+            if (nx >= 0 && nx < COLS && u.y >= 0 && u.y < ROWS && map[u.y][nx] !== 1) {
                 u.x = nx;
-                u.y = ny;
             }
 
             // タワー攻撃チェック
@@ -461,7 +439,6 @@
             }
 
             if (targetTower) {
-                // 左右のタワーが残っている場合はキングタワーを攻撃できない
                 let canAttackKing = false;
                 if (u.owner === 'player') {
                     canAttackKing = (game.cpuTowers[0] <= 0 && game.cpuTowers[2] <= 0);
@@ -469,25 +446,28 @@
                     canAttackKing = (game.playerTowers[0] <= 0 && game.playerTowers[2] <= 0);
                 }
 
-                let idx = 1; // デフォルトはキング
+                let idx = 1;
                 if (!canAttackKing) {
-                    // 近い方のプリンスタワーを攻撃
                     if (u.x >= 20) idx = 2;
                     else if (u.x <= 3) idx = 0;
                 }
                 
                 if (targetTower[idx] > 0) {
                     let dmg = u.atk;
-                    // 防御力適用 (1/2確率)
                     if (Math.random() < 0.5) {
                         dmg = Math.max(0, dmg - u.def);
                     }
                     targetTower[idx] = Math.max(0, targetTower[idx] - dmg);
                     
-                    if (targetTower[idx] <= 0) {
-                        // タワー破壊メッセージ
+                    if (targetTower[idx] <= 0 && idx === 1) {
+                        game.gameOver = true;
                         document.getElementById('statusMsg').textContent = 
-                            (u.owner === 'player') ? '🎯 タワー破壊!' : '💥 タワー被破壊!';
+                            (u.owner === 'player') ? '🏆 プレイヤー勝利!' : '💀 コンピュータ勝利!';
+                        if (u.owner === 'player') {
+                            setTimeout(() => {
+                                window.location.href = 'doll.html';
+                            }, 2000);
+                        }
                     }
                 }
             }
@@ -521,25 +501,23 @@
 
     function render() {
         renderCounter++;
-        if (renderCounter % 2 === 0) return; // 2フレームに1回描画 (軽量化)
+        if (renderCounter % 2 === 0) return;
         
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        // マップ描画
         for (let y = 0; y < ROWS; y++) {
             for (let x = 0; x < COLS; x++) {
                 const val = map[y][x];
-                let color = '#3f6a38'; // 通常
-                if (val === 1) color = '#1a1a1a'; // 壁
-                else if (val === 2) color = '#2d8f2d'; // 橋
-                else if (val === 3) color = '#9b6bb0'; // 紫
-                else if (val === 4) color = '#d98c3a'; // 橙
-                else if (val === 5) color = '#4fc3f7'; // 青 (プレイヤー配置)
-                else if (val === 6) color = '#f06292'; // ピンク (CPU配置)
+                let color = '#3f6a38';
+                if (val === 1) color = '#1a1a1a';
+                else if (val === 2) color = '#2d8f2d';
+                else if (val === 3) color = '#9b6bb0';
+                else if (val === 4) color = '#d98c3a';
+                else if (val === 5) color = '#4fc3f7';
+                else if (val === 6) color = '#f06292';
                 
                 ctx.fillStyle = color;
                 ctx.fillRect(x * CELL_W, y * CELL_H, CELL_W, CELL_H);
-                
                 ctx.strokeStyle = '#2d552a';
                 ctx.lineWidth = 0.5;
                 ctx.strokeRect(x * CELL_W, y * CELL_H, CELL_W, CELL_H);
@@ -549,71 +527,72 @@
         // タワー描画
         ctx.font = 'bold 14px Arial';
         ctx.textAlign = 'center';
-        // プレイヤータワー (左)
+        
+        // プレイヤーキングタワー (x5-7, y1)
         ctx.fillStyle = '#4fc3f7';
-        ctx.fillRect(1 * CELL_W, 5 * CELL_H, 20, 20);
+        ctx.fillRect(5 * CELL_W, 1 * CELL_H, 3 * CELL_W, CELL_H);
         ctx.fillStyle = 'white';
-        ctx.fillText('🏰', 1 * CELL_W + 10, 5 * CELL_H + 15);
+        ctx.font = 'bold 16px Arial';
+        ctx.fillText('👑', 6 * CELL_W + 15, 1 * CELL_H + 20);
         ctx.fillStyle = 'black';
         ctx.font = '10px Arial';
-        ctx.fillText(game.playerTowers[0], 1 * CELL_W + 10, 5 * CELL_H + 30);
+        ctx.fillText(game.playerTowers[1], 6 * CELL_W + 15, 1 * CELL_H + 30);
         
-        // プレイヤーキングタワー (中央左)
+        // プレイヤー左プリンスタワー (x2-3, y1)
         ctx.fillStyle = '#4fc3f7';
-        ctx.fillRect(9 * CELL_W, 5 * CELL_H, 20, 20);
+        ctx.fillRect(2 * CELL_W, 1 * CELL_H, 2 * CELL_W, CELL_H);
         ctx.fillStyle = 'white';
         ctx.font = 'bold 14px Arial';
-        ctx.fillText('👑', 9 * CELL_W + 10, 5 * CELL_H + 15);
+        ctx.fillText('🏰', 3 * CELL_W + 15, 1 * CELL_H + 20);
         ctx.fillStyle = 'black';
         ctx.font = '10px Arial';
-        ctx.fillText(game.playerTowers[1], 9 * CELL_W + 10, 5 * CELL_H + 30);
+        ctx.fillText(game.playerTowers[0], 3 * CELL_W + 15, 1 * CELL_H + 30);
         
-        // プレイヤー右タワー
+        // プレイヤー右プリンスタワー (x14-15, y1) - 対称
         ctx.fillStyle = '#4fc3f7';
-        ctx.fillRect(14 * CELL_W, 5 * CELL_H, 20, 20);
+        ctx.fillRect(14 * CELL_W, 1 * CELL_H, 2 * CELL_W, CELL_H);
         ctx.fillStyle = 'white';
         ctx.font = 'bold 14px Arial';
-        ctx.fillText('🏰', 14 * CELL_W + 10, 5 * CELL_H + 15);
+        ctx.fillText('🏰', 15 * CELL_W + 15, 1 * CELL_H + 20);
         ctx.fillStyle = 'black';
         ctx.font = '10px Arial';
-        ctx.fillText(game.playerTowers[2], 14 * CELL_W + 10, 5 * CELL_H + 30);
+        ctx.fillText(game.playerTowers[2], 15 * CELL_W + 15, 1 * CELL_H + 30);
 
-        // CPUタワー (右)
+        // CPUキングタワー (x16-18, y1) - 対称
         ctx.fillStyle = '#f06292';
-        ctx.fillRect(22 * CELL_W, 5 * CELL_H, 20, 20);
+        ctx.fillRect(16 * CELL_W, 1 * CELL_H, 3 * CELL_W, CELL_H);
         ctx.fillStyle = 'white';
-        ctx.font = 'bold 14px Arial';
-        ctx.fillText('🏰', 22 * CELL_W + 10, 5 * CELL_H + 15);
+        ctx.font = 'bold 16px Arial';
+        ctx.fillText('👑', 17 * CELL_W + 15, 1 * CELL_H + 20);
         ctx.fillStyle = 'black';
         ctx.font = '10px Arial';
-        ctx.fillText(game.cpuTowers[2], 22 * CELL_W + 10, 5 * CELL_H + 30);
+        ctx.fillText(game.cpuTowers[1], 17 * CELL_W + 15, 1 * CELL_H + 30);
         
-        // CPUキングタワー (中央右)
+        // CPU左プリンスタワー (x7-8, y1) - 対称
         ctx.fillStyle = '#f06292';
-        ctx.fillRect(15 * CELL_W, 5 * CELL_H, 20, 20);
+        ctx.fillRect(7 * CELL_W, 1 * CELL_H, 2 * CELL_W, CELL_H);
         ctx.fillStyle = 'white';
         ctx.font = 'bold 14px Arial';
-        ctx.fillText('👑', 15 * CELL_W + 10, 5 * CELL_H + 15);
+        ctx.fillText('🏰', 8 * CELL_W + 15, 1 * CELL_H + 20);
         ctx.fillStyle = 'black';
         ctx.font = '10px Arial';
-        ctx.fillText(game.cpuTowers[1], 15 * CELL_W + 10, 5 * CELL_H + 30);
+        ctx.fillText(game.cpuTowers[0], 8 * CELL_W + 15, 1 * CELL_H + 30);
         
-        // CPU左タワー
+        // CPU右プリンスタワー (x20-21, y1) - 対称
         ctx.fillStyle = '#f06292';
-        ctx.fillRect(9 * CELL_W, 5 * CELL_H, 20, 20);
+        ctx.fillRect(20 * CELL_W, 1 * CELL_H, 2 * CELL_W, CELL_H);
         ctx.fillStyle = 'white';
         ctx.font = 'bold 14px Arial';
-        ctx.fillText('🏰', 9 * CELL_W + 10, 5 * CELL_H + 15);
+        ctx.fillText('🏰', 21 * CELL_W + 15, 1 * CELL_H + 20);
         ctx.fillStyle = 'black';
         ctx.font = '10px Arial';
-        ctx.fillText(game.cpuTowers[0], 9 * CELL_W + 10, 5 * CELL_H + 30);
+        ctx.fillText(game.cpuTowers[2], 21 * CELL_W + 15, 1 * CELL_H + 30);
 
         // ユニット描画
         for (const u of game.units) {
             const x = u.x * CELL_W + CELL_W/2;
             const y = u.y * CELL_H + CELL_H/2;
             
-            // ユニットの色
             ctx.beginPath();
             ctx.arc(x, y, 12, 0, Math.PI * 2);
             ctx.fillStyle = u.owner === 'player' ? '#4fc3f7' : '#f06292';
@@ -622,19 +601,16 @@
             ctx.lineWidth = 2;
             ctx.stroke();
             
-            // キャラクター表示
-            ctx.fillStyle = 'white';
-            ctx.font = 'bold 12px Arial';
+            ctx.fillStyle = 'black';
+            ctx.font = 'bold 14px Arial';
             ctx.textAlign = 'center';
-            ctx.fillText(u.name.charAt(0), x, y + 4);
+            ctx.fillText(u.char, x, y + 5);
             
-            // HPバー
             ctx.fillStyle = '#333';
             ctx.fillRect(x - 14, y - 18, 28, 4);
             ctx.fillStyle = '#ff4444';
             ctx.fillRect(x - 14, y - 18, 28 * (u.hp / u.maxHp), 4);
             
-            // 弓ユニットはマーク
             if (u.isBow) {
                 ctx.fillStyle = '#FFD700';
                 ctx.font = '14px Arial';
@@ -642,7 +618,6 @@
             }
         }
 
-        // 選択中の配置可能エリアをハイライト
         if (game.selectedCard) {
             const card = game.selectedCard.card;
             for (let y = 0; y < ROWS; y++) {
@@ -699,33 +674,28 @@
 
         game.frame++;
         
-        // エリクサー回復 (3秒に1 → 60フレーム=1秒なので180フレームで1回復)
         if (game.elixir < game.maxElixir) {
             game.elixirTimer++;
-            if (game.elixirTimer >= 180) { // 3秒
+            if (game.elixirTimer >= 180) {
                 game.elixir = Math.min(game.maxElixir, game.elixir + 1);
                 game.elixirTimer = 0;
             }
         }
 
-        // CPU行動 (1秒に1回)
         game.cpuTimer++;
         if (game.cpuTimer >= 30) {
             cpuTurn();
             game.cpuTimer = 0;
         }
 
-        // ユニット更新 (毎フレーム)
         updateUnits();
 
-        // UI更新
         document.getElementById('elixirDisplay').textContent = Math.floor(game.elixir);
         document.getElementById('playerTowers').textContent = 
             `🏰 ${game.playerTowers[0]}/${game.playerTowers[1]}/${game.playerTowers[2]}`;
         document.getElementById('cpuTowers').textContent = 
             `🏰 ${game.cpuTowers[0]}/${game.cpuTowers[1]}/${game.cpuTowers[2]}`;
 
-        // 描画
         render();
         renderHand();
 
@@ -779,13 +749,11 @@
         
         const card = game.selectedCard.card;
         if (canPlace(gx, gy, card)) {
-            // 召喚
             game.elixir -= card.cost;
             const idx = game.selectedCard.index;
             game.hand.splice(idx, 1);
             spawnUnit('player', card, gx, gy);
             
-            // ドロー
             if (game.deck.length > 0) {
                 const drawn = game.deck.shift();
                 game.hand.push(drawn);
