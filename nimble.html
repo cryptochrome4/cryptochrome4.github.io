@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>鬼ごっこ 24×11</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: linear-gradient(145deg, #1a2a3a, #0f1a24);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', Roboto, system-ui, sans-serif;
+            padding: 16px;
+        }
+
+        .game-container {
+            background: #1e2f3f;
+            padding: 24px 28px 32px;
+            border-radius: 56px 56px 40px 40px;
+            box-shadow: 0 20px 30px rgba(0,0,0,0.7), inset 0 2px 4px rgba(255,255,255,0.08);
+            border: 1px solid #3d5a6d;
+        }
+
+        .grid-wrapper {
+            background: #16232e;
+            padding: 14px 14px 10px 14px;
+            border-radius: 28px;
+            box-shadow: inset 0 0 0 1px #2d4658, inset 0 8px 12px rgba(0,0,0,0.6);
+        }
+
+        canvas {
+            display: block;
+            margin: 0 auto;
+            width: 100%;
+            height: auto;
+            aspect-ratio: 24 / 11;
+            background: #1c2d3b;
+            border-radius: 20px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+            image-rendering: crisp-edges; /* ドット感 */
+            image-rendering: pixelated;
+            touch-action: none;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 22px;
+            gap: 12px 10px;
+        }
+
+        .speed-panel {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px 14px;
+            background: #13212b;
+            padding: 8px 18px 8px 16px;
+            border-radius: 60px;
+            border: 1px solid #355066;
+        }
+
+        .speed-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: #b6d0e0;
+            font-weight: 500;
+            font-size: 0.85rem;
+            letter-spacing: 0.3px;
+            text-shadow: 0 1px 2px black;
+        }
+
+        .speed-item select {
+            background: #1f3342;
+            color: #eaf2f9;
+            border: 1px solid #3d6077;
+            border-radius: 30px;
+            padding: 5px 10px 5px 8px;
+            font-weight: bold;
+            font-size: 0.8rem;
+            cursor: pointer;
+            outline: none;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .speed-item select option {
+            background: #1f3342;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-left: auto;
+        }
+
+        .btn {
+            background: #2f4a5e;
+            border: none;
+            border-radius: 40px;
+            padding: 8px 22px;
+            font-weight: 700;
+            font-size: 0.95rem;
+            color: #f0f9ff;
+            text-shadow: 0 1px 2px black;
+            box-shadow: 0 6px 0 #0e1a22, 0 4px 10px rgba(0,0,0,0.4);
+            cursor: pointer;
+            transition: all 0.06s linear;
+            letter-spacing: 0.5px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border: 1px solid #4f738b;
+        }
+
+        .btn:active {
+            transform: translateY(6px);
+            box-shadow: 0 1px 0 #0e1a22;
+        }
+
+        .btn.reset {
+            background: #5f4a3a;
+            border-color: #7f624a;
+        }
+
+        .btn.win {
+            background: #2d6b4a;
+            border-color: #4d9b6a;
+        }
+
+        #timerDisplay {
+            background: #0b171f;
+            padding: 4px 16px;
+            border-radius: 60px;
+            font-size: 1.7rem;
+            font-weight: 700;
+            color: #b3e4ff;
+            text-shadow: 0 0 8px #0088ff80;
+            letter-spacing: 2px;
+            border: 1px solid #2c5775;
+            min-width: 90px;
+            text-align: center;
+            box-shadow: inset 0 2px 6px black;
+        }
+
+        .status-msg {
+            color: #d7e9f5;
+            font-size: 0.95rem;
+            font-weight: 500;
+            background: #1f3543;
+            padding: 4px 20px;
+            border-radius: 40px;
+            border: 1px solid #3b6179;
+            min-height: 2.4rem;
+            display: flex;
+            align-items: center;
+        }
+
+        @media (max-width: 700px) {
+            .game-container {
+                padding: 12px;
+            }
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .speed-panel {
+                justify-content: center;
+            }
+            .btn-group {
+                margin-left: 0;
+                justify-content: center;
+            }
+        }
+
+        /* 勝利オーバーレイ (doll.html 誘導風) */
+        .win-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(6px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 999;
+            flex-direction: column;
+        }
+        .win-overlay.show {
+            display: flex;
+        }
+        .win-card {
+            background: #1d3342;
+            border-radius: 60px 60px 40px 40px;
+            padding: 30px 40px 40px;
+            max-width: 600px;
+            width: 90%;
+            box-shadow: 0 30px 40px rgba(0,0,0,0.8);
+            border: 1px solid #6d9abb;
+            text-align: center;
+        }
+        .win-card h2 {
+            color: #fadf8a;
+            font-size: 2.5rem;
+            margin: 0 0 12px;
+            text-shadow: 0 4px 0 #5f4a1a;
+            letter-spacing: 2px;
+        }
+        .win-card p {
+            color: #bddcee;
+            font-size: 1.1rem;
+        }
+        .win-card .doll-link {
+            display: inline-block;
+            background: #3d7a5a;
+            padding: 12px 30px;
+            border-radius: 60px;
+            font-weight: bold;
+            color: white;
+            text-decoration: none;
+            margin: 18px 0 10px;
+            border: 1px solid #7fc0a0;
+            box-shadow: 0 6px 0 #1f4532;
+            transition: 0.06s linear;
+            font-size: 1.2rem;
+        }
+        .win-card .doll-link:active {
+            transform: translateY(6px);
+            box-shadow: 0 1px 0 #1f4532;
+        }
+        .win-card .image-gallery {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 12px;
+            margin: 20px 0 10px;
+        }
+        .win-card .image-gallery img {
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 16px;
+            border: 2px solid #4f7b94;
+            background: #0b1a24;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+            transition: 0.1s;
+        }
+        .win-card .image-gallery img:hover {
+            transform: scale(1.05);
+            border-color: #eac67a;
+        }
+        .win-card .close-btn {
+            background: #5a4a4a;
+            border: none;
+            border-radius: 40px;
+            padding: 8px 30px;
+            color: white;
+            font-weight: bold;
+            margin-top: 10px;
+            cursor: pointer;
+            border: 1px solid #8f7676;
+            box-shadow: 0 4px 0 #322a2a;
+            transition: 0.06s linear;
+        }
+        .win-card .close-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 1px 0 #322a2a;
+        }
+        .win-card .image-note {
+            font-size: 0.8rem;
+            color: #90b4c9;
+            background: #0b1a24;
+            padding: 6px 12px;
+            border-radius: 40px;
+            display: inline-block;
+            margin-top: 6px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="game-container">
+    <div class="grid-wrapper">
+        <canvas id="gameCanvas" width="480" height="220"></canvas>
+    </div>
+
+    <div class="controls">
+        <div class="speed-panel">
+            <span class="speed-item">
+                🏃 鬼 <select id="oniSpeedSelect">
+                    <option value="slow">遅い</option>
+                    <option value="normal" selected>普通</option>
+                    <option value="fast">速い</option>
+                </select>
+            </span>
+            <span class="speed-item">
+                🧑 主 <select id="playerSpeedSelect">
+                    <option value="slow">遅い</option>
+                    <option value="normal" selected>普通</option>
+                    <option value="fast">速い</option>
+                </select>
+            </span>
+        </div>
+        <div id="timerDisplay">30</div>
+        <div class="btn-group">
+            <button class="btn reset" id="resetGameBtn">🔄 再戦</button>
+        </div>
+    </div>
+    <div style="display:flex; justify-content: space-between; margin-top: 8px;">
+        <div class="status-msg" id="statusMsg">▶ 矢印キーで移動</div>
+        <div style="color:#7a9bb3; font-size:0.8rem; align-self:center;">👆 タッチでも操作可</div>
+    </div>
+</div>
+
+<!-- 勝利オーバーレイ (doll.html誘導＋画像ギャラリー) -->
+<div class="win-overlay" id="winOverlay">
+    <div class="win-card">
+        <h2>🏆 勝利！</h2>
+        <p>30秒間 逃げ切った！<br>あなたは 最強の「主」だ！</p>
+        <div style="margin: 10px 0;">
+            <a href="#" class="doll-link" id="dollLink">🎎 doll.html へ誘導</a>
+        </div>
+        <div class="image-gallery" id="imageGallery">
+            <!-- 画像6枚 手動でURLを差し替え可能 -->
+            <img src="https://placehold.co/80x80/3d5a6d/white?text=1" alt="img1" />
+            <img src="https://placehold.co/80x80/5d4a6d/white?text=2" alt="img2" />
+            <img src="https://placehold.co/80x80/2d6b4a/white?text=3" alt="img3" />
+            <img src="https://placehold.co/80x80/8a6a3a/white?text=4" alt="img4" />
+            <img src="https://placehold.co/80x80/4a6a8a/white?text=5" alt="img5" />
+            <img src="https://placehold.co/80x80/8a4a5a/white?text=6" alt="img6" />
+        </div>
+        <div class="image-note">🖼️ 画像URLはコード内の <strong>img src</strong> を手動で差し替え</div>
+        <button class="close-btn" id="closeWinBtn">閉じる</button>
+    </div>
+</div>
+
+<script>
+    (function(){
+        // ---------- 設定 ----------
+        const COLS = 24;
+        const ROWS = 11;
+        const CELL_SIZE = 20; // canvas 480x220
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // 速度マップ (セル/秒)
+        const SPEED_MAP = {
+            slow: 3.0,
+            normal: 5.5,
+            fast: 8.5
+        };
+
+        // ゲーム状態
+        let player = { x: 2, y: 5 };
+        let oni = { x: 21, y: 5 };
+        let gameActive = false;
+        let gameResult = null; // 'win' or 'lose' or null
+        let timer = 30;
+        let timerInterval = null;
+        let animationFrame = null;
+        let lastTimestamp = 0;
+
+        // 速度 (デフォルト normal)
+        let playerSpeed = SPEED_MAP.normal;
+        let oniSpeed = SPEED_MAP.normal;
+
+        // キー入力
+        const keys = {
+            ArrowUp: false,
+            ArrowDown: false,
+            ArrowLeft: false,
+            ArrowRight: false
+        };
+
+        // DOM
+        const timerDisplay = document.getElementById('timerDisplay');
+        const statusMsg = document.getElementById('statusMsg');
+        const winOverlay = document.getElementById('winOverlay');
+        const dollLink = document.getElementById('dollLink');
+        const imageGallery = document.getElementById('imageGallery');
+
+        // ---------- 速度セレクト ----------
+        document.getElementById('oniSpeedSelect').addEventListener('change', function(e) {
+            oniSpeed = SPEED_MAP[e.target.value];
+        });
+        document.getElementById('playerSpeedSelect').addEventListener('change', function(e) {
+            playerSpeed = SPEED_MAP[e.target.value];
+        });
+
+        // ---------- リセット/初期化 ----------
+        function resetGame() {
+            // 停止
+            if (timerInterval) clearInterval(timerInterval);
+            if (animationFrame) cancelAnimationFrame(animationFrame);
+            timerInterval = null;
+            animationFrame = null;
+
+            player = { x: 2, y: 5 };
+            oni = { x: 21, y: 5 };
+            timer = 30;
+            gameActive = true;
+            gameResult = null;
+            winOverlay.classList.remove('show');
+            timerDisplay.textContent = '30';
+            statusMsg.innerText = '▶ 逃げ切れ！ 矢印キー';
+            lastTimestamp = 0;
+
+            // キーリセット
+            for (let k in keys) keys[k] = false;
+
+            draw();
+            startLoop();
+            startTimer();
+        }
+
+        // ---------- タイマー ----------
+        function startTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                if (!gameActive) return;
+                timer -= 1;
+                timerDisplay.textContent = timer >= 0 ? timer : '0';
+                if (timer <= 0) {
+                    // 勝利！
+                    if (gameActive) {
+                        gameActive = false;
+                        gameResult = 'win';
+                        statusMsg.innerText = '🎉 勝利！ 30秒逃げ切った！';
+                        showWinOverlay();
+                    }
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                }
+            }, 1000);
+        }
+
+        // ---------- ゲームループ (移動) ----------
+        function startLoop() {
+            if (animationFrame) cancelAnimationFrame(animationFrame);
+            lastTimestamp = 0;
+            function loop(timestamp) {
+                if (!gameActive) {
+                    draw();
+                    animationFrame = requestAnimationFrame(loop);
+                    return;
+                }
+                if (lastTimestamp === 0) lastTimestamp = timestamp;
+                const delta = Math.min((timestamp - lastTimestamp) / 1000, 0.05);
+                lastTimestamp = timestamp;
+
+                // 移動処理
+                movePlayer(delta);
+                moveOni(delta);
+
+                // 当たり判定 (鬼にタッチ)
+                if (Math.abs(player.x - oni.x) < 0.6 && Math.abs(player.y - oni.y) < 0.6) {
+                    gameActive = false;
+                    gameResult = 'lose';
+                    statusMsg.innerText = '💀 鬼に捕まった... 負け';
+                    if (timerInterval) clearInterval(timerInterval);
+                    timerInterval = null;
+                }
+
+                draw();
+                animationFrame = requestAnimationFrame(loop);
+            }
+            animationFrame = requestAnimationFrame(loop);
+        }
+
+        // ---------- 移動関数 ----------
+        function movePlayer(delta) {
+            if (!gameActive) return;
+            let dx = 0, dy = 0;
+            if (keys.ArrowUp) dy -= 1;
+            if (keys.ArrowDown) dy += 1;
+            if (keys.ArrowLeft) dx -= 1;
+            if (keys.ArrowRight) dx += 1;
+            if (dx === 0 && dy === 0) return;
+
+            const len = Math.sqrt(dx*dx + dy*dy);
+            const normDx = dx / len;
+            const normDy = dy / len;
+
+            const speed = playerSpeed;
+            let newX = player.x + normDx * speed * delta;
+            let newY = player.y + normDy * speed * delta;
+
+            // 壁
+            newX = Math.max(0.3, Math.min(COLS - 0.3, newX));
+            newY = Math.max(0.3, Math.min(ROWS - 0.3, newY));
+
+            player.x = newX;
+            player.y = newY;
+        }
+
+        function moveOni(delta) {
+            if (!gameActive) return;
+            const dx = player.x - oni.x;
+            const dy = player.y - oni.y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            if (dist < 0.01) return;
+
+            const speed = oniSpeed;
+            const step = speed * delta;
+            if (dist <= step) {
+                oni.x = player.x;
+                oni.y = player.y;
+                return;
+            }
+            const ratio = step / dist;
+            oni.x += dx * ratio;
+            oni.y += dy * ratio;
+
+            // 壁ガード
+            oni.x = Math.max(0.3, Math.min(COLS - 0.3, oni.x));
+            oni.y = Math.max(0.3, Math.min(ROWS - 0.3, oni.y));
+        }
+
+        // ---------- 描画 ----------
+        function draw() {
+            ctx.clearRect(0, 0, 480, 220);
+
+            // 背景グリッド (薄い線)
+            ctx.strokeStyle = '#2d4a5e';
+            ctx.lineWidth = 0.4;
+            for (let i = 0; i <= COLS; i++) {
+                ctx.beginPath();
+                ctx.moveTo(i * CELL_SIZE, 0);
+                ctx.lineTo(i * CELL_SIZE, 220);
+                ctx.stroke();
+            }
+            for (let i = 0; i <= ROWS; i++) {
+                ctx.beginPath();
+                ctx.moveTo(0, i * CELL_SIZE);
+                ctx.lineTo(480, i * CELL_SIZE);
+                ctx.stroke();
+            }
+
+            // プレイヤー 「主」
+            const px = player.x * CELL_SIZE, py = player.y * CELL_SIZE;
+            ctx.font = 'bold 18px "Segoe UI", "Meiryo", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.shadowColor = '#aaddff';
+            ctx.shadowBlur = 12;
+            ctx.fillStyle = '#b3eaff';
+            ctx.fillText('主', px, py-1);
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText('主', px, py);
+
+            // 鬼 「鬼」
+            const ox = oni.x * CELL_SIZE, oy = oni.y * CELL_SIZE;
+            ctx.shadowColor = '#ff8866';
+            ctx.shadowBlur = 16;
+            ctx.fillStyle = '#ff6a4a';
+            ctx.fillText('鬼', ox, oy-1);
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#ffb08a';
+            ctx.fillText('鬼', ox, oy);
+
+            // 枠線
+            ctx.strokeStyle = '#9ac2d9';
+            ctx.lineWidth = 1.5;
+            ctx.strokeRect(0, 0, 480, 220);
+
+            // ゲームオーバー表示（オーバーレイしないで簡易表示）
+            if (!gameActive && gameResult === 'lose') {
+                ctx.globalAlpha = 0.5;
+                ctx.fillStyle = '#440000';
+                ctx.fillRect(0, 0, 480, 220);
+                ctx.globalAlpha = 1;
+                ctx.font = 'bold 28px sans-serif';
+                ctx.fillStyle = '#ff8888';
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = '#ff0000';
+                ctx.fillText('💀 LOSE', 240, 110);
+                ctx.shadowBlur = 0;
+            } else if (gameResult === 'win') {
+                // 勝利時はオーバーレイ表示するので、canvasはそのまま
+            }
+        }
+
+        // ---------- 勝利オーバーレイ + doll.html誘導 + 画像ギャラリー ----------
+        function showWinOverlay() {
+            // doll.html リンク (実際はページ遷移)
+            dollLink.href = 'doll.html'; // 仮
+            dollLink.target = '_blank';
+            // 画像ギャラリーは既にHTMLに配置済み。手動でsrcを変更する想定。
+            winOverlay.classList.add('show');
+        }
+
+        // 閉じるボタン
+        document.getElementById('closeWinBtn').addEventListener('click', function() {
+            winOverlay.classList.remove('show');
+        });
+
+        // 再戦ボタン
+        document.getElementById('resetGameBtn').addEventListener('click', function() {
+            resetGame();
+        });
+
+        // ---------- キーボード ----------
+        window.addEventListener('keydown', (e) => {
+            if (e.key in keys) {
+                e.preventDefault();
+                keys[e.key] = true;
+            }
+            if (e.key === 'r' || e.key === 'R') {
+                resetGame();
+            }
+        });
+        window.addEventListener('keyup', (e) => {
+            if (e.key in keys) {
+                e.preventDefault();
+                keys[e.key] = false;
+            }
+        });
+
+        // タッチ / モバイル方向パッド代わり (簡易)
+        canvas.addEventListener('touchstart', handleTouch, { passive: false });
+        canvas.addEventListener('touchmove', handleTouch, { passive: false });
+        canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            // タッチ終了でキーリセット
+            for (let k in keys) keys[k] = false;
+        });
+
+        function handleTouch(e) {
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+
+            for (let touch of e.touches) {
+                const canvasX = (touch.clientX - rect.left) * scaleX;
+                const canvasY = (touch.clientY - rect.top) * scaleY;
+                const col = canvasX / CELL_SIZE;
+                const row = canvasY / CELL_SIZE;
+
+                // タッチ位置から方向を決定 (プレイヤー方向)
+                const dx = col - player.x;
+                const dy = row - player.y;
+                const absDx = Math.abs(dx);
+                const absDy = Math.abs(dy);
+
+                // しきい値以上でキーをセット
+                const threshold = 0.6;
+                keys.ArrowUp = false; keys.ArrowDown = false;
+                keys.ArrowLeft = false; keys.ArrowRight = false;
+
+                if (absDx < threshold && absDy < threshold) {
+                    // 近くなら何もしない
+                } else {
+                    if (absDx > absDy) {
+                        if (dx > 0) keys.ArrowRight = true;
+                        else keys.ArrowLeft = true;
+                    } else {
+                        if (dy > 0) keys.ArrowDown = true;
+                        else keys.ArrowUp = true;
+                    }
+                }
+                // 1つのタッチだけ反映
+                break;
+            }
+        }
+
+        // ---------- 画像ギャラリーのURL差し替え案内 (コンソール表示) ----------
+        console.log('📸 画像ギャラリーのURLを差し替えるには、.image-gallery img の src 属性を編集してください。');
+
+        // ---------- 開始 ----------
+        resetGame();
+    })();
+</script>
+</body>
+</html>
