@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>総理大臣シミュレーション · パワプロ育成風</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', 'Helvetica Neue', 'Hiragino Sans', sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            background: linear-gradient(145deg, #1a2a3a 0%, #0f1a26 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 16px;
+            margin: 0;
+        }
+        .game-container {
+            max-width: 580px;
+            width: 100%;
+            background: #e8e0d0;
+            background-image: radial-gradient(circle at 20% 30%, #f4efe4 0%, #d9cfbb 100%);
+            border-radius: 48px 48px 32px 32px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.7), inset 0 2px 4px rgba(255,242,210,0.6);
+            padding: 24px 20px 30px;
+            border: 3px solid #b8a68b;
+            position: relative;
+            transition: all 0.2s;
+        }
+        /* パワプロ風のヘッダー */
+        .game-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #2d3f4b;
+            padding: 8px 16px 8px 20px;
+            border-radius: 60px;
+            margin-bottom: 18px;
+            box-shadow: inset 0 -3px 0 #14212b, 0 6px 0 #0b141c;
+            color: #f5edc6;
+            text-shadow: 2px 2px 0 #1f2e3a;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+        .game-title span {
+            font-size: 1.1rem;
+            background: #1f2f3b;
+            padding: 4px 16px;
+            border-radius: 40px;
+            box-shadow: inset 0 -2px 0 #334a5a;
+        }
+        .game-title .pm-label {
+            background: #c9b58b;
+            color: #1d2b33;
+            text-shadow: none;
+            padding: 4px 18px;
+            border-radius: 40px;
+            font-size: 0.9rem;
+            box-shadow: inset 0 -2px 0 #a08860;
+        }
+        /* プレイヤー名 + 月表示 */
+        .status-bar {
+            background: #d2c4ac;
+            padding: 14px 18px;
+            border-radius: 80px;
+            margin-bottom: 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: inset 0 -4px 0 #b6a485, 0 4px 0 #73634a;
+            border: 1px solid #c6b294;
+            color: #1f2c1f;
+            font-weight: bold;
+        }
+        .pm-name {
+            font-size: 1.6rem;
+            background: #fcf3e0;
+            padding: 0 16px;
+            border-radius: 60px;
+            line-height: 1.4;
+            box-shadow: inset 0 -2px 0 #b8a282;
+            color: #2b3a29;
+            letter-spacing: 1px;
+        }
+        .pm-name small {
+            font-size: 0.9rem;
+            font-weight: normal;
+            color: #5b4d37;
+            margin-left: 6px;
+        }
+        .month-box {
+            background: #1d2b2f;
+            color: #efebc0;
+            padding: 8px 18px;
+            border-radius: 60px;
+            font-size: 1.2rem;
+            box-shadow: inset 0 -3px 0 #3d555e;
+            text-shadow: 1px 1px 0 #0e171c;
+        }
+        /* イベントカード */
+        .event-area {
+            background: #f3edde;
+            border-radius: 40px;
+            padding: 18px 16px 14px;
+            margin-bottom: 18px;
+            box-shadow: inset 0 -6px 0 #bfaf92, 0 8px 0 #7f6e55;
+            border: 1px solid #dccdb6;
+        }
+        .event-title {
+            font-size: 1.3rem;
+            font-weight: bold;
+            background: #c6b294;
+            display: inline-block;
+            padding: 0 20px 0 16px;
+            border-radius: 40px;
+            color: #1f2c22;
+            margin-bottom: 14px;
+            box-shadow: inset 0 -3px 0 #9b896c;
+        }
+        .event-desc {
+            background: #fcf8ec;
+            padding: 16px 18px;
+            border-radius: 30px;
+            font-size: 1.05rem;
+            line-height: 1.5;
+            color: #1e2b22;
+            box-shadow: inset 0 2px 6px rgba(80,60,30,0.2);
+            min-height: 80px;
+            margin-bottom: 12px;
+            border: 1px solid #dbceb6;
+        }
+        .choice-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin: 12px 0 4px;
+        }
+        .choice-btn {
+            background: #dfd3bd;
+            border: none;
+            border-radius: 60px;
+            padding: 14px 20px;
+            font-size: 1.05rem;
+            font-weight: bold;
+            text-align: left;
+            color: #1d2a1d;
+            box-shadow: inset 0 -5px 0 #a48d70, 0 5px 0 #6b5b44;
+            transition: 0.05s linear;
+            border: 1px solid #c7b396;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .choice-btn:active {
+            transform: translateY(4px);
+            box-shadow: inset 0 -1px 0 #a48d70, 0 2px 0 #6b5b44;
+        }
+        .choice-btn span {
+            background: #2c3f3a;
+            color: #f5edc0;
+            border-radius: 40px;
+            padding: 0 14px;
+            font-size: 0.9rem;
+            line-height: 1.8;
+            box-shadow: inset 0 -2px 0 #14211c;
+        }
+        .choice-btn.disabled {
+            opacity: 0.6;
+            filter: grayscale(0.3);
+            pointer-events: none;
+        }
+        /* リセットボタン */
+        .reset-area {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 16px;
+        }
+        .reset-btn {
+            background: #5b4d3a;
+            border: none;
+            color: #efe3c9;
+            font-weight: bold;
+            padding: 10px 24px;
+            border-radius: 60px;
+            font-size: 0.95rem;
+            box-shadow: inset 0 -4px 0 #322b1f, 0 4px 0 #1e1a12;
+            transition: 0.06s linear;
+            cursor: pointer;
+            border: 1px solid #6f604a;
+        }
+        .reset-btn:active {
+            transform: translateY(4px);
+            box-shadow: inset 0 -1px 0 #322b1f, 0 1px 0 #1e1a12;
+        }
+        .reset-confirm {
+            margin-top: 10px;
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            flex-wrap: wrap;
+        }
+        .reset-confirm button {
+            background: #b5533b;
+            border: none;
+            padding: 8px 18px;
+            border-radius: 40px;
+            font-weight: bold;
+            color: #f5efe0;
+            box-shadow: inset 0 -3px 0 #772f1f, 0 3px 0 #441d13;
+            transition: 0.04s linear;
+            cursor: pointer;
+            border: 1px solid #b35f47;
+        }
+        .reset-confirm button:active {
+            transform: translateY(3px);
+            box-shadow: inset 0 -1px 0 #772f1f, 0 1px 0 #441d13;
+        }
+        .reset-confirm .cancel-btn {
+            background: #6e7a74;
+            box-shadow: inset 0 -3px 0 #46534b, 0 3px 0 #2b3831;
+            border-color: #788680;
+        }
+        .hidden {
+            display: none !important;
+        }
+        .footer {
+            font-size: 0.7rem;
+            color: #6f604a;
+            text-align: center;
+            margin-top: 14px;
+            letter-spacing: 0.5px;
+            background: #d6c8b0;
+            border-radius: 40px;
+            padding: 4px 10px;
+            width: fit-content;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .choice-btn .badge {
+            background: #3e5a4a;
+            color: #f2eac0;
+            border-radius: 40px;
+            padding: 0 14px;
+            font-size: 0.8rem;
+        }
+        .game-over-message {
+            text-align: center;
+            background: #d6bca0;
+            border-radius: 40px;
+            padding: 10px;
+            font-weight: bold;
+            color: #1d2a1a;
+        }
+    </style>
+</head>
+<body>
+
+<div class="game-container" id="app">
+    <div class="game-title">
+        <span>⚾ 総理・育成</span>
+        <span class="pm-label">🇯🇵 PM</span>
+    </div>
+
+    <!-- 名前入力フェーズ -->
+    <div id="nameSetupPhase">
+        <div style="background: #d6c8b0; border-radius: 60px; padding: 20px 16px; box-shadow: inset 0 -4px 0 #b6a282;">
+            <label style="font-weight: bold; font-size: 1.3rem; display: block; margin-bottom: 12px; color: #1f2c1f;">⛩️ 総理の名前を決めてください</label>
+            <input type="text" id="playerNameInput" placeholder="例: あすか かずき" 
+                   style="width: 100%; padding: 16px; border-radius: 60px; border: 2px solid #9d8a6c; background: #fcf6e6; font-size: 1.3rem; font-weight: bold; outline: none;">
+            <button id="startGameBtn" 
+                    style="margin-top: 16px; width: 100%; background: #3d5a4a; border: none; padding: 16px; border-radius: 60px; font-weight: bold; font-size: 1.4rem; color: #f5efd0; box-shadow: inset 0 -6px 0 #1b3428, 0 6px 0 #0f231a; cursor: pointer;">
+                スタート
+            </button>
+        </div>
+    </div>
+
+    <!-- ゲームメイン -->
+    <div id="gameMainPhase" class="hidden">
+        <div class="status-bar">
+            <span class="pm-name" id="displayPmName">○○総理 <small>総理</small></span>
+            <span class="month-box" id="displayMonth">2026年1月</span>
+        </div>
+
+        <div class="event-area">
+            <div class="event-title" id="eventTitle">▶ 今月の政務</div>
+            <div class="event-desc" id="eventDesc">イベントがここに表示されます</div>
+            <div class="choice-grid" id="choiceContainer">
+                <!-- 動的に生成 -->
+            </div>
+        </div>
+
+        <!-- リセットボタン＋確認 -->
+        <div class="reset-area">
+            <button class="reset-btn" id="resetBtn">🗑️ リセット</button>
+        </div>
+        <div id="resetConfirmBox" class="reset-confirm hidden">
+            <button class="cancel-btn" id="resetCancel">キャンセル</button>
+            <button id="resetConfirmYes">本当にリセット (3回目)</button>
+        </div>
+        <div id="resetFinalConfirm" class="reset-confirm hidden">
+            <button class="cancel-btn" id="resetFinalCancel">やっぱやめとく</button>
+            <button id="resetFinalYes">⚠️ 最終確認！ リセット</button>
+        </div>
+        <div class="footer">⚡ 選択で未来を変えろ · 2030年12月まで</div>
+    </div>
+</div>
+
+<script>
+    (function() {
+        // ---- ゲームデータ ----
+        // 2026年1月～2030年12月まで (5年=60ヶ月)
+        const START_YEAR = 2026, START_MONTH = 1;
+        const END_YEAR = 2030, END_MONTH = 12;
+
+        // イベントデータ (月ごとに3択, イベント内容)
+        // 実際のゲームではもっと豊富に, ここでは60ヶ月分のテンプレートを生成 (簡易)
+        function generateEventData(year, month) {
+            const total = (year - START_YEAR) * 12 + (month - START_MONTH);
+            const seed = total % 7; // バリエーション用
+            const events = [
+                { title: "📈 経済対策", desc: "景気が停滞。打つ手は？" },
+                { title: "🌏 外交問題", desc: "近隣諸国と緊張。どう動く？" },
+                { title: "⚡ エネルギー危機", desc: "電力不足が深刻化。" },
+                { title: "🏥 医療改革", desc: "医療制度の抜本的見直し。" },
+                { title: "📚 教育改革", desc: "次世代の教育方針を決定。" },
+                { title: "💻 デジタル化", desc: "行政DXを加速せよ。" },
+                { title: "🛡️ 安全保障", desc: "国防・防災の優先施策。" }
+            ];
+            const ev = events[seed % events.length];
+            // 3つの選択肢 (それぞれ異なる結果)
+            const choices = [
+                { text: "積極策", effect: "支持率 +3" },
+                { text: "慎重策", effect: "支持率 +1, 安定" },
+                { text: "革新策", effect: "支持率 +5 だがリスク" }
+            ];
+            // 月ごとにちょっと変化
+            const m = month;
+            if (m === 1) choices[0].text = "🎍 新年景気対策";
+            else if (m === 12) choices[2].text = "🎄 年末特別予算";
+            else if (m === 6) choices[1].text = "🌧️ 梅雨対策";
+
+            return {
+                title: ev.title + ` (${year}.${month})`,
+                desc: ev.desc + ` 今月の選択で国運が変わる。`,
+                choices: choices
+            };
+        }
+
+        // ゲーム状態
+        let gameState = {
+            playerName: "",
+            currentYear: START_YEAR,
+            currentMonth: START_MONTH,
+            eventIndex: 0,  // 累計月インデックス
+            isGameOver: false,
+            resetStep: 0,   // 0: 通常, 1: 1回目確認, 2: 2回目確認, 3: 最終確認
+        };
+
+        // DOM要素
+        const nameSetup = document.getElementById('nameSetupPhase');
+        const gameMain = document.getElementById('gameMainPhase');
+        const playerNameInput = document.getElementById('playerNameInput');
+        const startBtn = document.getElementById('startGameBtn');
+        const displayPmName = document.getElementById('displayPmName');
+        const displayMonth = document.getElementById('displayMonth');
+        const eventTitle = document.getElementById('eventTitle');
+        const eventDesc = document.getElementById('eventDesc');
+        const choiceContainer = document.getElementById('choiceContainer');
+        const resetBtn = document.getElementById('resetBtn');
+        const resetConfirmBox = document.getElementById('resetConfirmBox');
+        const resetFinalConfirm = document.getElementById('resetFinalConfirm');
+        const resetCancel = document.getElementById('resetCancel');
+        const resetFinalCancel = document.getElementById('resetFinalCancel');
+        const resetConfirmYes = document.getElementById('resetConfirmYes');
+        const resetFinalYes = document.getElementById('resetFinalYes');
+
+        // ---- 永続化 (localStorage) ----
+        function saveState() {
+            if (gameState.playerName) {
+                const data = {
+                    name: gameState.playerName,
+                    year: gameState.currentYear,
+                    month: gameState.currentMonth,
+                    eventIdx: gameState.eventIndex,
+                    isGameOver: gameState.isGameOver
+                };
+                localStorage.setItem('pmSimState', JSON.stringify(data));
+            }
+        }
+
+        function loadState() {
+            const raw = localStorage.getItem('pmSimState');
+            if (!raw) return false;
+            try {
+                const data = JSON.parse(raw);
+                if (data.name && data.year && data.month !== undefined) {
+                    gameState.playerName = data.name;
+                    gameState.currentYear = data.year;
+                    gameState.currentMonth = data.month;
+                    gameState.eventIndex = data.eventIdx || 0;
+                    gameState.isGameOver = data.isGameOver || false;
+                    return true;
+                }
+            } catch(e) {}
+            return false;
+        }
+
+        // リセット (完全削除)
+        function resetGame() {
+            localStorage.removeItem('pmSimState');
+            gameState.playerName = "";
+            gameState.currentYear = START_YEAR;
+            gameState.currentMonth = START_MONTH;
+            gameState.eventIndex = 0;
+            gameState.isGameOver = false;
+            gameState.resetStep = 0;
+            hideResetConfirms();
+            nameSetup.classList.remove('hidden');
+            gameMain.classList.add('hidden');
+            // 入力欄クリア
+            playerNameInput.value = "";
+        }
+
+        // 確認UI 隠す
+        function hideResetConfirms() {
+            resetConfirmBox.classList.add('hidden');
+            resetFinalConfirm.classList.add('hidden');
+            resetBtn.classList.remove('hidden');
+        }
+
+        // ---- ゲーム進行 ----
+        function renderEvent() {
+            if (gameState.isGameOver) {
+                // ゲームオーバー表示
+                eventTitle.textContent = "🏁 任期終了";
+                eventDesc.innerHTML = `<div class="game-over-message">🎌 総理の任務を全うしました。お疲れ様でした！<br>最終月: ${gameState.currentYear}年${gameState.currentMonth}月</div>`;
+                choiceContainer.innerHTML = '';
+                return;
+            }
+
+            // 終了条件チェック
+            if (gameState.currentYear > END_YEAR || (gameState.currentYear === END_YEAR && gameState.currentMonth > END_MONTH)) {
+                gameState.isGameOver = true;
+                saveState();
+                renderEvent();
+                return;
+            }
+
+            // イベント取得
+            const ev = generateEventData(gameState.currentYear, gameState.currentMonth);
+            eventTitle.textContent = ev.title;
+            eventDesc.textContent = ev.desc;
+
+            // 選択肢ボタン
+            choiceContainer.innerHTML = '';
+            ev.choices.forEach((choice, idx) => {
+                const btn = document.createElement('button');
+                btn.className = 'choice-btn';
+                btn.innerHTML = `<span>${String.fromCharCode(65 + idx)}</span> ${choice.text} <span class="badge">${choice.effect}</span>`;
+                btn.addEventListener('click', function() {
+                    // 選択後の処理: 次月へ
+                    advanceMonth();
+                });
+                choiceContainer.appendChild(btn);
+            });
+
+            // 名前表示更新
+            displayPmName.innerHTML = `${gameState.playerName}総理 <small>総理</small>`;
+            displayMonth.textContent = `${gameState.currentYear}年${gameState.currentMonth}月`;
+        }
+
+        function advanceMonth() {
+            if (gameState.isGameOver) return;
+
+            // 月を進める
+            if (gameState.currentMonth === 12) {
+                gameState.currentYear += 1;
+                gameState.currentMonth = 1;
+            } else {
+                gameState.currentMonth += 1;
+            }
+            gameState.eventIndex += 1;
+
+            // 終了チェック
+            if (gameState.currentYear > END_YEAR || (gameState.currentYear === END_YEAR && gameState.currentMonth > END_MONTH)) {
+                gameState.isGameOver = true;
+            }
+
+            saveState();
+            renderEvent();
+        }
+
+        // ---- 初期化 / スタート ----
+        function startGame(name) {
+            if (!name.trim()) {
+                alert("総理の名前を入力してください！");
+                return;
+            }
+            gameState.playerName = name.trim();
+            gameState.currentYear = START_YEAR;
+            gameState.currentMonth = START_MONTH;
+            gameState.eventIndex = 0;
+            gameState.isGameOver = false;
+            gameState.resetStep = 0;
+
+            nameSetup.classList.add('hidden');
+            gameMain.classList.remove('hidden');
+            hideResetConfirms();
+
+            saveState();
+            renderEvent();
+        }
+
+        // ロード済みの状態でゲーム開始
+        function loadGame() {
+            if (gameState.playerName) {
+                nameSetup.classList.add('hidden');
+                gameMain.classList.remove('hidden');
+                renderEvent();
+                displayPmName.innerHTML = `${gameState.playerName}総理 <small>総理</small>`;
+                displayMonth.textContent = `${gameState.currentYear}年${gameState.currentMonth}月`;
+                hideResetConfirms();
+            } else {
+                nameSetup.classList.remove('hidden');
+                gameMain.classList.add('hidden');
+            }
+        }
+
+        // ---- イベントリスナー ----
+        startBtn.addEventListener('click', function() {
+            startGame(playerNameInput.value);
+        });
+        // Enterでスタート
+        playerNameInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') startGame(playerNameInput.value);
+        });
+
+        // リセットフロー (3回確認)
+        resetBtn.addEventListener('click', function() {
+            if (gameState.resetStep === 0) {
+                gameState.resetStep = 1;
+                resetConfirmBox.classList.remove('hidden');
+                resetFinalConfirm.classList.add('hidden');
+                resetBtn.classList.add('hidden');
+                resetConfirmYes.textContent = "本当にリセットしますか？ (1回目)";
+            }
+        });
+
+        resetCancel.addEventListener('click', function() {
+            gameState.resetStep = 0;
+            hideResetConfirms();
+            resetBtn.classList.remove('hidden');
+        });
+
+        resetConfirmYes.addEventListener('click', function() {
+            if (gameState.resetStep === 1) {
+                gameState.resetStep = 2;
+                resetConfirmYes.textContent = "⚠️ もう一度確認 (2回目)";
+                // 表示変更なし
+            } else if (gameState.resetStep === 2) {
+                gameState.resetStep = 3;
+                resetConfirmBox.classList.add('hidden');
+                resetFinalConfirm.classList.remove('hidden');
+                resetBtn.classList.add('hidden');
+            }
+        });
+
+        resetFinalCancel.addEventListener('click', function() {
+            gameState.resetStep = 0;
+            hideResetConfirms();
+            resetBtn.classList.remove('hidden');
+        });
+
+        resetFinalYes.addEventListener('click', function() {
+            // 最終リセット実行
+            resetGame();
+            gameState.resetStep = 0;
+            hideResetConfirms();
+            resetBtn.classList.remove('hidden');
+        });
+
+        // 初期ロード
+        const loaded = loadState();
+        if (loaded) {
+            loadGame();
+        } else {
+            nameSetup.classList.remove('hidden');
+            gameMain.classList.add('hidden');
+        }
+
+        // リセットボタン表示制御
+        window.addEventListener('load', function() {
+            // 何かしらの初期化
+        });
+
+        // 保存は各アクションで行う
+    })();
+</script>
+</body>
+</html>
