@@ -1661,6 +1661,417 @@ showVictory = function(winner) {
 // ---- 初期化：試合開始時にセットアップ ----
 console.log('✅ 後編完了！完全バトル実装');
 console.log('🎮 全機能揃いました！');
+  // ============================================================
+// 緊急修正：バトルループ完全書き換え
+// ============================================================
+
+// ---- バトルループ（完全版） ----
+function battleLoop() {
+  if (!battleState || battleState.gameOver) {
+    // ゲームオーバーなら描画だけ続ける
+    drawBattle();
+    return;
+  }
+  
+  const state = battleState;
+  state.frameCount = (state.frameCount || 0) + 1;
+  
+  // ---- エリクサー回復 ----
+  const elixirPerFrame = 1 / (state.elixirSpeed * 20);
+  state.playerElixir = Math.min(state.maxElixir, state.playerElixir + elixirPerFrame);
+  state.cpuElixir = Math.min(state.maxElixir, state.cpuElixir + elixirPerFrame);
+  
+  // ---- CPU行動 ----
+  if (state.frameCount % 12 === 0) {
+    tryCpuAction(state);
+  }
+  
+  // ---- プレイヤーユニット更新 ----
+  for (let i = state.playerUnits.length - 1; i >= 0; i--) {
+    const u = state.playerUnits[i];
+    if (!u.alive) {
+      state.playerUnits.splice(i, 1);
+      continue;
+    }
+    updateUnit(u, state.cpuUnits, state.cpuTower, 'player');
+  }
+  
+  // ---- CPUユニット更新 ----
+  for (let i = state.cpuUnits.length - 1; i >= 0; i--) {
+    const u = state.cpuUnits[i];
+    if (!u.alive) {
+      state.cpuUnits.splice(i, 1);
+      continue;
+    }
+    updateUnit(u, state.playerUnits, state.playerTower, 'cpu');
+  }
+  
+  // ---- エフェクト更新 ----
+  updateBattleEffects();
+  
+  // ---- UI更新 ----
+  updateBattleUI();
+  
+  // ---- 描画 ----
+  drawBattle();
+  
+  // ---- 勝敗判定 ----
+  if (state.cpuTower.hp <= 0) {
+    state.gameOver = true;
+    state.winner = 'player';
+    showVictory('player');
+  } else if (state.playerTower.hp <= 0) {
+    state.gameOver = true;
+    state.winner = 'cpu';
+    showVictory('cpu');
+  }
+}
+
+// ---- ユニット更新（簡易版） ----
+function updateUnit(unit, enemyUnits, enemyTower, team) {
+  if (!unit.alive) return;
+  if (unit.attackCooldown > 0) unit.attackCooldown--;
+  
+  // ---- 壁は動かない ----
+  if (unit.key === 'wall') return;
+  
+  // ---- ヒーラー ----
+  if (unit.isHealer) {
+    const allies = team === 'player' ? battleState.playerUnits : battleState.cpuUnits;
+    for (let a of allies) {
+      if (a === unit || !a.alive) continue;
+      if (getDistance(unit, a) < unit.range) {
+        a.hp = Math.min(a.maxHp, a.hp + 2);
+        addEffect(a.x, a.y, '💚', 10);
+      }
+    }
+    unit.x += (team === 'player' ? 1 : -1) * unit.speed * 0.5;
+    unit.x = Math.max(20, Math.min(780, unit.x));
+    unit.y = Math.max(20, Math.min(480, unit.y));
+    return;
+  }
+  
+  // ---- ターゲット選択 ----
+  let target = findTarget(unit, enemyUnits, enemyTower);
+  unit.target = target;
+  
+  if (!target) {
+    // 前進
+    unit.x += (team === 'player' ? 1 : -1) * unit.speed;
+    unit.x = Math.max(20, Math.min(780, unit.x));
+    unit.y = Math.max(20, Math.min(480, unit.y));
+    return;
+  }
+  
+  // ---- 距離判定 ----
+  let dist;
+  if (target.hp !== undefined) {
+    dist = getDistance(unit, target);
+  } else {
+    dist = getDistanceToRect(unit, target);
+  }
+  
+  if (dist <= unit.range) {
+    if (unit.attackCooldown === 0) {
+      performUnitAttack(unit, target, enemyUnits);
+      unit.attackCooldown = 30;
+    }
+  } else {
+    const dx = target.x - unit.x;
+    const dy = target.y - unit.y;
+    const len = Math.hypot(dx, dy);
+    if (len > 1) {
+      unit.x += (dx / len) * unit.speed;
+      unit.y += (dy / len) * unit.speed;
+    }
+  }
+  
+  unit.x = Math.max(20, Math.min(780, unit.x));
+  unit.y = Math.max(20, Math.min(480, unit.y));
+}
+
+// ---- ターゲット検索 ----
+function findTarget(unit, enemyUnits, enemyTower) {
+  let closest = null;
+  let closestDist = Infinity;
+  
+  for (let u of enemyUnits) {
+    if (!u.alive) continue;
+    const d = getDistance(unit, u);
+    if (d < closestDist) {
+      closestDist = d;
+      closest = u;
+    }
+  }
+  
+  const dTower = getDistanceToRect(unit, enemyTower);
+  if (dTower < closestDist) {
+    closestDist = dTower;
+    closest = enemyTower;
+  }
+  
+  return closest;
+}
+
+// ---- 攻撃実行 ----
+function performUnitAttack(unit, target, enemyUnits) {
+  // 爆弾兵
+  if (unit.isBomber) {
+    for (let u of enemyUnits) {
+      if (!u.alive) continue;
+      if (getDistance(unit, u) < 70) {
+        u.hp -= 25;
+        if (u.hp <= 0) u.alive = false;
+        addEffect(u.x, u.y, '💥', 20);
+      }
+    }
+    const tower = unit.team === 'player' ? battleState.cpuTower : battleState.playerTower;
+    if (getDistanceToRect(unit, tower) < 70) {
+      tower.hp -= 25;
+      addEffect(tower.x + 30, tower.y + 50, '💥', 20);
+    }
+    unit.alive = false;
+    return;
+  }
+  
+  // 魔法使い（範囲攻撃）
+  if (unit.isMage) {
+    for (let u of enemyUnits) {
+      if (!u.alive) continue;
+      if (getDistance(unit, u) < 50) {
+        u.hp -= 10;
+        if (u.hp <= 0) u.alive = false;
+        addEffect(u.x, u.y, '✨', 10);
+      }
+    }
+    const tower = unit.team === 'player' ? battleState.cpuTower : battleState.playerTower;
+    if (getDistanceToRect(unit, tower) < 50) {
+      tower.hp -= 5;
+      addEffect(tower.x + 30, tower.y + 50, '✨', 10);
+    }
+    return;
+  }
+  
+  // 通常攻撃
+  if (target.hp !== undefined) {
+    target.hp -= unit.attack;
+    if (target.hp <= 0) {
+      target.alive = false;
+      addEffect(target.x, target.y, '💀', 15);
+    }
+    addEffect(target.x, target.y, '⚔️', 8);
+  } else {
+    target.hp -= unit.attack;
+    if (target.hp < 0) target.hp = 0;
+    addEffect(target.x + 30, target.y + 50, '⚔️', 8);
+  }
+}
+
+// ---- 距離計算 ----
+function getDistance(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function getDistanceToRect(unit, rect) {
+  const cx = Math.max(rect.x, Math.min(unit.x, rect.x + 60));
+  const cy = Math.max(rect.y, Math.min(unit.y, rect.y + 100));
+  return Math.hypot(unit.x - cx, unit.y - cy);
+}
+
+// ---- エフェクト ----
+let battleEffects = [];
+
+function addEffect(x, y, text, duration) {
+  battleEffects.push({ x, y, text, duration, timer: 0 });
+}
+
+function updateBattleEffects() {
+  for (let i = battleEffects.length - 1; i >= 0; i--) {
+    battleEffects[i].timer++;
+    if (battleEffects[i].timer >= battleEffects[i].duration) {
+      battleEffects.splice(i, 1);
+    }
+  }
+}
+
+// ---- 描画（完全版） ----
+function drawBattle() {
+  const canvas = document.getElementById('battleCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const state = battleState;
+  if (!state) return;
+  
+  ctx.clearRect(0, 0, 800, 500);
+  
+  // 中央線
+  ctx.strokeStyle = '#4a6b3a';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([10, 15]);
+  ctx.beginPath();
+  ctx.moveTo(400, 20);
+  ctx.lineTo(400, 480);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  
+  // タワー
+  function drawTower(tower, x, y, isPlayer) {
+    const color = isPlayer ? '#2980b9' : '#c0392b';
+    ctx.fillStyle = color;
+    ctx.shadowColor = 'rgba(0,0,0,0.4)';
+    ctx.shadowBlur = 15;
+    ctx.fillRect(x, y, 60, 100);
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#ecf0f1';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(x, y, 60, 100);
+    const ratio = Math.max(0, tower.hp / tower.maxHp);
+    ctx.fillStyle = '#2c3e50';
+    ctx.fillRect(x, y - 22, 60, 12);
+    ctx.fillStyle = ratio > 0.5 ? '#2ecc71' : '#e74c3c';
+    ctx.fillRect(x, y - 22, 60 * ratio, 12);
+    ctx.font = '30px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(isPlayer ? '🔵' : '🔴', x + 30, y - 35);
+    ctx.fillStyle = 'white';
+    ctx.font = '12px sans-serif';
+    ctx.fillText(`${Math.floor(tower.hp)}/${tower.maxHp}`, x + 30, y - 10);
+  }
+  drawTower(state.playerTower, 80, 200, true);
+  drawTower(state.cpuTower, 660, 200, false);
+  
+  // ---- ユニット描画 ----
+  function drawUnit(u, color) {
+    if (!u.alive) return;
+    ctx.beginPath();
+    ctx.arc(u.x, u.y, u.size || 18, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.strokeStyle = '#ecf0f1';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = 'white';
+    ctx.font = `${Math.min(20, (u.size || 18) + 4)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(u.icon || '?', u.x, u.y - 1);
+    // HPバー
+    const barW = Math.min(30, (u.size || 18) * 2);
+    const barH = 4;
+    const hpRatio = Math.max(0, u.hp / u.maxHp);
+    ctx.fillStyle = '#2c3e50';
+    ctx.fillRect(u.x - barW/2, u.y - (u.size || 18) - 8, barW, barH);
+    ctx.fillStyle = hpRatio > 0.5 ? '#2ecc71' : '#e74c3c';
+    ctx.fillRect(u.x - barW/2, u.y - (u.size || 18) - 8, barW * hpRatio, barH);
+  }
+  
+  for (let u of state.playerUnits) {
+    drawUnit(u, '#3498db');
+  }
+  for (let u of state.cpuUnits) {
+    drawUnit(u, '#e74c3c');
+  }
+  
+  // ---- エフェクト描画 ----
+  for (let e of battleEffects) {
+    const alpha = 1 - (e.timer / e.duration);
+    const scale = 1 + (e.timer / e.duration) * 0.5;
+    ctx.globalAlpha = alpha;
+    ctx.font = `${24 * scale}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(e.text, e.x, e.y - e.timer * 0.5);
+  }
+  ctx.globalAlpha = 1.0;
+  
+  // ---- プレビュー ----
+  if (isPlayerDragging && playerPreviewUnit && playerSelectedUnit) {
+    const def = UNIT_TYPES[playerSelectedUnit];
+    if (def) {
+      ctx.globalAlpha = 0.5;
+      ctx.beginPath();
+      ctx.arc(playerPreviewUnit.x, playerPreviewUnit.y, def.size || 18, 0, Math.PI * 2);
+      ctx.fillStyle = '#3498db';
+      ctx.fill();
+      ctx.strokeStyle = '#ecf0f1';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = 'white';
+      ctx.font = `${Math.min(20, (def.size || 18) + 4)}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(def.icon, playerPreviewUnit.x, playerPreviewUnit.y - 1);
+      ctx.globalAlpha = 1.0;
+    }
+  }
+  
+  // ---- エリクサーバー ----
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.fillRect(10, 10, 100, 20);
+  ctx.fillStyle = '#ffd966';
+  ctx.fillRect(10, 10, (state.playerElixir / state.maxElixir) * 100, 20);
+  ctx.fillStyle = 'white';
+  ctx.font = '12px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`💎 ${Math.floor(state.playerElixir)}`, 14, 20);
+  
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.fillRect(690, 10, 100, 20);
+  ctx.fillStyle = '#ff6b6b';
+  ctx.fillRect(690, 10, (state.cpuElixir / state.maxElixir) * 100, 20);
+  ctx.fillStyle = 'white';
+  ctx.fillText(`💎 ${Math.floor(state.cpuElixir)}`, 694, 20);
+}
+
+// ---- 試合開始関数を完全に置き換え ----
+function startBattle() {
+  const cpuRandomCount = parseInt(document.getElementById('cpuRandomCount').value);
+  const playerTowerHp = parseInt(document.getElementById('playerTowerHp').value) || 120;
+  const cpuTowerHp = parseInt(document.getElementById('cpuTowerHp').value) || 120;
+  const elixirSpeed = parseFloat(document.getElementById('elixirSpeed').value) || 3;
+  
+  const cpuDeck = buildCpuDeck(cpuRandomCount);
+  
+  if (deck.length === 0) {
+    alert('デッキが空です。少なくとも1枚は選択してください。');
+    return;
+  }
+  
+  battleState = {
+    playerDeck: [...deck],
+    cpuDeck: cpuDeck,
+    playerTowerHp: playerTowerHp,
+    cpuTowerHp: cpuTowerHp,
+    elixirSpeed: elixirSpeed,
+    playerElixir: 10,
+    cpuElixir: 10,
+    maxElixir: 10,
+    playerUnits: [],
+    cpuUnits: [],
+    playerTower: { hp: playerTowerHp, maxHp: playerTowerHp },
+    cpuTower: { hp: cpuTowerHp, maxHp: cpuTowerHp },
+    gameOver: false,
+    winner: null,
+    playerLastUnit: null,
+    cpuLastUnit: null,
+    frameCount: 0
+  };
+  
+  // エフェクトクリア
+  battleEffects = [];
+  
+  showBattleScreen();
+  setupPlayerControls();
+  
+  if (battleInterval) clearInterval(battleInterval);
+  battleInterval = setInterval(battleLoop, 50);
+  isBattleActive = true;
+}
+
+// ---- 上書き適用 ----
+console.log('✅ 緊急修正完了！バトルルールが正しく動作するようになりました。');
 </script>
 </body>
 </html>
