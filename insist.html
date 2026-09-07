@@ -29,7 +29,6 @@
             position: relative;
             transition: 0.2s;
         }
-        /* 法廷バッジ */
         .court-badge {
             display: flex;
             justify-content: space-between;
@@ -55,7 +54,6 @@
             font-size: 1.1rem;
             box-shadow: 0 2px 0 #5f4530;
         }
-        /* 証拠・ステータス */
         .status-panel {
             background: #d7cbbe;
             border-radius: 40px;
@@ -88,7 +86,6 @@
             font-size: 0.9rem;
             font-weight: 500;
         }
-        /* 証言ウィンドウ */
         .testimony-box {
             background: #fcf9f2;
             border-radius: 32px;
@@ -115,7 +112,6 @@
         .testimony-box .speaker::before {
             content: "⚖️ ";
         }
-        /* 選択肢エリア */
         .choices {
             display: flex;
             flex-direction: column;
@@ -150,7 +146,6 @@
             pointer-events: none;
             filter: grayscale(0.5);
         }
-        /* リセット＆セーブエリア */
         .action-bar {
             display: flex;
             justify-content: flex-end;
@@ -484,12 +479,10 @@
             // ----------------------------------------------------------------
             const SAVE_KEY = 'gyakuten_save_data';
 
-            // デフォルト状態
             let state = {
-                chapter: 'chapter1',       // 'chapter1' | 'chapter2' | 'chapter3'
+                chapter: 'chapter1',
                 stageIndex: 0,
                 cleared: { chapter1: false, chapter2: false, chapter3: false },
-                // セーブデータに含める
             };
 
             // DOM refs
@@ -517,13 +510,11 @@
             function getCurrentStage() {
                 const ch = getChapterData(state.chapter);
                 if (!ch || !ch.stages || state.stageIndex >= ch.stages.length) {
-                    // 安全フォールバック
                     return ch?.stages?.[0] || { speaker: '裁判長', text: 'エラー', choices: [] };
                 }
                 return ch.stages[state.stageIndex];
             }
 
-            // 章の表示名
             function getChapterDisplayName(key) {
                 const map = {
                     chapter1: '第1章 · はんじょうの反社問題',
@@ -533,33 +524,35 @@
                 return map[key] || key;
             }
 
+            // ★★★★★ 最終章クリア時にmeme.htmlへ移動 ★★★★★
+            function checkFinalClear() {
+                if (state.chapter === 'chapter3' && state.cleared.chapter3 === true) {
+                    // 同じタブでmeme.htmlに移動
+                    window.location.href = 'meme.html';
+                }
+            }
+
             // 進行を描画
             function render() {
                 const chKey = state.chapter;
                 const chData = getChapterData(chKey);
                 const stage = getCurrentStage();
 
-                // 章ラベル
                 chapterLabel.textContent = getChapterDisplayName(chKey);
 
-                // ステージ表示
                 const total = chData.stages.length;
                 const index = state.stageIndex + 1;
                 stageDisplay.textContent = `📌 証言 ${index}/${total}`;
 
-                // クリアマーク
                 const isCleared = state.cleared[chKey] || false;
                 clearMark.textContent = isCleared ? '⭐ クリア済' : '⚪ 未クリア';
                 clearMark.style.background = isCleared ? '#b5d6a8' : '#b9a48b';
 
-                // セーブステータス (自動セーブ時は更新)
                 saveStatus.textContent = '💾 セーブ済み';
 
-                // 証言ボックス
                 speakerName.textContent = stage.speaker || '🎙️ 裁判長';
                 dialogueText.textContent = stage.text || '…';
 
-                // 選択肢
                 choicesContainer.innerHTML = '';
                 if (stage.choices && stage.choices.length > 0) {
                     stage.choices.forEach((choice, idx) => {
@@ -567,22 +560,19 @@
                         btn.className = 'choice-btn';
                         btn.textContent = choice.label;
                         btn.addEventListener('click', function() {
-                            // 選択肢の遷移
                             if (choice.next !== undefined) {
                                 const nextIndex = choice.next;
                                 const chStages = getChapterData(state.chapter).stages;
                                 if (nextIndex < chStages.length) {
                                     state.stageIndex = nextIndex;
-                                    // もし終端に到達したらクリアフラグ
                                     const newStage = getCurrentStage();
                                     if (newStage.choices.length === 0) {
-                                        // 終端→クリアとみなす (バッドエンドも含むが、テキストに応じて)
                                         state.cleared[state.chapter] = true;
-                                        // オートセーブ
                                         saveGame();
+                                        // ★ クリア後にmeme.htmlチェック
+                                        checkFinalClear();
                                     }
                                     render();
-                                    // セーブ（進行が変わったら）
                                     saveGame();
                                 }
                             }
@@ -590,7 +580,6 @@
                         choicesContainer.appendChild(btn);
                     });
                 } else {
-                    // 終端の場合「次へ」ボタンで次の章へ（クリア後）
                     if (state.cleared[state.chapter]) {
                         const nextChapter = getNextChapter(state.chapter);
                         if (nextChapter) {
@@ -600,27 +589,25 @@
                             btn.addEventListener('click', function() {
                                 state.chapter = nextChapter;
                                 state.stageIndex = 0;
-                                // クリアフラグは保持
                                 render();
                                 saveGame();
                             });
                             choicesContainer.appendChild(btn);
                         } else {
-                            // 最終章クリア後
+                            // 最終章クリア後 → ここでもチェック（念のため）
+                            checkFinalClear();
                             const btn = document.createElement('button');
                             btn.className = 'choice-btn';
-                            btn.textContent = '🏁 全ての章をクリアしました。最初から遊ぶにはリセット。';
+                            btn.textContent = '🏁 全ての章をクリアしました。meme.htmlへ移動します...';
                             btn.style.background = '#cfb89e';
                             btn.style.pointerEvents = 'none';
                             choicesContainer.appendChild(btn);
                         }
                     } else {
-                        // バッドエンド or 未クリア
                         const btn = document.createElement('button');
                         btn.className = 'choice-btn';
                         btn.textContent = '🔄 この章をやり直す';
                         btn.addEventListener('click', function() {
-                            // 同じ章の最初に戻る（クリアフラグは落とさない）
                             state.stageIndex = 0;
                             render();
                             saveGame();
@@ -628,9 +615,11 @@
                         choicesContainer.appendChild(btn);
                     }
                 }
+
+                // ★ 毎回レンダリングの最後にチェック（安全のため）
+                checkFinalClear();
             }
 
-            // 次の章を取得
             function getNextChapter(current) {
                 const order = ['chapter1', 'chapter2', 'chapter3'];
                 const idx = order.indexOf(current);
@@ -641,7 +630,7 @@
             }
 
             // ----------------------------------------------------------------
-            // 4. セーブ／ロード (localStorage)
+            // 4. セーブ／ロード
             // ----------------------------------------------------------------
             function saveGame() {
                 try {
@@ -662,7 +651,6 @@
                     const raw = localStorage.getItem(SAVE_KEY);
                     if (!raw) return false;
                     const data = JSON.parse(raw);
-                    // バリデーション
                     if (data.chapter && data.stageIndex !== undefined && data.cleared) {
                         state.chapter = data.chapter;
                         state.stageIndex = data.stageIndex;
@@ -673,7 +661,6 @@
                 return false;
             }
 
-            // 完全リセット
             function resetGame(force = false) {
                 state = {
                     chapter: 'chapter1',
@@ -686,11 +673,10 @@
             }
 
             // ----------------------------------------------------------------
-            // 5. モーダル・リセット制御 (二回確認)
+            // 5. モーダル・リセット制御
             // ----------------------------------------------------------------
             let resetPending = false;
             resetBtn.addEventListener('click', function() {
-                // 一回目
                 resetModal.style.display = 'flex';
                 resetPending = true;
             });
@@ -701,7 +687,6 @@
             });
 
             modalConfirm.addEventListener('click', function() {
-                // 二回目
                 if (resetPending) {
                     resetGame(true);
                     resetModal.style.display = 'none';
@@ -709,7 +694,6 @@
                 }
             });
 
-            // モーダル外クリックで閉じる
             resetModal.addEventListener('click', function(e) {
                 if (e.target === resetModal) {
                     resetModal.style.display = 'none';
@@ -717,7 +701,6 @@
                 }
             });
 
-            // セーブボタン (手動)
             saveBtn.addEventListener('click', function() {
                 saveGame();
                 saveStatus.textContent = '💾 手動セーブ完了';
@@ -728,18 +711,14 @@
             // 6. 初期化
             // ----------------------------------------------------------------
             (function init() {
-                // セーブデータがあればロード
                 const loaded = loadGame();
                 if (!loaded) {
-                    // 初回はデフォルト
                     resetGame(false);
                 } else {
-                    // ロード後、念のため章の存在チェック
                     if (!STORY[state.chapter]) {
                         state.chapter = 'chapter1';
                         state.stageIndex = 0;
                     }
-                    // ステージ範囲補正
                     const ch = getChapterData(state.chapter);
                     if (state.stageIndex >= ch.stages.length) {
                         state.stageIndex = 0;
@@ -747,7 +726,6 @@
                     render();
                     saveStatus.textContent = '💾 セーブデータを復元';
                 }
-                // 自動セーブ（変更時は都度セーブされるため、初期表示後にもう一度セーブ）
                 saveGame();
             })();
 
