@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>逆転裁判 · 令和の闇</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', 'Yu Gothic', sans-serif;
+        }
+        body {
+            background: #1a1a2e;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+        }
+        .game-container {
+            max-width: 880px;
+            width: 100%;
+            background: #f5f0e8;
+            background-image: linear-gradient(145deg, #f8f3ea 0%, #e8dfd3 100%);
+            border-radius: 48px 48px 28px 28px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.6), 0 0 0 2px #b8a58b inset;
+            padding: 24px 28px 32px;
+            position: relative;
+            transition: 0.2s;
+        }
+        /* 法廷バッジ */
+        .court-badge {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 4px solid #7d5d3a;
+            padding-bottom: 10px;
+            margin-bottom: 18px;
+        }
+        .court-badge h1 {
+            font-size: 1.9rem;
+            font-weight: 700;
+            color: #2d1f12;
+            letter-spacing: 2px;
+            text-shadow: 2px 2px 0 #c9b69a;
+            margin: 0;
+        }
+        .chapter-indicator {
+            background: #3f2c1b;
+            padding: 8px 18px;
+            border-radius: 60px;
+            color: #f0e2cf;
+            font-weight: 600;
+            font-size: 1.1rem;
+            box-shadow: 0 2px 0 #5f4530;
+        }
+        /* 証拠・ステータス */
+        .status-panel {
+            background: #d7cbbe;
+            border-radius: 40px;
+            padding: 12px 20px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border: 2px solid #b7a187;
+            box-shadow: inset 0 2px 4px #b09b84;
+        }
+        .progress {
+            display: flex;
+            gap: 6px;
+            font-weight: 600;
+            color: #1f140e;
+        }
+        .progress span {
+            background: #eee5da;
+            padding: 4px 14px;
+            border-radius: 30px;
+            border: 1px solid #a48d74;
+        }
+        .save-status {
+            background: #4d3825;
+            color: #f0e1cd;
+            padding: 5px 16px;
+            border-radius: 30px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+        /* 証言ウィンドウ */
+        .testimony-box {
+            background: #fcf9f2;
+            border-radius: 32px;
+            padding: 22px 28px;
+            min-height: 180px;
+            border: 3px solid #b59d80;
+            box-shadow: inset 0 6px 12px rgba(90, 60, 30, 0.2);
+            margin: 16px 0 24px;
+            font-size: 1.1rem;
+            line-height: 1.6;
+            color: #1e150e;
+            white-space: pre-wrap;
+            word-break: break-word;
+            transition: 0.2s;
+        }
+        .testimony-box .speaker {
+            font-weight: 700;
+            color: #7d3c1b;
+            display: block;
+            margin-bottom: 4px;
+            font-size: 1.1rem;
+            letter-spacing: 0.5px;
+        }
+        .testimony-box .speaker::before {
+            content: "⚖️ ";
+        }
+        /* 選択肢エリア */
+        .choices {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 12px;
+        }
+        .choice-btn {
+            background: #ede3d6;
+            border: 3px solid #8f775d;
+            border-radius: 60px;
+            padding: 14px 24px;
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: #20180e;
+            text-align: left;
+            cursor: pointer;
+            transition: all 0.08s linear;
+            box-shadow: 0 5px 0 #6b5743;
+            letter-spacing: 0.3px;
+        }
+        .choice-btn:hover {
+            background: #faf1e2;
+            transform: translateY(-2px);
+            box-shadow: 0 7px 0 #5f4b38;
+        }
+        .choice-btn:active {
+            transform: translateY(5px);
+            box-shadow: 0 2px 0 #5f4b38;
+        }
+        .choice-btn.disabled {
+            opacity: 0.6;
+            pointer-events: none;
+            filter: grayscale(0.5);
+        }
+        /* リセット＆セーブエリア */
+        .action-bar {
+            display: flex;
+            justify-content: flex-end;
+            gap: 16px;
+            margin-top: 28px;
+            border-top: 2px dashed #b49f89;
+            padding-top: 22px;
+            flex-wrap: wrap;
+        }
+        .action-btn {
+            background: #3b2b1d;
+            border: none;
+            padding: 10px 28px;
+            border-radius: 40px;
+            color: #efe5d8;
+            font-weight: 600;
+            font-size: 1.0rem;
+            box-shadow: 0 5px 0 #1b140e;
+            cursor: pointer;
+            transition: 0.08s linear;
+            letter-spacing: 0.5px;
+        }
+        .action-btn.reset {
+            background: #883f2a;
+            box-shadow: 0 5px 0 #542a1b;
+        }
+        .action-btn.reset:hover {
+            background: #a54d34;
+            transform: scale(0.97);
+        }
+        .action-btn:hover {
+            background: #4f3b29;
+            transform: scale(0.97);
+        }
+        .action-btn:active {
+            transform: translateY(5px);
+            box-shadow: 0 1px 0 #1b140e;
+        }
+        .footer-message {
+            text-align: right;
+            color: #524433;
+            font-size: 0.8rem;
+            margin-top: 8px;
+            opacity: 0.8;
+        }
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(3px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 999;
+        }
+        .modal-box {
+            background: #efe6da;
+            max-width: 460px;
+            width: 90%;
+            padding: 32px 28px;
+            border-radius: 64px 24px 64px 24px;
+            border: 4px solid #896f55;
+            box-shadow: 0 20px 40px #00000066;
+            text-align: center;
+        }
+        .modal-box h2 {
+            margin-top: 0;
+            color: #3d2a19;
+            font-weight: 700;
+            border-bottom: 3px solid #ae9278;
+            padding-bottom: 12px;
+        }
+        .modal-box p {
+            font-size: 1.2rem;
+            color: #20180f;
+        }
+        .modal-btn-group {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 28px;
+        }
+        .modal-btn {
+            background: #5f4734;
+            border: none;
+            padding: 12px 32px;
+            border-radius: 60px;
+            font-weight: 700;
+            color: #f0e3d4;
+            font-size: 1.1rem;
+            box-shadow: 0 4px 0 #2e1f14;
+            cursor: pointer;
+            transition: 0.06s linear;
+        }
+        .modal-btn.danger {
+            background: #9e3d2a;
+            box-shadow: 0 4px 0 #5f271b;
+        }
+        .modal-btn:hover {
+            transform: scale(0.95);
+        }
+        .modal-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 1px 0 #2e1f14;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container" id="app">
+        <div class="court-badge">
+            <h1>⚡逆転裁判</h1>
+            <div class="chapter-indicator" id="chapterLabel">第1章</div>
+        </div>
+
+        <div class="status-panel">
+            <div class="progress">
+                <span id="stageDisplay">📌 証言中</span>
+                <span id="clearMark" style="background:#b9a48b;">⚪ 未クリア</span>
+            </div>
+            <div class="save-status" id="saveStatus">💾 セーブ済み</div>
+        </div>
+
+        <div class="testimony-box" id="testimonyBox">
+            <span class="speaker" id="speakerName">🎙️ 裁判長</span>
+            <div id="dialogueText">法廷はこれより開廷する。…はんじょうの炎上案件、その真相を明らかにせよ。</div>
+        </div>
+
+        <div id="choicesContainer" class="choices">
+            <!-- 動的にボタン生成 -->
+        </div>
+
+        <div class="action-bar">
+            <button class="action-btn reset" id="resetBtn">⚠️ 最初からやり直す</button>
+            <button class="action-btn" id="saveBtn">📀 今の進行をセーブ</button>
+        </div>
+        <div class="footer-message">★ 各章クリアで自動セーブ | リセットは二度確認</div>
+    </div>
+
+    <!-- モーダル (リセット確認) -->
+    <div class="modal-overlay" id="resetModal">
+        <div class="modal-box">
+            <h2>⚠️ 本当にリセットしますか？</h2>
+            <p>すべての進行が消去されます。<br>（セーブデータも完全に削除）</p>
+            <div class="modal-btn-group">
+                <button class="modal-btn" id="modalCancel">やめる</button>
+                <button class="modal-btn danger" id="modalConfirm">はい、リセット</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function(){
+            "use strict";
+
+            // ----------------------------------------------------------------
+            // 1. ストーリーデータ (全3章)
+            // ----------------------------------------------------------------
+            const STORY = {
+                // 第1章: はんじょうの反社問題 (配信者炎上)
+                chapter1: {
+                    name: "第1章 · はんじょうの反社問題",
+                    stages: [
+                        {
+                            speaker: "🎙️ 裁判長",
+                            text: "本日は、配信者『はんじょう』の反社組織との繋がりが疑われる事件。告発者は匿名の内部告発。はんじょう、あなたは反社に金を送っていたのか？",
+                            choices: [
+                                { label: "✅ 認める。反社に金を送った。", next: 1 },
+                                { label: "❌ 否定する。全くのデマだ。", next: 2 }
+                            ]
+                        },
+                        {
+                            speaker: "⚡ はんじょう",
+                            text: "……確かに金は送った。だがそれは『取材協力費』だ。反社の実態を暴くための潜入取材だった。",
+                            choices: [
+                                { label: "📹 証拠の動画を提出する", next: 3 },
+                                { label: "🧾 領収書の控えを見せる", next: 4 }
+                            ]
+                        },
+                        {
+                            speaker: "⚡ はんじょう",
+                            text: "違う！ 俺は何も知らない。これは俺への嫌がらせだ！ 配信者同士の嫉妬だろう。",
+                            choices: [
+                                { label: "📱 過去の反社投稿を指摘", next: 5 },
+                                { label: "🔍 アカウントのログを鑑定", next: 5 }
+                            ]
+                        },
+                        {
+                            speaker: "🎙️ 裁判長",
+                            text: "動画には確かに反社のボスと握手するはんじょうが映っている…しかし、その後のインタビューで『真実を暴くため』と語っている。",
+                            choices: [
+                                { label: "👍 はんじょうを信じる", next: 6 },
+                                { label: "👎 やはり反社と癒着だ", next: 7 }
+                            ]
+                        },
+                        {
+                            speaker: "🎙️ 裁判長",
+                            text: "領収書には『反社調査費』とある。だが、これだけでは完全な証明にはならない。",
+                            choices: [
+                                { label: "🗂️ さらに内部告発の証言を", next: 6 },
+                                { label: "⚖️ 警察の捜査報告を求める", next: 6 }
+                            ]
+                        },
+                        {
+                            speaker: "🎙️ 裁判長",
+                            text: "はんじょうは反社の内部資料を提供し、警察も動いた。結果、彼は『ジャーナリスト』として認定された。\n\n✅ 第1章 クリア！ はんじょうの名誉は守られた。",
+                            choices: [] // 終端
+                        },
+                        {
+                            speaker: "🎙️ 裁判長",
+                            text: "はんじょうは有罪。反社との癒着が確定。配信者は永遠に活動停止となった。\n\n❌ 第1章 バッドエンド… やり直せ。",
+                            choices: [] // 終端
+                        }
+                    ]
+                },
+                // 第2章: こめお食中毒問題 (現実ニュース連動)
+                chapter2: {
+                    name: "第2章 · こめお食中毒事件",
+                    stages: [
+                        {
+                            speaker: "👨‍⚖️ 裁判長",
+                            text: "次なる事件は、人気YouTuber『こめお』が主催したイベントでの集団食中毒。被害者は40名以上。こめお、あなたは責任を認めるか？",
+                            choices: [
+                                { label: "🍣 仕入れ先の過失だ", next: 1 },
+                                { label: "😰 自分も被害者だ", next: 2 }
+                            ]
+                        },
+                        {
+                            speaker: "🍙 こめお",
+                            text: "仕入れ先の業者が賞味期限切れの魚を混ぜたんだ。俺は知らなかった。",
+                            choices: [
+                                { label: "📄 仕入れ先の契約書を提示", next: 3 },
+                                { label: "🧪 食品の検査結果を要求", next: 3 }
+                            ]
+                        },
+                        {
+                            speaker: "🍙 こめお",
+                            text: "俺も同じものを食べてダウンした。被害者なのに、なぜ責められるんだ？",
+                            choices: [
+                                { label: "🏥 病院の診断書を見せる", next: 4 },
+                                { label: "📹 当日の調理動画を確認", next: 4 }
+                            ]
+                        },
+                        {
+                            speaker: "⚖️ 検察官",
+                            text: "契約書には『仕入れ先が全責任を負う』とある。だが、こめおは衛生管理を怠っていた。",
+                            choices: [
+                                { label: "📋 衛生講習の受講証明", next: 5 },
+                                { label: "🧑‍🍳 シェフの証言を呼ぶ", next: 5 }
+                            ]
+                        },
+                        {
+                            speaker: "⚖️ 検察官",
+                            text: "こめおは重症で入院。しかし、主催者としての監督責任は免れない。",
+                            choices: [
+                                { label: "💊 全被害者への謝罪と補償", next: 5 },
+                                { label: "📢 再発防止策の発表", next: 5 }
+                            ]
+                        },
+                        {
+                            speaker: "👨‍⚖️ 裁判長",
+                            text: "こめおは全ての被害者に謝罪し、仕入れ先を変更。再発防止策を徹底した。\n\n✅ 第2章 クリア！ こめおは社会的責任を果たした。",
+                            choices: []
+                        },
+                        {
+                            speaker: "👨‍⚖️ 裁判長",
+                            text: "こめおの過失は大きく、営業停止命令。賠償金も莫大。\n\n❌ 第2章 バッドエンド… もう一度。",
+                            choices: []
+                        }
+                    ]
+                },
+                // 最終章: DJ社長10億円借金問題 (青笹死去)
+                chapter3: {
+                    name: "最終章 · DJ社長の10億円借金",
+                    stages: [
+                        {
+                            speaker: "🎤 裁判長",
+                            text: "最終審理。DJ社長、あなたは青笹氏から10億円を借りながら、返済の意思がない。青笹氏は先月、遺体で発見された。",
+                            choices: [
+                                { label: "💸 返す気はない", next: 1 },
+                                { label: "🤝 誠意を持って返済する", next: 2 }
+                            ]
+                        },
+                        {
+                            speaker: "🎧 DJ社長",
+                            text: "金はビジネスに使った。青笹には悪いが、返済は不可能だ。",
+                            choices: [
+                                { label: "📊 会社の決算書を提出", next: 3 },
+                                { label: "🧾 借金の無効を主張", next: 3 }
+                            ]
+                        },
+                        {
+                            speaker: "🎧 DJ社長",
+                            text: "俺はちゃんと返す気だ。青笹の遺族とも話をしている。",
+                            choices: [
+                                { label: "📝 返済計画書を見せる", next: 4 },
+                                { label: "🤲 青笹の遺族の証言", next: 4 }
+                            ]
+                        },
+                        {
+                            speaker: "📉 検察官",
+                            text: "決算書は赤字。借金を返す余力はない。青笹はあなたに金を貸した後、自殺した。",
+                            choices: [
+                                { label: "🕊️ 青笹の遺書を提示", next: 5 },
+                                { label: "📈 資産の隠し口座を暴露", next: 5 }
+                            ]
+                        },
+                        {
+                            speaker: "📉 検察官",
+                            text: "返済計画は杜撰。青笹の遺族も『信じていない』と証言。",
+                            choices: [
+                                { label: "⏳ 分割返済の誓約書", next: 5 },
+                                { label: "🏢 会社の売却を提案", next: 5 }
+                            ]
+                        },
+                        {
+                            speaker: "⚖️ 裁判長",
+                            text: "DJ社長は全財産を売却し、青笹の遺族に返済。しかし、青笹は戻らない…。\n\n✅ 最終章 クリア！ 借金は返済されたが、深い悲しみが残る。",
+                            choices: []
+                        },
+                        {
+                            speaker: "⚖️ 裁判長",
+                            text: "DJ社長は債務逃れの罪で懲役。10億円は回収不能。青笹の無念は永遠に。\n\n❌ 最終章 バッドエンド… やり直せ。",
+                            choices: []
+                        }
+                    ]
+                }
+            };
+
+            // ----------------------------------------------------------------
+            // 2. ゲーム状態管理
+            // ----------------------------------------------------------------
+            const SAVE_KEY = 'gyakuten_save_data';
+
+            // デフォルト状態
+            let state = {
+                chapter: 'chapter1',       // 'chapter1' | 'chapter2' | 'chapter3'
+                stageIndex: 0,
+                cleared: { chapter1: false, chapter2: false, chapter3: false },
+                // セーブデータに含める
+            };
+
+            // DOM refs
+            const chapterLabel = document.getElementById('chapterLabel');
+            const stageDisplay = document.getElementById('stageDisplay');
+            const clearMark = document.getElementById('clearMark');
+            const saveStatus = document.getElementById('saveStatus');
+            const testimonyBox = document.getElementById('testimonyBox');
+            const speakerName = document.getElementById('speakerName');
+            const dialogueText = document.getElementById('dialogueText');
+            const choicesContainer = document.getElementById('choicesContainer');
+            const resetBtn = document.getElementById('resetBtn');
+            const saveBtn = document.getElementById('saveBtn');
+            const resetModal = document.getElementById('resetModal');
+            const modalCancel = document.getElementById('modalCancel');
+            const modalConfirm = document.getElementById('modalConfirm');
+
+            // ----------------------------------------------------------------
+            // 3. コア関数
+            // ----------------------------------------------------------------
+            function getChapterData(chapterKey) {
+                return STORY[chapterKey] || STORY.chapter1;
+            }
+
+            function getCurrentStage() {
+                const ch = getChapterData(state.chapter);
+                if (!ch || !ch.stages || state.stageIndex >= ch.stages.length) {
+                    // 安全フォールバック
+                    return ch?.stages?.[0] || { speaker: '裁判長', text: 'エラー', choices: [] };
+                }
+                return ch.stages[state.stageIndex];
+            }
+
+            // 章の表示名
+            function getChapterDisplayName(key) {
+                const map = {
+                    chapter1: '第1章 · はんじょうの反社問題',
+                    chapter2: '第2章 · こめお食中毒事件',
+                    chapter3: '最終章 · DJ社長の借金問題'
+                };
+                return map[key] || key;
+            }
+
+            // 進行を描画
+            function render() {
+                const chKey = state.chapter;
+                const chData = getChapterData(chKey);
+                const stage = getCurrentStage();
+
+                // 章ラベル
+                chapterLabel.textContent = getChapterDisplayName(chKey);
+
+                // ステージ表示
+                const total = chData.stages.length;
+                const index = state.stageIndex + 1;
+                stageDisplay.textContent = `📌 証言 ${index}/${total}`;
+
+                // クリアマーク
+                const isCleared = state.cleared[chKey] || false;
+                clearMark.textContent = isCleared ? '⭐ クリア済' : '⚪ 未クリア';
+                clearMark.style.background = isCleared ? '#b5d6a8' : '#b9a48b';
+
+                // セーブステータス (自動セーブ時は更新)
+                saveStatus.textContent = '💾 セーブ済み';
+
+                // 証言ボックス
+                speakerName.textContent = stage.speaker || '🎙️ 裁判長';
+                dialogueText.textContent = stage.text || '…';
+
+                // 選択肢
+                choicesContainer.innerHTML = '';
+                if (stage.choices && stage.choices.length > 0) {
+                    stage.choices.forEach((choice, idx) => {
+                        const btn = document.createElement('button');
+                        btn.className = 'choice-btn';
+                        btn.textContent = choice.label;
+                        btn.addEventListener('click', function() {
+                            // 選択肢の遷移
+                            if (choice.next !== undefined) {
+                                const nextIndex = choice.next;
+                                const chStages = getChapterData(state.chapter).stages;
+                                if (nextIndex < chStages.length) {
+                                    state.stageIndex = nextIndex;
+                                    // もし終端に到達したらクリアフラグ
+                                    const newStage = getCurrentStage();
+                                    if (newStage.choices.length === 0) {
+                                        // 終端→クリアとみなす (バッドエンドも含むが、テキストに応じて)
+                                        state.cleared[state.chapter] = true;
+                                        // オートセーブ
+                                        saveGame();
+                                    }
+                                    render();
+                                    // セーブ（進行が変わったら）
+                                    saveGame();
+                                }
+                            }
+                        });
+                        choicesContainer.appendChild(btn);
+                    });
+                } else {
+                    // 終端の場合「次へ」ボタンで次の章へ（クリア後）
+                    if (state.cleared[state.chapter]) {
+                        const nextChapter = getNextChapter(state.chapter);
+                        if (nextChapter) {
+                            const btn = document.createElement('button');
+                            btn.className = 'choice-btn';
+                            btn.textContent = `▶️ 次の章 (${getChapterDisplayName(nextChapter)}) へ`;
+                            btn.addEventListener('click', function() {
+                                state.chapter = nextChapter;
+                                state.stageIndex = 0;
+                                // クリアフラグは保持
+                                render();
+                                saveGame();
+                            });
+                            choicesContainer.appendChild(btn);
+                        } else {
+                            // 最終章クリア後
+                            const btn = document.createElement('button');
+                            btn.className = 'choice-btn';
+                            btn.textContent = '🏁 全ての章をクリアしました。最初から遊ぶにはリセット。';
+                            btn.style.background = '#cfb89e';
+                            btn.style.pointerEvents = 'none';
+                            choicesContainer.appendChild(btn);
+                        }
+                    } else {
+                        // バッドエンド or 未クリア
+                        const btn = document.createElement('button');
+                        btn.className = 'choice-btn';
+                        btn.textContent = '🔄 この章をやり直す';
+                        btn.addEventListener('click', function() {
+                            // 同じ章の最初に戻る（クリアフラグは落とさない）
+                            state.stageIndex = 0;
+                            render();
+                            saveGame();
+                        });
+                        choicesContainer.appendChild(btn);
+                    }
+                }
+            }
+
+            // 次の章を取得
+            function getNextChapter(current) {
+                const order = ['chapter1', 'chapter2', 'chapter3'];
+                const idx = order.indexOf(current);
+                if (idx !== -1 && idx < order.length - 1) {
+                    return order[idx + 1];
+                }
+                return null;
+            }
+
+            // ----------------------------------------------------------------
+            // 4. セーブ／ロード (localStorage)
+            // ----------------------------------------------------------------
+            function saveGame() {
+                try {
+                    const data = {
+                        chapter: state.chapter,
+                        stageIndex: state.stageIndex,
+                        cleared: state.cleared
+                    };
+                    localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+                    saveStatus.textContent = '💾 セーブ完了';
+                } catch(e) {
+                    console.warn('セーブ失敗', e);
+                }
+            }
+
+            function loadGame() {
+                try {
+                    const raw = localStorage.getItem(SAVE_KEY);
+                    if (!raw) return false;
+                    const data = JSON.parse(raw);
+                    // バリデーション
+                    if (data.chapter && data.stageIndex !== undefined && data.cleared) {
+                        state.chapter = data.chapter;
+                        state.stageIndex = data.stageIndex;
+                        state.cleared = data.cleared;
+                        return true;
+                    }
+                } catch(e) {}
+                return false;
+            }
+
+            // 完全リセット
+            function resetGame(force = false) {
+                state = {
+                    chapter: 'chapter1',
+                    stageIndex: 0,
+                    cleared: { chapter1: false, chapter2: false, chapter3: false }
+                };
+                localStorage.removeItem(SAVE_KEY);
+                render();
+                saveStatus.textContent = '🗑️ リセット完了';
+            }
+
+            // ----------------------------------------------------------------
+            // 5. モーダル・リセット制御 (二回確認)
+            // ----------------------------------------------------------------
+            let resetPending = false;
+            resetBtn.addEventListener('click', function() {
+                // 一回目
+                resetModal.style.display = 'flex';
+                resetPending = true;
+            });
+
+            modalCancel.addEventListener('click', function() {
+                resetModal.style.display = 'none';
+                resetPending = false;
+            });
+
+            modalConfirm.addEventListener('click', function() {
+                // 二回目
+                if (resetPending) {
+                    resetGame(true);
+                    resetModal.style.display = 'none';
+                    resetPending = false;
+                }
+            });
+
+            // モーダル外クリックで閉じる
+            resetModal.addEventListener('click', function(e) {
+                if (e.target === resetModal) {
+                    resetModal.style.display = 'none';
+                    resetPending = false;
+                }
+            });
+
+            // セーブボタン (手動)
+            saveBtn.addEventListener('click', function() {
+                saveGame();
+                saveStatus.textContent = '💾 手動セーブ完了';
+                setTimeout(() => { saveStatus.textContent = '💾 セーブ済み'; }, 1500);
+            });
+
+            // ----------------------------------------------------------------
+            // 6. 初期化
+            // ----------------------------------------------------------------
+            (function init() {
+                // セーブデータがあればロード
+                const loaded = loadGame();
+                if (!loaded) {
+                    // 初回はデフォルト
+                    resetGame(false);
+                } else {
+                    // ロード後、念のため章の存在チェック
+                    if (!STORY[state.chapter]) {
+                        state.chapter = 'chapter1';
+                        state.stageIndex = 0;
+                    }
+                    // ステージ範囲補正
+                    const ch = getChapterData(state.chapter);
+                    if (state.stageIndex >= ch.stages.length) {
+                        state.stageIndex = 0;
+                    }
+                    render();
+                    saveStatus.textContent = '💾 セーブデータを復元';
+                }
+                // 自動セーブ（変更時は都度セーブされるため、初期表示後にもう一度セーブ）
+                saveGame();
+            })();
+
+        })();
+    </script>
+</body>
+</html>
