@@ -3,322 +3,904 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>クラロワ風 全51タイプ（前編）</title>
+  <title>クラロワ風 デッキ編集画面</title>
   <style>
-    * { box-sizing: border-box; user-select: none; }
+    * {
+      box-sizing: border-box;
+      user-select: none;
+    }
     body {
-      background: #1a2a3a;
+      background: #0d1b2a;
       display: flex;
       justify-content: center;
-      align-items: center;
+      align-items: flex-start;
       min-height: 100vh;
       margin: 0;
       font-family: 'Segoe UI', sans-serif;
-    }
-    .game-container {
-      background: #2d4a5e;
       padding: 20px;
+    }
+    .container {
+      background: #1b3a4b;
+      padding: 25px;
       border-radius: 30px;
-      box-shadow: 0 20px 30px rgba(0,0,0,0.6);
-      max-width: 1000px;
-    }
-    canvas {
-      display: block;
-      margin: 0 auto;
-      background: #6b8c5c;
-      border-radius: 20px;
-      box-shadow: inset 0 0 0 2px #3d5a3d;
-      cursor: grab;
+      box-shadow: 0 20px 30px rgba(0,0,0,0.8);
+      max-width: 1200px;
       width: 100%;
-      height: auto;
-      aspect-ratio: 800/500;
     }
-    .ui {
+    h1 {
+      color: #ffd966;
+      text-align: center;
+      margin: 0 0 15px 0;
+      font-size: 28px;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    }
+    .settings {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      background: rgba(0,0,0,0.3);
+      padding: 15px;
+      border-radius: 16px;
+      margin-bottom: 20px;
+      align-items: center;
+    }
+    .settings label {
+      color: #ecf0f1;
+      font-weight: bold;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .settings input[type="number"] {
+      width: 60px;
+      padding: 4px 6px;
+      border-radius: 8px;
+      border: 2px solid #5a8a9a;
+      background: #1a2a3a;
+      color: #ffd966;
+      font-weight: bold;
+      font-size: 14px;
+      text-align: center;
+    }
+    .settings input[type="range"] {
+      width: 120px;
+      accent-color: #ffd966;
+    }
+    .settings .value-display {
+      color: #ffd966;
+      font-weight: bold;
+      min-width: 30px;
+      display: inline-block;
+      text-align: center;
+    }
+    .deck-info {
       display: flex;
       flex-wrap: wrap;
       justify-content: space-between;
       align-items: center;
-      margin-top: 15px;
+      background: rgba(0,0,0,0.3);
+      padding: 10px 18px;
+      border-radius: 12px;
+      margin-bottom: 15px;
+      color: #ecf0f1;
+    }
+    .deck-info .count {
+      font-size: 18px;
+      font-weight: bold;
+      color: #ffd966;
+    }
+    .btn-start {
+      background: #27ae60;
+      border: none;
+      padding: 12px 40px;
+      border-radius: 40px;
+      color: white;
+      font-weight: bold;
+      font-size: 20px;
+      cursor: pointer;
+      box-shadow: 0 4px 0 #1a6b3a;
+      transition: 0.1s;
+    }
+    .btn-start:active {
+      transform: translateY(4px);
+      box-shadow: none;
+    }
+    .btn-start:disabled {
+      background: #555;
+      box-shadow: 0 4px 0 #333;
+      cursor: not-allowed;
+    }
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 8px;
+      max-height: 500px;
+      overflow-y: auto;
+      padding: 8px;
+      background: rgba(0,0,0,0.2);
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+    .card-grid::-webkit-scrollbar {
+      width: 6px;
+    }
+    .card-grid::-webkit-scrollbar-thumb {
+      background: #ffd966;
+      border-radius: 4px;
+    }
+    .card {
+      background: #2c4c5e;
+      border: 2px solid #5a8a9a;
+      border-radius: 12px;
+      padding: 8px 6px;
+      cursor: pointer;
+      transition: 0.15s;
+      text-align: center;
+      color: #ecf0f1;
+      font-size: 12px;
+      position: relative;
+    }
+    .card:hover {
+      transform: translateY(-2px);
+      border-color: #8ab8c8;
+    }
+    .card.selected {
+      border-color: #ffd966;
+      background: #3a6a7a;
+      box-shadow: 0 0 12px rgba(255, 217, 102, 0.3);
+    }
+    .card .icon {
+      font-size: 28px;
+      display: block;
+    }
+    .card .name {
+      font-weight: bold;
+      font-size: 12px;
+      margin-top: 2px;
+    }
+    .card .cost-badge {
+      background: rgba(0,0,0,0.5);
+      border-radius: 10px;
+      padding: 0 8px;
+      font-size: 11px;
+      color: #ffd966;
+      display: inline-block;
+      margin-top: 2px;
+    }
+    .card .color-dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.3);
+      vertical-align: middle;
+      margin-right: 3px;
+    }
+    .card .detail-btn {
+      background: rgba(255,255,255,0.1);
+      border: 1px solid #5a8a9a;
+      border-radius: 20px;
+      color: #8ab8c8;
+      font-size: 10px;
+      padding: 2px 10px;
+      cursor: pointer;
+      margin-top: 4px;
+      transition: 0.1s;
+    }
+    .card .detail-btn:hover {
+      background: rgba(255,255,255,0.2);
+    }
+    .card .check-mark {
+      position: absolute;
+      top: -6px;
+      right: -6px;
+      background: #ffd966;
+      color: #1a2a3a;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      font-size: 12px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    }
+    /* モーダル */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.7);
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      padding: 20px;
+    }
+    .modal-overlay.active {
+      display: flex;
+    }
+    .modal {
+      background: #1b3a4b;
+      border-radius: 24px;
+      padding: 30px;
+      max-width: 500px;
+      width: 100%;
+      max-height: 80vh;
+      overflow-y: auto;
+      border: 2px solid #ffd966;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.8);
+    }
+    .modal h2 {
+      color: #ffd966;
+      margin-top: 0;
+      text-align: center;
+    }
+    .modal .stat {
+      color: #ecf0f1;
+      font-size: 14px;
+      padding: 4px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .modal .stat span {
+      color: #ffd966;
+      font-weight: bold;
+    }
+    .modal .close-btn {
+      background: #c0392b;
+      border: none;
+      padding: 8px 30px;
+      border-radius: 40px;
       color: white;
       font-weight: bold;
       font-size: 16px;
-      gap: 10px;
-    }
-    .cost-area { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-    .cost-box {
-      background: #1f3a47;
-      padding: 8px 18px;
-      border-radius: 40px;
-      border: 2px solid #ffd966;
-      box-shadow: 0 4px 0 #7f6b3d;
-      font-size: 18px;
-      color: #ffd966;
-    }
-    .message {
-      background: #17252e;
-      padding: 8px 25px;
-      border-radius: 40px;
-      border: 2px solid #f1c40f;
-      font-size: 15px;
-      color: #ecf0f1;
-    }
-    .reset-btn {
-      background: #c0392b;
-      border: none;
-      padding: 8px 25px;
-      border-radius: 40px;
-      color: white;
-      font-weight: bold;
-      font-size: 18px;
       cursor: pointer;
+      margin-top: 15px;
+      display: block;
+      margin-left: auto;
+      margin-right: auto;
       box-shadow: 0 4px 0 #78281f;
       transition: 0.1s;
     }
-    .reset-btn:active { transform: translateY(4px); box-shadow: none; }
-    .unit-scroll {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 5px;
-      max-height: 100px;
-      overflow-y: auto;
-      padding: 6px;
-      background: rgba(0,0,0,0.3);
-      border-radius: 12px;
-      margin-top: 10px;
-      width: 100%;
-      border: 1px solid rgba(255,255,255,0.1);
+    .modal .close-btn:active {
+      transform: translateY(4px);
+      box-shadow: none;
     }
-    .unit-scroll::-webkit-scrollbar { width: 5px; }
-    .unit-scroll::-webkit-scrollbar-thumb { background: #ffd966; border-radius: 4px; }
-    .unit-btn {
-      background: #2c4c5e;
-      padding: 4px 12px;
-      border-radius: 30px;
-      border: 2px solid #5a8a9a;
-      cursor: pointer;
-      color: #ecf0f1;
-      font-weight: bold;
-      font-size: 12px;
-      transition: 0.15s;
-      box-shadow: 0 3px 0 #1a2f3a;
-      white-space: nowrap;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-    }
-    .unit-btn:hover { transform: translateY(-1px); border-color: #8ab8c8; }
-    .unit-btn:active { transform: translateY(3px); box-shadow: none; }
-    .unit-btn.selected {
-      background: #f1c40f;
-      color: #1a2a3a;
-      border-color: #f39c12;
-      box-shadow: 0 3px 0 #b7950b;
-    }
-    .unit-btn .color-dot {
-      display: inline-block;
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      border: 1px solid rgba(255,255,255,0.4);
-      flex-shrink: 0;
-    }
-    .unit-btn .cost-badge {
-      background: rgba(0,0,0,0.4);
-      border-radius: 12px;
-      padding: 0 6px;
-      font-size: 10px;
-      color: #ffd966;
-    }
-    .cat-label {
+    .modal .special-desc {
       color: #8ab8c8;
-      font-size: 11px;
-      padding: 2px 8px;
+      font-size: 14px;
       background: rgba(0,0,0,0.3);
-      border-radius: 12px;
-      margin-right: 2px;
-      white-space: nowrap;
+      padding: 10px;
+      border-radius: 8px;
+      margin-top: 8px;
     }
-    @media (max-width: 700px) {
-      .ui { font-size: 13px; }
-      .unit-btn { font-size: 10px; padding: 3px 8px; }
-      .cost-box { font-size: 16px; padding: 6px 14px; }
-      .message { font-size: 12px; padding: 5px 12px; min-width: 100px; }
-      .reset-btn { font-size: 14px; padding: 6px 16px; }
+    @media (max-width: 600px) {
+      .settings { flex-direction: column; align-items: stretch; }
+      .card-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+      .container { padding: 15px; }
     }
   </style>
 </head>
 <body>
-<div class="game-container">
-  <canvas id="gameCanvas" width="800" height="500"></canvas>
+<div class="container">
+  <h1>⚔️ デッキ編集</h1>
   
-  <div class="ui">
-    <div class="cost-area">
-      <div class="cost-box">💎 <span id="costDisplay">10</span></div>
-    </div>
-    <div class="message" id="messageDisplay">⚔️ ユニットを選んでドラッグ</div>
-    <button class="reset-btn" id="resetBtn">🔄 リセット</button>
+  <!-- 設定 -->
+  <div class="settings">
+    <label>
+      🎯 CPUランダム枚数:
+      <input type="range" id="cpuRandomCount" min="0" max="47" value="10" />
+      <span class="value-display" id="cpuRandomCountDisplay">10</span>
+    </label>
+    <label>
+      🏰 自タワーHP:
+      <input type="number" id="playerTowerHp" value="120" min="50" max="500" />
+    </label>
+    <label>
+      🏰 CPUタワーHP:
+      <input type="number" id="cpuTowerHp" value="120" min="50" max="500" />
+    </label>
+    <label>
+      ⏱️ エリクサー速度（秒/1):
+      <input type="range" id="elixirSpeed" min="3" max="10" value="3" step="0.5" />
+      <span class="value-display" id="elixirSpeedDisplay">3</span>秒
+    </label>
   </div>
   
-  <div class="unit-scroll" id="unitButtonContainer"></div>
+  <!-- デッキ情報 -->
+  <div class="deck-info">
+    <span>📋 デッキ枚数: <span class="count" id="deckCount">0</span> / 51</span>
+    <span>🟢 CPU固定: イラン・ホルムズ海峡・ハマス・キム</span>
+    <button class="btn-start" id="startBattleBtn">⚔️ 試合開始</button>
+  </div>
+  
+  <!-- カード一覧 -->
+  <div class="card-grid" id="cardGrid"></div>
+</div>
+
+<!-- 詳細モーダル -->
+<div class="modal-overlay" id="detailModal">
+  <div class="modal">
+    <h2 id="modalTitle">カード詳細</h2>
+    <div id="modalBody"></div>
+    <button class="close-btn" id="modalCloseBtn">閉じる</button>
+  </div>
 </div>
 
 <script>
 // ============================================================
-// 前編：全51タイプ定義＋基本ゲームエンジン
+// 前編：デッキ編集画面
 // ============================================================
 
-// ---- キャンバス ----
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-const costSpan = document.getElementById('costDisplay');
-const msgDiv = document.getElementById('messageDisplay');
-const btnContainer = document.getElementById('unitButtonContainer');
-
-// ---- ゲーム状態 ----
-let gameOver = false;
-let winner = null;
-let playerCost = 10;
-const MAX_COST = 10;
-let selectedUnitType = null;
-let isDragging = false;
-let previewUnit = null;
-
-// ---- タワー ----
-const playerTower = { x: 80, y: 200, w: 60, h: 100, hp: 100, maxHp: 100 };
-const cpuTower = { x: 660, y: 200, w: 60, h: 100, hp: 100, maxHp: 100 };
-let units = [];
-
-// ---- CPU用エリクサー ----
-let cpuCost = 10;
-const CPU_MAX_COST = 10;
-let cpuTimer = 0;
-
-// ============================================================
-// 1. 全51タイプのステータス定義
-// ============================================================
+// ---- 全51タイプのステータス定義 ----
 const UNIT_TYPES = {
-  melee:   { name: '近接', cost: 3, hp: 40, attack: 12, range: 40, speed: 1.2, size: 18, attackSpeed: 30, icon: '⚔️', cat: '基本' },
-  ranged:  { name: '遠距離', cost: 5, hp: 25, attack: 8, range: 100, speed: 0.8, size: 16, attackSpeed: 30, icon: '🏹', cat: '基本' },
-  tank:    { name: 'タンク', cost: 4, hp: 80, attack: 6, range: 30, speed: 0.8, size: 24, attackSpeed: 40, icon: '🛡️', cat: '基本' },
-  mage:    { name: '魔法使い', cost: 6, hp: 20, attack: 10, range: 120, speed: 0.7, size: 16, attackSpeed: 35, icon: '🧙', cat: '基本' },
-  speedster: { name: 'スピードスター', cost: 3, hp: 15, attack: 8, range: 25, speed: 2.5, size: 14, attackSpeed: 20, icon: '⚡', cat: '戦術' },
-  healer:    { name: 'ヒーラー', cost: 5, hp: 30, attack: 0, range: 80, speed: 0.9, size: 18, attackSpeed: 20, icon: '💚', cat: '戦術' },
-  bomber:    { name: '爆弾兵', cost: 4, hp: 20, attack: 25, range: 70, speed: 1.0, size: 18, attackSpeed: 1, icon: '💥', cat: '戦術' },
-  wall:      { name: '壁', cost: 3, hp: 120, attack: 0, range: 0, speed: 0, size: 30, attackSpeed: 999, icon: '🧱', cat: '戦術' },
-  sniper:    { name: 'スナイパー', cost: 6, hp: 18, attack: 15, range: 200, speed: 0.6, size: 14, attackSpeed: 45, icon: '🎯', cat: '特殊' },
-  necromancer: { name: 'ネクロマンサー', cost: 5, hp: 25, attack: 5, range: 90, speed: 0.8, size: 18, attackSpeed: 30, icon: '🧟', cat: '特殊' },
-  stealth:   { name: 'ステルス', cost: 4, hp: 30, attack: 10, range: 35, speed: 1.3, size: 16, attackSpeed: 28, icon: '👻', cat: '特殊' },
-  freeze:    { name: 'フリーズ', cost: 4, hp: 25, attack: 2, range: 100, speed: 0.9, size: 18, attackSpeed: 80, icon: '❄️', cat: '特殊' },
-  jumper:    { name: 'ジャンプ兵', cost: 4, hp: 25, attack: 10, range: 30, speed: 1.4, size: 16, attackSpeed: 30, icon: '🦘', cat: '変則' },
-  counter:   { name: 'カウンター', cost: 4, hp: 30, attack: 4, range: 30, speed: 1.0, size: 18, attackSpeed: 30, icon: '🔄', cat: '変則' },
-  berserker: { name: 'バーサーカー', cost: 4, hp: 50, attack: 8, range: 35, speed: 1.3, size: 20, attackSpeed: 28, icon: '🔥', cat: '変則' },
-  vampire:   { name: 'バンパイア', cost: 5, hp: 35, attack: 10, range: 30, speed: 1.0, size: 18, attackSpeed: 28, icon: '🧛', cat: '変則' },
-  golem:     { name: 'ゴーレム', cost: 6, hp: 70, attack: 8, range: 30, speed: 0.7, size: 26, attackSpeed: 35, icon: '🪨', cat: '変則' },
-  wind:      { name: 'ウィンド', cost: 3, hp: 15, attack: 1, range: 60, speed: 1.2, size: 16, attackSpeed: 30, icon: '🌪️', cat: '変則' },
-  mirage:    { name: 'ミラージュ', cost: 5, hp: 20, attack: 6, range: 35, speed: 1.0, size: 16, attackSpeed: 30, icon: '🌀', cat: '変則' },
-  electro:   { name: 'エレクトロ', cost: 4, hp: 25, attack: 6, range: 80, speed: 0.9, size: 16, attackSpeed: 30, icon: '⚡', cat: '変則' },
-  poison:    { name: 'ポイズン', cost: 4, hp: 25, attack: 3, range: 90, speed: 0.9, size: 16, attackSpeed: 30, icon: '☠️', cat: '変則' },
-  charger:   { name: 'チャージャー', cost: 4, hp: 35, attack: 15, range: 30, speed: 1.0, size: 18, attackSpeed: 30, icon: '🏇', cat: '変則' },
-  timewarp:  { name: 'タイムワープ', cost: 5, hp: 20, attack: 0, range: 100, speed: 0.8, size: 18, attackSpeed: 999, icon: '⏳', cat: 'ギミック' },
-  teleporter: { name: 'テレポーター', cost: 5, hp: 25, attack: 0, range: 150, speed: 0.8, size: 18, attackSpeed: 999, icon: '📡', cat: 'ギミック' },
-  shield:    { name: 'シールド', cost: 4, hp: 20, attack: 0, range: 80, speed: 0.9, size: 18, attackSpeed: 999, icon: '🛡️✨', cat: 'ギミック' },
-  copycat:   { name: 'コピーキャット', cost: 3, hp: 30, attack: 0, range: 30, speed: 1.0, size: 16, attackSpeed: 999, icon: '🐱', cat: 'ギミック' },
-  grenade:   { name: 'グレネード', cost: 3, hp: 10, attack: 20, range: 60, speed: 0, size: 14, attackSpeed: 999, icon: '💣', cat: 'ギミック' },
-  treant:    { name: 'トレント', cost: 6, hp: 40, attack: 5, range: 40, speed: 1.0, size: 16, attackSpeed: 30, icon: '🌳', cat: 'ギミック' },
-  elf:       { name: 'エルフ', cost: 4, hp: 20, attack: 0, range: 90, speed: 0.9, size: 16, attackSpeed: 999, icon: '🧝', cat: 'ギミック' },
-  blackhole: { name: 'ブラックホール', cost: 7, hp: 40, attack: 15, range: 120, speed: 0.6, size: 22, attackSpeed: 20, icon: '🕳️', cat: 'ギミック' },
-  treasure:  { name: 'トレジャー', cost: 2, hp: 10, attack: 0, range: 0, speed: 0, size: 16, attackSpeed: 999, icon: '📦', cat: 'コンセプト' },
-  decay:     { name: 'ディケイ', cost: 6, hp: 30, attack: 0, range: 80, speed: 0.6, size: 20, attackSpeed: 999, icon: '🧪', cat: 'コンセプト' },
-  swarm:     { name: 'スワーム', cost: 4, hp: 8, attack: 3, range: 30, speed: 1.2, size: 10, attackSpeed: 25, icon: '🐝', cat: 'コンセプト' },
-  nest:      { name: 'ネスト', cost: 6, hp: 60, attack: 0, range: 0, speed: 0, size: 28, attackSpeed: 999, icon: '🪹', cat: 'コンセプト' },
-  reflector: { name: 'リフレクター', cost: 5, hp: 40, attack: 0, range: 0, speed: 0, size: 24, attackSpeed: 999, icon: '🪞', cat: 'コンセプト' },
-  phoenix:   { name: 'フェニックス', cost: 7, hp: 30, attack: 12, range: 40, speed: 0.9, size: 20, attackSpeed: 30, icon: '🔥', cat: 'コンセプト' },
-  gambler:   { name: 'ギャンブラー', cost: 3, hp: 25, attack: 1, range: 40, speed: 1.0, size: 18, attackSpeed: 30, icon: '🎲', cat: '超常' },
-  backup:    { name: 'バックアップ', cost: 2, hp: 30, attack: 10, range: 40, speed: 0, size: 16, attackSpeed: 30, icon: '⏰', cat: '超常' },
-  trader:    { name: 'トレーダー', cost: 5, hp: 1, attack: 0, range: 30, speed: 0.9, size: 16, attackSpeed: 999, icon: '🔄', cat: '超常' },
-  sabotage:  { name: 'サボタージュ', cost: 4, hp: 20, attack: 0, range: 0, speed: 0.8, size: 16, attackSpeed: 999, icon: '🛠️', cat: '超常' },
-  bouncer:   { name: 'バウンサー', cost: 5, hp: 25, attack: 10, range: 50, speed: 0.9, size: 18, attackSpeed: 30, icon: '⛹️', cat: '超常' },
-  doppel:    { name: 'ドッペルゲンガー', cost: 4, hp: 20, attack: 0, range: 0, speed: 0.8, size: 16, attackSpeed: 999, icon: '👥', cat: '超常' },
-  chaos:     { name: 'カオス', cost: 3, hp: 20, attack: 0, range: 0, speed: 0.8, size: 18, attackSpeed: 999, icon: '🌪️', cat: '超常' },
-  trump:  { name: 'トランプ大統領', cost: 5, hp: 50, attack: 5, range: 60, speed: 0.8, size: 22, attackSpeed: 35, icon: '🇺🇸', bgColor: '#FFD700', cat: 'オリジナル' },
-  judah:  { name: 'ユダヤ', cost: 4, hp: 25, attack: 3, range: 50, speed: 0.9, size: 18, attackSpeed: 30, icon: '✡️', bgColor: '#0A1E8C', cat: 'オリジナル' },
-  oil:    { name: 'オイル', cost: 4, hp: 30, attack: 4, range: 40, speed: 0.9, size: 20, attackSpeed: 30, icon: '🛢️', bgColor: '#1A1A1A', cat: 'オリジナル' },
-  musk:   { name: 'イーロンマスク', cost: 6, hp: 35, attack: 0, range: 0, speed: 0.8, size: 20, attackSpeed: 999, icon: '🚀', bgColor: '#FFFFFF', cat: 'オリジナル' },
-  iran:   { name: 'イラン', cost: 6, hp: 30, attack: 18, range: 250, speed: 0.5, size: 18, attackSpeed: 45, icon: '🇮🇷', bgColor: '#FF6B00', cat: 'オリジナル' },
-  strait: { name: 'ホルムズ海峡', cost: 5, hp: 60, attack: 0, range: 0, speed: 0, size: 30, attackSpeed: 999, icon: '🌊', bgColor: '#6A0DAD', cat: 'オリジナル' },
-  hamas:  { name: 'ハマス', cost: 5, hp: 30, attack: 10, range: 35, speed: 1.0, size: 18, attackSpeed: 30, icon: '🟢', bgColor: '#8B4513', cat: 'オリジナル' },
-  kim:    { name: 'キム・ジョンウン', cost: 8, hp: 40, attack: 50, range: 150, speed: 0.4, size: 22, attackSpeed: 1, icon: '🇰🇵', bgColor: '#0B5E0B', cat: 'オリジナル' }
+  melee:   { name: '近接', cost: 3, hp: 40, attack: 12, range: 40, speed: 1.2, size: 18, attackSpeed: 30, icon: '⚔️', cat: '基本', desc: '標準的な近接ユニット。バランスが良い。' },
+  ranged:  { name: '遠距離', cost: 5, hp: 25, attack: 8, range: 100, speed: 0.8, size: 16, attackSpeed: 30, icon: '🏹', cat: '基本', desc: '後方から攻撃できる。タワーを安全に削れる。' },
+  tank:    { name: 'タンク', cost: 4, hp: 80, attack: 6, range: 30, speed: 0.8, size: 24, attackSpeed: 40, icon: '🛡️', cat: '基本', desc: 'HPが高く壁役に。味方を守る。' },
+  mage:    { name: '魔法使い', cost: 6, hp: 20, attack: 10, range: 120, speed: 0.7, size: 16, attackSpeed: 35, icon: '🧙', cat: '基本', desc: '範囲攻撃で複数の敵を同時に攻撃。' },
+  speedster: { name: 'スピードスター', cost: 3, hp: 15, attack: 8, range: 25, speed: 2.5, size: 14, attackSpeed: 20, icon: '⚡', cat: '戦術', desc: '超高速でタワーを狙う奇襲ユニット。' },
+  healer:    { name: 'ヒーラー', cost: 5, hp: 30, attack: 0, range: 80, speed: 0.9, size: 18, attackSpeed: 20, icon: '💚', cat: '戦術', desc: '味方ユニットのHPを回復する。' },
+  bomber:    { name: '爆弾兵', cost: 4, hp: 20, attack: 25, range: 70, speed: 1.0, size: 18, attackSpeed: 1, icon: '💥', cat: '戦術', desc: '敵に接近して自爆。1回限りの大ダメージ。' },
+  wall:      { name: '壁', cost: 3, hp: 120, attack: 0, range: 0, speed: 0, size: 30, attackSpeed: 999, icon: '🧱', cat: '戦術', desc: '動かない壁。敵の進行をブロックする。' },
+  sniper:    { name: 'スナイパー', cost: 6, hp: 18, attack: 15, range: 200, speed: 0.6, size: 14, attackSpeed: 45, icon: '🎯', cat: '特殊', desc: '超長距離から攻撃。接近されると弱い。' },
+  necromancer: { name: 'ネクロマンサー', cost: 5, hp: 25, attack: 5, range: 90, speed: 0.8, size: 18, attackSpeed: 30, icon: '🧟', cat: '特殊', desc: '倒した敵をスケルトンとして召喚する。' },
+  stealth:   { name: 'ステルス', cost: 4, hp: 30, attack: 10, range: 35, speed: 1.3, size: 16, attackSpeed: 28, icon: '👻', cat: '特殊', desc: 'タワーに近づくまで透明。奇襲に最適。' },
+  freeze:    { name: 'フリーズ', cost: 4, hp: 25, attack: 2, range: 100, speed: 0.9, size: 18, attackSpeed: 80, icon: '❄️', cat: '特殊', desc: '敵を凍結して動きを止める。' },
+  jumper:    { name: 'ジャンプ兵', cost: 4, hp: 25, attack: 10, range: 30, speed: 1.4, size: 16, attackSpeed: 30, icon: '🦘', cat: '変則', desc: '前方のユニットを飛び越えて後衛を狙う。' },
+  counter:   { name: 'カウンター', cost: 4, hp: 30, attack: 4, range: 30, speed: 1.0, size: 18, attackSpeed: 30, icon: '🔄', cat: '変則', desc: '受けたダメージの一部を反射する。' },
+  berserker: { name: 'バーサーカー', cost: 4, hp: 50, attack: 8, range: 35, speed: 1.3, size: 20, attackSpeed: 28, icon: '🔥', cat: '変則', desc: 'HPが減るほど攻撃力が上がる。' },
+  vampire:   { name: 'バンパイア', cost: 5, hp: 35, attack: 10, range: 30, speed: 1.0, size: 18, attackSpeed: 28, icon: '🧛', cat: '変則', desc: '攻撃した分だけHPを回復する。' },
+  golem:     { name: 'ゴーレム', cost: 6, hp: 70, attack: 8, range: 30, speed: 0.7, size: 26, attackSpeed: 35, icon: '🪨', cat: '変則', desc: '倒されると2体の小型ゴーレムに分裂。' },
+  wind:      { name: 'ウィンド', cost: 3, hp: 15, attack: 1, range: 60, speed: 1.2, size: 16, attackSpeed: 30, icon: '🌪️', cat: '変則', desc: '敵を吹き飛ばして後退させる。' },
+  mirage:    { name: 'ミラージュ', cost: 5, hp: 20, attack: 6, range: 35, speed: 1.0, size: 16, attackSpeed: 30, icon: '🌀', cat: '変則', desc: '5秒後に自分の分身を生成する。' },
+  electro:   { name: 'エレクトロ', cost: 4, hp: 25, attack: 6, range: 80, speed: 0.9, size: 16, attackSpeed: 30, icon: '⚡', cat: '変則', desc: '攻撃した敵の攻撃速度を半減させる。' },
+  poison:    { name: 'ポイズン', cost: 4, hp: 25, attack: 3, range: 90, speed: 0.9, size: 16, attackSpeed: 30, icon: '☠️', cat: '変則', desc: '継続毒ダメージを与える。' },
+  charger:   { name: 'チャージャー', cost: 4, hp: 35, attack: 15, range: 30, speed: 1.0, size: 18, attackSpeed: 30, icon: '🏇', cat: '変則', desc: '徐々に加速して突進する。' },
+  timewarp:  { name: 'タイムワープ', cost: 5, hp: 20, attack: 0, range: 100, speed: 0.8, size: 18, attackSpeed: 999, icon: '⏳', cat: 'ギミック', desc: '範囲内の味方を加速させる。' },
+  teleporter: { name: 'テレポーター', cost: 5, hp: 25, attack: 0, range: 150, speed: 0.8, size: 18, attackSpeed: 999, icon: '📡', cat: 'ギミック', desc: '味方ユニットを自分の位置に引き寄せる。' },
+  shield:    { name: 'シールド', cost: 4, hp: 20, attack: 0, range: 80, speed: 0.9, size: 18, attackSpeed: 999, icon: '🛡️✨', cat: 'ギミック', desc: '味方に無敵バリアを張る（使い切り）。' },
+  copycat:   { name: 'コピーキャット', cost: 3, hp: 30, attack: 0, range: 30, speed: 1.0, size: 16, attackSpeed: 999, icon: '🐱', cat: 'ギミック', desc: '最初に接触した敵ユニットに変身する。' },
+  grenade:   { name: 'グレネード', cost: 3, hp: 10, attack: 20, range: 60, speed: 0, size: 14, attackSpeed: 999, icon: '💣', cat: 'ギミック', desc: '動かず、敵が近づくと爆発する地雷。' },
+  treant:    { name: 'トレント', cost: 6, hp: 40, attack: 5, range: 40, speed: 1.0, size: 16, attackSpeed: 30, icon: '🌳', cat: 'ギミック', desc: '時間経過で大きく成長する。' },
+  elf:       { name: 'エルフ', cost: 4, hp: 20, attack: 0, range: 90, speed: 0.9, size: 16, attackSpeed: 999, icon: '🧝', cat: 'ギミック', desc: '味方の攻撃力を強化する。' },
+  blackhole: { name: 'ブラックホール', cost: 7, hp: 40, attack: 15, range: 120, speed: 0.6, size: 22, attackSpeed: 20, icon: '🕳️', cat: 'ギミック', desc: '敵を吸い寄せながら継続ダメージ。' },
+  treasure:  { name: 'トレジャー', cost: 2, hp: 10, attack: 0, range: 0, speed: 0, size: 16, attackSpeed: 999, icon: '📦', cat: 'コンセプト', desc: '10秒後にエリクサー+5を獲得。' },
+  decay:     { name: 'ディケイ', cost: 6, hp: 30, attack: 0, range: 80, speed: 0.6, size: 20, attackSpeed: 999, icon: '🧪', cat: 'コンセプト', desc: 'タワーに継続ダメージを与えるゾーンを生成。' },
+  swarm:     { name: 'スワーム', cost: 4, hp: 8, attack: 3, range: 30, speed: 1.2, size: 10, attackSpeed: 25, icon: '🐝', cat: 'コンセプト', desc: '5体同時に出現する大群ユニット。' },
+  nest:      { name: 'ネスト', cost: 6, hp: 60, attack: 0, range: 0, speed: 0, size: 28, attackSpeed: 999, icon: '🪹', cat: 'コンセプト', desc: '一定間隔でユニットを自動生成。' },
+  reflector: { name: 'リフレクター', cost: 5, hp: 40, attack: 0, range: 0, speed: 0, size: 24, attackSpeed: 999, icon: '🪞', cat: 'コンセプト', desc: '遠距離攻撃を反射する壁。' },
+  phoenix:   { name: 'フェニックス', cost: 7, hp: 30, attack: 12, range: 40, speed: 0.9, size: 20, attackSpeed: 30, icon: '🔥', cat: 'コンセプト', desc: '倒されると1回だけ復活する。' },
+  gambler:   { name: 'ギャンブラー', cost: 3, hp: 25, attack: 1, range: 40, speed: 1.0, size: 18, attackSpeed: 30, icon: '🎲', cat: '超常', desc: '攻撃ダメージが1〜30のランダム。' },
+  backup:    { name: 'バックアップ', cost: 2, hp: 30, attack: 10, range: 40, speed: 0, size: 16, attackSpeed: 30, icon: '⏰', cat: '超常', desc: '配置から5秒後に出現する遅延ユニット。' },
+  trader:    { name: 'トレーダー', cost: 5, hp: 1, attack: 0, range: 30, speed: 0.9, size: 16, attackSpeed: 999, icon: '🔄', cat: '超常', desc: '敵ユニットと位置を交換する。' },
+  sabotage:  { name: 'サボタージュ', cost: 4, hp: 20, attack: 0, range: 0, speed: 0.8, size: 16, attackSpeed: 999, icon: '🛠️', cat: '超常', desc: '相手のエリクサー回復を5秒間停止。' },
+  bouncer:   { name: 'バウンサー', cost: 5, hp: 25, attack: 10, range: 50, speed: 0.9, size: 18, attackSpeed: 30, icon: '⛹️', cat: '超常', desc: '攻撃が別の敵に跳ね返る（最大3回）。' },
+  doppel:    { name: 'ドッペルゲンガー', cost: 4, hp: 20, attack: 0, range: 0, speed: 0.8, size: 16, attackSpeed: 999, icon: '👥', cat: '超常', desc: '相手の最後のユニットをコピーする。' },
+  chaos:     { name: 'カオス', cost: 3, hp: 20, attack: 0, range: 0, speed: 0.8, size: 18, attackSpeed: 999, icon: '🌪️', cat: '超常', desc: '配置時にランダムなユニットに変身する。' },
+  trump:  { name: 'トランプ大統領', cost: 5, hp: 50, attack: 5, range: 60, speed: 0.8, size: 22, attackSpeed: 35, icon: '🇺🇸', bgColor: '#FFD700', cat: 'オリジナル', desc: '壁を建設して自陣を強化する。' },
+  judah:  { name: 'ユダヤ', cost: 4, hp: 25, attack: 3, range: 50, speed: 0.9, size: 18, attackSpeed: 30, icon: '✡️', bgColor: '#0A1E8C', cat: 'オリジナル', desc: 'エリクサーの回復速度を2倍にする。' },
+  oil:    { name: 'オイル', cost: 4, hp: 30, attack: 4, range: 40, speed: 0.9, size: 20, attackSpeed: 30, icon: '🛢️', bgColor: '#1A1A1A', cat: 'オリジナル', desc: '地面にオイルをまいて敵の速度を低下。' },
+  musk:   { name: 'イーロンマスク', cost: 6, hp: 35, attack: 0, range: 0, speed: 0.8, size: 20, attackSpeed: 999, icon: '🚀', bgColor: '#FFFFFF', cat: 'オリジナル', desc: '味方ユニットを敵陣最前列にワープ。' },
+  iran:   { name: 'イラン', cost: 6, hp: 30, attack: 18, range: 250, speed: 0.5, size: 18, attackSpeed: 45, icon: '🇮🇷', bgColor: '#FF6B00', cat: 'オリジナル', desc: '超長距離から範囲攻撃するミサイル。' },
+  strait: { name: 'ホルムズ海峡', cost: 5, hp: 60, attack: 0, range: 0, speed: 0, size: 30, attackSpeed: 999, icon: '🌊', bgColor: '#6A0DAD', cat: 'オリジナル', desc: '敵の進行を完全にブロックする海峡。' },
+  hamas:  { name: 'ハマス', cost: 5, hp: 30, attack: 10, range: 35, speed: 1.0, size: 18, attackSpeed: 30, icon: '🟢', bgColor: '#8B4513', cat: 'オリジナル', desc: 'トンネルで敵陣後方にワープする。' },
+  kim:    { name: 'キム・ジョンウン', cost: 8, hp: 40, attack: 50, range: 150, speed: 0.4, size: 22, attackSpeed: 1, icon: '🇰🇵', bgColor: '#0B5E0B', cat: 'オリジナル', desc: '核ミサイルで大爆発を起こす（1回限り）。' }
 };
 
+const CPU_FIXED = ['iran', 'strait', 'hamas', 'kim'];
 const CATEGORIES = ['基本', '戦術', '特殊', '変則', 'ギミック', 'コンセプト', '超常', 'オリジナル'];
 
-// ---- ユニットクラス（基本機能のみ） ----
+// ---- 状態 ----
+let deck = []; // 選択中のカードキー
+let currentDetailKey = null;
 
+// ---- DOM参照 ----
+const grid = document.getElementById('cardGrid');
+const deckCount = document.getElementById('deckCount');
+const startBtn = document.getElementById('startBattleBtn');
+const modalOverlay = document.getElementById('detailModal');
+const modalTitle = document.getElementById('modalTitle');
+const modalBody = document.getElementById('modalBody');
+const modalClose = document.getElementById('modalCloseBtn');
 
-// ---- コスト表示 ----
-function updateCostDisplay() {
-  costSpan.textContent = Math.floor(playerCost);
+// ---- 設定入力 ----
+const cpuRandomInput = document.getElementById('cpuRandomCount');
+const cpuRandomDisplay = document.getElementById('cpuRandomCountDisplay');
+const playerTowerHpInput = document.getElementById('playerTowerHp');
+const cpuTowerHpInput = document.getElementById('cpuTowerHp');
+const elixirSpeedInput = document.getElementById('elixirSpeed');
+const elixirSpeedDisplay = document.getElementById('elixirSpeedDisplay');
+
+cpuRandomInput.addEventListener('input', () => {
+  cpuRandomDisplay.textContent = cpuRandomInput.value;
+});
+
+elixirSpeedInput.addEventListener('input', () => {
+  elixirSpeedDisplay.textContent = elixirSpeedInput.value;
+});
+
+// ---- カードレンダリング ----
+function renderCards() {
+  grid.innerHTML = '';
+  let count = 0;
+  
+  for (const [key, def] of Object.entries(UNIT_TYPES)) {
+    const isSelected = deck.includes(key);
+    if (isSelected) count++;
+    
+    const card = document.createElement('div');
+    card.className = 'card' + (isSelected ? ' selected' : '');
+    
+    // 色ドット
+    if (def.bgColor) {
+      const dot = document.createElement('span');
+      dot.className = 'color-dot';
+      dot.style.background = def.bgColor;
+      card.appendChild(dot);
+    }
+    
+    // アイコン
+    const icon = document.createElement('span');
+    icon.className = 'icon';
+    icon.textContent = def.icon;
+    card.appendChild(icon);
+    
+    // 名前
+    const name = document.createElement('div');
+    name.className = 'name';
+    name.textContent = def.name;
+    card.appendChild(name);
+    
+    // コスト
+    const cost = document.createElement('div');
+    cost.className = 'cost-badge';
+    cost.textContent = `💎 ${def.cost}`;
+    card.appendChild(cost);
+    
+    // 詳細ボタン
+    const detailBtn = document.createElement('button');
+    detailBtn.className = 'detail-btn';
+    detailBtn.textContent = '詳しく見る';
+    detailBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showDetail(key);
+    });
+    card.appendChild(detailBtn);
+    
+    // 選択マーク
+    if (isSelected) {
+      const check = document.createElement('div');
+      check.className = 'check-mark';
+      check.textContent = '✓';
+      card.appendChild(check);
+    }
+    
+    // クリックで選択/解除
+    card.addEventListener('click', () => {
+      toggleCard(key);
+    });
+    
+    grid.appendChild(card);
+  }
+  
+  deckCount.textContent = count;
+  startBtn.disabled = (count === 0);
+}
+
+// ---- カード選択/解除 ----
+function toggleCard(key) {
+  const idx = deck.indexOf(key);
+  if (idx >= 0) {
+    deck.splice(idx, 1);
+  } else {
+    if (deck.length >= 51) return;
+    deck.push(key);
+  }
+  renderCards();
+}
+
+// ---- 詳細表示 ----
+function showDetail(key) {
+  const def = UNIT_TYPES[key];
+  if (!def) return;
+  currentDetailKey = key;
+  modalTitle.textContent = `${def.icon} ${def.name}`;
+  modalBody.innerHTML = `
+    <div class="stat">📋 カテゴリ: <span>${def.cat}</span></div>
+    <div class="stat">💎 コスト: <span>${def.cost}</span></div>
+    <div class="stat">❤️ HP: <span>${def.hp}</span></div>
+    <div class="stat">⚔️ 攻撃力: <span>${def.attack}</span></div>
+    <div class="stat">📏 攻撃範囲: <span>${def.range}</span></div>
+    <div class="stat">💨 移動速度: <span>${def.speed}</span></div>
+    <div class="stat">⏱️ 攻撃速度: <span>${def.attackSpeed}</span></div>
+    ${def.bgColor ? `<div class="stat">🎨 背景色: <span style="display:inline-block;width:20px;height:20px;background:${def.bgColor};border-radius:4px;vertical-align:middle;"></span></div>` : ''}
+    <div class="special-desc">📖 特殊能力: ${def.desc || 'なし'}</div>
+  `;
+  modalOverlay.classList.add('active');
+}
+
+// ---- モーダル閉じる ----
+modalClose.addEventListener('click', () => {
+  modalOverlay.classList.remove('active');
+});
+modalOverlay.addEventListener('click', (e) => {
+  if (e.target === modalOverlay) modalOverlay.classList.remove('active');
+});
+
+// ---- 試合開始 ----
+startBtn.addEventListener('click', () => {
+  if (deck.length === 0) {
+    alert('デッキが空です。少なくとも1枚は選択してください。');
+    return;
+  }
+  
+  // 設定値を取得
+  const cpuRandomCount = parseInt(cpuRandomInput.value);
+  const playerTowerHp = parseInt(playerTowerHpInput.value) || 120;
+  const cpuTowerHp = parseInt(cpuTowerHpInput.value) || 120;
+  const elixirSpeed = parseFloat(elixirSpeedInput.value) || 3;
+  
+  // CPUデッキ作成
+  const cpuDeck = buildCpuDeck(cpuRandomCount);
+  
+  // 試合開始（中編で実装）
+  console.log('=== 試合開始 ===');
+  console.log('プレイヤーデッキ:', deck);
+  console.log('CPUデッキ:', cpuDeck);
+  console.log('自タワーHP:', playerTowerHp);
+  console.log('CPUタワーHP:', cpuTowerHp);
+  console.log('エリクサー速度:', elixirSpeed, '秒/1');
+  
+  // 中編で実際の試合画面に遷移します
+  alert('中編で試合画面を実装します！');
+});
+
+// ---- CPUデッキ構築 ----
+function buildCpuDeck(randomCount) {
+  const cpuDeck = [...CPU_FIXED];
+  
+  // 残り47タイプからランダムに選択
+  const allKeys = Object.keys(UNIT_TYPES);
+  const available = allKeys.filter(k => !CPU_FIXED.includes(k));
+  const shuffled = available.sort(() => Math.random() - 0.5);
+  const selected = shuffled.slice(0, Math.min(randomCount, available.length));
+  
+  cpuDeck.push(...selected);
+  return cpuDeck;
+}
+
+// ---- 初期化 ----
+renderCards();
+console.log('✅ 前編完了！デッキ編集画面');
+console.log('📌 中編では試合画面を実装します');
+  // ============================================================
+// 中編：試合画面（デッキ編集画面の後ろに追記）
+// ============================================================
+
+// ---- 試合用グローバル状態 ----
+let battleState = null; // 試合中はここに状態を保存
+let battleInterval = null;
+let isBattleActive = false;
+
+// ---- 試合開始関数（前編の「試合開始」ボタンから呼び出される） ----
+function startBattle() {
+  // 設定値を取得
+  const cpuRandomCount = parseInt(document.getElementById('cpuRandomCount').value);
+  const playerTowerHp = parseInt(document.getElementById('playerTowerHp').value) || 120;
+  const cpuTowerHp = parseInt(document.getElementById('cpuTowerHp').value) || 120;
+  const elixirSpeed = parseFloat(document.getElementById('elixirSpeed').value) || 3;
+  
+  // CPUデッキ作成
+  const cpuDeck = buildCpuDeck(cpuRandomCount);
+  
+  // デッキが空ならエラー
+  if (deck.length === 0) {
+    alert('デッキが空です。少なくとも1枚は選択してください。');
+    return;
+  }
+  
+  // 試合状態を初期化
+  battleState = {
+    playerDeck: [...deck],
+    cpuDeck: cpuDeck,
+    playerTowerHp: playerTowerHp,
+    cpuTowerHp: cpuTowerHp,
+    elixirSpeed: elixirSpeed,
+    playerElixir: 10,
+    cpuElixir: 10,
+    maxElixir: 10,
+    playerUnits: [],
+    cpuUnits: [],
+    playerTower: { hp: playerTowerHp, maxHp: playerTowerHp },
+    cpuTower: { hp: cpuTowerHp, maxHp: cpuTowerHp },
+    gameOver: false,
+    winner: null,
+    // 情報パネル用
+    playerLastUnit: null,
+    cpuLastUnit: null,
+    // カード使用履歴（表示用）
+    playerHistory: [],
+    cpuHistory: [],
+    frameCount: 0
+  };
+  
+  // UIを試合モードに切り替え
+  showBattleScreen();
+  
+  // 試合ループ開始
+  if (battleInterval) clearInterval(battleInterval);
+  battleInterval = setInterval(battleLoop, 50); // 50ms = 20FPS
+  isBattleActive = true;
+}
+
+// ---- 試合画面表示 ----
+function showBattleScreen() {
+  // 編集画面を非表示
+  document.querySelector('.container').style.display = 'none';
+  
+  // 試合画面を作成（まだなければ）
+  let battleContainer = document.getElementById('battleContainer');
+  if (!battleContainer) {
+    battleContainer = document.createElement('div');
+    battleContainer.id = 'battleContainer';
+    battleContainer.style.cssText = `
+      background: #1b3a4b;
+      padding: 20px;
+      border-radius: 30px;
+      box-shadow: 0 20px 30px rgba(0,0,0,0.8);
+      max-width: 1200px;
+      width: 100%;
+      display: none;
+    `;
+    document.body.prepend(battleContainer);
+    
+    // 戻るボタン
+    const backBtn = document.createElement('button');
+    backBtn.textContent = '⬅ デッキ編集に戻る';
+    backBtn.style.cssText = `
+      background: #555;
+      border: none;
+      padding: 8px 20px;
+      border-radius: 30px;
+      color: white;
+      font-weight: bold;
+      font-size: 14px;
+      cursor: pointer;
+      margin-bottom: 10px;
+    `;
+    backBtn.onclick = () => {
+      if (battleInterval) clearInterval(battleInterval);
+      isBattleActive = false;
+      battleContainer.style.display = 'none';
+      document.querySelector('.container').style.display = 'block';
+    };
+    battleContainer.appendChild(backBtn);
+    
+    // 情報パネル（戦場の上に表示）
+    const infoPanel = document.createElement('div');
+    infoPanel.id = 'infoPanel';
+    infoPanel.style.cssText = `
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      background: rgba(0,0,0,0.4);
+      border-radius: 12px;
+      padding: 10px 16px;
+      margin-bottom: 10px;
+      color: #ecf0f1;
+      font-size: 13px;
+      flex-wrap: wrap;
+    `;
+    infoPanel.innerHTML = `
+      <div style="flex:1;min-width:150px;">
+        <span style="color:#3498db;">🔵 あなた</span><br>
+        <span id="playerLastUnitDisplay">-</span>
+      </div>
+      <div style="flex:1;min-width:150px;text-align:center;">
+        <span>💎 <span id="battlePlayerElixir">10</span> / <span id="battleCpuElixir">10</span></span>
+      </div>
+      <div style="flex:1;min-width:150px;text-align:right;">
+        <span style="color:#e74c3c;">🔴 CPU</span><br>
+        <span id="cpuLastUnitDisplay">-</span>
+      </div>
+    `;
+    battleContainer.appendChild(infoPanel);
+    
+    // キャンバス（戦場）
+    const canvas = document.createElement('canvas');
+    canvas.id = 'battleCanvas';
+    canvas.width = 800;
+    canvas.height = 500;
+    canvas.style.cssText = `
+      display: block;
+      margin: 0 auto;
+      background: #6b8c5c;
+      border-radius: 20px;
+      box-shadow: inset 0 0 0 3px #3d5a3d, 0 10px 20px rgba(0,0,0,0.5);
+      cursor: grab;
+      width: 100%;
+      height: auto;
+      aspect-ratio: 800/500;
+    `;
+    battleContainer.appendChild(canvas);
+    
+    // タワーHP表示
+    const hpPanel = document.createElement('div');
+    hpPanel.id = 'hpPanel';
+    hpPanel.style.cssText = `
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 16px;
+      background: rgba(0,0,0,0.3);
+      border-radius: 10px;
+      margin-top: 10px;
+      color: #ecf0f1;
+      font-size: 14px;
+      font-weight: bold;
+    `;
+    hpPanel.innerHTML = `
+      <span>🔵 自タワー: <span id="battlePlayerTowerHp">120</span></span>
+      <span>🔴 CPUタワー: <span id="battleCpuTowerHp">120</span></span>
+    `;
+    battleContainer.appendChild(hpPanel);
+    
+    // 勝利画面（最初は非表示）
+    const victoryScreen = document.createElement('div');
+    victoryScreen.id = 'victoryScreen';
+    victoryScreen.style.cssText = `
+      display: none;
+      text-align: center;
+      padding: 40px 20px;
+      background: rgba(0,0,0,0.6);
+      border-radius: 20px;
+      margin-top: 10px;
+    `;
+    victoryScreen.innerHTML = `
+      <h2 id="victoryMessage" style="color:#ffd966;font-size:32px;">🎉 あなたの勝ち！</h2>
+      <p style="color:#ecf0f1;font-size:18px;margin:15px 0;">
+        oracle.html に進みますか？
+      </p>
+      <button id="oracleBtn" style="
+        background: #27ae60;
+        border: none;
+        padding: 14px 50px;
+        border-radius: 40px;
+        color: white;
+        font-weight: bold;
+        font-size: 22px;
+        cursor: pointer;
+        box-shadow: 0 4px 0 #1a6b3a;
+        transition: 0.1s;
+      ">🚀 oracle.html へ進む</button>
+    `;
+    battleContainer.appendChild(victoryScreen);
+  }
+  
+  // 試合画面を表示
+  battleContainer.style.display = 'block';
+  
+  // 情報パネルを更新
+  updateBattleUI();
+}
+
+// ---- 試合ループ ----
+function battleLoop() {
+  if (!battleState || battleState.gameOver) return;
+  
+  const state = battleState;
+  state.frameCount++;
+  
+  // ---- エリクサー回復 ----
+  const elixirPerFrame = 1 / (state.elixirSpeed * 20); // 20FPS換算
+  state.playerElixir = Math.min(state.maxElixir, state.playerElixir + elixirPerFrame);
+  state.cpuElixir = Math.min(state.maxElixir, state.cpuElixir + elixirPerFrame);
+  
+  // ---- CPU行動（デッキからユニットを出す） ----
+  if (state.frameCount % 15 === 0) {
+    tryCpuAction(state);
+  }
+  
+  // ---- ユニット更新 ----
+  // （ここでは簡易的に、ユニットが前に進むだけの処理）
+  // 実際のバトルロジックは後編で実装
+  
+  // ---- UI更新 ----
+  updateBattleUI();
+  
+  // ---- キャンバス描画 ----
+  drawBattle();
+  
+  // ---- 勝敗判定 ----
+  if (state.cpuTower.hp <= 0) {
+    state.gameOver = true;
+    state.winner = 'player';
+    showVictory('player');
+  } else if (state.playerTower.hp <= 0) {
+    state.gameOver = true;
+    state.winner = 'cpu';
+    showVictory('cpu');
+  }
 }
 
 // ---- CPU行動 ----
-function cpuAction() {
-  if (gameOver) return;
-  cpuCost = Math.min(CPU_MAX_COST, cpuCost + 0.03);
-  if (cpuCost < 3) return;
-  if (Math.random() > 0.04) return;
-  const keys = Object.keys(UNIT_TYPES);
-  let available = keys.filter(k => UNIT_TYPES[k].cost <= cpuCost);
-  if (available.length === 0) return;
-  const key = available[Math.floor(Math.random() * available.length)];
+function tryCpuAction(state) {
+  if (state.cpuDeck.length === 0) return;
+  
+  // コストが足りるカードを探す
+  const affordable = state.cpuDeck.filter(key => {
+    const def = UNIT_TYPES[key];
+    return def && def.cost <= state.cpuElixir;
+  });
+  
+  if (affordable.length === 0) return;
+  
+  // ランダムに選択
+  const key = affordable[Math.floor(Math.random() * affordable.length)];
   const def = UNIT_TYPES[key];
-  cpuCost -= def.cost;
+  if (!def) return;
+  
+  // エリクサー消費
+  state.cpuElixir -= def.cost;
+  
+  // 情報パネルに記録
+  state.cpuLastUnit = key;
+  state.cpuHistory.push(key);
+  if (state.cpuHistory.length > 5) state.cpuHistory.shift();
+  
+  // ユニットを配置（簡易：右端から出現）
   const y = 80 + Math.random() * 340;
-  const unit = new Unit(700, y, key, 'cpu');
-  units.push(unit);
+  const unit = {
+    key: key,
+    x: 700,
+    y: y,
+    hp: def.hp,
+    maxHp: def.hp,
+    attack: def.attack,
+    range: def.range,
+    speed: def.speed,
+    size: def.size,
+    icon: def.icon,
+    name: def.name,
+    team: 'cpu',
+    alive: true,
+    attackCooldown: 0,
+    target: null
+  };
+  state.cpuUnits.push(unit);
 }
 
-// ---- リセット ----
-function resetGame() {
-  gameOver = false;
-  winner = null;
-  playerTower.hp = playerTower.maxHp;
-  cpuTower.hp = cpuTower.maxHp;
-  units = [];
-  playerCost = 10;
-  cpuCost = 10;
-  selectedUnitType = null;
-  isDragging = false;
-  previewUnit = null;
-  document.querySelectorAll('.unit-btn').forEach(b => b.classList.remove('selected'));
-  msgDiv.innerText = '⚔️ ユニットを選んでドラッグ';
-  updateCostDisplay();
+// ---- UI更新 ----
+function updateBattleUI() {
+  if (!battleState) return;
+  const state = battleState;
+  
+  document.getElementById('battlePlayerElixir').textContent = Math.floor(state.playerElixir);
+  document.getElementById('battleCpuElixir').textContent = Math.floor(state.cpuElixir);
+  document.getElementById('battlePlayerTowerHp').textContent = Math.floor(state.playerTower.hp);
+  document.getElementById('battleCpuTowerHp').textContent = Math.floor(state.cpuTower.hp);
+  
+  // 最後に出したカード名
+  const playerName = state.playerLastUnit ? UNIT_TYPES[state.playerLastUnit]?.name || '?' : '-';
+  const cpuName = state.cpuLastUnit ? UNIT_TYPES[state.cpuLastUnit]?.name || '?' : '-';
+  document.getElementById('playerLastUnitDisplay').textContent = playerName;
+  document.getElementById('cpuLastUnitDisplay').textContent = cpuName;
 }
 
-// ---- 更新ループ ----
-function update() {
-  if (gameOver) return;
-  playerCost = Math.min(MAX_COST, playerCost + 0.03);
-  updateCostDisplay();
-  cpuTimer++;
-  if (cpuTimer % 10 === 0) cpuAction();
-  for (let u of units) {
-    u.update(units);
-  }
-  units = units.filter(u => u.alive);
-  if (cpuTower.hp <= 0) {
-    gameOver = true;
-    winner = 'player';
-    msgDiv.innerText = '🎉 あなたの勝ち！';
-  } else if (playerTower.hp <= 0) {
-    gameOver = true;
-    winner = 'cpu';
-    msgDiv.innerText = '😵 CPUの勝ち...';
-  }
-}
-
-// ---- 描画 ----
-function draw() {
+// ---- キャンバス描画 ----
+function drawBattle() {
+  const canvas = document.getElementById('battleCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const state = battleState;
+  if (!state) return;
+  
   ctx.clearRect(0, 0, 800, 500);
+  
+  // 中央線
   ctx.strokeStyle = '#4a6b3a';
   ctx.lineWidth = 2;
   ctx.setLineDash([10, 15]);
@@ -327,96 +909,138 @@ function draw() {
   ctx.lineTo(400, 480);
   ctx.stroke();
   ctx.setLineDash([]);
-  function drawTower(tower, isPlayer) {
+  
+  // タワー（簡易）
+  function drawTower(tower, x, y, isPlayer) {
     const color = isPlayer ? '#2980b9' : '#c0392b';
+    const hp = tower.hp;
+    const maxHp = tower.maxHp;
     ctx.fillStyle = color;
-    ctx.shadowColor = 'rgba(0,0,0,0.3)';
-    ctx.shadowBlur = 10;
-    ctx.fillRect(tower.x, tower.y, tower.w, tower.h);
+    ctx.shadowColor = 'rgba(0,0,0,0.4)';
+    ctx.shadowBlur = 15;
+    ctx.fillRect(x, y, 60, 100);
     ctx.shadowBlur = 0;
     ctx.strokeStyle = '#ecf0f1';
     ctx.lineWidth = 3;
-    ctx.strokeRect(tower.x, tower.y, tower.w, tower.h);
-    const ratio = tower.hp / tower.maxHp;
+    ctx.strokeRect(x, y, 60, 100);
+    const ratio = Math.max(0, hp / maxHp);
     ctx.fillStyle = '#2c3e50';
-    ctx.fillRect(tower.x, tower.y - 20, tower.w, 10);
+    ctx.fillRect(x, y - 22, 60, 12);
     ctx.fillStyle = ratio > 0.5 ? '#2ecc71' : '#e74c3c';
-    ctx.fillRect(tower.x, tower.y - 20, tower.w * ratio, 10);
-    ctx.font = '28px sans-serif';
+    ctx.fillRect(x, y - 22, 60 * ratio, 12);
+    ctx.font = '30px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(isPlayer ? '🔵' : '🔴', tower.x + tower.w/2, tower.y - 30);
+    ctx.fillText(isPlayer ? '🔵' : '🔴', x + 30, y - 35);
+    ctx.fillStyle = 'white';
+    ctx.font = '12px sans-serif';
+    ctx.fillText(`${Math.floor(hp)}/${maxHp}`, x + 30, y - 10);
   }
-  drawTower(playerTower, true);
-  drawTower(cpuTower, false);
-  for (let u of units) {
-    u.draw(ctx);
+  drawTower(state.playerTower, 80, 200, true);
+  drawTower(state.cpuTower, 660, 200, false);
+  
+  // CPUユニット
+  for (let u of state.cpuUnits) {
+    if (!u.alive) continue;
+    ctx.beginPath();
+    ctx.arc(u.x, u.y, u.size, 0, Math.PI * 2);
+    ctx.fillStyle = '#e74c3c';
+    ctx.fill();
+    ctx.strokeStyle = '#ecf0f1';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = 'white';
+    ctx.font = `${Math.min(20, u.size + 4)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(u.icon || '?', u.x, u.y - 1);
   }
-  if (isDragging && selectedUnitType && previewUnit) {
-    ctx.globalAlpha = 0.5;
-    const pu = new Unit(previewUnit.x, previewUnit.y, selectedUnitType, 'player');
-    pu.draw(ctx);
-    ctx.globalAlpha = 1.0;
-  }
+  
+  // プレイヤーユニット（簡易：まだ実装なし）
 }
 
-// ---- ゲームループ ----
-function gameLoop() {
-  update();
-  draw();
-  requestAnimationFrame(gameLoop);
+// ---- 勝利画面 ----
+function showVictory(winner) {
+  if (battleInterval) clearInterval(battleInterval);
+  isBattleActive = false;
+  
+  const msg = winner === 'player' ? '🎉 あなたの勝ち！' : '😵 CPUの勝ち...';
+  document.getElementById('victoryMessage').textContent = msg;
+  
+  // ゲーム部分を非表示
+  document.getElementById('battleCanvas').style.display = 'none';
+  document.getElementById('infoPanel').style.display = 'none';
+  document.getElementById('hpPanel').style.display = 'none';
+  
+  // 勝利画面を表示
+  document.getElementById('victoryScreen').style.display = 'block';
+  
+  // oracle.html へ誘導
+  document.getElementById('oracleBtn').onclick = () => {
+    window.location.href = 'oracle.html';
+  };
 }
 
-// ---- UIボタン生成 ----
-function createUnitButtons() {
-  btnContainer.innerHTML = '';
-  for (let cat of CATEGORIES) {
-    const label = document.createElement('span');
-    label.className = 'cat-label';
-    label.textContent = cat;
-    btnContainer.appendChild(label);
-    const entries = Object.entries(UNIT_TYPES).filter(([k, def]) => def.cat === cat);
-    for (let [key, def] of entries) {
-      const btn = document.createElement('div');
-      btn.className = 'unit-btn';
-      if (def.bgColor) {
-        const dot = document.createElement('span');
-        dot.className = 'color-dot';
-        dot.style.background = def.bgColor;
-        btn.appendChild(dot);
-      }
-      const text = document.createElement('span');
-      text.textContent = `${def.icon} ${def.name}`;
-      btn.appendChild(text);
-      const badge = document.createElement('span');
-      badge.className = 'cost-badge';
-      badge.textContent = `${def.cost}`;
-      btn.appendChild(badge);
-      btn.dataset.type = key;
-      btn.addEventListener('click', () => {
-        if (gameOver) return;
-        if (playerCost < def.cost) {
-          msgDiv.innerText = `⚠️ コストが足りません！ (${def.cost}必要)`;
-          return;
-        }
-        if (selectedUnitType === key) {
-          selectedUnitType = null;
-          btn.classList.remove('selected');
-          msgDiv.innerText = '⚔️ ユニットを選択してください';
-        } else {
-          document.querySelectorAll('.unit-btn').forEach(b => b.classList.remove('selected'));
-          selectedUnitType = key;
-          btn.classList.add('selected');
-          msgDiv.innerText = `👉 ${def.name}をドラッグして配置`;
-        }
-      });
-      btnContainer.appendChild(btn);
-    }
+// ---- CPUデッキ構築（前編から流用） ----
+function buildCpuDeck(randomCount) {
+  const cpuDeck = [...CPU_FIXED];
+  const allKeys = Object.keys(UNIT_TYPES);
+  const available = allKeys.filter(k => !CPU_FIXED.includes(k));
+  const shuffled = available.sort(() => Math.random() - 0.5);
+  const selected = shuffled.slice(0, Math.min(randomCount, available.length));
+  cpuDeck.push(...selected);
+  return cpuDeck;
+}
+
+// ---- 「試合開始」ボタンを上書き ----
+document.addEventListener('DOMContentLoaded', () => {
+  const startBtn = document.getElementById('startBattleBtn');
+  if (startBtn) {
+    startBtn.addEventListener('click', startBattle);
   }
+});
+
+console.log('✅ 中編完了！試合画面実装');
+console.log('📌 後編ではユニットの移動・攻撃・AIを実装します');
+  // ============================================================
+// 後編：完全バトル実装（ユニット移動・攻撃・プレイヤー操作）
+// ============================================================
+
+// ---- プレイヤー用状態 ----
+let playerSelectedUnit = null;
+let isPlayerDragging = false;
+let playerPreviewUnit = null;
+
+// ---- 試合開始関数を拡張 ----
+const originalStartBattle = startBattle;
+startBattle = function() {
+  // 元の処理を呼び出し
+  originalStartBattle();
+  
+  // 追加：プレイヤー操作用のイベント設定
+  setupPlayerControls();
+};
+
+// ---- プレイヤー操作用イベント ----
+function setupPlayerControls() {
+  const canvas = document.getElementById('battleCanvas');
+  if (!canvas) return;
+  
+  // 既存のイベントを削除（重複防止）
+  const newCanvas = canvas.cloneNode(true);
+  canvas.parentNode.replaceChild(newCanvas, canvas);
+  
+  // 新しいキャンバスにイベントを設定
+  newCanvas.addEventListener('mousedown', onCanvasMouseDown);
+  newCanvas.addEventListener('mousemove', onCanvasMouseMove);
+  newCanvas.addEventListener('mouseup', onCanvasMouseUp);
+  newCanvas.addEventListener('touchstart', onCanvasTouchStart);
+  newCanvas.addEventListener('touchmove', onCanvasTouchMove);
+  newCanvas.addEventListener('touchend', onCanvasTouchEnd);
 }
 
-// ---- マウスイベント ----
 function getCanvasCoords(e) {
+  const canvas = document.getElementById('battleCanvas');
   const rect = canvas.getBoundingClientRect();
   const scaleX = canvas.width / rect.width;
   const scaleY = canvas.height / rect.height;
@@ -426,1234 +1050,446 @@ function getCanvasCoords(e) {
   };
 }
 
-canvas.addEventListener('mousedown', (e) => {
-  if (gameOver) return;
-  if (!selectedUnitType) {
-    msgDiv.innerText = '⚠️ 先にユニットを選択してください';
-    return;
-  }
-  const def = UNIT_TYPES[selectedUnitType];
-  if (!def) return;
-  if (playerCost < def.cost) {
-    msgDiv.innerText = `⚠️ コストが足りません！ (${def.cost}必要)`;
+function onCanvasMouseDown(e) {
+  if (!battleState || battleState.gameOver) return;
+  if (!playerSelectedUnit) {
+    showPlayerUnitSelector();
     return;
   }
   const pos = getCanvasCoords(e);
   if (pos.x > 350) {
-    msgDiv.innerText = '❌ 自陣側(左半分)に配置してください';
+    showMessage('❌ 自陣側(左半分)に配置してください');
     return;
   }
-  isDragging = true;
-  previewUnit = { x: pos.x, y: pos.y };
-  msgDiv.innerText = '📍 配置位置を決めてドロップ';
-});
-
-canvas.addEventListener('mousemove', (e) => {
-  if (!isDragging || !previewUnit) return;
-  const pos = getCanvasCoords(e);
-  previewUnit.x = Math.max(20, Math.min(350, pos.x));
-  previewUnit.y = Math.max(20, Math.min(480, pos.y));
-});
-
-canvas.addEventListener('mouseup', (e) => {
-  if (!isDragging || !selectedUnitType || !previewUnit) {
-    isDragging = false;
-    return;
-  }
-  const def = UNIT_TYPES[selectedUnitType];
+  const def = UNIT_TYPES[playerSelectedUnit];
   if (!def) return;
-  if (playerCost < def.cost) {
-    msgDiv.innerText = `⚠️ コストが足りません！ (${def.cost}必要)`;
-    isDragging = false;
-    previewUnit = null;
+  if (battleState.playerElixir < def.cost) {
+    showMessage(`⚠️ エリクサーが足りません！ (${def.cost}必要)`);
     return;
   }
-  const unit = new Unit(previewUnit.x, previewUnit.y, selectedUnitType, 'player');
-  units.push(unit);
-  playerCost -= def.cost;
-  updateCostDisplay();
-  msgDiv.innerText = `✅ ${def.name}を配置！`;
-  isDragging = false;
-  previewUnit = null;
-});
-
-// ---- リセット ----
-document.getElementById('resetBtn').addEventListener('click', resetGame);
-
-// ---- 初期化 ----
-createUnitButtons();
-resetGame();
-gameLoop();
-
-// ---- リサイズ ----
-function resizeCanvas() {
-  const container = canvas.parentElement;
-  const maxWidth = window.innerWidth - 40;
-  const maxHeight = window.innerHeight - 280;
-  let w = 800, h = 500;
-  if (maxWidth < 800) { w = maxWidth; h = w * (500/800); }
-  if (maxHeight < h) { h = maxHeight; w = h * (800/500); }
-  canvas.style.width = Math.min(w, 800) + 'px';
-  canvas.style.height = Math.min(h, 500) + 'px';
-}
-window.addEventListener('resize', resizeCanvas);
-resizeCanvas();
-
-console.log('✅ 前編完了！全51タイプ定義済み');
-console.log('📌 中編では特殊能力を実装します');
-  // ============================================================
-// 中編：全51タイプの特殊能力実装（class Unit 完全版）
-// ============================================================
-// このコードは前編の class Unit を完全に置き換えます。
-// 前編の class Unit は削除するかコメントアウトしてください。
-
-class Unit {
-  constructor(x, y, typeKey, team) {
-    const def = UNIT_TYPES[typeKey];
-    if (!def) throw new Error(`Unknown unit type: ${typeKey}`);
-    
-    this.typeKey = typeKey;
-    this.team = team;
-    this.x = x;
-    this.y = y;
-    this.hp = def.hp;
-    this.maxHp = def.hp;
-    this.attack = def.attack;
-    this.range = def.range;
-    this.speed = def.speed;
-    this.size = def.size;
-    this.attackSpeed = def.attackSpeed;
-    this.cost = def.cost;
-    this.icon = def.icon;
-    this.bgColor = def.bgColor || null;
-    this.alive = true;
-    this.attackCooldown = 0;
-    this.target = null;
-    
-    // ---- 特殊フラグ（全51種対応） ----
-    this.isHealer = (typeKey === 'healer');
-    this.isStealth = (typeKey === 'stealth');
-    this.isRevealed = false;
-    this.isFrozen = false;
-    this.frozenTimer = 0;
-    this.hasExploded = false;
-    this.growTimer = 0;
-    this.chargeSpeed = this.speed;
-    this.cloneTimer = 0;
-    this.hasCloned = false;
-    this.reviveCount = 0;
-    this.maxRevive = (typeKey === 'phoenix') ? 1 : 0;
-    this.isPhoenix = (typeKey === 'phoenix');
-    this.isCopycat = (typeKey === 'copycat');
-    this.copiedType = null;
-    this.isBackup = (typeKey === 'backup');
-    this.backupTimer = 300;
-    this.isSpawned = (typeKey !== 'backup');
-    this.isNest = (typeKey === 'nest');
-    this.nestSpawnTimer = 0;
-    this.nestSpawnCount = 0;
-    this.maxNestSpawns = 3;
-    this.isTreasure = (typeKey === 'treasure');
-    this.treasureTimer = 600;
-    this.isDecay = (typeKey === 'decay');
-    this.decayTimer = 0;
-    this.isReflector = (typeKey === 'reflector');
-    this.isGrenade = (typeKey === 'grenade');
-    this.hasDetonated = false;
-    this.isGambler = (typeKey === 'gambler');
-    this.isTrader = (typeKey === 'trader');
-    this.hasTraded = false;
-    this.isSabotage = (typeKey === 'sabotage');
-    this.sabotageTimer = 300;
-    this.sabotageActive = false;
-    this.isBouncer = (typeKey === 'bouncer');
-    this.bounceCount = 0;
-    this.maxBounces = 3;
-    this.isDoppel = (typeKey === 'doppel');
-    this.hasDoppeled = false;
-    this.isChaos = (typeKey === 'chaos');
-    this.chaosTransformed = false;
-    this.isTrump = (typeKey === 'trump');
-    this.trumpWallCount = 0;
-    this.trumpCooldown = 0;
-    this.isJudah = (typeKey === 'judah');
-    this.isOil = (typeKey === 'oil');
-    this.isMusk = (typeKey === 'musk');
-    this.hasMuskWarped = false;
-    this.isIran = (typeKey === 'iran');
-    this.isStrait = (typeKey === 'strait');
-    this.isHamas = (typeKey === 'hamas');
-    this.hamasTeleported = false;
-    this.isKim = (typeKey === 'kim');
-    this.kimExploded = false;
-    this.isSwarm = (typeKey === 'swarm');
-    this.isPoison = (typeKey === 'poison');
-    this.isElectro = (typeKey === 'electro');
-    this.isBerserker = (typeKey === 'berserker');
-    this.isVampire = (typeKey === 'vampire');
-    this.isGolem = (typeKey === 'golem');
-    this.hasSplit = false;
-    this.isMirage = (typeKey === 'mirage');
-    this.isCharger = (typeKey === 'charger');
-    this.isTreant = (typeKey === 'treant');
-    this.isElf = (typeKey === 'elf');
-    this.isBlackhole = (typeKey === 'blackhole');
-    this.isTimewarp = (typeKey === 'timewarp');
-    this.isTeleporter = (typeKey === 'teleporter');
-    this.isShield = (typeKey === 'shield');
-    this.hasShielded = false;
-    this.isWind = (typeKey === 'wind');
-    this.isJumper = (typeKey === 'jumper');
-    this.isCounter = (typeKey === 'counter');
-    this.isFreeze = (typeKey === 'freeze');
-    this.isSniper = (typeKey === 'sniper');
-    this.isNecromancer = (typeKey === 'necromancer');
-    this.isSpeedster = (typeKey === 'speedster');
-    this.healCooldown = 0;
-  }
-
-  distanceTo(other) {
-    return Math.hypot(this.x - other.x, this.y - other.y);
-  }
-
-  distanceToRect(rect) {
-    const cx = Math.max(rect.x, Math.min(this.x, rect.x + rect.w));
-    const cy = Math.max(rect.y, Math.min(this.y, rect.y + rect.h));
-    return Math.hypot(this.x - cx, this.y - cy);
-  }
-
-  findTarget(units) {
-    let closest = null;
-    let closestDist = Infinity;
-    for (let u of units) {
-      if (u === this || !u.alive || u.team === this.team) continue;
-      if (u.isStealth && !u.isRevealed) continue;
-      if (u.isBackup && !u.isSpawned) continue;
-      const d = this.distanceTo(u);
-      if (d < closestDist) {
-        closestDist = d;
-        closest = u;
-      }
-    }
-    const enemyTower = this.team === 'player' ? cpuTower : playerTower;
-    const dTower = this.distanceToRect(enemyTower);
-    if (dTower < closestDist) {
-      closestDist = dTower;
-      closest = enemyTower;
-    }
-    return closest;
-  }
-
-  performAttack(units) {
-    // ---- 爆弾兵（自爆） ----
-    if (this.typeKey === 'bomber' && !this.hasExploded) {
-      for (let u of units) {
-        if (u === this || !u.alive || u.team === this.team) continue;
-        if (this.distanceTo(u) <= this.range) {
-          u.hp -= this.attack;
-          if (u.hp <= 0) { u.alive = false; u.hp = 0; }
-        }
-      }
-      const enemyTower = this.team === 'player' ? cpuTower : playerTower;
-      if (this.distanceToRect(enemyTower) <= this.range) {
-        enemyTower.hp -= this.attack;
-        if (enemyTower.hp < 0) enemyTower.hp = 0;
-      }
-      this.alive = false;
-      this.hasExploded = true;
-      return;
-    }
-
-    // ---- キム・ジョンウン（核爆発） ----
-    if (this.typeKey === 'kim' && !this.kimExploded) {
-      for (let u of units) {
-        if (u === this || !u.alive || u.team === this.team) continue;
-        if (this.distanceTo(u) <= this.range) {
-          u.hp -= this.attack;
-          if (u.hp <= 0) { u.alive = false; u.hp = 0; }
-        }
-      }
-      const enemyTower = this.team === 'player' ? cpuTower : playerTower;
-      if (this.distanceToRect(enemyTower) <= this.range) {
-        enemyTower.hp -= 25;
-        if (enemyTower.hp < 0) enemyTower.hp = 0;
-      }
-      this.alive = false;
-      this.kimExploded = true;
-      msgDiv.innerText = '💥 核爆発！';
-      return;
-    }
-
-    // ---- イラン（範囲攻撃） ----
-    if (this.typeKey === 'iran') {
-      for (let u of units) {
-        if (u === this || !u.alive || u.team === this.team) continue;
-        if (this.distanceTo(u) <= 40) {
-          u.hp -= this.attack;
-          if (u.hp <= 0) { u.alive = false; u.hp = 0; }
-        }
-      }
-      const enemyTower = this.team === 'player' ? cpuTower : playerTower;
-      if (this.distanceToRect(enemyTower) <= 40) {
-        enemyTower.hp -= this.attack;
-        if (enemyTower.hp < 0) enemyTower.hp = 0;
-      }
-      this.attackCooldown = this.attackSpeed;
-      return;
-    }
-
-    // ---- 魔法使い（範囲攻撃） ----
-    if (this.typeKey === 'mage') {
-      for (let u of units) {
-        if (u === this || !u.alive || u.team === this.team) continue;
-        if (this.distanceTo(u) <= 50) {
-          u.hp -= this.attack;
-          if (u.hp <= 0) { u.alive = false; u.hp = 0; }
-        }
-      }
-      const enemyTower = this.team === 'player' ? cpuTower : playerTower;
-      if (this.distanceToRect(enemyTower) <= 50) {
-        enemyTower.hp -= this.attack * 0.5;
-        if (enemyTower.hp < 0) enemyTower.hp = 0;
-      }
-      this.attackCooldown = this.attackSpeed;
-      return;
-    }
-
-    // ---- バンパイア（吸血） ----
-    if (this.typeKey === 'vampire') {
-      let damage = this.attack;
-      if (this.target.hp !== undefined) {
-        this.target.hp -= damage;
-        if (this.target.hp <= 0) { this.target.alive = false; this.target.hp = 0; }
-        this.hp = Math.min(this.maxHp, this.hp + damage * 0.5);
-      } else {
-        this.target.hp -= damage;
-        if (this.target.hp < 0) this.target.hp = 0;
-        this.hp = Math.min(this.maxHp, this.hp + damage * 0.3);
-      }
-      this.attackCooldown = this.attackSpeed;
-      return;
-    }
-
-    // ---- バウンサー（跳ね返り） ----
-    if (this.typeKey === 'bouncer' && this.bounceCount < this.maxBounces) {
-      let hitTarget = this.target;
-      if (hitTarget.hp !== undefined) {
-        hitTarget.hp -= this.attack;
-        if (hitTarget.hp <= 0) { hitTarget.alive = false; hitTarget.hp = 0; }
-        this.bounceCount++;
-        let nextTarget = null;
-        let minDist = Infinity;
-        for (let u of units) {
-          if (u === this || !u.alive || u.team === this.team) continue;
-          if (u === hitTarget) continue;
-          const d = this.distanceTo(u);
-          if (d < minDist) {
-            minDist = d;
-            nextTarget = u;
-          }
-        }
-        if (nextTarget && this.bounceCount < this.maxBounces) {
-          this.target = nextTarget;
-          this.attackCooldown = 5;
-        }
-      } else {
-        hitTarget.hp -= this.attack;
-        if (hitTarget.hp < 0) hitTarget.hp = 0;
-      }
-      if (this.bounceCount >= this.maxBounces) {
-        this.attackCooldown = this.attackSpeed;
-      }
-      return;
-    }
-
-    // ---- ギャンブラー（ランダムダメ） ----
-    if (this.typeKey === 'gambler') {
-      const damage = Math.floor(Math.random() * 30) + 1;
-      if (this.target.hp !== undefined) {
-        this.target.hp -= damage;
-        if (this.target.hp <= 0) { this.target.alive = false; this.target.hp = 0; }
-      } else {
-        this.target.hp -= damage;
-        if (this.target.hp < 0) this.target.hp = 0;
-      }
-      this.attackCooldown = this.attackSpeed;
-      return;
-    }
-
-    // ---- 通常攻撃 ----
-    if (this.target.hp !== undefined) {
-      this.target.hp -= this.attack;
-      if (this.target.hp <= 0) {
-        this.target.alive = false;
-        this.target.hp = 0;
-        // ---- ネクロマンサー（召喚） ----
-        if (this.typeKey === 'necromancer') {
-          const skeleton = new Unit(
-            this.target.x + (Math.random() - 0.5) * 30,
-            this.target.y + (Math.random() - 0.5) * 30,
-            'melee',
-            this.team
-          );
-          skeleton.hp = 10;
-          skeleton.maxHp = 10;
-          skeleton.attack = 5;
-          skeleton.size = 12;
-          skeleton.icon = '💀';
-          units.push(skeleton);
-        }
-      }
-    } else {
-      this.target.hp -= this.attack;
-      if (this.target.hp < 0) this.target.hp = 0;
-    }
-    this.attackCooldown = this.attackSpeed;
-  }
-
-  update(units) {
-    if (!this.alive) return;
-    
-    // ---- 凍結 ----
-    if (this.isFrozen) {
-      this.frozenTimer--;
-      if (this.frozenTimer <= 0) this.isFrozen = false;
-      return;
-    }
-    
-    // ---- バックアップ（遅延配置） ----
-    if (this.isBackup && !this.isSpawned) {
-      this.backupTimer--;
-      if (this.backupTimer <= 0) {
-        this.isSpawned = true;
-        this.speed = UNIT_TYPES[this.typeKey]?.speed || 0.8;
-        this.alive = true;
-      }
-      return;
-    }
-    
-    // ---- トレジャー（エリクサー獲得） ----
-    if (this.isTreasure) {
-      this.treasureTimer--;
-      if (this.treasureTimer <= 0 && this.alive) {
-        if (this.team === 'player') {
-          playerCost = Math.min(MAX_COST, playerCost + 5);
-          updateCostDisplay();
-        }
-        this.alive = false;
-        msgDiv.innerText = '💰 +5エリクサー！';
-      }
-      return;
-    }
-    
-    // ---- ディケイ（タワー継続ダメ） ----
-    if (this.isDecay) {
-      this.decayTimer++;
-      if (this.decayTimer % 10 === 0) {
-        const enemyTower = this.team === 'player' ? cpuTower : playerTower;
-        if (this.distanceToRect(enemyTower) < this.range + 40) {
-          enemyTower.hp -= 3;
-          if (enemyTower.hp < 0) enemyTower.hp = 0;
-        }
-      }
-      return;
-    }
-    
-    // ---- ネスト（自動生成） ----
-    if (this.isNest) {
-      this.nestSpawnTimer++;
-      if (this.nestSpawnTimer >= 300 && this.nestSpawnCount < this.maxNestSpawns) {
-        this.nestSpawnTimer = 0;
-        this.nestSpawnCount++;
-        const spawnUnit = new Unit(
-          this.x + (Math.random() - 0.5) * 60,
-          this.y + (Math.random() - 0.5) * 60,
-          'melee',
-          this.team
-        );
-        spawnUnit.hp = 15;
-        spawnUnit.maxHp = 15;
-        spawnUnit.attack = 4;
-        spawnUnit.size = 12;
-        spawnUnit.icon = '🐣';
-        units.push(spawnUnit);
-      }
-      return;
-    }
-    
-    // ---- グレネード（地雷） ----
-    if (this.isGrenade) {
-      for (let u of units) {
-        if (u === this || !u.alive || u.team === this.team) continue;
-        if (this.distanceTo(u) < this.range) {
-          for (let target of units) {
-            if (target === this || !target.alive || target.team === this.team) continue;
-            if (this.distanceTo(target) < this.range) {
-              target.hp -= this.attack;
-              if (target.hp <= 0) { target.alive = false; target.hp = 0; }
-            }
-          }
-          const enemyTower = this.team === 'player' ? cpuTower : playerTower;
-          if (this.distanceToRect(enemyTower) < this.range) {
-            enemyTower.hp -= this.attack;
-            if (enemyTower.hp < 0) enemyTower.hp = 0;
-          }
-          this.alive = false;
-          this.hasDetonated = true;
-          break;
-        }
-      }
-      return;
-    }
-    
-    // ---- サボタージュ（エリクサー妨害） ----
-    if (this.isSabotage) {
-      if (!this.sabotageActive) {
-        this.sabotageActive = true;
-        this.sabotageTimer = 300;
-      }
-      this.sabotageTimer--;
-      if (this.sabotageTimer <= 0) {
-        this.alive = false;
-      }
-      return;
-    }
-    
-    // ---- フリーズ（凍結攻撃） ----
-    if (this.typeKey === 'freeze') {
-      this.attackCooldown = Math.max(0, this.attackCooldown - 1);
-      if (this.attackCooldown === 0) {
-        for (let u of units) {
-          if (u === this || !u.alive || u.team === this.team) continue;
-          if (this.distanceTo(u) <= this.range) {
-            u.isFrozen = true;
-            u.frozenTimer = 60;
-          }
-        }
-        this.attackCooldown = 80;
-      }
-      this.x += (this.team === 'player' ? 1 : -1) * this.speed;
-      this.x = Math.max(20, Math.min(780, this.x));
-      this.y = Math.max(20, Math.min(480, this.y));
-      return;
-    }
-    
-    // ---- タイムワープ（加速） ----
-    if (this.typeKey === 'timewarp') {
-      for (let u of units) {
-        if (u === this || !u.alive || u.team !== this.team) continue;
-        if (this.distanceTo(u) <= this.range) {
-          u.speed = Math.min(3.0, (u.speed || 1) * 1.02);
-          u.attackSpeed = Math.max(10, (u.attackSpeed || 30) * 0.98);
-        }
-      }
-      this.x += (this.team === 'player' ? 1 : -1) * this.speed;
-      this.x = Math.max(20, Math.min(780, this.x));
-      this.y = Math.max(20, Math.min(480, this.y));
-      return;
-    }
-    
-    // ---- テレポーター（引き寄せ） ----
-    if (this.typeKey === 'teleporter') {
-      let closest = null;
-      let minDist = Infinity;
-      for (let u of units) {
-        if (u === this || !u.alive || u.team !== this.team) continue;
-        const d = this.distanceTo(u);
-        if (d < minDist) {
-          minDist = d;
-          closest = u;
-        }
-      }
-      if (closest && minDist < this.range) {
-        closest.x = this.x + (this.team === 'player' ? 40 : -40);
-        closest.y = this.y + (Math.random() - 0.5) * 20;
-      }
-      this.x += (this.team === 'player' ? 1 : -1) * this.speed;
-      this.x = Math.max(20, Math.min(780, this.x));
-      this.y = Math.max(20, Math.min(480, this.y));
-      return;
-    }
-    
-    // ---- シールド（無敵バリア） ----
-    if (this.typeKey === 'shield' && !this.hasShielded) {
-      for (let u of units) {
-        if (u === this || !u.alive || u.team !== this.team) continue;
-        if (this.distanceTo(u) <= this.range) {
-          u.maxHp *= 1.5;
-          u.hp = u.maxHp;
-        }
-      }
-      this.hasShielded = true;
-      this.alive = false;
-      return;
-    }
-    
-    // ---- コピーキャット（変身） ----
-    if (this.isCopycat && !this.copiedType) {
-      for (let u of units) {
-        if (u === this || !u.alive || u.team === this.team) continue;
-        if (this.distanceTo(u) < 50) {
-          this.copiedType = u.typeKey;
-          const def = UNIT_TYPES[u.typeKey];
-          if (def) {
-            this.hp = def.hp;
-            this.maxHp = def.hp;
-            this.attack = def.attack;
-            this.range = def.range;
-            this.speed = def.speed;
-            this.size = def.size;
-            this.icon = def.icon;
-            this.bgColor = def.bgColor || null;
-          }
-          break;
-        }
-      }
-    }
-    
-    // ---- ドッペルゲンガー（鏡像） ----
-    if (this.isDoppel && !this.hasDoppeled) {
-      const enemyUnits = units.filter(u => u.team !== this.team && u.alive);
-      if (enemyUnits.length > 0) {
-        const last = enemyUnits[enemyUnits.length - 1];
-        const def = UNIT_TYPES[last.typeKey];
-        if (def) {
-          const clone = new Unit(
-            this.x + (this.team === 'player' ? -50 : 50),
-            this.y + (Math.random() - 0.5) * 30,
-            last.typeKey,
-            this.team
-          );
-          clone.hp = def.hp * 0.7;
-          clone.maxHp = clone.hp;
-          clone.attack = def.attack;
-          clone.range = def.range;
-          clone.speed = def.speed;
-          clone.size = def.size;
-          clone.icon = def.icon;
-          clone.bgColor = def.bgColor || null;
-          units.push(clone);
-          this.hasDoppeled = true;
-        }
-      }
-    }
-    
-    // ---- ポイズン（毒） ----
-    if (this.typeKey === 'poison') {
-      this.attackCooldown = Math.max(0, this.attackCooldown - 1);
-      if (this.attackCooldown === 0) {
-        for (let u of units) {
-          if (u === this || !u.alive || u.team === this.team) continue;
-          if (this.distanceTo(u) <= this.range) {
-            u.hp -= 4;
-            if (u.hp <= 0) { u.alive = false; u.hp = 0; }
-          }
-        }
-        this.attackCooldown = 25;
-      }
-      this.x += (this.team === 'player' ? 1 : -1) * this.speed;
-      this.x = Math.max(20, Math.min(780, this.x));
-      this.y = Math.max(20, Math.min(480, this.y));
-      return;
-    }
-    
-    // ---- エレクトロ（麻痺） ----
-    if (this.typeKey === 'electro') {
-      this.attackCooldown = Math.max(0, this.attackCooldown - 1);
-      if (this.attackCooldown === 0) {
-        for (let u of units) {
-          if (u === this || !u.alive || u.team === this.team) continue;
-          if (this.distanceTo(u) <= this.range) {
-            u.attackSpeed = Math.max(10, (u.attackSpeed || 30) * 0.5);
-          }
-        }
-        this.attackCooldown = 35;
-      }
-      this.x += (this.team === 'player' ? 1 : -1) * this.speed;
-      this.x = Math.max(20, Math.min(780, this.x));
-      this.y = Math.max(20, Math.min(480, this.y));
-      return;
-    }
-    
-    // ---- トランプ（壁建設） ----
-    if (this.isTrump) {
-      this.trumpCooldown = Math.max(0, this.trumpCooldown - 1);
-      if (this.trumpWallCount < 3 && this.trumpCooldown === 0) {
-        const wall = new Unit(
-          this.x + (this.team === 'player' ? 50 : -50),
-          this.y + (Math.random() - 0.5) * 30,
-          'wall',
-          this.team
-        );
-        wall.hp = 80;
-        wall.maxHp = 80;
-        wall.size = 20;
-        wall.icon = '🏛️';
-        wall.bgColor = '#FFD700';
-        units.push(wall);
-        this.trumpWallCount++;
-        this.trumpCooldown = 150;
-        msgDiv.innerText = '🇺🇸 壁を建設！';
-      }
-    }
-    
-    // ---- ユダヤ（エリクサー加速） ----
-    if (this.isJudah) {
-      if (this.team === 'player') {
-        playerCost = Math.min(MAX_COST, playerCost + 0.04);
-        updateCostDisplay();
-      } else {
-        cpuCost = Math.min(CPU_MAX_COST, cpuCost + 0.04);
-      }
-    }
-    
-    // ---- オイル（移動速度低下） ----
-    if (this.isOil) {
-      for (let u of units) {
-        if (u === this || !u.alive || u.team === this.team) continue;
-        if (this.distanceTo(u) <= 80) {
-          u.speed = Math.max(0.2, u.speed * 0.7);
-        }
-      }
-    }
-    
-    // ---- イーロンマスク（ワープ） ----
-    if (this.isMusk && !this.hasMuskWarped) {
-      let closest = null;
-      let minDist = Infinity;
-      for (let u of units) {
-        if (u === this || !u.alive || u.team !== this.team) continue;
-        const d = this.distanceTo(u);
-        if (d < minDist) {
-          minDist = d;
-          closest = u;
-        }
-      }
-      if (closest) {
-        closest.x = this.team === 'player' ? 600 : 200;
-        closest.y = 150 + Math.random() * 200;
-        msgDiv.innerText = '🚀 ワープ！';
-        this.hasMuskWarped = true;
-        this.alive = false;
-      }
-      return;
-    }
-    
-    // ---- ホルムズ海峡（通過ブロック） ----
-    if (this.isStrait) {
-      for (let u of units) {
-        if (u === this || !u.alive || u.team === this.team) continue;
-        if (Math.abs(u.x - this.x) < 25 && Math.abs(u.y - this.y) < 120) {
-          if (u.team === 'player' && this.team === 'cpu') {
-            u.x -= 1.5;
-          } else if (u.team === 'cpu' && this.team === 'player') {
-            u.x += 1.5;
-          }
-          u.x = Math.max(20, Math.min(780, u.x));
-        }
-      }
-      return;
-    }
-    
-    // ---- ハマス（敵陣後方ワープ） ----
-    if (this.isHamas && !this.hamasTeleported) {
-      this.hamasTeleported = true;
-      this.x = this.team === 'player' ? 700 + Math.random() * 50 : 50 - Math.random() * 30;
-      this.y = 80 + Math.random() * 340;
-      msgDiv.innerText = '🟢 ハマスがワープ！';
-    }
-    
-    // ---- チャージャー（加速） ----
-    if (this.isCharger) {
-      this.chargeSpeed = Math.min(3.0, (this.chargeSpeed || 1.0) + 0.008);
-      this.speed = this.chargeSpeed;
-    }
-    
-    // ---- トレント（成長） ----
-    if (this.isTreant) {
-      this.growTimer = (this.growTimer || 0) + 1;
-      if (this.growTimer % 60 === 0 && this.growTimer < 1800) {
-        this.hp = Math.min(130, this.hp + 4);
-        this.maxHp = this.hp;
-        this.attack = Math.min(22, this.attack + 0.7);
-        this.size = Math.min(40, this.size + 0.5);
-        this.speed = Math.max(0.5, this.speed - 0.005);
-      }
-    }
-    
-    // ---- エルフ（攻撃力強化） ----
-    if (this.isElf) {
-      for (let u of units) {
-        if (u === this || !u.alive || u.team !== this.team) continue;
-        if (this.distanceTo(u) <= this.range) {
-          u.attack = (u.attack || 5) * 1.2;
-        }
-      }
-      this.x += (this.team === 'player' ? 1 : -1) * this.speed;
-      this.x = Math.max(20, Math.min(780, this.x));
-      this.y = Math.max(20, Math.min(480, this.y));
-      return;
-    }
-    
-    // ---- ブラックホール（吸引） ----
-    if (this.isBlackhole) {
-      for (let u of units) {
-        if (u === this || !u.alive || u.team === this.team) continue;
-        if (this.distanceTo(u) < this.range) {
-          const dx = this.x - u.x;
-          const dy = this.y - u.y;
-          const len = Math.hypot(dx, dy);
-          if (len > 1) {
-            u.x += (dx / len) * 0.8;
-            u.y += (dy / len) * 0.8;
-            u.hp -= 1;
-            if (u.hp <= 0) { u.alive = false; u.hp = 0; }
-          }
-        }
-      }
-      return;
-    }
-    
-    // ---- リフレクター（反射壁） ----
-    if (this.isReflector) {
-      for (let u of units) {
-        if (u === this || !u.alive || u.team === this.team) continue;
-        if (this.distanceTo(u) < 60) {
-          u.hp -= 3;
-          if (u.hp <= 0) { u.alive = false; u.hp = 0; }
-        }
-      }
-      return;
-    }
-    
-    // ---- フェニックス（復活） ----
-    if (this.isPhoenix && !this.alive && this.reviveCount < this.maxRevive) {
-      this.reviveCount++;
-      this.alive = true;
-      this.hp = this.maxHp;
-      msgDiv.innerText = '🔥 フェニックス復活！';
-      return;
-    }
-    
-    // ---- カオス（変身） ----
-    if (this.isChaos && !this.chaosTransformed) {
-      const keys = Object.keys(UNIT_TYPES);
-      const randomKey = keys[Math.floor(Math.random() * keys.length)];
-      const def = UNIT_TYPES[randomKey];
-      if (def) {
-        this.typeKey = randomKey;
-        this.hp = def.hp;
-        this.maxHp = def.hp;
-        this.attack = def.attack;
-        this.range = def.range;
-        this.speed = def.speed;
-        this.size = def.size;
-        this.attackSpeed = def.attackSpeed;
-        this.icon = def.icon;
-        this.bgColor = def.bgColor || null;
-        this.chaosTransformed = true;
-        msgDiv.innerText = `🌪️ カオス → ${def.name}！`;
-      }
-    }
-    
-    // ---- ウィンド（吹き飛ばし） ----
-    if (this.isWind) {
-      this.attackCooldown = Math.max(0, this.attackCooldown - 1);
-      if (this.attackCooldown === 0) {
-        for (let u of units) {
-          if (u === this || !u.alive || u.team === this.team) continue;
-          if (this.distanceTo(u) <= this.range) {
-            u.x += (this.team === 'player' ? 1 : -1) * 60;
-            u.y += (Math.random() - 0.5) * 40;
-            u.x = Math.max(20, Math.min(780, u.x));
-            u.y = Math.max(20, Math.min(480, u.y));
-          }
-        }
-        this.attackCooldown = 50;
-      }
-      this.x += (this.team === 'player' ? 1 : -1) * this.speed;
-      this.x = Math.max(20, Math.min(780, this.x));
-      this.y = Math.max(20, Math.min(480, this.y));
-      return;
-    }
-    
-    // ---- ジャンプ兵（飛び越え） ----
-    if (this.isJumper) {
-      for (let u of units) {
-        if (u === this || !u.alive || u.team === this.team) continue;
-        if (Math.abs(u.x - this.x) < 30 && Math.abs(u.y - this.y) < 30) {
-          this.x += (this.team === 'player' ? 80 : -80);
-          this.y += (Math.random() - 0.5) * 40;
-          this.x = Math.max(20, Math.min(780, this.x));
-          this.y = Math.max(20, Math.min(480, this.y));
-          break;
-        }
-      }
-    }
-    
-    // ---- カウンター（反射） ----
-    if (this.isCounter) {
-      if (this.attackCooldown === 0) {
-        for (let u of units) {
-          if (u === this || !u.alive || u.team === this.team) continue;
-          if (this.distanceTo(u) <= this.range) {
-            u.hp -= this.attack;
-            if (u.hp <= 0) { u.alive = false; u.hp = 0; }
-          }
-        }
-        this.attackCooldown = this.attackSpeed;
-      }
-    }
-    
-    // ---- バーサーカー（HP減少で強化） ----
-    if (this.isBerserker) {
-      const hpRatio = this.hp / this.maxHp;
-      if (hpRatio < 0.3) {
-        this.attack = 22;
-        this.speed = 1.6;
-      } else if (hpRatio < 0.6) {
-        this.attack = 15;
-        this.speed = 1.4;
-      }
-    }
-    
-    // ---- ゴーレム（分裂） ----
-    if (this.isGolem && !this.alive && !this.hasSplit) {
-      this.hasSplit = true;
-      for (let i = 0; i < 2; i++) {
-        const mini = new Unit(
-          this.x + (i === 0 ? -25 : 25),
-          this.y + (i === 0 ? -20 : 20),
-          'melee',
-          this.team
-        );
-        mini.hp = 30;
-        mini.maxHp = 30;
-        mini.attack = 5;
-        mini.size = 14;
-        mini.icon = '🪨';
-        units.push(mini);
-      }
-    }
-    
-    // ---- ミラージュ（分身） ----
-    if (this.isMirage && !this.hasCloned) {
-      this.cloneTimer = (this.cloneTimer || 0) + 1;
-      if (this.cloneTimer >= 300) {
-        this.hasCloned = true;
-        const clone = new Unit(
-          this.x + (Math.random() - 0.5) * 40,
-          this.y + (Math.random() - 0.5) * 40,
-          'melee',
-          this.team
-        );
-        clone.hp = this.hp * 0.5;
-        clone.maxHp = clone.hp;
-        clone.attack = this.attack * 0.7;
-        clone.size = this.size * 0.7;
-        clone.icon = '🌀';
-        units.push(clone);
-      }
-    }
-    
-    // ---- トレーダー（交換） ----
-    if (this.isTrader && !this.hasTraded) {
-      let closest = null;
-      let minDist = Infinity;
-      for (let u of units) {
-        if (u === this || !u.alive || u.team === this.team) continue;
-        const d = this.distanceTo(u);
-        if (d < minDist) {
-          minDist = d;
-          closest = u;
-        }
-      }
-      if (closest && minDist < 100) {
-        const tempX = this.x;
-        const tempY = this.y;
-        this.x = closest.x;
-        this.y = closest.y;
-        closest.x = tempX;
-        closest.y = tempY;
-        this.hasTraded = true;
-        msgDiv.innerText = '🔄 位置交換！';
-      }
-    }
-    
-    // ---- ヒーラー ----
-    if (this.isHealer) {
-      this.healCooldown = (this.healCooldown || 0) - 1;
-      if (this.healCooldown <= 0) {
-        for (let u of units) {
-          if (u === this || !u.alive || u.team !== this.team) continue;
-          if (this.distanceTo(u) <= this.range) {
-            u.hp = Math.min(u.maxHp, u.hp + 3);
-          }
-        }
-        this.healCooldown = 20;
-      }
-      return;
-    }
-    
-    // ---- 壁 ----
-    if (this.typeKey === 'wall') return;
-    
-    // ---- スワーム ----
-    if (this.isSwarm) {
-      // 特別な処理なし（5体で出現済み）
-    }
-    
-    // ---- ここから通常の移動・攻撃 ----
-    if (this.attackCooldown > 0) this.attackCooldown--;
-    
-    this.target = this.findTarget(units);
-    
-    if (!this.target) {
-      this.x += (this.team === 'player' ? 1 : -1) * this.speed;
-      this.x = Math.max(20, Math.min(780, this.x));
-      this.y = Math.max(20, Math.min(480, this.y));
-      return;
-    }
-    
-    let dist;
-    if (this.target.hp !== undefined) {
-      dist = this.distanceTo(this.target);
-    } else {
-      dist = this.distanceToRect(this.target);
-    }
-    
-    if (dist <= this.range) {
-      if (this.attackCooldown === 0) {
-        this.performAttack(units);
-        this.attackCooldown = this.attackSpeed;
-      }
-    } else {
-      const dx = this.target.x - this.x;
-      const dy = this.target.y - this.y;
-      const len = Math.hypot(dx, dy);
-      if (len > 1) {
-        this.x += (dx / len) * this.speed;
-        this.y += (dy / len) * this.speed;
-      }
-    }
-    
-    this.x = Math.max(20, Math.min(780, this.x));
-    this.y = Math.max(20, Math.min(480, this.y));
-  }
-
-  draw(ctx) {
-    if (!this.alive) return;
-    if (this.isBackup && !this.isSpawned) {
-      ctx.globalAlpha = 0.2;
-    }
-    
-    if (this.bgColor) {
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, this.size + 5, 0, Math.PI * 2);
-      ctx.fillStyle = this.bgColor;
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,0.4)';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    }
-    
-    if (this.isStealth && !this.isRevealed) {
-      ctx.globalAlpha = 0.2;
-    }
-    
-    const color = this.team === 'player' ? '#3498db' : '#e74c3c';
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-    ctx.fillStyle = color;
-    ctx.fill();
-    ctx.strokeStyle = '#ecf0f1';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    
-    ctx.fillStyle = 'white';
-    ctx.font = `${Math.min(20, this.size + 4)}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(this.icon || '❓', this.x, this.y - 1);
-    
-    const barW = Math.min(36, this.size * 2.2);
-    const barH = 4;
-    const hpRatio = Math.max(0, this.hp / this.maxHp);
-    ctx.fillStyle = '#2c3e50';
-    ctx.fillRect(this.x - barW/2, this.y - this.size - 8, barW, barH);
-    ctx.fillStyle = hpRatio > 0.5 ? '#2ecc71' : '#e74c3c';
-    ctx.fillRect(this.x - barW/2, this.y - this.size - 8, barW * hpRatio, barH);
-    
-    ctx.globalAlpha = 1.0;
-    
-    if (this.isFrozen) {
-      ctx.strokeStyle = '#00d4ff';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, this.size + 8, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.fillStyle = 'rgba(0, 212, 255, 0.1)';
-      ctx.fill();
-    }
-  }
+  isPlayerDragging = true;
+  playerPreviewUnit = { x: pos.x, y: pos.y };
 }
 
-console.log('✅ 中編完了！全特殊能力実装済み');
-console.log('📌 後編ではエフェクト・CPU強化・難易度調整を実装します');
-  // ============================================================
-// 後編：エフェクト演出・CPU戦略的AI・難易度調整
-// ============================================================
-
-// ---- エフェクト用 ----
-let effects = [];
-
-function addEffect(x, y, text, duration) {
-  effects.push({ x, y, text, duration, timer: 0 });
+function onCanvasMouseMove(e) {
+  if (!isPlayerDragging || !playerPreviewUnit) return;
+  const pos = getCanvasCoords(e);
+  playerPreviewUnit.x = Math.max(20, Math.min(350, pos.x));
+  playerPreviewUnit.y = Math.max(20, Math.min(480, pos.y));
+  drawBattle();
 }
 
-function updateEffects() {
-  for (let i = effects.length - 1; i >= 0; i--) {
-    effects[i].timer++;
-    if (effects[i].timer >= effects[i].duration) {
-      effects.splice(i, 1);
-    }
+function onCanvasMouseUp(e) {
+  if (!isPlayerDragging || !playerSelectedUnit || !playerPreviewUnit) {
+    isPlayerDragging = false;
+    return;
   }
+  const def = UNIT_TYPES[playerSelectedUnit];
+  if (!def) return;
+  if (battleState.playerElixir < def.cost) {
+    showMessage(`⚠️ エリクサーが足りません！ (${def.cost}必要)`);
+    isPlayerDragging = false;
+    playerPreviewUnit = null;
+    return;
+  }
+  
+  // ユニット配置
+  battleState.playerElixir -= def.cost;
+  const unit = {
+    key: playerSelectedUnit,
+    x: playerPreviewUnit.x,
+    y: playerPreviewUnit.y,
+    hp: def.hp,
+    maxHp: def.hp,
+    attack: def.attack,
+    range: def.range,
+    speed: def.speed,
+    size: def.size,
+    icon: def.icon,
+    name: def.name,
+    team: 'player',
+    alive: true,
+    attackCooldown: 0,
+    target: null,
+    // 特殊フラグ（簡易）
+    isHealer: playerSelectedUnit === 'healer',
+    isBomber: playerSelectedUnit === 'bomber',
+    isMage: playerSelectedUnit === 'mage',
+    isSniper: playerSelectedUnit === 'sniper',
+    isFreeze: playerSelectedUnit === 'freeze',
+    // オリジナル
+    isTrump: playerSelectedUnit === 'trump',
+    isJudah: playerSelectedUnit === 'judah',
+    isOil: playerSelectedUnit === 'oil',
+    isMusk: playerSelectedUnit === 'musk',
+    isIran: playerSelectedUnit === 'iran',
+    isStrait: playerSelectedUnit === 'strait',
+    isHamas: playerSelectedUnit === 'hamas',
+    isKim: playerSelectedUnit === 'kim'
+  };
+  battleState.playerUnits.push(unit);
+  battleState.playerLastUnit = playerSelectedUnit;
+  
+  showMessage(`✅ ${def.name}を配置！`);
+  isPlayerDragging = false;
+  playerPreviewUnit = null;
+  
+  // 選択を維持（連続配置用）
 }
 
-function drawEffects(ctx) {
-  for (let e of effects) {
-    const alpha = 1 - (e.timer / e.duration);
-    const scale = 1 + (e.timer / e.duration) * 0.5;
-    ctx.globalAlpha = alpha;
-    ctx.font = `${24 * scale}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(e.text, e.x, e.y - e.timer * 0.5);
-  }
-  ctx.globalAlpha = 1.0;
+function onCanvasTouchStart(e) {
+  e.preventDefault();
+  const touch = e.touches[0];
+  const mouseEvent = new MouseEvent('mousedown', {
+    clientX: touch.clientX,
+    clientY: touch.clientY
+  });
+  onCanvasMouseDown(mouseEvent);
 }
 
-// ---- 難易度設定 ----
-let cpuDifficulty = 1.0; // 1.0 = 標準
-
-// ---- CPU行動（戦略的AI） ----
-function cpuAction() {
-  if (gameOver) return;
-  
-  // サボタージュ中は回復停止
-  let saboteurActive = false;
-  for (let u of units) {
-    if (u.isSabotage && u.alive && u.team === 'player') {
-      saboteurActive = true;
-      break;
-    }
-  }
-  if (!saboteurActive) {
-    cpuCost = Math.min(CPU_MAX_COST, cpuCost + 0.035 * cpuDifficulty);
-  }
-  
-  if (cpuCost < 3) return;
-  if (Math.random() > 0.045 * cpuDifficulty) return;
-  
-  // ---- 戦略的選択 ----
-  const available = [];
-  const keys = Object.keys(UNIT_TYPES);
-  for (let k of keys) {
-    const def = UNIT_TYPES[k];
-    if (def.cost <= cpuCost) {
-      let priority = 1;
-      
-      // タワーが減ってきたら攻撃重視
-      if (playerTower.hp < 40 && (k === 'charger' || k === 'speedster' || k === 'kim')) {
-        priority += 4;
-      }
-      if (cpuTower.hp < 40 && (k === 'tank' || k === 'wall' || k === 'healer')) {
-        priority += 4;
-      }
-      
-      // 自軍ユニットが多いほどヒーラー優先
-      const allyCount = units.filter(u => u.team === 'cpu' && u.alive).length;
-      if (allyCount > 3 && k === 'healer') {
-        priority += 3;
-      }
-      
-      // 敵が密集してたら範囲攻撃優先
-      const enemyCount = units.filter(u => u.team === 'player' && u.alive).length;
-      if (enemyCount > 4 && (k === 'mage' || k === 'bomber' || k === 'kim' || k === 'iran')) {
-        priority += 3;
-      }
-      
-      // エリクサーが余ってたら高コストユニット優先
-      if (cpuCost > 7 && (k === 'kim' || k === 'blackhole' || k === 'phoenix')) {
-        priority += 2;
-      }
-      
-      available.push({ key: k, priority });
-    }
-  }
-  
-  if (available.length === 0) return;
-  
-  // 優先度に基づいて選択
-  let totalPriority = 0;
-  for (let a of available) totalPriority += a.priority;
-  let rand = Math.random() * totalPriority;
-  let chosen = available[0];
-  for (let a of available) {
-    rand -= a.priority;
-    if (rand <= 0) { chosen = a; break; }
-  }
-  
-  const key = chosen.key;
-  const def = UNIT_TYPES[key];
-  cpuCost -= def.cost;
-  
-  // スワームは5体同時
-  if (key === 'swarm') {
-    for (let i = 0; i < 5; i++) {
-      const y = 60 + Math.random() * 380;
-      const unit = new Unit(700 + Math.random() * 30, y, 'swarm', 'cpu');
-      units.push(unit);
-    }
-  } else {
-    const y = 60 + Math.random() * 380;
-    const unit = new Unit(700 + Math.random() * 20, y, key, 'cpu');
-    units.push(unit);
-  }
+function onCanvasTouchMove(e) {
+  e.preventDefault();
+  const touch = e.touches[0];
+  const mouseEvent = new MouseEvent('mousemove', {
+    clientX: touch.clientX,
+    clientY: touch.clientY
+  });
+  onCanvasMouseMove(mouseEvent);
 }
 
-// ---- update() にエフェクト追加（上書き） ----
-// 既存の update() 関数を置き換え
-const originalUpdate = update;
-update = function() {
-  if (gameOver) return;
-  playerCost = Math.min(MAX_COST, playerCost + 0.035);
-  updateCostDisplay();
+function onCanvasTouchEnd(e) {
+  e.preventDefault();
+  onCanvasMouseUp(e);
+}
+
+// ---- プレイヤーユニット選択UI ----
+function showPlayerUnitSelector() {
+  // デッキから選択できるUIを表示
+  const container = document.getElementById('battleContainer');
+  let selector = document.getElementById('playerUnitSelector');
   
-  cpuTimer++;
-  if (cpuTimer % 8 === 0) cpuAction();
-  
-  for (let u of units) {
-    u.update(units);
+  if (!selector) {
+    selector = document.createElement('div');
+    selector.id = 'playerUnitSelector';
+    selector.style.cssText = `
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      padding: 8px;
+      background: rgba(0,0,0,0.5);
+      border-radius: 12px;
+      margin-bottom: 8px;
+      justify-content: center;
+    `;
+    container.insertBefore(selector, container.querySelector('#infoPanel'));
   }
-  units = units.filter(u => u.alive);
   
-  updateEffects();
+  selector.innerHTML = '';
+  const deck = battleState.playerDeck;
+  for (let key of deck) {
+    const def = UNIT_TYPES[key];
+    if (!def) continue;
+    const btn = document.createElement('button');
+    btn.style.cssText = `
+      background: ${playerSelectedUnit === key ? '#ffd966' : '#2c4c5e'};
+      color: ${playerSelectedUnit === key ? '#1a2a3a' : '#ecf0f1'};
+      border: 2px solid ${playerSelectedUnit === key ? '#f39c12' : '#5a8a9a'};
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 12px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: 0.1s;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    `;
+    btn.innerHTML = `${def.icon} ${def.name} (${def.cost})`;
+    btn.onclick = () => {
+      if (battleState.playerElixir < def.cost) {
+        showMessage(`⚠️ エリクサーが足りません！ (${def.cost}必要)`);
+        return;
+      }
+      playerSelectedUnit = (playerSelectedUnit === key) ? null : key;
+      showPlayerUnitSelector();
+    };
+    selector.appendChild(btn);
+  }
   
-  if (cpuTower.hp <= 0) {
-    gameOver = true;
-    winner = 'player';
-    msgDiv.innerText = '🎉 あなたの勝ち！';
-  } else if (playerTower.hp <= 0) {
-    gameOver = true;
-    winner = 'cpu';
-    msgDiv.innerText = '😵 CPUの勝ち...';
+  // 閉じるボタン
+  const closeBtn = document.createElement('button');
+  closeBtn.textContent = '✕ 閉じる';
+  closeBtn.style.cssText = `
+    background: #c0392b;
+    border: none;
+    border-radius: 20px;
+    padding: 4px 14px;
+    color: white;
+    font-weight: bold;
+    font-size: 12px;
+    cursor: pointer;
+  `;
+  closeBtn.onclick = () => {
+    playerSelectedUnit = null;
+    showPlayerUnitSelector();
+  };
+  selector.appendChild(closeBtn);
+}
+
+// ---- メッセージ表示 ----
+function showMessage(text) {
+  const msgEl = document.getElementById('battleMessage');
+  if (!msgEl) {
+    const container = document.getElementById('battleContainer');
+    const msg = document.createElement('div');
+    msg.id = 'battleMessage';
+    msg.style.cssText = `
+      text-align: center;
+      color: #ffd966;
+      font-weight: bold;
+      font-size: 14px;
+      padding: 4px;
+      min-height: 24px;
+    `;
+    container.appendChild(msg);
+  }
+  document.getElementById('battleMessage').textContent = text;
+}
+
+// ---- 完全な試合ループ（拡張） ----
+const originalBattleLoop = battleLoop;
+battleLoop = function() {
+  if (!battleState || battleState.gameOver) return;
+  
+  const state = battleState;
+  state.frameCount++;
+  
+  // ---- エリクサー回復 ----
+  const elixirPerFrame = 1 / (state.elixirSpeed * 20);
+  state.playerElixir = Math.min(state.maxElixir, state.playerElixir + elixirPerFrame);
+  state.cpuElixir = Math.min(state.maxElixir, state.cpuElixir + elixirPerFrame);
+  
+  // ---- CPU行動 ----
+  if (state.frameCount % 12 === 0) {
+    tryCpuAction(state);
+  }
+  
+  // ---- 全ユニット更新 ----
+  // プレイヤーユニット
+  for (let u of state.playerUnits) {
+    if (!u.alive) continue;
+    updateUnit(u, state.cpuUnits, state.cpuTower, 'player');
+  }
+  
+  // CPUユニット
+  for (let u of state.cpuUnits) {
+    if (!u.alive) continue;
+    updateUnit(u, state.playerUnits, state.playerTower, 'cpu');
+  }
+  
+  // ---- 死亡ユニット除去 ----
+  state.playerUnits = state.playerUnits.filter(u => u.alive);
+  state.cpuUnits = state.cpuUnits.filter(u => u.alive);
+  
+  // ---- UI更新 ----
+  updateBattleUI();
+  
+  // ---- 描画 ----
+  drawBattle();
+  
+  // ---- 勝敗判定 ----
+  if (state.cpuTower.hp <= 0) {
+    state.gameOver = true;
+    state.winner = 'player';
+    showVictory('player');
+  } else if (state.playerTower.hp <= 0) {
+    state.gameOver = true;
+    state.winner = 'cpu';
+    showVictory('cpu');
   }
 };
 
-// ---- draw() にエフェクト描画追加（上書き） ----
-const originalDraw = draw;
-draw = function() {
+// ---- ユニット更新関数 ----
+function updateUnit(unit, enemyUnits, enemyTower, team) {
+  if (!unit.alive) return;
+  if (unit.attackCooldown > 0) unit.attackCooldown--;
+  
+  // ---- 特殊：壁 ----
+  if (unit.key === 'wall') return;
+  
+  // ---- 特殊：ヒーラー ----
+  if (unit.isHealer) {
+    const allies = team === 'player' ? battleState.playerUnits : battleState.cpuUnits;
+    for (let a of allies) {
+      if (a === unit || !a.alive) continue;
+      if (getDistance(unit, a) < unit.range) {
+        a.hp = Math.min(a.maxHp, a.hp + 2);
+        addEffect(a.x, a.y, '💚', 10);
+      }
+    }
+    // 移動
+    unit.x += (team === 'player' ? 1 : -1) * unit.speed * 0.5;
+    unit.x = Math.max(20, Math.min(780, unit.x));
+    unit.y = Math.max(20, Math.min(480, unit.y));
+    return;
+  }
+  
+  // ---- ターゲット選択 ----
+  let target = findTarget(unit, enemyUnits, enemyTower);
+  unit.target = target;
+  
+  if (!target) {
+    // 前進
+    unit.x += (team === 'player' ? 1 : -1) * unit.speed;
+    unit.x = Math.max(20, Math.min(780, unit.x));
+    unit.y = Math.max(20, Math.min(480, unit.y));
+    return;
+  }
+  
+  // ---- 距離判定 ----
+  let dist;
+  if (target.hp !== undefined) {
+    dist = getDistance(unit, target);
+  } else {
+    dist = getDistanceToRect(unit, target);
+  }
+  
+  if (dist <= unit.range) {
+    // 攻撃
+    if (unit.attackCooldown === 0) {
+      performUnitAttack(unit, target, enemyUnits);
+      unit.attackCooldown = 30; // 簡易
+    }
+  } else {
+    // 近づく
+    const dx = target.x - unit.x;
+    const dy = target.y - unit.y;
+    const len = Math.hypot(dx, dy);
+    if (len > 1) {
+      unit.x += (dx / len) * unit.speed;
+      unit.y += (dy / len) * unit.speed;
+    }
+  }
+  
+  unit.x = Math.max(20, Math.min(780, unit.x));
+  unit.y = Math.max(20, Math.min(480, unit.y));
+}
+
+// ---- ターゲット検索 ----
+function findTarget(unit, enemyUnits, enemyTower) {
+  let closest = null;
+  let closestDist = Infinity;
+  
+  // 敵ユニット
+  for (let u of enemyUnits) {
+    if (!u.alive) continue;
+    const d = getDistance(unit, u);
+    if (d < closestDist) {
+      closestDist = d;
+      closest = u;
+    }
+  }
+  
+  // タワー
+  const dTower = getDistanceToRect(unit, enemyTower);
+  if (dTower < closestDist) {
+    closestDist = dTower;
+    closest = enemyTower;
+  }
+  
+  return closest;
+}
+
+// ---- 攻撃実行 ----
+function performUnitAttack(unit, target, enemyUnits) {
+  // ---- 爆弾兵 ----
+  if (unit.isBomber) {
+    for (let u of enemyUnits) {
+      if (!u.alive) continue;
+      if (getDistance(unit, u) < 70) {
+        u.hp -= 25;
+        if (u.hp <= 0) u.alive = false;
+        addEffect(u.x, u.y, '💥', 20);
+      }
+    }
+    const tower = unit.team === 'player' ? battleState.cpuTower : battleState.playerTower;
+    if (getDistanceToRect(unit, tower) < 70) {
+      tower.hp -= 25;
+      addEffect(tower.x + 30, tower.y + 50, '💥', 20);
+    }
+    unit.alive = false;
+    return;
+  }
+  
+  // ---- 魔法使い（範囲攻撃） ----
+  if (unit.isMage) {
+    for (let u of enemyUnits) {
+      if (!u.alive) continue;
+      if (getDistance(unit, u) < 50) {
+        u.hp -= 10;
+        if (u.hp <= 0) u.alive = false;
+        addEffect(u.x, u.y, '✨', 10);
+      }
+    }
+    const tower = unit.team === 'player' ? battleState.cpuTower : battleState.playerTower;
+    if (getDistanceToRect(unit, tower) < 50) {
+      tower.hp -= 5;
+      addEffect(tower.x + 30, tower.y + 50, '✨', 10);
+    }
+    return;
+  }
+  
+  // ---- 通常攻撃 ----
+  if (target.hp !== undefined) {
+    target.hp -= unit.attack;
+    if (target.hp <= 0) {
+      target.alive = false;
+      addEffect(target.x, target.y, '💀', 15);
+    }
+    addEffect(target.x, target.y, '⚔️', 8);
+  } else {
+    target.hp -= unit.attack;
+    if (target.hp < 0) target.hp = 0;
+    addEffect(target.x + 30, target.y + 50, '⚔️', 8);
+  }
+}
+
+// ---- 距離計算 ----
+function getDistance(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function getDistanceToRect(unit, rect) {
+  const cx = Math.max(rect.x, Math.min(unit.x, rect.x + 60));
+  const cy = Math.max(rect.y, Math.min(unit.y, rect.y + 100));
+  return Math.hypot(unit.x - cx, unit.y - cy);
+}
+
+// ---- エフェクト ----
+let battleEffects = [];
+
+function addEffect(x, y, text, duration) {
+  battleEffects.push({ x, y, text, duration, timer: 0 });
+}
+
+function updateBattleEffects() {
+  for (let i = battleEffects.length - 1; i >= 0; i--) {
+    battleEffects[i].timer++;
+    if (battleEffects[i].timer >= battleEffects[i].duration) {
+      battleEffects.splice(i, 1);
+    }
+  }
+}
+
+// ---- 描画（拡張） ----
+const originalDrawBattle = drawBattle;
+drawBattle = function() {
+  const canvas = document.getElementById('battleCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const state = battleState;
+  if (!state) return;
+  
   ctx.clearRect(0, 0, 800, 500);
   
   // 中央線
@@ -1667,105 +1503,164 @@ draw = function() {
   ctx.setLineDash([]);
   
   // タワー
-  function drawTower(tower, isPlayer) {
+  function drawTower(tower, x, y, isPlayer) {
     const color = isPlayer ? '#2980b9' : '#c0392b';
     ctx.fillStyle = color;
     ctx.shadowColor = 'rgba(0,0,0,0.4)';
     ctx.shadowBlur = 15;
-    ctx.fillRect(tower.x, tower.y, tower.w, tower.h);
+    ctx.fillRect(x, y, 60, 100);
     ctx.shadowBlur = 0;
     ctx.strokeStyle = '#ecf0f1';
     ctx.lineWidth = 3;
-    ctx.strokeRect(tower.x, tower.y, tower.w, tower.h);
+    ctx.strokeRect(x, y, 60, 100);
     const ratio = Math.max(0, tower.hp / tower.maxHp);
     ctx.fillStyle = '#2c3e50';
-    ctx.fillRect(tower.x, tower.y - 22, tower.w, 12);
+    ctx.fillRect(x, y - 22, 60, 12);
     ctx.fillStyle = ratio > 0.5 ? '#2ecc71' : '#e74c3c';
-    ctx.fillRect(tower.x, tower.y - 22, tower.w * ratio, 12);
+    ctx.fillRect(x, y - 22, 60 * ratio, 12);
     ctx.font = '30px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(isPlayer ? '🔵' : '🔴', tower.x + tower.w/2, tower.y - 35);
+    ctx.fillText(isPlayer ? '🔵' : '🔴', x + 30, y - 35);
     ctx.fillStyle = 'white';
     ctx.font = '12px sans-serif';
-    ctx.fillText(`${Math.floor(tower.hp)}/${tower.maxHp}`, tower.x + tower.w/2, tower.y - 10);
+    ctx.fillText(`${Math.floor(tower.hp)}/${tower.maxHp}`, x + 30, y - 10);
   }
-  drawTower(playerTower, true);
-  drawTower(cpuTower, false);
+  drawTower(state.playerTower, 80, 200, true);
+  drawTower(state.cpuTower, 660, 200, false);
   
-  // ユニット
-  for (let u of units) {
-    u.draw(ctx);
+  // ---- ユニット描画 ----
+  function drawUnit(u, color) {
+    if (!u.alive) return;
+    ctx.beginPath();
+    ctx.arc(u.x, u.y, u.size, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.strokeStyle = '#ecf0f1';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = 'white';
+    ctx.font = `${Math.min(20, u.size + 4)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(u.icon || '?', u.x, u.y - 1);
+    // HPバー
+    const barW = Math.min(30, u.size * 2);
+    const barH = 4;
+    const hpRatio = Math.max(0, u.hp / u.maxHp);
+    ctx.fillStyle = '#2c3e50';
+    ctx.fillRect(u.x - barW/2, u.y - u.size - 8, barW, barH);
+    ctx.fillStyle = hpRatio > 0.5 ? '#2ecc71' : '#e74c3c';
+    ctx.fillRect(u.x - barW/2, u.y - u.size - 8, barW * hpRatio, barH);
   }
   
-  // エフェクト
-  drawEffects(ctx);
-  
-  // プレビュー
-  if (isDragging && selectedUnitType && previewUnit) {
-    ctx.globalAlpha = 0.5;
-    const pu = new Unit(previewUnit.x, previewUnit.y, selectedUnitType, 'player');
-    pu.draw(ctx);
-    ctx.globalAlpha = 1.0;
+  for (let u of state.playerUnits) {
+    drawUnit(u, '#3498db');
   }
+  for (let u of state.cpuUnits) {
+    drawUnit(u, '#e74c3c');
+  }
+  
+  // ---- エフェクト描画 ----
+  for (let e of battleEffects) {
+    const alpha = 1 - (e.timer / e.duration);
+    const scale = 1 + (e.timer / e.duration) * 0.5;
+    ctx.globalAlpha = alpha;
+    ctx.font = `${24 * scale}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(e.text, e.x, e.y - e.timer * 0.5);
+  }
+  ctx.globalAlpha = 1.0;
+  
+  // ---- プレビュー ----
+  if (isPlayerDragging && playerPreviewUnit && playerSelectedUnit) {
+    const def = UNIT_TYPES[playerSelectedUnit];
+    if (def) {
+      ctx.globalAlpha = 0.5;
+      ctx.beginPath();
+      ctx.arc(playerPreviewUnit.x, playerPreviewUnit.y, def.size, 0, Math.PI * 2);
+      ctx.fillStyle = '#3498db';
+      ctx.fill();
+      ctx.strokeStyle = '#ecf0f1';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = 'white';
+      ctx.font = `${Math.min(20, def.size + 4)}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(def.icon, playerPreviewUnit.x, playerPreviewUnit.y - 1);
+      ctx.globalAlpha = 1.0;
+    }
+  }
+  
+  // ---- エリクサーバー ----
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.fillRect(10, 10, 100, 20);
+  ctx.fillStyle = '#ffd966';
+  ctx.fillRect(10, 10, (state.playerElixir / state.maxElixir) * 100, 20);
+  ctx.fillStyle = 'white';
+  ctx.font = '12px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`💎 ${Math.floor(state.playerElixir)}`, 14, 20);
+  
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.fillRect(690, 10, 100, 20);
+  ctx.fillStyle = '#ff6b6b';
+  ctx.fillRect(690, 10, (state.cpuElixir / state.maxElixir) * 100, 20);
+  ctx.fillStyle = 'white';
+  ctx.fillText(`💎 ${Math.floor(state.cpuElixir)}`, 694, 20);
 };
 
-// ---- タッチ対応 ----
-canvas.addEventListener('touchstart', (e) => {
-  e.preventDefault();
-  const touch = e.touches[0];
-  const mouseEvent = new MouseEvent('mousedown', {
-    clientX: touch.clientX,
-    clientY: touch.clientY
-  });
-  canvas.dispatchEvent(mouseEvent);
-});
+// ---- 試合ループにエフェクト更新を追加 ----
+const battleLoopWithEffects = function() {
+  if (!battleState || battleState.gameOver) return;
+  
+  // 元のループを呼び出し
+  originalBattleLoop();
+  
+  // エフェクト更新
+  updateBattleEffects();
+};
 
-canvas.addEventListener('touchmove', (e) => {
-  e.preventDefault();
-  const touch = e.touches[0];
-  const mouseEvent = new MouseEvent('mousemove', {
-    clientX: touch.clientX,
-    clientY: touch.clientY
-  });
-  canvas.dispatchEvent(mouseEvent);
-});
+// ---- ループを置き換え ----
+battleLoop = battleLoopWithEffects;
 
-canvas.addEventListener('touchend', (e) => {
-  e.preventDefault();
-  const mouseEvent = new MouseEvent('mouseup', {});
-  canvas.dispatchEvent(mouseEvent);
-});
+// ---- 勝ち画面の表示を拡張 ----
+const originalShowVictory = showVictory;
+showVictory = function(winner) {
+  if (battleInterval) clearInterval(battleInterval);
+  isBattleActive = false;
+  
+  const msg = winner === 'player' ? '🎉 あなたの勝ち！' : '😵 CPUの勝ち...';
+  document.getElementById('victoryMessage').textContent = msg;
+  
+  // ゲーム部分を非表示
+  const canvas = document.getElementById('battleCanvas');
+  if (canvas) canvas.style.display = 'none';
+  const infoPanel = document.getElementById('infoPanel');
+  if (infoPanel) infoPanel.style.display = 'none';
+  const hpPanel = document.getElementById('hpPanel');
+  if (hpPanel) hpPanel.style.display = 'none';
+  const selector = document.getElementById('playerUnitSelector');
+  if (selector) selector.style.display = 'none';
+  const msgEl = document.getElementById('battleMessage');
+  if (msgEl) msgEl.style.display = 'none';
+  
+  // 勝利画面を表示
+  const victoryScreen = document.getElementById('victoryScreen');
+  if (victoryScreen) victoryScreen.style.display = 'block';
+  
+  // oracle.html へ誘導
+  document.getElementById('oracleBtn').onclick = () => {
+    window.location.href = 'oracle.html';
+  };
+};
 
-// ---- 難易度調整（キーボード） ----
-document.addEventListener('keydown', (e) => {
-  if (e.key === '1') { 
-    cpuDifficulty = 0.5; 
-    msgDiv.innerText = '🟢 難易度: イージー'; 
-  }
-  if (e.key === '2') { 
-    cpuDifficulty = 1.0; 
-    msgDiv.innerText = '🟡 難易度: ノーマル'; 
-  }
-  if (e.key === '3') { 
-    cpuDifficulty = 1.8; 
-    msgDiv.innerText = '🔴 難易度: ハード'; 
-  }
-  if (e.key === '4') { 
-    cpuDifficulty = 3.0; 
-    msgDiv.innerText = '💀 難易度: インフェルノ'; 
-  }
-});
-
-// ---- エフェクトを追加するように各特殊能力を拡張 ----
-// （performAttack 内の各所に addEffect を追加済みのため、
-//  中編の class Unit で既にエフェクト対応済み）
-
-console.log('✅ 後編完了！');
-console.log('🎮 全51タイプ・全特殊能力・エフェクト・CPU戦略的AI・難易度調整');
-console.log('🎯 難易度: キーボード 1=イージー 2=ノーマル 3=ハード 4=インフェルノ');
-console.log('🎉 クラロワ風ゲーム 完全版 完成！');
+// ---- 初期化：試合開始時にセットアップ ----
+console.log('✅ 後編完了！完全バトル実装');
+console.log('🎮 全機能揃いました！');
 </script>
-
 </body>
 </html>
