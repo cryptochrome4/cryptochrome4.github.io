@@ -216,7 +216,7 @@ body { background:#1a1a2e; display:flex; justify-content:center; align-items:cen
 
 <script>
 // ============================================================
-// 7日間サバイバルゲーム (完全版 + デバッグ強制描画)
+// 7日間サバイバルゲーム (完全版 + モブ所持品視覚化)
 // ============================================================
 
 (function(){
@@ -521,6 +521,8 @@ function initGame() {
       alive: true,
       taskId: mi2,
       hasDelivered: false,
+      // ★ 所持アイテムフラグ
+      hasItem: false,
       targetX: null,
       targetY: null,
       targetBlock: null,
@@ -685,6 +687,8 @@ function updateMobs() {
     if (!mob.alive) continue;
 
     if (mob.hasDelivered) {
+      // 納品済み → アイテムを持っていない
+      mob.hasItem = false;
       if (state.frameCount % 8 === 0) {
         var dirs = [[0,-1],[0,1],[-1,0],[1,0]];
         var d = dirs[rand(0, 3)];
@@ -715,6 +719,7 @@ function updateMobs() {
         }
         if (idx >= 0) {
           state.items.splice(idx, 1);
+          mob.hasItem = true; // ★ アイテムを所持
           mob.state = 'moving_to_hut';
           mob.targetX = 3;
           mob.targetY = 5;
@@ -744,6 +749,7 @@ function updateMobs() {
           hutItem.used = true;
           hutItem.cooldown = 5;
           mob.hasDelivered = true;
+          mob.hasItem = false; // ★ 納品したのでアイテム消える
           state.points += 1;
           addLog('✅ ' + mob.name + ' 納品完了！ +1ポイント');
           updateUI();
@@ -758,6 +764,7 @@ function updateMobs() {
         }
       } else {
         mob.hasDelivered = true;
+        mob.hasItem = false;
         mob.state = 'delivered';
       }
     } else {
@@ -926,6 +933,7 @@ function killHero(killer) {
 function killMob(mob, killer) {
   if (!mob.alive) return;
   mob.alive = false;
+  mob.hasItem = false;
   state.mobAlive--;
   addLog('💀 ' + mob.name + ' が ' + killer + ' に殺された (生存 ' + state.mobAlive + '/8)');
   updateUI();
@@ -1388,7 +1396,7 @@ btnMobControl.addEventListener('click', function() {
   }
 });
 
-// ---- ★★★ 修正: キャンバスクリック（デバッグ強化） ----
+// ---- キャンバスクリック ----
 canvas.addEventListener('click', function(e) {
   console.log('=== クリックイベント ===');
   if (state.gameOver) return;
@@ -1410,7 +1418,6 @@ canvas.addEventListener('click', function(e) {
     return;
   }
 
-  // モブ操作モード
   if (state.mobControlMode) {
     var clickedMob = null;
     for (var i = 0; i < state.mobs.length; i++) {
@@ -1461,7 +1468,7 @@ canvas.addEventListener('click', function(e) {
   }
 });
 
-// ---- ★★★ 修正: render() 関数（デバッグ強化＋強制描画） ----
+// ---- ★★★ 修正: render() 関数（モブ所持品の紫枠表示） ----
 function render() {
   // デバッグ出力（1秒に1回）
   if (state.frameCount % 60 === 0) {
@@ -1476,7 +1483,7 @@ function render() {
 
   ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
-  // ★ 強制修正: 主人公のブロックに合わせる
+  // 強制修正: 主人公のブロックに合わせる
   if (state.hero && state.hero.alive) {
     state.currentBlock = state.hero.blockId;
   }
@@ -1577,33 +1584,39 @@ function render() {
     ctx.fillText(label2, px2 + BLOCK_SIZE/2, py2 + BLOCK_SIZE/2);
   }
 
-  // ---- ★★★ キャラクター描画（強制表示） ★★★ ----
+  // ---- ★★★ キャラクター描画（モブ所持品は紫枠） ★★★ ----
   var allChars = [];
 
   if (state.hero && state.hero.alive && state.hero.blockId === blockId) {
-    allChars.push({ name: state.hero.img, x: state.hero.x, y: state.hero.y, isHero: true });
+    allChars.push({ name: state.hero.img, x: state.hero.x, y: state.hero.y, isHero: true, hasItem: false });
   }
 
   for (var mi3 = 0; mi3 < state.mobs.length; mi3++) {
     var mob3 = state.mobs[mi3];
     if (mob3.alive && mob3.blockId === blockId) {
-      allChars.push({ name: mob3.img, x: mob3.x, y: mob3.y, isHero: false });
+      allChars.push({ 
+        name: mob3.img, 
+        x: mob3.x, 
+        y: mob3.y, 
+        isHero: false, 
+        hasItem: mob3.hasItem || false,
+        mobName: mob3.name
+      });
     }
   }
 
   if (state.jason && state.jason.alive && state.jason.blockId === blockId) {
-    allChars.push({ name: state.jason.img, x: state.jason.x, y: state.jason.y, isHero: false });
+    allChars.push({ name: state.jason.img, x: state.jason.x, y: state.jason.y, isHero: false, hasItem: false });
   }
 
   if (state.bear && state.bear.alive && state.bear.blockId === blockId) {
-    allChars.push({ name: state.bear.img, x: state.bear.x, y: state.bear.y, isHero: false });
+    allChars.push({ name: state.bear.img, x: state.bear.x, y: state.bear.y, isHero: false, hasItem: false });
   }
 
   if (state.wolf && state.wolf.alive && state.wolf.blockId === blockId) {
-    allChars.push({ name: state.wolf.img, x: state.wolf.x, y: state.wolf.y, isHero: false });
+    allChars.push({ name: state.wolf.img, x: state.wolf.x, y: state.wolf.y, isHero: false, hasItem: false });
   }
 
-  // デバッグ: キャラクターが0の場合
   if (allChars.length === 0 && state.frameCount % 60 === 0) {
     console.warn('⚠️ 描画するキャラクターが0です');
   }
@@ -1645,6 +1658,23 @@ function render() {
       var label3 = ch.name;
       if (label3.length > 2) label3 = label3.substring(0, 2);
       ctx.fillText(label3, px3 + BLOCK_SIZE/2, py3 + BLOCK_SIZE/2);
+    }
+
+    // ★★★ モブがアイテムを持っている場合、紫枠で囲む ★★★
+    if (ch.hasItem === true && ch.isHero === false) {
+      ctx.strokeStyle = '#aa44ff';
+      ctx.lineWidth = 3;
+      ctx.shadowColor = '#aa44ff';
+      ctx.shadowBlur = 8;
+      ctx.strokeRect(px3, py3, BLOCK_SIZE, BLOCK_SIZE);
+      ctx.shadowBlur = 0;
+      
+      // 小さな「品」マークを右上に表示
+      ctx.fillStyle = '#aa44ff';
+      ctx.font = 'bold 10px "MS Gothic"';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'top';
+      ctx.fillText('◆', px3 + BLOCK_SIZE - 2, py3 + 1);
     }
   }
 
@@ -1812,7 +1842,7 @@ mobileToggle.addEventListener('click', function() {
 // ---- ボタン ----
 btnDrop.addEventListener('click', dropItem);
 
-// ---- ★★★ メインループ（render 呼び出しを保証）★★★ ----
+// ---- メインループ ----
 function gameLoop() {
   if (!state.isGameLoopRunning && state.gameOver) {
     render();
@@ -1827,7 +1857,6 @@ function gameLoop() {
     if (state.frameCount % 4 === 0) updateEnemies();
   }
 
-  // ★ render() は必ず呼ばれる
   render();
   state.animFrame = requestAnimationFrame(gameLoop);
 }
