@@ -228,7 +228,7 @@ body { background:#1a1a2e; display:flex; justify-content:center; align-items:cen
 
 <script>
 // ============================================================
-// 7日間サバイバルゲーム (完全版 - 役割ラベル非表示)
+// 7日間サバイバルゲーム (裏切り者逃走優先度修正版)
 // ============================================================
 
 (function(){
@@ -965,6 +965,7 @@ function forceDeliverMob(mob) {
   return true;
 }
 
+// ★★★ 修正: updateMobs() 内の裏切り者処理 ★★★
 function updateMobs() {
   for (var i = 0; i < state.mobs.length; i++) {
     var mob = state.mobs[i];
@@ -972,23 +973,72 @@ function updateMobs() {
 
     if (mob.hasDelivered) {
       mob.hasItem = false;
+      
+      // ★ 裏切り者の行動（逃走優先度付き）
       if (mob.role === MOB_ROLE.TRAITOR && mob.roleActive) {
         var hero = state.hero;
-        if (hero && hero.alive && hero.blockId === 4 && mob.blockId === 4) {
-          var dx = hero.x - mob.x;
-          var dy = hero.y - mob.y;
-          if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
-            var mx = 0, my = 0;
-            if (dx > 0) mx = 1;
-            else if (dx < 0) mx = -1;
-            else if (dy > 0) my = 1;
-            else if (dy < 0) my = -1;
-            moveCharacter(mob, mx, my);
+        var shouldFlee = false;
+        var fleeTarget = null;
+        
+        // ★ 優先度1: 熊から逃げる
+        if (state.bear && state.bear.alive && state.bear.blockId === mob.blockId) {
+          shouldFlee = true;
+          fleeTarget = state.bear;
+        }
+        // ★ 優先度2: ジェイソンから逃げる
+        else if (state.jason && state.jason.alive && state.jason.blockId === mob.blockId) {
+          shouldFlee = true;
+          fleeTarget = state.jason;
+        }
+        
+        // 逃げる処理
+        if (shouldFlee && fleeTarget) {
+          var dx = mob.x - fleeTarget.x;
+          var dy = mob.y - fleeTarget.y;
+          var mx = 0, my = 0;
+          if (Math.abs(dx) >= Math.abs(dy)) {
+            mx = dx > 0 ? 1 : -1;
+          } else {
+            my = dy > 0 ? 1 : -1;
           }
+          // 逃げる方向に移動（壁や木があれば別方向を試す）
+          if (!moveCharacter(mob, mx, my)) {
+            var attempts = [
+              [mx, 0], [0, my], [-mx, 0], [0, -my],
+              [mx, my], [-mx, my], [mx, -my], [-mx, -my]
+            ];
+            for (var a = 0; a < attempts.length; a++) {
+              if (moveCharacter(mob, attempts[a][0], attempts[a][1])) break;
+            }
+          }
+          continue;
+        }
+        
+        // ★ 優先度3: 主人公が小屋にいる → 襲う
+        if (hero && hero.alive && hero.blockId === 4 && mob.blockId === 4) {
+          var dx2 = hero.x - mob.x;
+          var dy2 = hero.y - mob.y;
+          if (Math.abs(dx2) > 1 || Math.abs(dy2) > 1) {
+            var mx2 = 0, my2 = 0;
+            if (dx2 > 0) mx2 = 1;
+            else if (dx2 < 0) mx2 = -1;
+            else if (dy2 > 0) my2 = 1;
+            else if (dy2 < 0) my2 = -1;
+            moveCharacter(mob, mx2, my2);
+          }
+          continue;
+        }
+        
+        // ★ 優先度4: ランダム移動
+        if (state.frameCount % 8 === 0) {
+          var dirs = [[0,-1],[0,1],[-1,0],[1,0]];
+          var d = dirs[rand(0, 3)];
+          moveCharacter(mob, d[0], d[1]);
         }
         continue;
       }
       
+      // ★ 補強減らしの処理（変更なし）
       if (mob.role === MOB_ROLE.SABOTEUR && mob.roleActive) {
         var hero2 = state.hero;
         if (hero2 && hero2.alive && state.heroItem === '銃') {
@@ -1012,6 +1062,7 @@ function updateMobs() {
         }
       }
       
+      // ★ 通常のランダム移動
       if (state.frameCount % 8 === 0) {
         var dirs = [[0,-1],[0,1],[-1,0],[1,0]];
         var d = dirs[rand(0, 3)];
@@ -1020,6 +1071,7 @@ function updateMobs() {
       continue;
     }
 
+    // ---- 納品前のモブ（変更なし） ----
     if (mob.moveCooldown > 0) { mob.moveCooldown--; continue; }
     mob.moveCooldown = 3;
 
