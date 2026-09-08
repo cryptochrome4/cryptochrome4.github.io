@@ -216,7 +216,7 @@ body { background:#1a1a2e; display:flex; justify-content:center; align-items:cen
 
 <script>
 // ============================================================
-// 7日間サバイバルゲーム (完全版 + モブ操作モード)
+// 7日間サバイバルゲーム (完全版 + デバッグ強制描画)
 // ============================================================
 
 (function(){
@@ -275,11 +275,16 @@ function loadImages(callback) {
   }
   totalImages = names.length;
   imagesLoaded = 0;
+  if (totalImages === 0) { callback(); return; }
   for (var i = 0; i < names.length; i++) {
     var name = names[i];
     var img = new Image();
     img.onload = function() { imagesLoaded++; if (imagesLoaded >= totalImages) callback(); };
-    img.onerror = function() { imagesLoaded++; if (imagesLoaded >= totalImages) callback(); };
+    img.onerror = function() { 
+      console.warn('画像読み込み失敗:', this.src);
+      imagesLoaded++; 
+      if (imagesLoaded >= totalImages) callback(); 
+    };
     img.src = IMG_FILES[name];
     imageCache[name] = img;
   }
@@ -322,10 +327,9 @@ var state = {
   bearKillCooldown: 0,
   isGameLoopRunning: false,
   pendingRespawn: [],
-  // ★ モブ操作モード
   mobControlMode: false,
   selectedMob: null,
-  arrowDirections: []  // [{dx, dy, x, y}]
+  arrowDirections: []
 };
 
 var canvas = document.getElementById('mapCanvas');
@@ -409,6 +413,7 @@ function moveCharacter(entity, dx, dy) {
 
 // ---- 初期化 ----
 function initGame() {
+  console.log('=== initGame 開始 ===');
   if (state.animFrame) { cancelAnimationFrame(state.animFrame); state.animFrame = null; }
   if (state.dayTimerInterval) { clearInterval(state.dayTimerInterval); state.dayTimerInterval = null; }
 
@@ -490,6 +495,7 @@ function initGame() {
     img: CHARACTERS[HERO_NAME].img,
     alive: true
   };
+  console.log('主人公初期位置:', state.hero.x, state.hero.y, 'ブロック:', state.hero.blockId);
 
   var mobPositions = [
     {x:1,y:1},{x:8,y:1},{x:1,y:8},{x:8,y:8},
@@ -624,6 +630,7 @@ function spawnItems() {
       blockId: bid3
     });
   }
+  console.log('アイテム生成数:', state.items.length);
 }
 
 function assignMobTask(mob) {
@@ -1258,7 +1265,7 @@ function updateUI() {
   }
 }
 
-// ---- ★ モブ操作モード ----
+// ---- モブ操作モード ----
 function clearArrows() {
   arrowOverlay.innerHTML = '';
   state.arrowDirections = [];
@@ -1282,9 +1289,7 @@ function showMobArrows(mob) {
     var d = directions[i];
     var nx = mob.x + d.dx;
     var ny = mob.y + d.dy;
-    // 範囲チェック
     if (nx < 0 || nx >= GRID_SIZE || ny < 0 || ny >= GRID_SIZE) {
-      // ブロック移動可能かチェック（端を超える場合）
       var g = blockToGrid(mob.blockId);
       var newRow = g.row, newCol = g.col;
       var newX = nx, newY = ny;
@@ -1298,7 +1303,6 @@ function showMobArrows(mob) {
           state.blockMap[newBlock][newY][newX] === 'tree') continue;
       validDirs.push({ dx: d.dx, dy: d.dy, label: d.label, x: nx, y: ny });
     } else {
-      // 範囲内
       if (state.blockMap[mob.blockId] && state.blockMap[mob.blockId][ny] &&
           state.blockMap[mob.blockId][ny][nx] === 'tree') continue;
       validDirs.push({ dx: d.dx, dy: d.dy, label: d.label, x: nx, y: ny });
@@ -1312,7 +1316,6 @@ function showMobArrows(mob) {
 
   state.arrowDirections = validDirs;
 
-  // オーバーレイに矢印を配置
   var wrapRect = document.getElementById('mapWrap').getBoundingClientRect();
   var canvasRect = canvas.getBoundingClientRect();
   var offsetX = canvasRect.left - wrapRect.left;
@@ -1338,7 +1341,6 @@ function showMobArrows(mob) {
         var moved = moveCharacter(state.selectedMob, dx, dy);
         if (moved) {
           addLog('🔄 ' + state.selectedMob.name + ' を移動させた');
-          // 移動後、選択を解除して矢印を消す
           clearArrows();
           btnMobControl.classList.remove('active-mode');
           state.mobControlMode = false;
@@ -1348,7 +1350,6 @@ function showMobArrows(mob) {
         }
       }
     });
-    // タッチ対応
     arrow.addEventListener('touchstart', function(e) {
       e.preventDefault();
       e.stopPropagation();
@@ -1387,8 +1388,9 @@ btnMobControl.addEventListener('click', function() {
   }
 });
 
-// ---- キャンバスクリック（モブ操作モード時はモブ選択優先） ----
+// ---- ★★★ 修正: キャンバスクリック（デバッグ強化） ----
 canvas.addEventListener('click', function(e) {
+  console.log('=== クリックイベント ===');
   if (state.gameOver) return;
   var rect = canvas.getBoundingClientRect();
   var scaleX = canvas.width / rect.width;
@@ -1397,15 +1399,19 @@ canvas.addEventListener('click', function(e) {
   var my = (e.clientY - rect.top) * scaleY;
   var gx = Math.floor(mx / BLOCK_SIZE);
   var gy = Math.floor(my / BLOCK_SIZE);
+  console.log('クリック位置:', gx, gy);
   if (gx < 0 || gx >= GRID_SIZE || gy < 0 || gy >= GRID_SIZE) return;
 
   var hero = state.hero;
   if (!hero || !hero.alive) return;
-  if (hero.blockId !== state.currentBlock) return;
+  if (hero.blockId !== state.currentBlock) {
+    console.log('主人公のブロックと表示ブロックが不一致:', hero.blockId, state.currentBlock);
+    state.currentBlock = hero.blockId;
+    return;
+  }
 
-  // ★ モブ操作モード中
+  // モブ操作モード
   if (state.mobControlMode) {
-    // クリック位置にモブがいるかチェック
     var clickedMob = null;
     for (var i = 0; i < state.mobs.length; i++) {
       var mob = state.mobs[i];
@@ -1416,7 +1422,6 @@ canvas.addEventListener('click', function(e) {
       }
     }
     if (clickedMob) {
-      // すでに同じモブが選択されていたら解除
       if (state.selectedMob === clickedMob) {
         clearArrows();
         addLog('🔄 ' + clickedMob.name + ' の選択を解除');
@@ -1426,14 +1431,12 @@ canvas.addEventListener('click', function(e) {
       addLog('🔄 ' + clickedMob.name + ' を選択 (矢印をクリックして移動)');
       return;
     } else {
-      // モブがいない場所をクリック → 解除
       clearArrows();
       addLog('🔄 モブ選択解除');
       return;
     }
   }
 
-  // ---- 通常モード ----
   pickupItemByClick(gx, gy);
 
   var clickedObj = null;
@@ -1457,6 +1460,201 @@ canvas.addEventListener('click', function(e) {
     useItemOnObject(clickedObj.type);
   }
 });
+
+// ---- ★★★ 修正: render() 関数（デバッグ強化＋強制描画） ----
+function render() {
+  // デバッグ出力（1秒に1回）
+  if (state.frameCount % 60 === 0) {
+    console.log('=== render デバッグ ===');
+    console.log('currentBlock:', state.currentBlock);
+    console.log('hero.blockId:', state.hero ? state.hero.blockId : 'null');
+    console.log('hero.x:', state.hero ? state.hero.x : 'null');
+    console.log('hero.y:', state.hero ? state.hero.y : 'null');
+    console.log('items:', state.items.length);
+    console.log('mobs alive:', state.mobs.filter(function(m) { return m.alive; }).length);
+  }
+
+  ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+  // ★ 強制修正: 主人公のブロックに合わせる
+  if (state.hero && state.hero.alive) {
+    state.currentBlock = state.hero.blockId;
+  }
+
+  var blockId = state.currentBlock;
+
+  // ---- 背景 ----
+  ctx.fillStyle = blockId === 4 ? '#8B7D6B' : '#2d5a27';
+  ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+  // ---- グリッド線 ----
+  ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+  ctx.lineWidth = 0.5;
+  for (var gx = 0; gx <= GRID_SIZE; gx++) {
+    ctx.beginPath();
+    ctx.moveTo(gx * BLOCK_SIZE, 0);
+    ctx.lineTo(gx * BLOCK_SIZE, CANVAS_SIZE);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, gx * BLOCK_SIZE);
+    ctx.lineTo(CANVAS_SIZE, gx * BLOCK_SIZE);
+    ctx.stroke();
+  }
+
+  // ---- 木 ----
+  if (blockId !== 4) {
+    for (var y = 0; y < GRID_SIZE; y++) {
+      for (var x = 0; x < GRID_SIZE; x++) {
+        if (state.blockMap[blockId] && state.blockMap[blockId][y] && state.blockMap[blockId][y][x] === 'tree') {
+          ctx.fillStyle = '#1a3d1a';
+          ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+          ctx.fillStyle = '#2a5a2a';
+          ctx.fillRect(x * BLOCK_SIZE + 4, y * BLOCK_SIZE + 4, BLOCK_SIZE - 8, BLOCK_SIZE - 8);
+          ctx.fillStyle = '#3a7a3a';
+          ctx.font = '14px "MS Gothic"';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('木', x * BLOCK_SIZE + BLOCK_SIZE/2, y * BLOCK_SIZE + BLOCK_SIZE/2);
+        }
+      }
+    }
+  }
+
+  // ---- 小屋オブジェクト ----
+  if (blockId === 4) {
+    for (var oi = 0; oi < state.objects.length; oi++) {
+      var obj = state.objects[oi];
+      if (obj.blockId !== blockId) continue;
+      var px = obj.x * BLOCK_SIZE;
+      var py = obj.y * BLOCK_SIZE;
+      var isCooling = obj.cooldown > 0;
+      ctx.fillStyle = obj.used ? (isCooling ? '#664444' : '#555') : '#3a3a5a';
+      ctx.fillRect(px + 2, py + 2, BLOCK_SIZE - 4, BLOCK_SIZE - 4);
+      ctx.strokeStyle = obj.used ? (isCooling ? '#884444' : '#777') : '#88aaff';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(px + 2, py + 2, BLOCK_SIZE - 4, BLOCK_SIZE - 4);
+      ctx.fillStyle = obj.used ? (isCooling ? '#aa6666' : '#888') : '#ffffff';
+      ctx.font = '12px "MS Gothic"';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      var label = obj.type;
+      if (obj.type === '窓') label = '密';
+      if (obj.type === '樽') label = '椅';
+      ctx.fillText(label, px + BLOCK_SIZE/2, py + BLOCK_SIZE/2);
+      if (isCooling) {
+        ctx.fillStyle = '#ff6644';
+        ctx.font = '8px "MS Gothic"';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(obj.cooldown + 's', px + BLOCK_SIZE/2, py + BLOCK_SIZE);
+      }
+    }
+  }
+
+  // ---- アイテム ----
+  for (var ii = 0; ii < state.items.length; ii++) {
+    var item = state.items[ii];
+    if (item.blockId !== blockId) continue;
+    var px2 = item.x * BLOCK_SIZE;
+    var py2 = item.y * BLOCK_SIZE;
+
+    if (item.name === '斧' || item.name === '銃') {
+      var img = getImage(item.name);
+      if (img) {
+        ctx.drawImage(img, px2, py2, BLOCK_SIZE, BLOCK_SIZE);
+        continue;
+      }
+    }
+
+    ctx.fillStyle = '#ffdd44';
+    ctx.fillRect(px2 + 4, py2 + 4, BLOCK_SIZE - 8, BLOCK_SIZE - 8);
+    ctx.fillStyle = '#000';
+    ctx.font = '10px "MS Gothic"';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    var label2 = item.name;
+    if (label2.length > 4) label2 = label2.substring(0, 4);
+    ctx.fillText(label2, px2 + BLOCK_SIZE/2, py2 + BLOCK_SIZE/2);
+  }
+
+  // ---- ★★★ キャラクター描画（強制表示） ★★★ ----
+  var allChars = [];
+
+  if (state.hero && state.hero.alive && state.hero.blockId === blockId) {
+    allChars.push({ name: state.hero.img, x: state.hero.x, y: state.hero.y, isHero: true });
+  }
+
+  for (var mi3 = 0; mi3 < state.mobs.length; mi3++) {
+    var mob3 = state.mobs[mi3];
+    if (mob3.alive && mob3.blockId === blockId) {
+      allChars.push({ name: mob3.img, x: mob3.x, y: mob3.y, isHero: false });
+    }
+  }
+
+  if (state.jason && state.jason.alive && state.jason.blockId === blockId) {
+    allChars.push({ name: state.jason.img, x: state.jason.x, y: state.jason.y, isHero: false });
+  }
+
+  if (state.bear && state.bear.alive && state.bear.blockId === blockId) {
+    allChars.push({ name: state.bear.img, x: state.bear.x, y: state.bear.y, isHero: false });
+  }
+
+  if (state.wolf && state.wolf.alive && state.wolf.blockId === blockId) {
+    allChars.push({ name: state.wolf.img, x: state.wolf.x, y: state.wolf.y, isHero: false });
+  }
+
+  // デバッグ: キャラクターが0の場合
+  if (allChars.length === 0 && state.frameCount % 60 === 0) {
+    console.warn('⚠️ 描画するキャラクターが0です');
+  }
+
+  // キャラクター描画
+  for (var ci = 0; ci < allChars.length; ci++) {
+    var ch = allChars[ci];
+    var px3 = ch.x * BLOCK_SIZE;
+    var py3 = ch.y * BLOCK_SIZE;
+
+    var img = getImage(ch.name);
+    if (img) {
+      ctx.drawImage(img, px3, py3, BLOCK_SIZE, BLOCK_SIZE);
+    } else {
+      var colors = {
+        '紅葉': '#aa44ff',
+        '加藤': '#ff6644',
+        '松本': '#ff6644',
+        '坪池': '#ff6644',
+        '市川': '#ff6644',
+        '青笹': '#ff6644',
+        '角田': '#ff6644',
+        '木元': '#ff6644',
+        '山崎': '#ff6644',
+        'ジェイソン': '#ff0000',
+        '熊': '#8B4513',
+        '狼': '#888888'
+      };
+      var color = colors[ch.name] || '#888';
+      ctx.fillStyle = color;
+      ctx.fillRect(px3 + 2, py3 + 2, BLOCK_SIZE - 4, BLOCK_SIZE - 4);
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(px3 + 2, py3 + 2, BLOCK_SIZE - 4, BLOCK_SIZE - 4);
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 12px "MS Gothic"';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      var label3 = ch.name;
+      if (label3.length > 2) label3 = label3.substring(0, 2);
+      ctx.fillText(label3, px3 + BLOCK_SIZE/2, py3 + BLOCK_SIZE/2);
+    }
+  }
+
+  // ---- ブロック名 ----
+  ctx.fillStyle = 'rgba(255,255,255,0.25)';
+  ctx.font = '10px "MS Gothic"';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText(BLOCK_NAMES[blockId], 4, 4);
+}
 
 // ---- キーボード ----
 document.addEventListener('keydown', function(e) {
@@ -1496,9 +1694,11 @@ canvas.addEventListener('touchstart', function(e) {
 
   var hero = state.hero;
   if (!hero || !hero.alive) return;
-  if (hero.blockId !== state.currentBlock) return;
+  if (hero.blockId !== state.currentBlock) {
+    state.currentBlock = hero.blockId;
+    return;
+  }
 
-  // ★ モブ操作モード中
   if (state.mobControlMode) {
     var clickedMob = null;
     for (var i = 0; i < state.mobs.length; i++) {
@@ -1525,7 +1725,6 @@ canvas.addEventListener('touchstart', function(e) {
     }
   }
 
-  // 通常モード
   pickupItemByClick(gx, gy);
 
   var clickedObj = null;
@@ -1613,8 +1812,29 @@ mobileToggle.addEventListener('click', function() {
 // ---- ボタン ----
 btnDrop.addEventListener('click', dropItem);
 
+// ---- ★★★ メインループ（render 呼び出しを保証）★★★ ----
+function gameLoop() {
+  if (!state.isGameLoopRunning && state.gameOver) {
+    render();
+    state.animFrame = requestAnimationFrame(gameLoop);
+    return;
+  }
+
+  state.frameCount++;
+
+  if (!state.gameOver) {
+    if (state.frameCount % 3 === 0) updateMobs();
+    if (state.frameCount % 4 === 0) updateEnemies();
+  }
+
+  // ★ render() は必ず呼ばれる
+  render();
+  state.animFrame = requestAnimationFrame(gameLoop);
+}
+
 // ---- 起動 ----
 loadImages(function() {
+  console.log('=== 画像読み込み完了 ===');
   setupDpad();
   initGame();
 });
