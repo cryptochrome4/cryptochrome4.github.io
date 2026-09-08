@@ -56,7 +56,82 @@
       letter-spacing: 1px;
     }
 
-    /* ステータスバー / フェッチ情報 */
+    /* APIキー入力エリア */
+    .key-input-area {
+      background: #0f1a14;
+      border: 1px solid #1a332a;
+      border-radius: 12px;
+      padding: 1.5rem 2rem;
+      margin-bottom: 2rem;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 1rem;
+      box-shadow: 0 0 20px #00ffaa0a;
+    }
+
+    .key-input-area label {
+      color: #7cccaa;
+      font-size: 0.9rem;
+      letter-spacing: 1px;
+    }
+
+    .key-input-area input {
+      flex: 1;
+      min-width: 200px;
+      background: #0a120e;
+      border: 1px solid #1a3a2e;
+      color: #00ffaa;
+      padding: 0.6rem 1rem;
+      border-radius: 30px;
+      font-family: inherit;
+      font-size: 0.9rem;
+      outline: none;
+      transition: border 0.3s;
+    }
+
+    .key-input-area input:focus {
+      border-color: #00ffaa;
+      box-shadow: 0 0 20px #00ffaa22;
+    }
+
+    .key-input-area input::placeholder {
+      color: #2a5a4a;
+      opacity: 0.7;
+    }
+
+    .key-input-area .btn-primary {
+      background: transparent;
+      border: 1px solid #00ffaa66;
+      color: #00ffaa;
+      padding: 0.6rem 1.8rem;
+      border-radius: 30px;
+      font-family: inherit;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: #0f1a14;
+      letter-spacing: 1px;
+      white-space: nowrap;
+    }
+
+    .key-input-area .btn-primary:hover {
+      background: #00ffaa22;
+      border-color: #00ffaa;
+      box-shadow: 0 0 20px #00ffaa33;
+    }
+
+    .key-status {
+      font-size: 0.8rem;
+      color: #5ea783;
+      margin-left: auto;
+    }
+
+    .key-status .saved {
+      color: #00ffaa;
+    }
+
+    /* ステータスバー */
     .status-bar {
       background: #0f1a14;
       border-left: 6px solid #00ffaa;
@@ -241,6 +316,8 @@
       .glitch-header h1 { font-size: 1.6rem; }
       .news-card { padding: 1rem; }
       .news-title { font-size: 1rem; }
+      .key-input-area { padding: 1rem; }
+      .key-input-area input { min-width: 150px; }
     }
   </style>
 </head>
@@ -252,53 +329,56 @@
       <div class="badge">🔍 #cybersecurity #databreach</div>
     </header>
 
+    <!-- APIキー入力エリア -->
+    <div class="key-input-area" id="keyInputArea">
+      <label for="apiKeyInput">🔑 APIキー</label>
+      <input type="password" id="apiKeyInput" placeholder="NewsAPIのキーを入力" autocomplete="off">
+      <button class="btn-primary" id="setKeyButton">設定</button>
+      <span class="key-status" id="keyStatus">⚪ 未設定</span>
+    </div>
+
     <!-- ステータスバー -->
     <div class="status-bar">
       <div class="status-text">
         <span class="dot"></span>
-        <span id="statusMessage">🔄 最新のセキュリティニュースを取得中...</span>
+        <span id="statusMessage">🔑 APIキーを設定してください</span>
       </div>
       <button class="refresh-btn" id="refreshButton">⟳ 更新</button>
     </div>
 
     <!-- ニュースリスト -->
     <div id="newsContainer" class="news-grid">
-      <!-- 動的に挿入 -->
-      <div class="loading">
-        <div class="spinner"></div>
-        <span>ローディング</span>
+      <div class="empty-message">
+        🔑 APIキーを入力して「設定」を押してください
       </div>
     </div>
 
     <div class="footer-note">
-      <span>⚡ NewsAPI ｜ 個人学習用ダッシュボード ｜ フロントエンドのみ</span>
+      <span>⚡ NewsAPI ｜ 個人学習用ダッシュボード ｜ キーはブラウザに保存されます</span>
     </div>
   </div>
 
   <script>
     (function() {
-      // ---------- 設定 ----------
-      // NewsAPI のエンドポイント (フロントエンドから叩ける無料枠)
-      const API_BASE = 'https://newsapi.org/v2/everything';
-      // ⚠️ ここにあなたのAPIキーを入れてください（無料枠: https://newsapi.org/register）
-      // このコードはGitHub Pagesで公開する場合、キーが露出することに注意してください。
-      // 個人学習用として、キーを直書きします。（公開リポジトリでは避けてください）
-      const API_KEY = 'YOUR_NEWSAPI_KEY';  // ← あなたのAPIキーに置き換えてください
+      // ---------- DOM要素 ----------
+      const apiKeyInput = document.getElementById('apiKeyInput');
+      const setKeyButton = document.getElementById('setKeyButton');
+      const keyStatus = document.getElementById('keyStatus');
+      const statusMessage = document.getElementById('statusMessage');
+      const newsContainer = document.getElementById('newsContainer');
+      const refreshButton = document.getElementById('refreshButton');
 
-      // 検索キーワード（サイバーセキュリティ関連）
+      // ---------- 設定 ----------
+      const API_BASE = 'https://newsapi.org/v2/everything';
       const QUERY = 'cybersecurity OR "data breach" OR hacking';
-      // 取得件数
       const PAGE_SIZE = 10;
-      // 言語: 英語 (en) / 日本語 (ja) など。ここではen（多くの記事）
       const LANGUAGE = 'en';
-      // ソート: 最新順
       const SORT_BY = 'publishedAt';
 
-      // DOM 要素
-      const newsContainer = document.getElementById('newsContainer');
-      const statusMessage = document.getElementById('statusMessage');
+      // 保存キー名
+      const STORAGE_KEY = 'newsapi_cyber_key';
 
-      // ---------- ヘルパー: 日付フォーマット (簡易) ----------
+      // ---------- ヘルパー関数 ----------
       function formatDate(dateString) {
         if (!dateString) return '日付不明';
         try {
@@ -310,22 +390,60 @@
         }
       }
 
-      // ---------- ニュースを描画 ----------
-      function renderNews(articles) {
-        // コンテナをクリア
-        newsContainer.innerHTML = '';
+      function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+      }
 
+      // ---------- キーの保存と読み込み ----------
+      function loadStoredKey() {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          apiKeyInput.value = stored;
+          updateKeyStatus(true);
+          return stored;
+        }
+        updateKeyStatus(false);
+        return null;
+      }
+
+      function saveKey(key) {
+        if (key && key.trim().length > 0) {
+          localStorage.setItem(STORAGE_KEY, key.trim());
+          updateKeyStatus(true);
+          return true;
+        } else {
+          localStorage.removeItem(STORAGE_KEY);
+          updateKeyStatus(false);
+          return false;
+        }
+      }
+
+      function updateKeyStatus(isSet) {
+        if (isSet) {
+          keyStatus.innerHTML = '✅ 設定済み';
+          keyStatus.style.color = '#00ffaa';
+        } else {
+          keyStatus.innerHTML = '⚪ 未設定';
+          keyStatus.style.color = '#5ea783';
+        }
+      }
+
+      // ---------- ニュース描画 ----------
+      function renderNews(articles) {
+        newsContainer.innerHTML = '';
         if (!articles || articles.length === 0) {
           newsContainer.innerHTML = `
             <div class="empty-message">
               ⚡ ニュースが見つかりませんでした。<br>
-              <span style="font-size:0.8rem; opacity:0.6;">キーワードを変えてみるか、しばらくしてから再読み込みしてください。</span>
+              <span style="font-size:0.8rem; opacity:0.6;">キーワードを変えるか、しばらくしてから再読み込みしてください。</span>
             </div>
           `;
           return;
         }
 
-        // 各記事をカードとしてレンダリング
         let html = '';
         articles.forEach((article, index) => {
           const title = article.title || 'タイトルなし';
@@ -334,7 +452,6 @@
           const sourceName = article.source?.name || 'Unknown';
           const publishedAt = article.publishedAt ? formatDate(article.publishedAt) : '';
 
-          // 記事タイトルが長い場合の省略はCSSに任せる (word-break)
           html += `
             <div class="news-card">
               <div class="news-title">
@@ -349,21 +466,22 @@
             </div>
           `;
         });
-
         newsContainer.innerHTML = html;
       }
 
-      // 簡易的なXSS対策 (テキストのみ想定)
-      function escapeHtml(text) {
-        if (!text) return '';
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-      }
+      // ---------- APIフェッチ ----------
+      async function fetchCybersecurityNews(apiKey) {
+        // キーチェック
+        if (!apiKey || apiKey.trim().length === 0) {
+          statusMessage.innerHTML = '🔑 APIキーが設定されていません';
+          newsContainer.innerHTML = `
+            <div class="empty-message">
+              🔑 APIキーを入力して「設定」を押してください
+            </div>
+          `;
+          return;
+        }
 
-      // ---------- APIからニュースをフェッチ ----------
-      async function fetchCybersecurityNews() {
-        // ステータス更新
         statusMessage.innerHTML = '🔄 フェッチ中...';
         newsContainer.innerHTML = `
           <div class="loading">
@@ -372,33 +490,18 @@
           </div>
         `;
 
-        // URL パラメータ構築
         const params = new URLSearchParams({
           q: QUERY,
           language: LANGUAGE,
           sortBy: SORT_BY,
           pageSize: PAGE_SIZE,
-          apiKey: API_KEY,
+          apiKey: apiKey.trim(),
         });
-
-        // もしAPI_KEYがプレースホルダーのままならエラー表示
-        if (API_KEY === 'YOUR_NEWSAPI_KEY') {
-          statusMessage.innerHTML = '⚠️ APIキーが設定されていません。コード内のAPI_KEYを設定してください。';
-          newsContainer.innerHTML = `
-            <div class="empty-message" style="border-color: #aa5533;">
-              ❗ NewsAPIのキーが必要です。<br>
-              <span style="font-size:0.8rem;">https://newsapi.org/register で取得し、コード内のAPI_KEYを書き換えてください。</span>
-            </div>
-          `;
-          return;
-        }
 
         const url = `${API_BASE}?${params.toString()}`;
 
         try {
           const response = await fetch(url);
-
-          // レスポンスチェック
           if (!response.ok) {
             let errorMsg = `HTTP ${response.status}`;
             try {
@@ -409,15 +512,11 @@
           }
 
           const data = await response.json();
-
-          // status チェック (NewsAPI は status: "ok" または "error")
           if (data.status === 'error') {
             throw new Error(data.message || 'APIからエラー応答がありました');
           }
 
-          // 記事リスト
           const articles = data.articles || [];
-          // ステータス更新
           statusMessage.innerHTML = `✅ ${articles.length}件のニュースを取得 (${new Date().toLocaleTimeString()})`;
           renderNews(articles);
 
@@ -428,24 +527,63 @@
             <div class="empty-message" style="border-color: #aa5533;">
               ⚠️ データの取得に失敗しました。<br>
               <span style="font-size:0.8rem;">${escapeHtml(error.message)}</span><br>
-              <span style="font-size:0.7rem; opacity:0.5;">ネットワーク接続とAPIキーを確認してください。</span>
+              <span style="font-size:0.7rem; opacity:0.5;">APIキーが正しいか、ネットワーク接続を確認してください。</span>
             </div>
           `;
         }
       }
 
-      // ---------- 初期ロード & 更新ボタン ----------
-      document.addEventListener('DOMContentLoaded', () => {
-        // 初回フェッチ
-        fetchCybersecurityNews();
+      // ---------- メイン処理 ----------
+      function handleSetKey() {
+        const key = apiKeyInput.value.trim();
+        if (key.length === 0) {
+          alert('APIキーを入力してください。');
+          return;
+        }
+        saveKey(key);
+        statusMessage.innerHTML = '🔑 キーを設定しました。ニュースを取得します...';
+        fetchCybersecurityNews(key);
+      }
 
-        // 更新ボタン
-        const refreshBtn = document.getElementById('refreshButton');
-        refreshBtn.addEventListener('click', () => {
-          fetchCybersecurityNews();
-        });
+      function handleRefresh() {
+        const key = loadStoredKey();
+        if (!key) {
+          statusMessage.innerHTML = '🔑 先にAPIキーを設定してください';
+          newsContainer.innerHTML = `
+            <div class="empty-message">
+              🔑 APIキーを入力して「設定」を押してください
+            </div>
+          `;
+          return;
+        }
+        fetchCybersecurityNews(key);
+      }
+
+      // ---------- イベント登録 ----------
+      setKeyButton.addEventListener('click', handleSetKey);
+      refreshButton.addEventListener('click', handleRefresh);
+
+      // Enterキーでも設定できるように
+      apiKeyInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          handleSetKey();
+        }
       });
 
+      // ---------- 初期化 ----------
+      const storedKey = loadStoredKey();
+      if (storedKey) {
+        statusMessage.innerHTML = '🔑 保存済みキーを使用します。ニュースを取得中...';
+        fetchCybersecurityNews(storedKey);
+      } else {
+        statusMessage.innerHTML = '🔑 APIキーを入力して「設定」を押してください';
+        newsContainer.innerHTML = `
+          <div class="empty-message">
+            🔑 APIキーを入力して「設定」を押してください
+          </div>
+        `;
+      }
     })();
   </script>
 </body>
