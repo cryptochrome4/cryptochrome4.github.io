@@ -1,1524 +1,1663 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>ジェイソンからの脱出 - 再構築版</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>7日間サバイバル</title>
 <style>
-* { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
-body {
-    background: #0a0a1a;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
-    font-family: 'Courier New', monospace;
+* { margin:0; padding:0; box-sizing:border-box; user-select:none; -webkit-touch-callout:none; }
+body { background:#1a1a2e; display:flex; justify-content:center; align-items:center; min-height:100vh; font-family:'MS Gothic',monospace; touch-action:pan-y; }
+#gameContainer { background:#2d2d44; padding:15px; border-radius:10px; box-shadow:0 0 30px rgba(0,0,0,0.8); max-width:100%; }
+#mainArea { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
+#mapWrap { background:#1a1a2e; border:3px solid #444; border-radius:5px; padding:4px; position:relative; touch-action:none; }
+#mapCanvas { display:block; background:#2d5a27; image-rendering:pixelated; cursor:default; touch-action:none; width:320px; height:320px; }
+#infoPanel { width:220px; background:#1a1a2e; border:2px solid #444; border-radius:5px; padding:12px; color:#aaf; font-size:13px; line-height:1.7; flex-shrink:0; }
+#infoPanel .title { color:#ffcc66; font-size:15px; font-weight:bold; text-align:center; border-bottom:1px solid #444; padding-bottom:6px; margin-bottom:8px; }
+#infoPanel .stat { display:flex; justify-content:space-between; padding:2px 0; border-bottom:1px solid #333; }
+#infoPanel .stat .label { color:#99bbdd; }
+#infoPanel .stat .value { color:#ffdd99; font-weight:bold; }
+#logArea { background:#0d0d1a; border:1px solid #333; border-radius:3px; padding:4px 6px; height:90px; overflow-y:auto; font-size:12px; color:#88cc88; margin-top:6px; }
+#logArea .log-entry { border-bottom:1px solid #222; padding:1px 0; }
+#controls { display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; }
+#controls button { background:#333366; border:1px solid #555599; color:#ccd; padding:4px 12px; border-radius:3px; font-size:12px; cursor:pointer; font-family:inherit; touch-action:manipulation; }
+#controls button:hover { background:#444488; }
+#controls button:active { background:#222255; }
+#bottomBar { display:flex; justify-content:space-between; margin-top:10px; color:#88aacc; font-size:13px; padding:0 4px; flex-wrap:wrap; gap:4px; }
+#dayDisplay { color:#ffaa66; font-weight:bold; }
+#msgPopup { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:rgba(0,0,0,0.92); border:3px solid #ffcc44; border-radius:12px; padding:25px 40px; color:#fff; text-align:center; display:none; z-index:100; pointer-events:auto; min-width:200px; }
+#msgPopup h2 { color:#ffcc44; font-size:26px; margin-bottom:10px; }
+#msgPopup p { font-size:15px; color:#ddd; margin-bottom:16px; }
+#msgPopup .btn { background:#ffcc44; border:none; padding:8px 32px; border-radius:6px; font-size:16px; font-weight:bold; cursor:pointer; color:#1a1a2e; touch-action:manipulation; }
+#msgPopup .btn:hover { background:#ffdd66; }
+.night-overlay { position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,30,0.55); pointer-events:none; display:none; border-radius:3px; }
+
+/* ===== スマホ用十字キー ===== */
+#mobileControls {
+  position:absolute;
+  bottom:10px;
+  left:10px;
+  display:none;
+  z-index:50;
+  touch-action:none;
+  pointer-events:none;
 }
-#gameContainer {
-    background: #1a1a2e;
-    padding: 15px;
-    border-radius: 10px;
-    border: 2px solid #333;
+#mobileControls.active { display:block; pointer-events:auto; }
+#dpad {
+  position:relative;
+  width:130px;
+  height:130px;
+  touch-action:none;
 }
-#topPanel {
-    display: flex;
-    justify-content: space-between;
-    background: #0f0f1f;
-    padding: 6px 12px;
-    border-radius: 5px;
-    margin-bottom: 8px;
-    color: #ccc;
-    font-size: 12px;
-    flex-wrap: wrap;
-    gap: 4px;
+#dpad button {
+  position:absolute;
+  width:44px;
+  height:44px;
+  background:rgba(255,255,255,0.25);
+  border:2px solid rgba(255,255,255,0.5);
+  border-radius:8px;
+  color:#fff;
+  font-size:22px;
+  text-align:center;
+  line-height:40px;
+  cursor:pointer;
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
+  user-select:none;
+  font-weight:bold;
+  text-shadow:0 0 6px rgba(0,0,0,0.8);
 }
-#topPanel .val { color: #ffd93d; font-weight: bold; }
-#canvasWrapper {
-    position: relative;
-    border: 3px solid #2a2a4a;
-    background: #1a3a1a;
+#dpad button:active { background:rgba(255,255,255,0.5); }
+#dpad #dpad-up { top:0; left:43px; }
+#dpad #dpad-down { bottom:0; left:43px; }
+#dpad #dpad-left { top:43px; left:0; }
+#dpad #dpad-right { top:43px; right:0; }
+#dpad #dpad-center {
+  top:43px;
+  left:43px;
+  width:44px;
+  height:44px;
+  background:rgba(255,255,255,0.10);
+  border:1px solid rgba(255,255,255,0.2);
+  border-radius:50%;
+  font-size:12px;
+  line-height:44px;
+  color:rgba(255,255,255,0.3);
+  pointer-events:none;
 }
-canvas {
-    display: block;
-    width: 800px;
-    height: 600px;
-    image-rendering: pixelated;
-    background: #1a3a1a;
-    cursor: crosshair;
+
+#mobileToggle {
+  background:#444488;
+  border:1px solid #6666aa;
+  color:#ccd;
+  padding:4px 12px;
+  border-radius:3px;
+  font-size:12px;
+  cursor:pointer;
+  font-family:inherit;
+  touch-action:manipulation;
 }
-#bottomPanel {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 8px;
-    gap: 10px;
+#mobileToggle:active { background:#555599; }
+#mobileToggle.active { background:#558844; border-color:#66aa66; }
+
+/* ===== スマホ用タップクリック案内 ===== */
+#tapHint {
+  position:absolute;
+  bottom:10px;
+  right:10px;
+  color:rgba(255,255,255,0.2);
+  font-size:10px;
+  display:none;
+  pointer-events:none;
+  z-index:40;
+  text-align:right;
+  line-height:1.3;
 }
-#statusMsg {
-    color: #ff6b6b;
-    padding: 6px 10px;
-    background: #0f0f1f;
-    border-radius: 5px;
-    font-size: 13px;
-    flex: 1;
-    min-height: 30px;
-    border: 1px solid #2a2a4a;
+#tapHint.active { display:block; }
+
+/* ===== レスポンシブ ===== */
+@media (max-width:700px) {
+  #mainArea { flex-direction:column; align-items:center; }
+  #infoPanel { width:100%; max-width:320px; }
+  #mapCanvas { width:320px; height:320px; }
 }
-#statusMsg.info { color: #64d8ff; }
-#statusMsg.success { color: #69db7c; }
-#inventoryDisplay {
-    color: #a8e6cf;
-    font-size: 12px;
-    background: #0f0f1f;
-    padding: 4px 10px;
-    border-radius: 3px;
-    border: 1px solid #2a2a4a;
-    min-width: 80px;
-    text-align: center;
-}
-#gameOverlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0,0,0,0.85);
-    display: none;
-    justify-content: center;
-    align-items: center;
-    flex-direction: column;
-    color: white;
-    z-index: 10;
-}
-#gameOverlay.show { display: flex; }
-#gameOverlay .title { font-size: 32px; margin-bottom: 10px; }
-#gameOverlay .sub { font-size: 18px; color: #aaa; margin-bottom: 20px; }
-#gameOverlay button {
-    background: #4a4a6a;
-    color: white;
-    border: 2px solid #6a6a8a;
-    padding: 10px 30px;
-    font-family: 'Courier New', monospace;
-    font-size: 16px;
-    cursor: pointer;
-}
-#gameOverlay button:hover { background: #5a5a8a; }
-.minimap {
-    display: grid;
-    grid-template-columns: repeat(3, 26px);
-    grid-template-rows: repeat(3, 26px);
-    gap: 2px;
-    background: #0f0f1f;
-    padding: 4px;
-    border-radius: 5px;
-    border: 1px solid #2a2a4a;
-    flex-shrink: 0;
-}
-.minimap-cell {
-    background: #1a3a1a;
-    border: 1px solid #2a2a4a;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 7px;
-    color: #444;
-    position: relative;
-    cursor: pointer;
-}
-.minimap-cell.current { border: 2px solid #ffd93d; }
-.minimap-cell.has-jason { background: #4a0a0a; }
-.minimap-cell .dot {
-    width: 4px;
-    height: 4px;
-    border-radius: 50%;
-    position: absolute;
-}
-.minimap-cell .dot.player { background: #ff6b6b; top: 2px; left: 2px; }
-.minimap-cell .dot.jason { 
-    background: #ff0000; bottom: 2px; right: 2px;
-    animation: pulse 0.5s infinite;
-}
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.3; }
-}
-.arrow-btn {
-    position: absolute;
-    background: rgba(255,255,255,0.08);
-    border: 2px solid rgba(255,255,255,0.2);
-    color: white;
-    font-size: 20px;
-    width: 44px;
-    height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    border-radius: 5px;
-    z-index: 5;
-    transition: 0.2s;
-}
-.arrow-btn:hover { background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.4); }
-.arrow-btn.hidden { display: none; }
-.arrow-btn.top { top: 10px; left: 50%; transform: translateX(-50%); }
-.arrow-btn.bottom { bottom: 10px; left: 50%; transform: translateX(-50%); }
-.arrow-btn.left { left: 10px; top: 50%; transform: translateY(-50%); }
-.arrow-btn.right { right: 10px; top: 50%; transform: translateY(-50%); }
-#stageLabel {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    background: rgba(0,0,0,0.7);
-    color: #ffd93d;
-    padding: 4px 12px;
-    border-radius: 5px;
-    font-size: 13px;
-    z-index: 5;
-    border: 1px solid #ffd93d33;
+@media (max-width:400px) {
+  #mapCanvas { width:280px; height:280px; }
+  #dpad { width:110px; height:110px; }
+  #dpad button { width:36px; height:36px; font-size:18px; line-height:34px; }
+  #dpad #dpad-up { left:37px; }
+  #dpad #dpad-down { left:37px; }
+  #dpad #dpad-left { top:37px; }
+  #dpad #dpad-right { top:37px; }
+  #dpad #dpad-center { top:37px; left:37px; width:36px; height:36px; line-height:36px; font-size:10px; }
+  #infoPanel { font-size:12px; padding:8px; }
 }
 </style>
 </head>
 <body>
 <div id="gameContainer">
-    <div id="topPanel">
-        <span>日 <span class="val" id="dayDisplay">1</span>/7</span>
-        <span><span class="val" id="phaseDisplay">朝</span></span>
-        <span>補強 <span class="val" id="defenseDisplay">0</span></span>
-        <span id="inventoryDisplay">[ なし ]</span>
-        <span><span class="val" id="stageDisplay">中央</span></span>
-        <span>木 <span class="val" id="woodDisplay">0</span>/20</span>
-    </div>
-    <div id="canvasWrapper">
-        <canvas id="gameCanvas" width="800" height="600"></canvas>
-        <div id="stageLabel">ステージ: <span id="stageNameLabel">中央</span></div>
-        <div class="arrow-btn top" id="arrowUp">▲</div>
-        <div class="arrow-btn bottom" id="arrowDown">▼</div>
-        <div class="arrow-btn left" id="arrowLeft">◄</div>
-        <div class="arrow-btn right" id="arrowRight">►</div>
-        <div id="gameOverlay">
-            <div class="title" id="resultTitle">ゲームオーバー</div>
-            <div class="sub" id="resultSub">ジェイソンにやられた...</div>
-            <button id="restartBtn">[ やり直す ]</button>
-        </div>
-    </div>
-    <div id="bottomPanel">
-        <div id="statusMsg">> クリックでアイテム取得 | 矢印で移動</div>
-        <div class="minimap" id="minimap"></div>
-    </div>
+<div id="mainArea">
+<div id="mapWrap">
+<canvas id="mapCanvas" width="320" height="320"></canvas>
+<div class="night-overlay" id="nightOverlay"></div>
+<div id="msgPopup">
+<h2 id="popupTitle"></h2>
+<p id="popupDesc"></p>
+<button class="btn" id="popupBtn">OK</button>
+</div>
+
+<!-- スマホ用十字キー -->
+<div id="mobileControls">
+<div id="dpad">
+<button id="dpad-up">▲</button>
+<button id="dpad-down">▼</button>
+<button id="dpad-left">◀</button>
+<button id="dpad-right">▶</button>
+<div id="dpad-center">✚</div>
+</div>
+</div>
+<div id="tapHint">タップでクリック</div>
+</div>
+
+<div id="infoPanel">
+<div class="title">📋 情報パネル</div>
+<div class="stat"><span class="label">📅 日数</span><span class="value" id="dispDay">1 / 7</span></div>
+<div class="stat"><span class="label">🔰 補強ポイント</span><span class="value" id="dispPoints">0</span></div>
+<div class="stat"><span class="label">📦 所持アイテム</span><span class="value" id="dispItem">なし</span></div>
+<div class="stat"><span class="label">👥 生存モブ</span><span class="value" id="dispMobAlive">8 / 8</span></div>
+<div id="logArea"><div style="color:#667;font-size:11px;">— ログ —</div></div>
+<div id="controls">
+<button id="btnDrop">📤 落とす</button>
+<button id="mobileToggle">📱 スマホ操作</button>
+</div>
+</div>
+</div>
+<div id="bottomBar">
+<span id="dayDisplay">🌅 1日目 (30秒)</span>
+<span>⬆⬇⬅➡ 移動</span>
+</div>
 </div>
 
 <script>
 // ============================================================
-// ゼロから作り直し - シンプルで堅牢に
+// 7日間サバイバルゲーム (完全版)
+// ・品クールダウン5秒
+// ・狼から逃げるジェイソン＆熊
+// ・納品アイテムは3日後に復活 (品1〜8除く)
+// ・斧・銃は画像表示
+// ・スマホ用十字キー＋タップクリック
 // ============================================================
 
-console.log('ゲーム起動');
+(function(){
+"use strict";
 
-// ===== 定数 =====
-const CELL = 40;
-const COLS = 20;
-const ROWS = 15;
-const STAGE_NAMES = ['左上','上','右上','左','小屋','右','左下','下','右下','家の中'];
+var BLOCK_SIZE = 32;
+var GRID_SIZE = 10;
+var CANVAS_SIZE = 320;
+var DAY_DURATION = 30;
+var MAX_DAYS = 7;
 
-// ===== ステージマップ =====
-function createMaps() {
-    const maps = [];
-    for(let i=0; i<9; i++) {
-        maps.push(Array(ROWS).fill().map(() => Array(COLS).fill(0)));
-    }
-    // 中央(4)に小屋
-    for(let r=5; r<=9; r++) {
-        for(let c=7; c<=11; c++) {
-            maps[4][r][c] = 1;
-        }
-    }
-    // 倉庫 (8ブロック)
-    for(let i=0; i<8; i++) {
-        const col = 6 + (i % 4);
-        const row = 10 + Math.floor(i / 4);
-        maps[4][row][col] = 2;
-    }
-    // ドア
-    maps[4][9][9] = 3;
-    maps[4][9][10] = 3;
-    
-    // 家の中(9)
-    const house = Array(ROWS).fill().map(() => Array(COLS).fill(0));
-    for(let r=4; r<=10; r++) {
-        for(let c=6; c<=13; c++) {
-            house[r][c] = 1;
-        }
-    }
-    house[7][10] = 4; // タンス
-    house[8][8] = 5;  // ベッド
-    house[5][7] = 6;  // 窓
-    house[5][12] = 6; // 窓
-    house[10][9] = 3; // ドア
-    house[10][10] = 3;
-    maps.push(house);
-    return maps;
-}
-
-// ===== ゲーム状態 =====
-const G = {
-    maps: null,
-    day: 1,
-    phase: 0,
-    phaseTimer: 0,
-    defense: 0,
-    woodCount: 0,
-    maxWood: 20,
-    inventory: null,
-    currentStage: 4,
-    gameOver: false,
-    ended: false,
-    
-    player: { x: 400, y: 300, stage: 4, speed: 3 },
-    mouseX: 400,
-    mouseY: 300,
-    
-    jason: { x: 50, y: 50, stage: 0, speed: 1 },
-    jasonSpeed: 1,
-    jasonTimer: 0,
-    
-    // 補強フラグ
-    windowReinforced: false,
-    trapSet: false,
-    wolfFed: false,
-    gunStored: false,
-    axeStored: false,
-    reinforcedBlocks: 0,
-    woodInWarehouse: 0,
-    
-    // アイテム
-    items: {},
-    trees: {},
-    wolves: {},
-    characters: {},
-    bear: null,
-    
-    frame: 0
+var IMG_FILES = {
+  '加藤': 'img154streamer.jpg',
+  '松本': 'img155streamer.jpg',
+  '坪池': 'img156streamer.jpg',
+  '市川': 'img157youtuber.jpg',
+  '青笹': 'img158nontitle.jpg',
+  '角田': 'img159streamer.jpg',
+  '木元': 'img160artist.jpg',
+  '山崎': 'img161streamer.jpg',
+  '紅葉': 'img162feat.jpg',
+  'ジェイソン': 'img163enemy.jpg',
+  '熊': 'img164bear.jpg',
+  '狼': 'img165wolf.jpg',
+  '斧': 'img166axe.jpg',
+  '銃': 'img167gun.jpg'
 };
 
-// ===== ユーティリティ =====
-function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
-function dist(a, b) { return Math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2); }
-function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+var CHARACTERS = {
+  '加藤': { speed: 40, img: '加藤' },
+  '松本': { speed: 60, img: '松本' },
+  '坪池': { speed: 70, img: '坪池' },
+  '市川': { speed: 30, img: '市川' },
+  '青笹': { speed: 80, img: '青笹' },
+  '角田': { speed: 20, img: '角田' },
+  '木元': { speed: 50, img: '木元' },
+  '山崎': { speed: 10, img: '山崎' },
+  '紅葉': { speed: 70, img: '紅葉' },
+  'ジェイソン': { speed: 10, img: 'ジェイソン' },
+  '熊': { speed: 50, img: '熊' },
+  '狼': { speed: 40, img: '狼' }
+};
 
-// ===== 衝突判定 =====
-function isBlocked(x, y, stage, size) {
-    const half = size || 18;
-    if(x - half < 0 || x + half > 800 || y - half < 0 || y + half > 600) return true;
-    const map = G.maps[stage];
-    const col = Math.floor(x / CELL);
-    const row = Math.floor(y / CELL);
-    if(col < 0 || col >= COLS || row < 0 || row >= ROWS) return true;
-    if(map[row] && map[row][col] === 1) return true;
-    if(map[row] && map[row][col] === 2) return true;
-    if(map[row] && map[row][col] === 3) return true;
-    if(map[row] && map[row][col] === 4) return true;
-    if(map[row] && map[row][col] === 5) return true;
-    // 木
-    const trees = G.trees[stage] || [];
-    for(let tree of trees) {
-        if(Math.abs(x - tree.x) < 20 + half && Math.abs(y - tree.y) < 20 + half) {
-            return true;
-        }
+var MOB_NAMES = ['加藤','松本','坪池','市川','青笹','角田','木元','山崎'];
+var HERO_NAME = '紅葉';
+
+// 品番号 → 森ブロックID マッピング (0=森8, 1=森7, 2=森6, 3=森5, 4=小屋, 5=森4, 6=森3, 7=森2, 8=森1)
+var ITEM_BLOCK_MAP = [8,7,6,5,3,2,1,0];
+
+var imageCache = {};
+var imagesLoaded = 0;
+var totalImages = 0;
+
+function loadImages(callback) {
+  var names = [];
+  for (var key in IMG_FILES) {
+    if (IMG_FILES.hasOwnProperty(key)) {
+      names.push(key);
     }
-    return false;
-}
+  }
+  totalImages = names.length;
+  imagesLoaded = 0;
 
-function tryMove(obj, dx, dy, stage) {
-    const size = obj.size || 18;
-    if(!isBlocked(obj.x + dx, obj.y, stage, size)) {
-        obj.x += dx;
-    }
-    if(!isBlocked(obj.x, obj.y + dy, stage, size)) {
-        obj.y += dy;
-    }
-    obj.x = clamp(obj.x, 20, 780);
-    obj.y = clamp(obj.y, 20, 580);
-}
-
-// ===== 木の配置 =====
-function createTrees() {
-    const trees = {};
-    for(let stage=0; stage<9; stage++) {
-        const list = [];
-        const count = stage === 4 ? 3 : 6 + rand(0, 3);
-        for(let i=0; i<count; i++) {
-            let x, y, ok;
-            let attempts = 0;
-            do {
-                x = 30 + Math.random() * 740;
-                y = 30 + Math.random() * 540;
-                ok = true;
-                if(stage === 4) {
-                    if(x > 280 && x < 480 && y > 200 && y < 400) ok = false;
-                    if(x > 280 && x < 440 && y > 400 && y < 480) ok = false;
-                }
-                for(let t of list) {
-                    if(Math.abs(t.x - x) < 50 && Math.abs(t.y - y) < 50) ok = false;
-                }
-                attempts++;
-            } while(!ok && attempts < 30);
-            if(ok) list.push({x: x, y: y});
-        }
-        trees[stage] = list;
-    }
-    trees[9] = [];
-    return trees;
-}
-
-// ===== アイテム配置 =====
-function createItems() {
-    const items = {};
-    for(let stage=0; stage<9; stage++) {
-        const list = [];
-        const cells = [];
-        for(let r=0; r<ROWS; r++) {
-            for(let c=0; c<COLS; c++) {
-                if(G.maps[stage][r][c] === 0) {
-                    cells.push({x: c*CELL + CELL/2, y: r*CELL + CELL/2});
-                }
-            }
-        }
-        // シャッフル
-        for(let i=cells.length-1; i>0; i--) {
-            const j = rand(0, i);
-            [cells[i], cells[j]] = [cells[j], cells[i]];
-        }
-        const woodCount = [3,3,3,3,0,2,2,2,2][stage];
-        let idx = 0;
-        for(let i=0; i<woodCount && i<cells.length; i++) {
-            list.push({
-                x: cells[idx].x,
-                y: cells[idx].y,
-                type: '木材',
-                collected: false,
-                respawnDay: 0
-            });
-            idx++;
-        }
-        const specials = ['スコップ', '狼の餌', '銃', '斧'];
-        for(let s of specials) {
-            if(idx < cells.length) {
-                list.push({
-                    x: cells[idx].x,
-                    y: cells[idx].y,
-                    type: s,
-                    collected: false,
-                    respawnDay: 0
-                });
-                idx++;
-            }
-        }
-        items[stage] = list;
-    }
-    items[9] = [];
-    return items;
-}
-
-// ===== 狼の配置 =====
-function createWolves() {
-    const wolves = {};
-    for(let stage=0; stage<9; stage++) {
-        if(stage === 4) { wolves[stage] = []; continue; }
-        const cells = [];
-        for(let r=0; r<ROWS; r++) {
-            for(let c=0; c<COLS; c++) {
-                if(G.maps[stage][r][c] === 0) {
-                    cells.push({x: c*CELL + CELL/2, y: r*CELL + CELL/2});
-                }
-            }
-        }
-        const list = [];
-        const count = rand(0, 1);
-        for(let i=0; i<count && cells.length>0; i++) {
-            const idx = rand(0, cells.length-1);
-            list.push({
-                x: cells[idx].x,
-                y: cells[idx].y,
-                speed: 40,
-                isFed: false,
-                alive: true,
-                targetX: cells[idx].x,
-                targetY: cells[idx].y,
-                moveTimer: rand(0, 30)
-            });
-            cells.splice(idx, 1);
-        }
-        wolves[stage] = list;
-    }
-    wolves[9] = [];
-    return wolves;
-}
-
-// ===== キャラクター =====
-function createCharacters() {
-    const names = ['坪池','加藤','山崎','松本','角田','木元','市川','青笹'];
-    const colors = ['#e74c3c','#3498db','#2ecc71','#9b59b6','#f39c12','#1abc9c','#e67e22','#2e86de'];
-    const chars = {};
-    names.forEach((name, i) => {
-        chars[name] = {
-            x: 200 + i * 50 + rand(-20, 20),
-            y: 200 + Math.floor(i/4) * 80 + rand(-20, 20),
-            stage: 4,
-            speed: [70,40,10,60,20,50,30,80][i],
-            color: colors[i],
-            alive: true,
-            actionTimer: rand(0, 30),
-            targetX: 400,
-            targetY: 300
-        };
-    });
-    return chars;
-}
-
-// ===== 初期化 =====
-function initGame() {
-    console.log('初期化開始');
-    G.maps = createMaps();
-    G.trees = createTrees();
-    G.items = createItems();
-    G.wolves = createWolves();
-    G.characters = createCharacters();
-    
-    // 熊
-    const bearStage = rand(0, 8);
-    while(bearStage === 4) bearStage = rand(0, 8);
-    G.bear = {
-        stage: bearStage,
-        x: rand(50, 750),
-        y: rand(50, 550),
-        speed: 60,
-        isHungry: false,
-        alive: true,
-        hungryDays: new Set(),
-        moveTimer: 0,
-        targetX: rand(50, 750),
-        targetY: rand(50, 550)
+  for (var i = 0; i < names.length; i++) {
+    var name = names[i];
+    var img = new Image();
+    img.onload = function() {
+      imagesLoaded++;
+      if (imagesLoaded >= totalImages) { callback(); }
     };
-    while(G.bear.hungryDays.size < 2) {
-        G.bear.hungryDays.add(rand(1, 7));
-    }
-    
-    G.player.x = 400;
-    G.player.y = 300;
-    G.player.stage = 4;
-    G.mouseX = 400;
-    G.mouseY = 300;
-    
-    G.jason.stage = rand(0, 8);
-    while(G.jason.stage === 4) G.jason.stage = rand(0, 8);
-    G.jason.x = rand(50, 750);
-    G.jason.y = rand(50, 550);
-    G.jason.speed = 1;
-    G.jasonSpeed = 1;
-    G.jasonTimer = 0;
-    
-    G.day = 1;
-    G.phase = 0;
-    G.phaseTimer = 0;
-    G.defense = 0;
-    G.woodCount = 0;
-    G.inventory = null;
-    G.currentStage = 4;
-    G.windowReinforced = false;
-    G.trapSet = false;
-    G.wolfFed = false;
-    G.gunStored = false;
-    G.axeStored = false;
-    G.reinforcedBlocks = 0;
-    G.woodInWarehouse = 0;
-    G.gameOver = false;
-    G.ended = false;
-    G.frame = 0;
-    
-    document.getElementById('gameOverlay').classList.remove('show');
-    updateUI();
-    updateMinimap();
-    updateArrows();
-    document.getElementById('statusMsg').textContent = '> ゲームスタート！';
-    document.getElementById('statusMsg').className = 'info';
-    console.log('初期化完了');
+    img.onerror = function() {
+      imagesLoaded++;
+      if (imagesLoaded >= totalImages) { callback(); }
+    };
+    img.src = IMG_FILES[name];
+    imageCache[name] = img;
+  }
 }
 
-// ===== フェーズ更新 =====
-function updatePhase() {
-    G.phaseTimer++;
-    if(G.phaseTimer >= 30) {
-        G.phaseTimer = 0;
-        G.phase = (G.phase + 1) % 3;
-        if(G.phase === 0) {
-            G.day++;
-            if(G.day > 7) { endGame(); return; }
-            G.jasonSpeed = Math.min(7, 1 + (G.day-1) * 1);
-            G.jason.speed = G.jasonSpeed;
-            // アイテム復活
-            for(let stage in G.items) {
-                for(let item of G.items[stage]) {
-                    if(item.collected && item.respawnDay > 0 && G.day >= item.respawnDay) {
-                        item.collected = false;
-                        item.respawnDay = 0;
-                    }
-                }
-            }
-            // 熊の空腹
-            if(G.bear) {
-                G.bear.isHungry = G.bear.hungryDays.has(G.day);
-            }
-            updateUI();
-        }
-        const phaseNames = ['朝', '昼', '夜'];
-        document.getElementById('phaseDisplay').textContent = phaseNames[G.phase];
-        document.getElementById('dayDisplay').textContent = G.day;
-    }
+function getImage(name) {
+  var img = imageCache[name];
+  if (img && img.complete && img.naturalWidth > 0) return img;
+  return null;
 }
 
-// ===== ジェイソン =====
-function updateJason() {
-    if(G.gameOver || G.ended) return;
-    const jason = G.jason;
-    const player = G.player;
-    
-    G.jasonTimer++;
-    if(G.jasonTimer > 40 + rand(0, 40)) {
-        G.jasonTimer = 0;
-        const current = jason.stage;
-        const row = Math.floor(current / 3);
-        const col = current % 3;
-        const neighbors = [current];
-        if(row > 0) neighbors.push(current - 3);
-        if(row < 2) neighbors.push(current + 3);
-        if(col > 0) neighbors.push(current - 1);
-        if(col < 2) neighbors.push(current + 1);
-        if(current === 4) neighbors.push(9);
-        if(current === 9) neighbors.push(4);
-        
-        if(neighbors.includes(player.stage) && Math.random() < 0.35) {
-            jason.stage = player.stage;
-        } else {
-            jason.stage = neighbors[rand(0, neighbors.length-1)];
-        }
-        jason.x = rand(50, 750);
-        jason.y = rand(50, 550);
-    }
-    
-    if(jason.stage === player.stage && player.alive) {
-        const dx = player.x - jason.x;
-        const dy = player.y - jason.y;
-        const d = Math.sqrt(dx*dx + dy*dy);
-        if(d > 20) {
-            const speed = jason.speed * 0.12;
-            const mx = (dx/d) * Math.min(speed, d);
-            const my = (dy/d) * Math.min(speed, d);
-            tryMove(jason, mx, my, jason.stage);
-        }
-        if(d < 25) {
-            gameOver(false, 'ジェイソンに捕まった');
-        }
-    }
+var state = {
+  day: 1,
+  dayElapsed: 0,
+  points: 0,
+  gameOver: false,
+  gameWon: false,
+  paused: false,
+  night: false,
+  hero: null,
+  mobs: [],
+  jason: null,
+  bear: null,
+  wolf: null,
+  items: [],
+  objects: [],
+  heroItem: null,
+  mobAlive: 8,
+  blockMap: [],
+  currentBlock: 4,
+  logs: [],
+  jasonPoints: 0,
+  bearAttackDays: [],
+  dayStartTime: 0,
+  animFrame: null,
+  dayTimerInterval: null,
+  frameCount: 0,
+  jasonKillCooldown: 0,
+  bearKillCooldown: 0,
+  isGameLoopRunning: false,
+  // ★ 納品アイテム復活用
+  pendingRespawn: []
+};
+
+var canvas = document.getElementById('mapCanvas');
+var ctx = canvas.getContext('2d');
+var nightOverlay = document.getElementById('nightOverlay');
+var popup = document.getElementById('msgPopup');
+var popupTitle = document.getElementById('popupTitle');
+var popupDesc = document.getElementById('popupDesc');
+var popupBtn = document.getElementById('popupBtn');
+var dispDay = document.getElementById('dispDay');
+var dispPoints = document.getElementById('dispPoints');
+var dispItem = document.getElementById('dispItem');
+var dispMobAlive = document.getElementById('dispMobAlive');
+var logArea = document.getElementById('logArea');
+var dayDisplay = document.getElementById('dayDisplay');
+var btnDrop = document.getElementById('btnDrop');
+var mobileToggle = document.getElementById('mobileToggle');
+var mobileControls = document.getElementById('mobileControls');
+var tapHint = document.getElementById('tapHint');
+
+function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+function addLog(msg) {
+  state.logs.unshift(msg);
+  if (state.logs.length > 50) state.logs.pop();
+  renderLog();
 }
 
-// ===== プレイヤー =====
-function updatePlayer() {
-    if(G.gameOver || G.ended) return;
-    const player = G.player;
-    const dx = G.mouseX - player.x;
-    const dy = G.mouseY - player.y;
-    const d = Math.sqrt(dx*dx + dy*dy);
-    if(d > 5) {
-        const speed = player.speed * 0.12;
-        const mx = (dx/d) * Math.min(speed, d);
-        const my = (dy/d) * Math.min(speed, d);
-        tryMove(player, mx, my, player.stage);
-    }
+function renderLog() {
+  var html = '<div style="color:#667;font-size:11px;">— ログ —</div>';
+  for (var i = 0; i < Math.min(state.logs.length, 12); i++) {
+    html += '<div class="log-entry">' + state.logs[i] + '</div>';
+  }
+  logArea.innerHTML = html;
 }
 
-// ===== モブ =====
+var BLOCK_NAMES = ['森8','森7','森6','森5','小屋','森4','森3','森2','森1'];
+
+function blockToGrid(blockId) {
+  return { row: Math.floor(blockId / 3), col: blockId % 3 };
+}
+
+function gridToBlock(row, col) {
+  if (row < 0 || row > 2 || col < 0 || col > 2) return -1;
+  return row * 3 + col;
+}
+
+function moveCharacter(entity, dx, dy) {
+  if (!entity || !entity.alive) return false;
+
+  var nx = entity.x + dx;
+  var ny = entity.y + dy;
+
+  if (nx >= 0 && nx < GRID_SIZE && ny >= 0 && ny < GRID_SIZE) {
+    if (state.blockMap[entity.blockId] && state.blockMap[entity.blockId][ny] &&
+        state.blockMap[entity.blockId][ny][nx] === 'tree') {
+      return false;
+    }
+    entity.x = nx;
+    entity.y = ny;
+    return true;
+  }
+
+  var g = blockToGrid(entity.blockId);
+  var newRow = g.row;
+  var newCol = g.col;
+  var newX = nx;
+  var newY = ny;
+
+  if (nx < 0) { newCol--; newX = GRID_SIZE - 1; }
+  else if (nx >= GRID_SIZE) { newCol++; newX = 0; }
+  else if (ny < 0) { newRow--; newY = GRID_SIZE - 1; }
+  else if (ny >= GRID_SIZE) { newRow++; newY = 0; }
+
+  var newBlock = gridToBlock(newRow, newCol);
+  if (newBlock < 0 || newBlock > 8) return false;
+
+  if (state.blockMap[newBlock] && state.blockMap[newBlock][newY] &&
+      state.blockMap[newBlock][newY][newX] === 'tree') {
+    return false;
+  }
+
+  entity.blockId = newBlock;
+  entity.x = newX;
+  entity.y = newY;
+
+  if (entity === state.hero) {
+    state.currentBlock = newBlock;
+  }
+
+  return true;
+}
+
+// ---- 初期化 ----
+function initGame() {
+  if (state.animFrame) { cancelAnimationFrame(state.animFrame); state.animFrame = null; }
+  if (state.dayTimerInterval) { clearInterval(state.dayTimerInterval); state.dayTimerInterval = null; }
+
+  state.day = 1;
+  state.dayElapsed = 0;
+  state.points = 0;
+  state.gameOver = false;
+  state.gameWon = false;
+  state.night = false;
+  state.heroItem = null;
+  state.mobAlive = 8;
+  state.logs = [];
+  state.jasonPoints = 0;
+  state.items = [];
+  state.objects = [];
+  state.jasonKillCooldown = 0;
+  state.bearKillCooldown = 0;
+  state.currentBlock = 4;
+  state.isGameLoopRunning = true;
+  state.frameCount = 0;
+  state.pendingRespawn = [];
+
+  var days = [1,2,3,4,5,6,7];
+  state.bearAttackDays = [];
+  var shuffled = days.slice();
+  for (var i = shuffled.length - 1; i > 0; i--) {
+    var j = rand(0, i);
+    var tmp = shuffled[i];
+    shuffled[i] = shuffled[j];
+    shuffled[j] = tmp;
+  }
+  state.bearAttackDays = shuffled.slice(0, 2);
+  addLog('🐻 熊の襲撃日: ' + state.bearAttackDays.join(', ') + '日目');
+
+  state.jasonPoints = rand(15, 20);
+  addLog('🔪 ジェイソンポイント: ' + state.jasonPoints);
+
+  state.blockMap = [];
+  for (var b = 0; b < 9; b++) {
+    state.blockMap[b] = [];
+    for (var y = 0; y < GRID_SIZE; y++) {
+      state.blockMap[b][y] = [];
+      for (var x = 0; x < GRID_SIZE; x++) {
+        state.blockMap[b][y][x] = null;
+      }
+    }
+  }
+
+  for (var b2 = 0; b2 < 9; b2++) {
+    if (b2 === 4) continue;
+    for (var t = 0; t < 3; t++) {
+      var tx, ty;
+      var attempts = 0;
+      do {
+        tx = rand(0, 8);
+        ty = rand(0, 8);
+        attempts++;
+      } while (attempts < 50 && state.blockMap[b2][ty][tx] !== null);
+      if (state.blockMap[b2][ty][tx] === null) {
+        state.blockMap[b2][ty][tx] = 'tree';
+        if (ty + 1 < GRID_SIZE && state.blockMap[b2][ty+1][tx] === null) {
+          state.blockMap[b2][ty+1][tx] = 'tree';
+        }
+      }
+    }
+  }
+
+  state.hero = {
+    name: HERO_NAME,
+    x: rand(3, 6),
+    y: rand(3, 6),
+    blockId: 4,
+    speed: CHARACTERS[HERO_NAME].speed,
+    img: CHARACTERS[HERO_NAME].img,
+    alive: true
+  };
+
+  var mobPositions = [
+    {x:1,y:1},{x:8,y:1},{x:1,y:8},{x:8,y:8},
+    {x:2,y:0},{x:7,y:0},{x:0,y:2},{x:0,y:7}
+  ];
+  state.mobs = [];
+  var shuffledMobs = MOB_NAMES.slice();
+  for (var mi = shuffledMobs.length - 1; mi > 0; mi--) {
+    var mj = rand(0, mi);
+    var mt = shuffledMobs[mi];
+    shuffledMobs[mi] = shuffledMobs[mj];
+    shuffledMobs[mj] = mt;
+  }
+  for (var mi2 = 0; mi2 < 8; mi2++) {
+    var pos = mobPositions[mi2 % mobPositions.length];
+    var mob = {
+      name: shuffledMobs[mi2],
+      x: pos.x,
+      y: pos.y,
+      blockId: 4,
+      speed: CHARACTERS[shuffledMobs[mi2]].speed,
+      img: CHARACTERS[shuffledMobs[mi2]].img,
+      alive: true,
+      taskId: mi2,
+      hasDelivered: false,
+      targetX: null,
+      targetY: null,
+      targetBlock: null,
+      state: 'idle',
+      moveCooldown: 0
+    };
+    state.mobs.push(mob);
+  }
+
+  var jasonBlock = rand(0, 8);
+  if (jasonBlock === 4) jasonBlock = 0;
+  state.jason = {
+    name: 'ジェイソン',
+    x: rand(0, 9),
+    y: rand(0, 9),
+    blockId: jasonBlock,
+    speed: 10,
+    img: 'ジェイソン',
+    alive: true,
+    moveCooldown: 0
+  };
+
+  var bearBlock = rand(0, 8);
+  if (bearBlock === 4) bearBlock = 1;
+  state.bear = {
+    name: '熊',
+    x: rand(0, 9),
+    y: rand(0, 9),
+    blockId: bearBlock,
+    speed: 50,
+    img: '熊',
+    alive: true,
+    moveCooldown: 0
+  };
+
+  var wolfBlock = rand(0, 8);
+  if (wolfBlock === 4) wolfBlock = 2;
+  state.wolf = {
+    name: '狼',
+    x: rand(0, 9),
+    y: rand(0, 9),
+    blockId: wolfBlock,
+    speed: 40,
+    img: '狼',
+    alive: true,
+    moveCooldown: 0
+  };
+
+  state.objects = [
+    { type: '樽', x: 6, y: 4, blockId: 4, used: false, cooldown: 0 },
+    { type: '箱', x: 7, y: 4, blockId: 4, used: false, cooldown: 0 },
+    { type: '品', x: 3, y: 5, blockId: 4, used: false, cooldown: 0 },
+    { type: '窓', x: 5, y: 5, blockId: 4, used: false, cooldown: 0 },
+    { type: '穴', x: 7, y: 7, blockId: 4, used: false, cooldown: 0 }
+  ];
+
+  spawnItems();
+
+  for (var m = 0; m < state.mobs.length; m++) {
+    assignMobTask(state.mobs[m]);
+  }
+
+  updateUI();
+  renderLog();
+  addLog('🌅 ゲーム開始！ 7日間逃げ切れ！');
+
+  state.dayStartTime = Date.now();
+  startDayTimer();
+
+  if (state.animFrame) cancelAnimationFrame(state.animFrame);
+  state.isGameLoopRunning = true;
+  gameLoop();
+}
+
+// ---- アイテム生成 ----
+function spawnItems() {
+  state.items = [];
+  var itemTypes = ['材','斧','銃','餌','堀'];
+
+  // 品1〜品8 (モブ用) … 森1→品1, 森2→品2, …
+  for (var i = 0; i < 8; i++) {
+    var bid = ITEM_BLOCK_MAP[i];
+    state.items.push({
+      name: '品' + (i + 1),
+      x: rand(0, 9),
+      y: rand(0, 9),
+      blockId: bid
+    });
+  }
+
+  // 品10〜品80 (主人公用) … 森1→品10, 森2→品20, …
+  for (var i = 0; i < 8; i++) {
+    var bid2 = ITEM_BLOCK_MAP[i];
+    state.items.push({
+      name: '品' + ((i + 1) * 10),
+      x: rand(0, 9),
+      y: rand(0, 9),
+      blockId: bid2
+    });
+  }
+
+  // 材・斧・銃・餌・堀 (全ブロックランダム)
+  var allBlocks = [0,1,2,3,4,5,6,7,8];
+  for (var ti = 0; ti < itemTypes.length; ti++) {
+    var bid3 = allBlocks[rand(0, allBlocks.length - 1)];
+    state.items.push({
+      name: itemTypes[ti],
+      x: rand(0, 9),
+      y: rand(0, 9),
+      blockId: bid3
+    });
+  }
+}
+
+// ---- モブタスク ----
+function assignMobTask(mob) {
+  if (!mob.alive || mob.hasDelivered) return;
+  var targetName = '品' + (mob.taskId + 1);
+  var targetItem = null;
+  for (var i = 0; i < state.items.length; i++) {
+    if (state.items[i].name === targetName) {
+      targetItem = state.items[i];
+      break;
+    }
+  }
+  if (targetItem) {
+    mob.targetX = targetItem.x;
+    mob.targetY = targetItem.y;
+    mob.targetBlock = targetItem.blockId;
+    mob.state = 'moving_to_item';
+  } else {
+    mob.state = 'idle';
+  }
+}
+
+function getDirectionToBlock(entity, targetBlock) {
+  var current = blockToGrid(entity.blockId);
+  var target = blockToGrid(targetBlock);
+  var dr = target.row - current.row;
+  var dc = target.col - current.col;
+  if (dr === 0 && dc === 0) return null;
+  if (dc < 0 && entity.x === 0) return { dx: -1, dy: 0 };
+  if (dc > 0 && entity.x === GRID_SIZE - 1) return { dx: 1, dy: 0 };
+  if (dr < 0 && entity.y === 0) return { dx: 0, dy: -1 };
+  if (dr > 0 && entity.y === GRID_SIZE - 1) return { dx: 0, dy: 1 };
+  if (dc < 0) return { dx: -1, dy: 0 };
+  if (dc > 0) return { dx: 1, dy: 0 };
+  if (dr < 0) return { dx: 0, dy: -1 };
+  if (dr > 0) return { dx: 0, dy: 1 };
+  return null;
+}
+
+function getObjectAt(blockId, x, y, type) {
+  for (var i = 0; i < state.objects.length; i++) {
+    var o = state.objects[i];
+    if (o.blockId === blockId && o.x === x && o.y === y && o.type === type) return o;
+  }
+  return null;
+}
+
+// ---- モブAI ----
 function updateMobs() {
-    if(G.gameOver || G.ended) return;
-    for(let name in G.characters) {
-        const char = G.characters[name];
-        if(!char.alive) continue;
-        if(char.stage === 9) { char.stage = 4; continue; }
-        char.actionTimer++;
-        if(char.actionTimer > 30 + rand(0, 20)) {
-            char.actionTimer = 0;
-            if(Math.random() < 0.3) {
-                const current = char.stage;
-                const row = Math.floor(current / 3);
-                const col = current % 3;
-                const neighbors = [current];
-                if(row > 0) neighbors.push(current - 3);
-                if(row < 2) neighbors.push(current + 3);
-                if(col > 0) neighbors.push(current - 1);
-                if(col < 2) neighbors.push(current + 1);
-                char.stage = neighbors[rand(0, neighbors.length-1)];
-                char.x = rand(50, 750);
-                char.y = rand(50, 550);
-            } else {
-                char.targetX = rand(50, 750);
-                char.targetY = rand(50, 550);
-            }
-        }
-        if(char.stage === G.currentStage) {
-            const dx = char.targetX - char.x;
-            const dy = char.targetY - char.y;
-            const d = Math.sqrt(dx*dx + dy*dy);
-            if(d > 10) {
-                const speed = char.speed * 0.08;
-                const mx = (dx/d) * Math.min(speed, d);
-                const my = (dy/d) * Math.min(speed, d);
-                tryMove(char, mx, my, char.stage);
-            }
-        }
-    }
-}
+  for (var i = 0; i < state.mobs.length; i++) {
+    var mob = state.mobs[i];
+    if (!mob.alive) continue;
 
-// ===== 狼 =====
-function updateWolves() {
-    if(G.gameOver || G.ended) return;
-    for(let stage in G.wolves) {
-        for(let wolf of G.wolves[stage]) {
-            if(!wolf.alive) continue;
-            wolf.moveTimer++;
-            if(wolf.moveTimer > 30 + rand(0, 30)) {
-                wolf.moveTimer = 0;
-                wolf.targetX = rand(50, 750);
-                wolf.targetY = rand(50, 550);
-            }
-            // ジェイソンと熊から逃げる
-            let fleeX = 0, fleeY = 0, fleeing = false;
-            const jason = G.jason;
-            if(jason.stage === parseInt(stage)) {
-                const d = dist(wolf, jason);
-                if(d < 150) {
-                    fleeX += (wolf.x - jason.x) / d * 60;
-                    fleeY += (wolf.y - jason.y) / d * 60;
-                    fleeing = true;
-                }
-            }
-            const bear = G.bear;
-            if(bear && bear.alive && bear.stage === parseInt(stage) && bear.isHungry) {
-                const d = dist(wolf, bear);
-                if(d < 150) {
-                    fleeX += (wolf.x - bear.x) / d * 60;
-                    fleeY += (wolf.y - bear.y) / d * 60;
-                    fleeing = true;
-                }
-            }
-            if(fleeing && (Math.abs(fleeX) > 5 || Math.abs(fleeY) > 5)) {
-                const d = Math.sqrt(fleeX*fleeX + fleeY*fleeY);
-                const speed = wolf.speed * 0.15;
-                const mx = (fleeX/d) * Math.min(speed, d);
-                const my = (fleeY/d) * Math.min(speed, d);
-                tryMove(wolf, mx, my, parseInt(stage));
-            } else if(wolf.stage === G.currentStage) {
-                const dx = wolf.targetX - wolf.x;
-                const dy = wolf.targetY - wolf.y;
-                const d = Math.sqrt(dx*dx + dy*dy);
-                if(d > 10) {
-                    const speed = wolf.speed * 0.08;
-                    const mx = (dx/d) * Math.min(speed, d);
-                    const my = (dy/d) * Math.min(speed, d);
-                    tryMove(wolf, mx, my, parseInt(stage));
-                }
-            }
-            wolf.x = clamp(wolf.x, 20, 780);
-            wolf.y = clamp(wolf.y, 20, 580);
-        }
+    if (mob.hasDelivered) {
+      if (state.frameCount % 8 === 0) {
+        var dirs = [[0,-1],[0,1],[-1,0],[1,0]];
+        var d = dirs[rand(0, 3)];
+        moveCharacter(mob, d[0], d[1]);
+      }
+      continue;
     }
-}
 
-// ===== 熊 =====
-function updateBear() {
-    if(G.gameOver || G.ended) return;
-    if(!G.bear || !G.bear.alive) return;
-    const bear = G.bear;
-    const player = G.player;
-    
-    if(bear.stage === player.stage && bear.isHungry) {
-        const dx = player.x - bear.x;
-        const dy = player.y - bear.y;
-        const d = Math.sqrt(dx*dx + dy*dy);
-        if(d > 15) {
-            const speed = bear.speed * 0.1;
-            const mx = (dx/d) * Math.min(speed, d);
-            const my = (dy/d) * Math.min(speed, d);
-            tryMove(bear, mx, my, bear.stage);
+    if (mob.moveCooldown > 0) { mob.moveCooldown--; continue; }
+    mob.moveCooldown = 3;
+
+    if (mob.state === 'moving_to_item') {
+      if (mob.blockId !== mob.targetBlock) {
+        var td = getDirectionToBlock(mob, mob.targetBlock);
+        if (td) moveCharacter(mob, td.dx, td.dy);
+        continue;
+      }
+      var dx = mob.targetX - mob.x;
+      var dy = mob.targetY - mob.y;
+      if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) {
+        var idx = -1;
+        for (var j = 0; j < state.items.length; j++) {
+          var it = state.items[j];
+          if (it.name === '品' + (mob.taskId + 1) && it.blockId === mob.blockId &&
+              Math.abs(it.x - mob.x) <= 1 && Math.abs(it.y - mob.y) <= 1) {
+            idx = j; break;
+          }
         }
-        if(d < 30) {
-            gameOver(false, '熊に襲われた');
+        if (idx >= 0) {
+          state.items.splice(idx, 1);
+          mob.state = 'moving_to_hut';
+          mob.targetX = 3;
+          mob.targetY = 5;
+          mob.targetBlock = 4;
+          addLog('📦 ' + mob.name + ' が 品' + (mob.taskId + 1) + ' を入手');
+        } else {
+          mob.state = 'idle';
+          assignMobTask(mob);
         }
+      } else {
+        var mx = 0, my = 0;
+        if (mob.targetX > mob.x) mx = 1;
+        else if (mob.targetX < mob.x) mx = -1;
+        else if (mob.targetY > mob.y) my = 1;
+        else if (mob.targetY < mob.y) my = -1;
+        if (mx !== 0 || my !== 0) moveCharacter(mob, mx, my);
+      }
+    } else if (mob.state === 'moving_to_hut') {
+      if (mob.blockId !== 4) {
+        var td2 = getDirectionToBlock(mob, 4);
+        if (td2) moveCharacter(mob, td2.dx, td2.dy);
+        continue;
+      }
+      var hutItem = getObjectAt(4, 3, 5, '品');
+      if (hutItem && !hutItem.used) {
+        if (Math.abs(3 - mob.x) <= 1 && Math.abs(5 - mob.y) <= 1) {
+          hutItem.used = true;
+          hutItem.cooldown = 5;
+          mob.hasDelivered = true;
+          state.points += 1;
+          addLog('✅ ' + mob.name + ' 納品完了！ +1ポイント');
+          updateUI();
+          mob.state = 'delivered';
+        } else {
+          var mx2 = 0, my2 = 0;
+          if (3 > mob.x) mx2 = 1;
+          else if (3 < mob.x) mx2 = -1;
+          else if (5 > mob.y) my2 = 1;
+          else if (5 < mob.y) my2 = -1;
+          if (mx2 !== 0 || my2 !== 0) moveCharacter(mob, mx2, my2);
+        }
+      } else {
+        mob.hasDelivered = true;
+        mob.state = 'delivered';
+      }
     } else {
-        bear.moveTimer++;
-        if(bear.moveTimer > 50) {
-            bear.moveTimer = 0;
-            bear.targetX = rand(50, 750);
-            bear.targetY = rand(50, 550);
-        }
-        const dx = bear.targetX - bear.x;
-        const dy = bear.targetY - bear.y;
-        const d = Math.sqrt(dx*dx + dy*dy);
-        if(d > 10) {
-            const speed = bear.speed * 0.05;
-            const mx = (dx/d) * Math.min(speed, d);
-            const my = (dy/d) * Math.min(speed, d);
-            tryMove(bear, mx, my, bear.stage);
-        }
+      assignMobTask(mob);
     }
-    bear.x = clamp(bear.x, 20, 780);
-    bear.y = clamp(bear.y, 20, 580);
+  }
 }
 
-// ===== クリック =====
-function handleClick() {
-    if(G.gameOver || G.ended) return;
-    const player = G.player;
-    const stage = G.currentStage;
-    
-    // ドア
-    if(stage === 4) {
-        const col = Math.floor(player.x / CELL);
-        const row = Math.floor(player.y / CELL);
-        if((row === 9 && col === 9) || (row === 9 && col === 10)) {
-            G.currentStage = 9;
-            player.x = 400;
-            player.y = 300;
-            document.getElementById('stageDisplay').textContent = '家の中';
-            document.getElementById('stageNameLabel').textContent = '家の中';
-            updateUI();
-            updateMinimap();
-            updateArrows();
-            document.getElementById('statusMsg').textContent = '[ 家の中 ]';
-            document.getElementById('statusMsg').className = 'info';
-            return;
+// ---- ★ 狼から逃げる処理 ----
+function fleeFromWolf(entity) {
+  if (!state.wolf || !state.wolf.alive) return false;
+  if (entity.blockId !== state.wolf.blockId) return false;
+  if (Math.abs(entity.x - state.wolf.x) > 3 || Math.abs(entity.y - state.wolf.y) > 3) return false;
+
+  var dx = entity.x - state.wolf.x;
+  var dy = entity.y - state.wolf.y;
+  var mx = 0, my = 0;
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    mx = dx > 0 ? 1 : -1;
+  } else {
+    my = dy > 0 ? 1 : -1;
+  }
+  // 逃げる方向に移動を試みる
+  if (moveCharacter(entity, mx, my)) return true;
+  // 失敗したら別の方向を試す
+  var attempts = [
+    [mx, 0], [0, my], [-mx, 0], [0, -my],
+    [mx, my], [-mx, my], [mx, -my], [-mx, -my]
+  ];
+  for (var i = 0; i < attempts.length; i++) {
+    if (moveCharacter(entity, attempts[i][0], attempts[i][1])) return true;
+  }
+  return false;
+}
+
+// ---- 敵AI ----
+function updateEnemies() {
+  // ジェイソン
+  if (state.jason && state.jason.alive) {
+    var jSpeed = 10 + (state.day - 1) * 10;
+    if (state.jason.speed !== jSpeed) state.jason.speed = jSpeed;
+
+    if (state.jason.moveCooldown > 0) {
+      state.jason.moveCooldown--;
+    } else {
+      state.jason.moveCooldown = Math.max(1, Math.floor(12 / (state.jason.speed / 10)));
+
+      var hero = state.hero;
+
+      // ★ 狼が同じブロックにいる → 狼から逃げる (最優先)
+      if (state.wolf && state.wolf.alive && state.jason.blockId === state.wolf.blockId) {
+        var fled = fleeFromWolf(state.jason);
+        if (fled) {
+          // 逃げた後も引き続き処理
         }
+      }
+      // 狼がいない or 逃げられなかった → 主人公を追跡
+      else if (hero && hero.alive) {
+        if (state.jason.blockId === hero.blockId) {
+          var jdx = hero.x - state.jason.x;
+          var jdy = hero.y - state.jason.y;
+          var jmx = 0, jmy = 0;
+          if (Math.abs(jdx) > Math.abs(jdy)) {
+            jmx = jdx > 0 ? 1 : -1;
+          } else {
+            jmy = jdy > 0 ? 1 : -1;
+          }
+          moveCharacter(state.jason, jmx, jmy);
+          if (Math.abs(state.jason.x - hero.x) <= 0.5 && Math.abs(state.jason.y - hero.y) <= 0.5) {
+            killHero('ジェイソン');
+          }
+        } else {
+          var dir = getDirectionToBlock(state.jason, hero.blockId);
+          if (dir) moveCharacter(state.jason, dir.dx, dir.dy);
+        }
+      }
     }
-    if(stage === 9) {
-        const col = Math.floor(player.x / CELL);
-        const row = Math.floor(player.y / CELL);
-        if(col < 6 || col > 13 || row < 4 || row > 10) {
-            G.currentStage = 4;
-            player.x = 400;
-            player.y = 370;
-            document.getElementById('stageDisplay').textContent = '小屋';
-            document.getElementById('stageNameLabel').textContent = '小屋';
-            updateUI();
-            updateMinimap();
-            updateArrows();
-            document.getElementById('statusMsg').textContent = '[ 外に出た ]';
-            document.getElementById('statusMsg').className = 'info';
-            return;
+
+    for (var m = 0; m < state.mobs.length; m++) {
+      var mob = state.mobs[m];
+      if (!mob.alive) continue;
+      if (state.jason.blockId === mob.blockId) {
+        if (Math.abs(state.jason.x - mob.x) <= 0.5 && Math.abs(state.jason.y - mob.y) <= 0.5) {
+          if (state.jasonKillCooldown <= 0) {
+            killMob(mob, 'ジェイソン');
+            state.jasonKillCooldown = 20;
+          }
         }
+      }
     }
-    
-    // アイテム取得
-    const items = G.items[stage] || [];
-    for(let item of items) {
-        if(item.collected) continue;
-        if(dist(player, item) < 40) {
-            if(item.type === '木材') {
-                if(G.woodCount < G.maxWood) {
-                    G.woodCount++;
-                    item.collected = true;
-                    item.respawnDay = G.day + 3;
-                    document.getElementById('statusMsg').textContent = '[ 木材拾った ] ' + G.woodCount + '/' + G.maxWood;
-                    document.getElementById('statusMsg').className = 'success';
-                    updateUI();
-                    return;
-                } else {
-                    document.getElementById('statusMsg').textContent = '[ 木材いっぱい ]';
-                    document.getElementById('statusMsg').className = '';
-                    return;
-                }
-            } else if(G.inventory === null) {
-                G.inventory = item.type;
-                item.collected = true;
-                item.respawnDay = G.day + 3;
-                document.getElementById('statusMsg').textContent = '[ ' + item.type + '拾った ]';
-                document.getElementById('statusMsg').className = 'success';
-                updateUI();
-                return;
-            } else {
-                document.getElementById('statusMsg').textContent = '[ インベントリ一杯 ]';
-                document.getElementById('statusMsg').className = '';
-                return;
-            }
+    if (state.jasonKillCooldown > 0) state.jasonKillCooldown--;
+  }
+
+  // 熊
+  var isBearAttackDay = false;
+  for (var d = 0; d < state.bearAttackDays.length; d++) {
+    if (state.bearAttackDays[d] === state.day) isBearAttackDay = true;
+  }
+
+  if (state.bear && state.bear.alive) {
+    if (state.bear.moveCooldown > 0) {
+      state.bear.moveCooldown--;
+    } else {
+      state.bear.moveCooldown = 3;
+
+      var hero2 = state.hero;
+
+      // ★ 狼が同じブロックにいる → 狼から逃げる (最優先)
+      if (state.wolf && state.wolf.alive && state.bear.blockId === state.wolf.blockId) {
+        fleeFromWolf(state.bear);
+      }
+      // 襲撃日かつ狼がいない/逃げられなかった → 主人公を追跡
+      else if (hero2 && hero2.alive && isBearAttackDay) {
+        if (state.bear.blockId === hero2.blockId) {
+          var bdx = hero2.x - state.bear.x;
+          var bdy = hero2.y - state.bear.y;
+          var bmx = 0, bmy = 0;
+          if (Math.abs(bdx) > Math.abs(bdy)) {
+            bmx = bdx > 0 ? 1 : -1;
+          } else {
+            bmy = bdy > 0 ? 1 : -1;
+          }
+          moveCharacter(state.bear, bmx, bmy);
+          if (Math.abs(state.bear.x - hero2.x) <= 0.5 && Math.abs(state.bear.y - hero2.y) <= 0.5) {
+            killHero('熊');
+          }
+        } else {
+          var dir2 = getDirectionToBlock(state.bear, hero2.blockId);
+          if (dir2) moveCharacter(state.bear, dir2.dx, dir2.dy);
         }
+      } else {
+        var dirs = [[0,-1],[0,1],[-1,0],[1,0]];
+        var d2 = dirs[rand(0, 3)];
+        moveCharacter(state.bear, d2[0], d2[1]);
+      }
     }
-    
-    // 倉庫
-    if(stage === 4) {
-        const col = Math.floor(player.x / CELL);
-        const row = Math.floor(player.y / CELL);
-        if(col >= 6 && col <= 9 && row >= 10 && row <= 11) {
-            if(G.woodCount > 0) {
-                const toStore = Math.min(G.woodCount, 20 - G.woodInWarehouse);
-                G.woodCount -= toStore;
-                G.woodInWarehouse += toStore;
-                while(G.woodInWarehouse >= 3 && G.reinforcedBlocks < 8) {
-                    G.woodInWarehouse -= 3;
-                    G.reinforcedBlocks++;
-                    G.defense += 10;
-                    document.getElementById('statusMsg').textContent = '[ 補強材 +10 ] (' + G.reinforcedBlocks + '/8)';
-                    document.getElementById('statusMsg').className = 'success';
-                }
-                updateUI();
-                return;
-            } else {
-                document.getElementById('statusMsg').textContent = '[ 倉庫: ' + G.woodInWarehouse + '/20 ]';
-                document.getElementById('statusMsg').className = 'info';
-                return;
-            }
+
+    for (var m2 = 0; m2 < state.mobs.length; m2++) {
+      var mob2 = state.mobs[m2];
+      if (!mob2.alive) continue;
+      if (state.bear.blockId === mob2.blockId && isBearAttackDay) {
+        if (Math.abs(state.bear.x - mob2.x) <= 0.5 && Math.abs(state.bear.y - mob2.y) <= 0.5) {
+          if (state.bearKillCooldown <= 0) {
+            killMob(mob2, '熊');
+            state.bearKillCooldown = 20;
+          }
         }
+      }
     }
-    
-    // スコップ (ドア前)
-    if(stage === 4) {
-        const col = Math.floor(player.x / CELL);
-        const row = Math.floor(player.y / CELL);
-        if((row === 9 && col === 9) || (row === 9 && col === 10)) {
-            if(G.inventory === 'スコップ' && !G.trapSet) {
-                G.trapSet = true;
-                G.defense += 10;
-                G.inventory = null;
-                document.getElementById('statusMsg').textContent = '[ 落とし穴 +10 ]';
-                document.getElementById('statusMsg').className = 'success';
-                updateUI();
-                return;
-            } else if(G.trapSet) {
-                document.getElementById('statusMsg').textContent = '[ もう掘ってある ]';
-                document.getElementById('statusMsg').className = '';
-                return;
-            } else {
-                document.getElementById('statusMsg').textContent = '[ スコップが必要 ]';
-                document.getElementById('statusMsg').className = '';
-                return;
-            }
-        }
+    if (state.bearKillCooldown > 0) state.bearKillCooldown--;
+  }
+
+  // 狼 (ランダム)
+  if (state.wolf && state.wolf.alive) {
+    if (state.wolf.moveCooldown > 0) {
+      state.wolf.moveCooldown--;
+    } else {
+      state.wolf.moveCooldown = 4;
+      var dirs2 = [[0,-1],[0,1],[-1,0],[1,0]];
+      var d3 = dirs2[rand(0, 3)];
+      moveCharacter(state.wolf, d3[0], d3[1]);
     }
-    
-    // 家の中
-    if(stage === 9) {
-        const col = Math.floor(player.x / CELL);
-        const row = Math.floor(player.y / CELL);
-        // タンス
-        if(col >= 9 && col <= 11 && row >= 6 && row <= 8) {
-            if(G.inventory === '銃' && !G.gunStored) {
-                G.gunStored = true;
-                G.defense += 10;
-                G.inventory = null;
-                document.getElementById('statusMsg').textContent = '[ 銃をタンス +10 ]';
-                document.getElementById('statusMsg').className = 'success';
-                updateUI();
-                return;
-            } else if(G.inventory === '斧' && !G.axeStored) {
-                G.axeStored = true;
-                G.defense += 10;
-                G.inventory = null;
-                document.getElementById('statusMsg').textContent = '[ 斧をタンス +10 ]';
-                document.getElementById('statusMsg').className = 'success';
-                updateUI();
-                return;
-            } else if(G.reinforcedBlocks > 0) {
-                const add = Math.min(G.reinforcedBlocks, 7);
-                G.reinforcedBlocks -= add;
-                G.defense += add * 10;
-                document.getElementById('statusMsg').textContent = '[ 補強材タンス +' + (add*10) + ' ]';
-                document.getElementById('statusMsg').className = 'success';
-                updateUI();
-                return;
-            } else {
-                document.getElementById('statusMsg').textContent = '[ 置けるものなし ]';
-                document.getElementById('statusMsg').className = '';
-                return;
-            }
-        }
-        // 窓
-        if((col === 7 || col === 8) && row === 5) {
-            if(G.inventory === '木材' && G.woodCount >= 3 && !G.windowReinforced) {
-                G.woodCount -= 3;
-                G.windowReinforced = true;
-                G.defense += 10;
-                G.inventory = null;
-                document.getElementById('statusMsg').textContent = '[ 窓補強 +10 ]';
-                document.getElementById('statusMsg').className = 'success';
-                updateUI();
-                return;
-            } else if(G.windowReinforced) {
-                document.getElementById('statusMsg').textContent = '[ もう補強済み ]';
-                document.getElementById('statusMsg').className = '';
-                return;
-            } else {
-                document.getElementById('statusMsg').textContent = '[ 木材3個必要 ]';
-                document.getElementById('statusMsg').className = '';
-                return;
-            }
-        }
-        if((col === 12 || col === 13) && row === 5) {
-            if(G.inventory === '木材' && G.woodCount >= 3 && !G.windowReinforced) {
-                G.woodCount -= 3;
-                G.windowReinforced = true;
-                G.defense += 10;
-                G.inventory = null;
-                document.getElementById('statusMsg').textContent = '[ 窓補強 +10 ]';
-                document.getElementById('statusMsg').className = 'success';
-                updateUI();
-                return;
-            } else if(G.windowReinforced) {
-                document.getElementById('statusMsg').textContent = '[ もう補強済み ]';
-                document.getElementById('statusMsg').className = '';
-                return;
-            } else {
-                document.getElementById('statusMsg').textContent = '[ 木材3個必要 ]';
-                document.getElementById('statusMsg').className = '';
-                return;
-            }
-        }
+  }
+}
+
+// ---- 殺害処理 ----
+function killHero(killer) {
+  if (!state.hero || !state.hero.alive) return;
+  state.hero.alive = false;
+  state.gameOver = true;
+  state.isGameLoopRunning = false;
+  if (state.dayTimerInterval) { clearInterval(state.dayTimerInterval); state.dayTimerInterval = null; }
+  addLog('💀 主人公が ' + killer + ' に殺された... ゲームオーバー');
+  showPopup('ゲームオーバー', '主人公が ' + killer + ' に殺されました...', '再挑戦', function() {
+    hidePopup();
+    initGame();
+  });
+}
+
+function killMob(mob, killer) {
+  if (!mob.alive) return;
+  mob.alive = false;
+  state.mobAlive--;
+  addLog('💀 ' + mob.name + ' が ' + killer + ' に殺された (生存 ' + state.mobAlive + '/8)');
+  updateUI();
+}
+
+// ---- 主人公移動 ----
+function moveHero(dx, dy) {
+  if (state.gameOver || state.paused) return;
+  var hero = state.hero;
+  if (!hero || !hero.alive) return;
+  moveCharacter(hero, dx, dy);
+  updateUI();
+}
+
+// ---- クリックでアイテム拾い ----
+function pickupItemByClick(gx, gy) {
+  var hero = state.hero;
+  if (!hero || !hero.alive) return;
+  if (state.heroItem) {
+    addLog('⚠️ すでにアイテムを持っている');
+    return;
+  }
+  if (Math.abs(gx - hero.x) > 1 || Math.abs(gy - hero.y) > 1) {
+    addLog('⚠️ 範囲外です');
+    return;
+  }
+  for (var i = 0; i < state.items.length; i++) {
+    var item = state.items[i];
+    if (item.blockId !== hero.blockId) continue;
+    if (item.x === gx && item.y === gy) {
+      state.heroItem = item.name;
+      state.items.splice(i, 1);
+      addLog('📦 ' + item.name + ' を拾った');
+      updateUI();
+      return;
     }
-    
-    // 狼の餌
-    if(stage !== 4 && stage !== 9 && G.inventory === '狼の餌') {
-        const wolves = G.wolves[stage] || [];
-        for(let wolf of wolves) {
-            if(!wolf.isFed && dist(player, wolf) < 60) {
-                wolf.isFed = true;
-                G.wolfFed = true;
-                G.defense += 10;
-                G.inventory = null;
-                document.getElementById('statusMsg').textContent = '[ 狼に餌 +10 ]';
-                document.getElementById('statusMsg').className = 'success';
-                updateUI();
-                return;
-            }
-        }
-        document.getElementById('statusMsg').textContent = '[ 狼の近くで ]';
-        document.getElementById('statusMsg').className = '';
+  }
+  addLog('⚠️ そこにアイテムはありません');
+}
+
+// ---- ★ 納品アイテム復活処理 ----
+function scheduleRespawn(itemName, blockId) {
+  // 品1〜品8 は復活させない
+  if (/^品[1-8]$/.test(itemName)) return;
+
+  // すでに pendingRespawn に同じアイテムがないかチェック
+  for (var i = 0; i < state.pendingRespawn.length; i++) {
+    if (state.pendingRespawn[i].name === itemName && state.pendingRespawn[i].blockId === blockId) {
+      return;
+    }
+  }
+
+  var respawnDay = state.day + 3;
+  state.pendingRespawn.push({
+    name: itemName,
+    blockId: blockId,
+    respawnDay: respawnDay
+  });
+  addLog('⏳ ' + itemName + ' は ' + respawnDay + '日目に復活します');
+}
+
+function processRespawn() {
+  var toRespawn = [];
+  var remaining = [];
+  for (var i = 0; i < state.pendingRespawn.length; i++) {
+    var p = state.pendingRespawn[i];
+    if (p.respawnDay <= state.day) {
+      toRespawn.push(p);
+    } else {
+      remaining.push(p);
+    }
+  }
+  state.pendingRespawn = remaining;
+
+  for (var j = 0; j < toRespawn.length; j++) {
+    var item = toRespawn[j];
+    // 品10〜品80 は固定ブロックに復活、それ以外はランダムブロック
+    var blockId = item.blockId;
+    if (/^品[1-9][0-9]$/.test(item.name)) {
+      // 品番号からブロックを特定
+      var num = parseInt(item.name.replace('品', ''), 10);
+      var idx = (num / 10) - 1;
+      if (idx >= 0 && idx < 8) {
+        blockId = ITEM_BLOCK_MAP[idx];
+      } else {
+        blockId = rand(0, 8);
+        if (blockId === 4) blockId = 0;
+      }
+    } else {
+      // 材・斧・銃・餌・堀 → ランダムブロック
+      var allBlocks = [0,1,2,3,4,5,6,7,8];
+      blockId = allBlocks[rand(0, allBlocks.length - 1)];
+    }
+
+    // 既に同じアイテムが存在しないかチェック
+    var exists = false;
+    for (var k = 0; k < state.items.length; k++) {
+      if (state.items[k].name === item.name && state.items[k].blockId === blockId) {
+        exists = true;
+        break;
+      }
+    }
+    if (!exists) {
+      state.items.push({
+        name: item.name,
+        x: rand(0, 9),
+        y: rand(0, 9),
+        blockId: blockId
+      });
+      addLog('♻️ ' + item.name + ' が復活しました');
+    }
+  }
+}
+
+// ---- アイテム使用 ----
+function useItemOnObject(objType) {
+  if (!state.hero || !state.hero.alive) return;
+  if (!state.heroItem) {
+    addLog('⚠️ アイテムを持っていない');
+    return;
+  }
+
+  var hero = state.hero;
+  var itemName = state.heroItem;
+
+  // 餌→狼
+  if (itemName === '餌' && objType === '狼') {
+    if (state.wolf && state.wolf.alive && state.wolf.blockId === hero.blockId) {
+      if (Math.abs(state.wolf.x - hero.x) <= 1 && Math.abs(state.wolf.y - hero.y) <= 1) {
+        state.points += 1;
+        var consumedBlock = hero.blockId;
+        var consumedName = itemName;
+        state.heroItem = null;
+        state.wolf.alive = false;
+        addLog('✅ 餌で狼を懐かせた！ +1ポイント');
+        // ★ 復活予約 (品1〜8以外)
+        scheduleRespawn(consumedName, consumedBlock);
+        updateUI();
         return;
-    }
-    
-    document.getElementById('statusMsg').textContent = '[ 何もない ]';
-    document.getElementById('statusMsg').className = '';
-}
-
-// ===== ステージ移動 =====
-function moveStage(dir) {
-    if(G.gameOver || G.ended) return;
-    const current = G.currentStage;
-    if(current === 9) {
-        G.currentStage = 4;
-        G.player.x = 400;
-        G.player.y = 370;
-        document.getElementById('stageDisplay').textContent = '小屋';
-        document.getElementById('stageNameLabel').textContent = '小屋';
-        updateUI();
-        updateMinimap();
-        updateArrows();
+      } else {
+        addLog('⚠️ 狼が近くにいない');
         return;
-    }
-    const row = Math.floor(current / 3);
-    const col = current % 3;
-    let target = current;
-    switch(dir) {
-        case 'up': if(row > 0) target = current - 3; break;
-        case 'down': if(row < 2) target = current + 3; break;
-        case 'left': if(col > 0) target = current - 1; break;
-        case 'right': if(col < 2) target = current + 1; break;
-    }
-    if(target !== current) {
-        G.currentStage = target;
-        G.player.x = 400;
-        G.player.y = 300;
-        document.getElementById('stageDisplay').textContent = STAGE_NAMES[target];
-        document.getElementById('stageNameLabel').textContent = STAGE_NAMES[target];
-        updateUI();
-        updateMinimap();
-        updateArrows();
-        document.getElementById('statusMsg').textContent = '[ ' + STAGE_NAMES[target] + ' ]';
-        document.getElementById('statusMsg').className = 'info';
-    }
-}
-
-function updateArrows() {
-    const current = G.currentStage;
-    const isHouse = current === 9;
-    const row = Math.floor(current / 3);
-    const col = current % 3;
-    document.getElementById('arrowUp').classList.toggle('hidden', isHouse || row === 0);
-    document.getElementById('arrowDown').classList.toggle('hidden', isHouse || row === 2);
-    document.getElementById('arrowLeft').classList.toggle('hidden', isHouse || col === 0);
-    document.getElementById('arrowRight').classList.toggle('hidden', isHouse || col === 2);
-}
-
-// ===== ゲームオーバー =====
-function gameOver(win, reason) {
-    if(G.ended) return;
-    G.ended = true;
-    G.gameOver = !win;
-    G.won = win;
-    document.getElementById('gameOverlay').classList.add('show');
-    if(win) {
-        document.getElementById('resultTitle').textContent = '[ 勝利 ]';
-        document.getElementById('resultSub').textContent = '防御: ' + G.defense;
+      }
     } else {
-        document.getElementById('resultTitle').textContent = '[ ゲームオーバー ]';
-        document.getElementById('resultSub').textContent = reason;
+      addLog('⚠️ 狼が近くにいない');
+      return;
     }
-}
+  }
 
-function endGame() {
-    if(G.ended) return;
-    const jasonPoints = 50 + rand(0, 40);
-    if(G.defense > jasonPoints) {
-        gameOver(true, '防御' + G.defense + ' vs ジェイソン' + jasonPoints);
-    } else {
-        gameOver(false, '防御' + G.defense + ' vs ジェイソン' + jasonPoints);
+  var obj = null;
+  for (var i = 0; i < state.objects.length; i++) {
+    var o = state.objects[i];
+    if (o.blockId !== hero.blockId) continue;
+    if (o.type !== objType) continue;
+    if (Math.abs(o.x - hero.x) <= 1 && Math.abs(o.y - hero.y) <= 1) {
+      obj = o;
+      break;
     }
+  }
+
+  if (!obj) {
+    addLog('⚠️ ' + objType + ' が近くにない');
+    return;
+  }
+
+  if (obj.used) {
+    addLog('⚠️ この' + objType + 'はクールダウン中です (残り ' + obj.cooldown + '秒)');
+    return;
+  }
+
+  var valid = false;
+  if (objType === '窓' && itemName === '材') valid = true;
+  else if (objType === '穴' && itemName === '堀') valid = true;
+  else if (objType === '樽' && itemName === '斧') valid = true;
+  else if (objType === '箱' && itemName === '銃') valid = true;
+  else if (objType === '品' && itemName.indexOf('品') === 0) valid = true;
+
+  if (!valid) {
+    addLog('⚠️ ' + itemName + ' は ' + objType + ' に使えない');
+    return;
+  }
+
+  // ★ 使用: クールダウン5秒
+  obj.used = true;
+  obj.cooldown = 5;
+
+  var consumedBlock2 = hero.blockId;
+  var consumedName2 = itemName;
+
+  state.points += 1;
+  state.heroItem = null;
+  addLog('✅ ' + itemName + ' を使って +1ポイント！ (クールダウン5秒)');
+
+  // ★ 復活予約 (品1〜8以外)
+  scheduleRespawn(consumedName2, consumedBlock2);
+
+  updateUI();
 }
 
-// ===== UI =====
-function updateUI() {
-    document.getElementById('defenseDisplay').textContent = G.defense;
-    document.getElementById('dayDisplay').textContent = G.day;
-    document.getElementById('woodDisplay').textContent = G.woodCount;
-    const inv = G.inventory ? G.inventory : 'なし';
-    document.getElementById('inventoryDisplay').textContent = '[ ' + inv + ' ]';
+// ---- アイテムを落とす ----
+function dropItem() {
+  if (!state.heroItem) {
+    addLog('⚠️ 持っているアイテムがない');
+    return;
+  }
+  var hero = state.hero;
+  state.items.push({
+    name: state.heroItem,
+    x: hero.x,
+    y: hero.y,
+    blockId: hero.blockId
+  });
+  addLog('📤 ' + state.heroItem + ' を落とした');
+  state.heroItem = null;
+  updateUI();
 }
 
-function updateMinimap() {
-    const container = document.getElementById('minimap');
-    container.innerHTML = '';
-    for(let i=0; i<9; i++) {
-        const cell = document.createElement('div');
-        cell.className = 'minimap-cell';
-        if(i === G.currentStage) cell.classList.add('current');
-        if(i === G.jason.stage) cell.classList.add('has-jason');
-        if(i === G.currentStage) {
-            const dot = document.createElement('span');
-            dot.className = 'dot player';
-            cell.appendChild(dot);
+// ---- タイマー ----
+function startDayTimer() {
+  if (state.dayTimerInterval) { clearInterval(state.dayTimerInterval); state.dayTimerInterval = null; }
+  state.dayElapsed = 0;
+  state.night = false;
+  nightOverlay.style.display = 'none';
+
+  state.dayTimerInterval = setInterval(function() {
+    if (state.gameOver || state.paused) return;
+    state.dayElapsed++;
+    var remaining = DAY_DURATION - state.dayElapsed;
+    dayDisplay.textContent = '🌅 ' + state.day + '日目 (' + Math.max(0, remaining) + '秒)';
+
+    if (remaining <= 10 && !state.night) {
+      state.night = true;
+      nightOverlay.style.display = 'block';
+      addLog('🌙 夜になった...');
+    }
+
+    // オブジェクトクールダウン更新
+    for (var i = 0; i < state.objects.length; i++) {
+      var obj = state.objects[i];
+      if (obj.cooldown > 0) {
+        obj.cooldown--;
+        if (obj.cooldown === 0) {
+          obj.used = false;
         }
-        if(i === G.jason.stage) {
-            const dot = document.createElement('span');
-            dot.className = 'dot jason';
-            cell.appendChild(dot);
-        }
-        const label = document.createElement('span');
-        label.style.fontSize = '6px';
-        label.style.color = '#555';
-        label.textContent = i;
-        cell.appendChild(label);
-        cell.onclick = () => { if(!G.gameOver && !G.ended) moveStageTo(i); };
-        container.appendChild(cell);
+      }
     }
+
+    if (state.dayElapsed >= DAY_DURATION) {
+      nextDay();
+    }
+  }, 1000);
 }
 
-function moveStageTo(stage) {
-    if(G.gameOver || G.ended) return;
-    if(stage === G.currentStage) return;
-    if(G.currentStage === 9) return;
-    const row = Math.floor(G.currentStage / 3);
-    const col = G.currentStage % 3;
-    const tRow = Math.floor(stage / 3);
-    const tCol = stage % 3;
-    if(Math.abs(row - tRow) + Math.abs(col - tCol) !== 1) return;
-    G.currentStage = stage;
-    G.player.x = 400;
-    G.player.y = 300;
-    document.getElementById('stageDisplay').textContent = STAGE_NAMES[stage];
-    document.getElementById('stageNameLabel').textContent = STAGE_NAMES[stage];
-    updateUI();
-    updateMinimap();
-    updateArrows();
-}
+// ---- 日付更新 ----
+function nextDay() {
+  if (state.dayTimerInterval) { clearInterval(state.dayTimerInterval); state.dayTimerInterval = null; }
+  state.day++;
 
-// ===== 描画 =====
-function draw() {
-    const ctx = document.getElementById('gameCanvas').getContext('2d');
-    ctx.clearRect(0, 0, 800, 600);
-    
-    const stage = G.currentStage;
-    const map = G.maps[stage];
-    const isNight = G.phase === 2;
-    
-    for(let r=0; r<ROWS; r++) {
-        for(let c=0; c<COLS; c++) {
-            const x = c * CELL;
-            const y = r * CELL;
-            const tile = map[r][c];
-            
-            if(tile === 0) {
-                ctx.fillStyle = isNight ? '#0a1a0a' : '#1a4a1a';
-                ctx.fillRect(x, y, CELL, CELL);
-                if((r+c)%2===0) {
-                    ctx.fillStyle = isNight ? '#0f1f0f' : '#1f5a1f';
-                    ctx.fillRect(x+10, y+10, 20, 20);
-                }
-            } else if(tile === 1) {
-                ctx.fillStyle = isNight ? '#3a2a1a' : '#8b6b4d';
-                ctx.fillRect(x, y, CELL, CELL);
-                ctx.fillStyle = isNight ? '#2a1a0a' : '#6b4d2d';
-                ctx.fillRect(x+2, y+2, CELL-4, CELL-4);
-                if(stage === 4 && r===5) {
-                    ctx.fillStyle = isNight ? '#2a1a0a' : '#5a3a1a';
-                    ctx.fillRect(x-5, y-5, CELL+10, 8);
-                }
-            } else if(tile === 2) {
-                const idx = (r-10)*4 + (c-6);
-                const filled = idx < G.reinforcedBlocks;
-                ctx.fillStyle = filled ? '#ffd93d' : '#5a4a3a';
-                ctx.fillRect(x, y, CELL, CELL);
-                ctx.fillStyle = filled ? '#ccaa22' : '#3a2a1a';
-                ctx.fillRect(x+2, y+2, CELL-4, CELL-4);
-                if(filled) {
-                    ctx.fillStyle = '#000';
-                    ctx.font = '14px "Courier New"';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText('補', x+20, y+20);
-                } else {
-                    ctx.fillStyle = '#7a6a5a';
-                    ctx.font = '14px "Courier New"';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText('□', x+20, y+20);
-                }
-            } else if(tile === 3) {
-                ctx.fillStyle = '#4a3a2a';
-                ctx.fillRect(x+10, y+20, 20, 18);
-                ctx.fillStyle = '#6b4d2d';
-                ctx.fillRect(x+12, y+22, 16, 14);
-                ctx.fillStyle = '#ffd93d';
-                ctx.font = '14px "Courier New"';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText('門', x+20, y+28);
-            } else if(tile === 4) {
-                ctx.fillStyle = '#4a3a2a';
-                ctx.fillRect(x+5, y+5, 30, 30);
-                ctx.fillStyle = '#6a5a4a';
-                ctx.fillRect(x+10, y+10, 20, 20);
-                ctx.fillStyle = '#ffd93d';
-                ctx.font = '12px "Courier New"';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText('箱', x+20, y+20);
-            } else if(tile === 5) {
-                ctx.fillStyle = '#2a4a6a';
-                ctx.fillRect(x+5, y+25, 30, 15);
-                ctx.fillStyle = '#3a5a7a';
-                ctx.fillRect(x+8, y+28, 24, 8);
-                ctx.fillStyle = '#5a7a9a';
-                ctx.fillRect(x+22, y+22, 12, 8);
-            } else if(tile === 6) {
-                ctx.fillStyle = G.windowReinforced ? '#4a8a4a' : '#3a6a3a';
-                ctx.fillRect(x+8, y+6, 24, 24);
-                ctx.fillStyle = G.windowReinforced ? '#6aaa6a' : '#4a7a4a';
-                ctx.fillRect(x+12, y+10, 16, 16);
-                ctx.fillStyle = '#3a2a1a';
-                ctx.fillRect(x+18, y+4, 4, 28);
-                if(G.windowReinforced) {
-                    ctx.fillStyle = '#ffd93d';
-                    ctx.font = '16px "Courier New"';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText('v', x+20, y+18);
-                }
-            }
-        }
-    }
-    
-    // 木
-    const trees = G.trees[stage] || [];
-    for(let tree of trees) {
-        ctx.fillStyle = isNight ? '#1a0a05' : '#4a2a1a';
-        ctx.fillRect(tree.x-4, tree.y+4, 8, 12);
-        ctx.fillStyle = isNight ? '#0a1a0a' : '#2a6a2a';
-        ctx.beginPath();
-        ctx.arc(tree.x, tree.y-4, 18, 0, Math.PI*2);
-        ctx.fill();
-        ctx.fillStyle = isNight ? '#0f1f0f' : '#3a7a3a';
-        ctx.beginPath();
-        ctx.arc(tree.x-8, tree.y-8, 12, 0, Math.PI*2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(tree.x+8, tree.y-8, 12, 0, Math.PI*2);
-        ctx.fill();
-    }
-    
-    // アイテム
-    const items = G.items[stage] || [];
-    for(let item of items) {
-        if(item.collected) continue;
-        const colors = {
-            '木材': '#ff8c00',
-            'スコップ': '#b8860b',
-            '狼の餌': '#c0392b',
-            '銃': '#2c3e50',
-            '斧': '#7f8c8d'
-        };
-        ctx.fillStyle = colors[item.type] || '#ffd700';
-        ctx.fillRect(item.x-10, item.y-10, 20, 20);
-        ctx.fillStyle = '#fff';
-        ctx.font = '10px "Courier New"';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        const label = item.type === '木材' ? '木' : item.type.substring(0,2);
-        ctx.fillText(label, item.x, item.y+1);
-    }
-    
-    // 狼
-    const wolves = G.wolves[stage] || [];
-    for(let wolf of wolves) {
-        if(!wolf.alive) continue;
-        const s = 2;
-        ctx.fillStyle = wolf.isFed ? '#78909c' : '#90a4ae';
-        ctx.fillRect(wolf.x-6*s, wolf.y-3*s, 12*s, 7*s);
-        ctx.fillRect(wolf.x-7*s, wolf.y-6*s, 7*s, 6*s);
-        ctx.fillRect(wolf.x-7*s, wolf.y-8*s, 3*s, 4*s);
-        ctx.fillRect(wolf.x-4*s, wolf.y-8*s, 3*s, 4*s);
-        ctx.fillStyle = '#000';
-        ctx.fillRect(wolf.x-5*s, wolf.y-5*s, 2*s, 2*s);
-        ctx.fillRect(wolf.x-3*s, wolf.y-5*s, 2*s, 2*s);
-        ctx.fillStyle = wolf.isFed ? '#ff8a80' : '#ff1744';
-        ctx.fillRect(wolf.x-5*s, wolf.y-2*s, 3*s, 2*s);
-        if(wolf.isFed) {
-            ctx.fillStyle = '#ff6b6b';
-            ctx.font = '10px "Courier New"';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'bottom';
-            ctx.fillText('+', wolf.x, wolf.y-10*s);
-        }
-    }
-    
-    // 熊
-    if(G.bear && G.bear.alive && G.bear.stage === stage) {
-        const bear = G.bear;
-        const s = 2.5;
-        ctx.fillStyle = bear.isHungry ? '#4a0a0a' : '#5d4037';
-        ctx.fillRect(bear.x-7*s, bear.y-3*s, 14*s, 9*s);
-        ctx.fillRect(bear.x-5*s, bear.y-7*s, 10*s, 7*s);
-        ctx.fillRect(bear.x-7*s, bear.y-9*s, 4*s, 4*s);
-        ctx.fillRect(bear.x+3*s, bear.y-9*s, 4*s, 4*s);
-        ctx.fillStyle = bear.isHungry ? '#8b0000' : '#795548';
-        ctx.fillRect(bear.x-6*s, bear.y-8*s, 2*s, 2*s);
-        ctx.fillRect(bear.x+4*s, bear.y-8*s, 2*s, 2*s);
-        ctx.fillStyle = '#000';
-        ctx.fillRect(bear.x-3*s, bear.y-5*s, 2*s, 2*s);
-        ctx.fillRect(bear.x+1*s, bear.y-5*s, 2*s, 2*s);
-        ctx.fillStyle = bear.isHungry ? '#ff0000' : '#333';
-        ctx.fillRect(bear.x-1*s, bear.y-3*s, 2*s, 2*s);
-        if(bear.isHungry) {
-            ctx.fillStyle = '#ff0000';
-            ctx.font = '10px "Courier New"';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'bottom';
-            ctx.fillText('!', bear.x, bear.y-10*s);
-        }
-    }
-    
-    // ジェイソン
-    if(G.jason.stage === stage) {
-        const s = 2.5;
-        ctx.fillStyle = '#e8e8e8';
-        ctx.fillRect(G.jason.x-6*s, G.jason.y-10*s, 12*s, 10*s);
-        ctx.fillStyle = '#1a1a2e';
-        ctx.fillRect(G.jason.x-4*s, G.jason.y-7*s, 2.5*s, 3*s);
-        ctx.fillRect(G.jason.x+1.5*s, G.jason.y-7*s, 2.5*s, 3*s);
-        ctx.fillRect(G.jason.x-1*s, G.jason.y-3*s, 2*s, 2*s);
-        ctx.fillStyle = '#2c3e50';
-        ctx.fillRect(G.jason.x-5*s, G.jason.y, 10*s, 10*s);
-        ctx.fillRect(G.jason.x-7*s, G.jason.y+2*s, 2*s, 6*s);
-        ctx.fillRect(G.jason.x+5*s, G.jason.y+2*s, 2*s, 6*s);
-        ctx.fillStyle = '#1a1a2e';
-        ctx.fillRect(G.jason.x-3*s, G.jason.y+10*s, 3*s, 4*s);
-        ctx.fillRect(G.jason.x+1*s, G.jason.y+10*s, 3*s, 4*s);
-        ctx.fillStyle = '#78909c';
-        ctx.fillRect(G.jason.x+6*s, G.jason.y-4*s, 1.5*s, 8*s);
-        ctx.fillRect(G.jason.x+5*s, G.jason.y-6*s, 3.5*s, 2*s);
-        ctx.fillStyle = '#ff1744';
-        ctx.fillRect(G.jason.x+5.5*s, G.jason.y-5*s, 2*s, 1*s);
-        ctx.fillStyle = 'rgba(255,0,0,0.05)';
-        ctx.beginPath();
-        ctx.arc(G.jason.x, G.jason.y, 40, 0, Math.PI*2);
-        ctx.fill();
-    }
-    
-    // モブ
-    for(let name in G.characters) {
-        const char = G.characters[name];
-        if(!char.alive || char.stage !== stage || stage === 9) continue;
-        const s = 2;
-        ctx.fillStyle = '#333';
-        ctx.fillRect(char.x-5*s, char.y-9*s, 10*s, 8*s);
-        ctx.fillStyle = '#f5d0b8';
-        ctx.fillRect(char.x-4*s, char.y-7*s, 8*s, 5*s);
-        ctx.fillStyle = '#000';
-        ctx.fillRect(char.x-3*s, char.y-6*s, 2*s, 2*s);
-        ctx.fillRect(char.x+1*s, char.y-6*s, 2*s, 2*s);
-        ctx.fillStyle = '#c0392b';
-        ctx.fillRect(char.x-1*s, char.y-3*s, 2*s, 1*s);
-        ctx.fillStyle = char.color;
-        ctx.fillRect(char.x-4*s, char.y, 8*s, 8*s);
-        ctx.fillRect(char.x-6*s, char.y+1*s, 2*s, 5*s);
-        ctx.fillRect(char.x+4*s, char.y+1*s, 2*s, 5*s);
-        ctx.fillStyle = '#2c3e50';
-        ctx.fillRect(char.x-3*s, char.y+8*s, 2*s, 4*s);
-        ctx.fillRect(char.x+1*s, char.y+8*s, 2*s, 4*s);
-        ctx.fillStyle = '#aaa';
-        ctx.font = '8px "Courier New"';
-        ctx.textAlign = 'center';
-        ctx.fillText(name, char.x, char.y+24);
-    }
-    
-    // プレイヤー
-    if(G.player.alive && G.player.stage === stage) {
-        const s = 2;
-        ctx.fillStyle = '#c0392b';
-        ctx.fillRect(G.player.x-5*s, G.player.y-9*s, 10*s, 8*s);
-        ctx.fillStyle = '#f5d0b8';
-        ctx.fillRect(G.player.x-4*s, G.player.y-7*s, 8*s, 5*s);
-        ctx.fillStyle = '#000';
-        ctx.fillRect(G.player.x-3*s, G.player.y-6*s, 2*s, 2*s);
-        ctx.fillRect(G.player.x+1*s, G.player.y-6*s, 2*s, 2*s);
-        ctx.fillStyle = '#c0392b';
-        ctx.fillRect(G.player.x-1*s, G.player.y-3*s, 2*s, 1*s);
-        ctx.fillStyle = '#e74c3c';
-        ctx.fillRect(G.player.x-4*s, G.player.y, 8*s, 8*s);
-        ctx.fillRect(G.player.x-6*s, G.player.y+1*s, 2*s, 5*s);
-        ctx.fillRect(G.player.x+4*s, G.player.y+1*s, 2*s, 5*s);
-        ctx.fillStyle = '#2c3e50';
-        ctx.fillRect(G.player.x-3*s, G.player.y+8*s, 2*s, 4*s);
-        ctx.fillRect(G.player.x+1*s, G.player.y+8*s, 2*s, 4*s);
-        ctx.fillStyle = '#ffd700';
-        ctx.font = '14px "Courier New"';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'bottom';
-        ctx.fillText('*', G.player.x, G.player.y-10*s);
-        ctx.fillStyle = '#fff';
-        ctx.font = '8px "Courier New"';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'bottom';
-        ctx.fillText('紅葉', G.player.x, G.player.y+24);
-    }
-    
-    // 情報
-    ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    ctx.fillRect(0, 0, 280, 20);
-    ctx.fillStyle = '#fff';
-    ctx.font = '11px "Courier New"';
-    ctx.textAlign = 'left';
-    ctx.fillText('速' + G.jasonSpeed + ' 木' + G.woodCount + '/' + G.maxWood + ' 防' + G.defense, 8, 15);
-    
-    // 倉庫ブロック
-    ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    ctx.fillRect(550, 0, 250, 20);
-    ctx.fillStyle = '#ffd93d';
-    ctx.font = '10px "Courier New"';
-    ctx.textAlign = 'left';
-    ctx.fillText('倉庫:', 558, 14);
-    for(let i=0; i<8; i++) {
-        const bx = 610 + i * 22;
-        ctx.fillStyle = i < G.reinforcedBlocks ? '#ffd93d' : '#333';
-        ctx.fillRect(bx, 4, 18, 12);
-        ctx.strokeStyle = '#555';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(bx, 4, 18, 12);
-        if(i < G.reinforcedBlocks) {
-            ctx.fillStyle = '#000';
-            ctx.font = '7px "Courier New"';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('補', bx+9, 10);
-        }
-    }
-    
-    // 夜
-    if(isNight) {
-        ctx.fillStyle = 'rgba(0,0,30,0.2)';
-        ctx.fillRect(0, 0, 800, 600);
-        ctx.fillStyle = 'rgba(255,255,200,0.08)';
-        ctx.beginPath();
-        ctx.arc(720, 50, 35, 0, Math.PI*2);
-        ctx.fill();
-    }
-}
+  if (state.day > MAX_DAYS) {
+    endGame();
+    return;
+  }
 
-// ===== メインループ =====
-function gameLoop() {
-    if(!G.ended) {
-        G.frame++;
-        updatePhase();
-        updateJason();
-        updatePlayer();
-        updateMobs();
-        updateWolves();
-        updateBear();
-        updateUI();
-        updateMinimap();
+  var jSpeed = 10 + (state.day - 1) * 10;
+  addLog('📈 ' + state.day + '日目: ジェイソンの速度が ' + jSpeed + ' になった');
+
+  // ★ 復活処理
+  processRespawn();
+
+  // モブ再割り当て
+  for (var i = 0; i < state.mobs.length; i++) {
+    var mob = state.mobs[i];
+    if (mob.alive && !mob.hasDelivered) {
+      assignMobTask(mob);
     }
-    draw();
-    requestAnimationFrame(gameLoop);
-}
+  }
 
-// ===== イベント =====
-const canvas = document.getElementById('gameCanvas');
-
-canvas.addEventListener('mousemove', (e) => {
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    G.mouseX = clamp((e.clientX - rect.left) * scaleX, 20, 780);
-    G.mouseY = clamp((e.clientY - rect.top) * scaleY, 20, 580);
-});
-
-canvas.addEventListener('click', handleClick);
-
-canvas.addEventListener('contextmenu', (e) => {
-    e.preventDefault();
-    if(G.gameOver || G.ended) return;
-    if(G.inventory !== null) {
-        const items = G.items[G.currentStage] || [];
-        items.push({
-            x: G.player.x + rand(-30, 30),
-            y: G.player.y + rand(-30, 30),
-            type: G.inventory,
-            collected: false,
-            respawnDay: 0
+  // 品10〜品80 再補充 (品1〜品8は再補充しない)
+  for (var b = 0; b < 8; b++) {
+    var bid = ITEM_BLOCK_MAP[b];
+    var itemName = '品' + ((b + 1) * 10);
+    var exists = false;
+    for (var it = 0; it < state.items.length; it++) {
+      if (state.items[it].name === itemName) { exists = true; break; }
+    }
+    if (!exists) {
+      // まだpendingRespawnにないかチェック
+      var pending = false;
+      for (var p = 0; p < state.pendingRespawn.length; p++) {
+        if (state.pendingRespawn[p].name === itemName) { pending = true; break; }
+      }
+      if (!pending) {
+        state.items.push({
+          name: itemName,
+          x: rand(0, 9),
+          y: rand(0, 9),
+          blockId: bid
         });
-        G.items[G.currentStage] = items;
-        G.inventory = null;
-        document.getElementById('statusMsg').textContent = '[ アイテム捨てた ]';
-        document.getElementById('statusMsg').className = 'info';
-        updateUI();
+      }
     }
+  }
+
+  // 小屋オブジェクトリセット
+  for (var oi = 0; oi < state.objects.length; oi++) {
+    state.objects[oi].used = false;
+    state.objects[oi].cooldown = 0;
+  }
+
+  state.dayElapsed = 0;
+  state.night = false;
+  nightOverlay.style.display = 'none';
+  updateUI();
+  startDayTimer();
+}
+
+// ---- ゲーム終了 ----
+function endGame() {
+  if (state.gameOver) return;
+  state.isGameLoopRunning = false;
+  if (state.dayTimerInterval) { clearInterval(state.dayTimerInterval); state.dayTimerInterval = null; }
+
+  var totalPoints = state.points;
+  var jasonPts = state.jasonPoints;
+
+  addLog('🏁 7日間終了！ 総ポイント: ' + totalPoints + ' / ジェイソンポイント: ' + jasonPts);
+
+  if (totalPoints > jasonPts) {
+    state.gameWon = true;
+    addLog('🎉 勝利！');
+    showPopup('🎉 勝利！', '補強ポイント ' + totalPoints + ' で ジェイソンポイント ' + jasonPts + ' を上回った！\nrefined.html に移動します', '移動する', function() {
+      hidePopup();
+      window.location.href = 'refined.html';
+    });
+  } else if (totalPoints === jasonPts) {
+    state.gameOver = true;
+    addLog('⚖️ 引き分け... 負け');
+    showPopup('😵 引き分け', '補強ポイント ' + totalPoints + ' で ジェイソンポイント ' + jasonPts + ' と同点...\n負けです', '再挑戦', function() {
+      hidePopup();
+      initGame();
+    });
+  } else {
+    state.gameOver = true;
+    addLog('💀 敗北...');
+    showPopup('💀 敗北', '補強ポイント ' + totalPoints + ' で ジェイソンポイント ' + jasonPts + ' に届かなかった...', '再挑戦', function() {
+      hidePopup();
+      initGame();
+    });
+  }
+}
+
+// ---- ポップアップ ----
+function showPopup(title, desc, btnText, callback) {
+  popupTitle.textContent = title;
+  popupDesc.textContent = desc;
+  popupBtn.textContent = btnText;
+  popup.style.display = 'block';
+  popupBtn.onclick = callback;
+}
+
+function hidePopup() { popup.style.display = 'none'; }
+
+// ---- UI更新 ----
+function updateUI() {
+  dispDay.textContent = state.day + ' / 7';
+  dispPoints.textContent = state.points;
+  dispItem.textContent = state.heroItem || 'なし';
+  dispMobAlive.textContent = state.mobAlive + ' / 8';
+  if (!state.gameOver) {
+    var remaining = DAY_DURATION - state.dayElapsed;
+    dayDisplay.textContent = '🌅 ' + state.day + '日目 (' + Math.max(0, remaining) + '秒)';
+  }
+}
+
+// ---- メインループ ----
+function gameLoop() {
+  if (!state.isGameLoopRunning && state.gameOver) {
+    render();
+    state.animFrame = requestAnimationFrame(gameLoop);
+    return;
+  }
+
+  state.frameCount++;
+
+  if (!state.gameOver) {
+    if (state.frameCount % 3 === 0) updateMobs();
+    if (state.frameCount % 4 === 0) updateEnemies();
+  }
+
+  render();
+  state.animFrame = requestAnimationFrame(gameLoop);
+}
+
+// ---- ★ 描画 (斧・銃は画像表示) ----
+function render() {
+  ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+  var blockId = state.currentBlock;
+
+  ctx.fillStyle = blockId === 4 ? '#8B7D6B' : '#2d5a27';
+  ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+  ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+  ctx.lineWidth = 0.5;
+  for (var gx = 0; gx <= GRID_SIZE; gx++) {
+    ctx.beginPath();
+    ctx.moveTo(gx * BLOCK_SIZE, 0);
+    ctx.lineTo(gx * BLOCK_SIZE, CANVAS_SIZE);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, gx * BLOCK_SIZE);
+    ctx.lineTo(CANVAS_SIZE, gx * BLOCK_SIZE);
+    ctx.stroke();
+  }
+
+  // 木
+  if (blockId !== 4) {
+    for (var y = 0; y < GRID_SIZE; y++) {
+      for (var x = 0; x < GRID_SIZE; x++) {
+        if (state.blockMap[blockId] && state.blockMap[blockId][y] && state.blockMap[blockId][y][x] === 'tree') {
+          ctx.fillStyle = '#1a3d1a';
+          ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+          ctx.fillStyle = '#2a5a2a';
+          ctx.fillRect(x * BLOCK_SIZE + 4, y * BLOCK_SIZE + 4, BLOCK_SIZE - 8, BLOCK_SIZE - 8);
+          ctx.fillStyle = '#3a7a3a';
+          ctx.font = '14px "MS Gothic"';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('木', x * BLOCK_SIZE + BLOCK_SIZE/2, y * BLOCK_SIZE + BLOCK_SIZE/2);
+        }
+      }
+    }
+  }
+
+  // 小屋オブジェクト
+  if (blockId === 4) {
+    for (var oi = 0; oi < state.objects.length; oi++) {
+      var obj = state.objects[oi];
+      if (obj.blockId !== blockId) continue;
+      var px = obj.x * BLOCK_SIZE;
+      var py = obj.y * BLOCK_SIZE;
+      var isCooling = obj.cooldown > 0;
+      ctx.fillStyle = obj.used ? (isCooling ? '#664444' : '#555') : '#3a3a5a';
+      ctx.fillRect(px + 2, py + 2, BLOCK_SIZE - 4, BLOCK_SIZE - 4);
+      ctx.strokeStyle = obj.used ? (isCooling ? '#884444' : '#777') : '#88aaff';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(px + 2, py + 2, BLOCK_SIZE - 4, BLOCK_SIZE - 4);
+      ctx.fillStyle = obj.used ? (isCooling ? '#aa6666' : '#888') : '#ffffff';
+      ctx.font = '12px "MS Gothic"';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      var label = obj.type;
+      if (obj.type === '窓') label = '密';
+      if (obj.type === '樽') label = '椅';
+      ctx.fillText(label, px + BLOCK_SIZE/2, py + BLOCK_SIZE/2);
+      if (isCooling) {
+        ctx.fillStyle = '#ff6644';
+        ctx.font = '8px "MS Gothic"';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(obj.cooldown + 's', px + BLOCK_SIZE/2, py + BLOCK_SIZE);
+      }
+    }
+  }
+
+  // ★ アイテム (斧・銃は画像表示)
+  for (var ii = 0; ii < state.items.length; ii++) {
+    var item = state.items[ii];
+    if (item.blockId !== blockId) continue;
+    var px2 = item.x * BLOCK_SIZE;
+    var py2 = item.y * BLOCK_SIZE;
+
+    // 斧と銃は画像表示
+    if (item.name === '斧' || item.name === '銃') {
+      var img = getImage(item.name);
+      if (img) {
+        ctx.drawImage(img, px2, py2, BLOCK_SIZE, BLOCK_SIZE);
+        continue;
+      }
+    }
+
+    // その他は従来通り
+    ctx.fillStyle = '#ffdd44';
+    ctx.fillRect(px2 + 4, py2 + 4, BLOCK_SIZE - 8, BLOCK_SIZE - 8);
+    ctx.fillStyle = '#000';
+    ctx.font = '10px "MS Gothic"';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    var label2 = item.name;
+    if (label2.length > 4) label2 = label2.substring(0, 4);
+    ctx.fillText(label2, px2 + BLOCK_SIZE/2, py2 + BLOCK_SIZE/2);
+  }
+
+  // キャラクター
+  var allChars = [];
+  if (state.hero && state.hero.alive && state.hero.blockId === blockId) {
+    allChars.push({ name: state.hero.img, x: state.hero.x, y: state.hero.y });
+  }
+  for (var mi3 = 0; mi3 < state.mobs.length; mi3++) {
+    var mob3 = state.mobs[mi3];
+    if (mob3.alive && mob3.blockId === blockId) {
+      allChars.push({ name: mob3.img, x: mob3.x, y: mob3.y });
+    }
+  }
+  if (state.jason && state.jason.alive && state.jason.blockId === blockId) {
+    allChars.push({ name: state.jason.img, x: state.jason.x, y: state.jason.y });
+  }
+  if (state.bear && state.bear.alive && state.bear.blockId === blockId) {
+    allChars.push({ name: state.bear.img, x: state.bear.x, y: state.bear.y });
+  }
+  if (state.wolf && state.wolf.alive && state.wolf.blockId === blockId) {
+    allChars.push({ name: state.wolf.img, x: state.wolf.x, y: state.wolf.y });
+  }
+
+  for (var ci = 0; ci < allChars.length; ci++) {
+    var ch = allChars[ci];
+    var px3 = ch.x * BLOCK_SIZE;
+    var py3 = ch.y * BLOCK_SIZE;
+    var img = getImage(ch.name);
+    if (img) {
+      ctx.drawImage(img, px3, py3, BLOCK_SIZE, BLOCK_SIZE);
+    } else {
+      var colors = {
+        '紅葉': '#aa44ff',
+        '加藤': '#ff6644',
+        '松本': '#ff6644',
+        '坪池': '#ff6644',
+        '市川': '#ff6644',
+        '青笹': '#ff6644',
+        '角田': '#ff6644',
+        '木元': '#ff6644',
+        '山崎': '#ff6644',
+        'ジェイソン': '#ff0000',
+        '熊': '#8B4513',
+        '狼': '#888888'
+      };
+      var color = colors[ch.name] || '#888';
+      ctx.fillStyle = color;
+      ctx.fillRect(px3 + 2, py3 + 2, BLOCK_SIZE - 4, BLOCK_SIZE - 4);
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(px3 + 2, py3 + 2, BLOCK_SIZE - 4, BLOCK_SIZE - 4);
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 12px "MS Gothic"';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      var label3 = ch.name;
+      if (label3.length > 2) label3 = label3.substring(0, 2);
+      ctx.fillText(label3, px3 + BLOCK_SIZE/2, py3 + BLOCK_SIZE/2);
+    }
+  }
+
+  ctx.fillStyle = 'rgba(255,255,255,0.25)';
+  ctx.font = '10px "MS Gothic"';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText(BLOCK_NAMES[blockId], 4, 4);
+}
+
+// ---- キーボード ----
+document.addEventListener('keydown', function(e) {
+  var key = e.key;
+  var arrowKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+  if (arrowKeys.indexOf(key) >= 0) {
+    e.preventDefault();
+    var dir = { ArrowUp: [0,-1], ArrowDown: [0,1], ArrowLeft: [-1,0], ArrowRight: [1,0] };
+    var d = dir[key];
+    moveHero(d[0], d[1]);
+  }
 });
 
-document.getElementById('arrowUp').addEventListener('click', () => moveStage('up'));
-document.getElementById('arrowDown').addEventListener('click', () => moveStage('down'));
-document.getElementById('arrowLeft').addEventListener('click', () => moveStage('left'));
-document.getElementById('arrowRight').addEventListener('click', () => moveStage('right'));
+// ---- マウスクリック ----
+canvas.addEventListener('click', function(e) {
+  if (state.gameOver) return;
+  var rect = canvas.getBoundingClientRect();
+  var scaleX = canvas.width / rect.width;
+  var scaleY = canvas.height / rect.height;
+  var mx = (e.clientX - rect.left) * scaleX;
+  var my = (e.clientY - rect.top) * scaleY;
+  var gx = Math.floor(mx / BLOCK_SIZE);
+  var gy = Math.floor(my / BLOCK_SIZE);
+  if (gx < 0 || gx >= GRID_SIZE || gy < 0 || gy >= GRID_SIZE) return;
 
-document.addEventListener('keydown', (e) => {
-    if(e.key === 'r' || e.key === 'R') initGame();
-    if(e.key === 'ArrowUp') moveStage('up');
-    if(e.key === 'ArrowDown') moveStage('down');
-    if(e.key === 'ArrowLeft') moveStage('left');
-    if(e.key === 'ArrowRight') moveStage('right');
-    if(e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        handleClick();
+  var hero = state.hero;
+  if (!hero || !hero.alive) return;
+  if (hero.blockId !== state.currentBlock) return;
+
+  pickupItemByClick(gx, gy);
+
+  var clickedObj = null;
+  for (var oi2 = 0; oi2 < state.objects.length; oi2++) {
+    var obj2 = state.objects[oi2];
+    if (obj2.blockId !== hero.blockId) continue;
+    if (obj2.x === gx && obj2.y === gy) {
+      clickedObj = obj2;
+      break;
     }
+  }
+
+  if (state.wolf && state.wolf.alive && state.wolf.blockId === hero.blockId) {
+    if (state.wolf.x === gx && state.wolf.y === gy) {
+      useItemOnObject('狼');
+      return;
+    }
+  }
+
+  if (clickedObj) {
+    useItemOnObject(clickedObj.type);
+  }
 });
 
-document.getElementById('restartBtn').addEventListener('click', initGame);
+// ---- ★ スマホ用タッチ対応 ----
+var touchStartX = 0, touchStartY = 0;
+var isTouching = false;
 
-// ===== 起動 =====
-console.log('起動');
-initGame();
-gameLoop();
-console.log('実行中');
+canvas.addEventListener('touchstart', function(e) {
+  e.preventDefault();
+  var touch = e.touches[0];
+  if (!touch) return;
+  var rect = canvas.getBoundingClientRect();
+  var scaleX = canvas.width / rect.width;
+  var scaleY = canvas.height / rect.height;
+  var mx = (touch.clientX - rect.left) * scaleX;
+  var my = (touch.clientY - rect.top) * scaleY;
+  var gx = Math.floor(mx / BLOCK_SIZE);
+  var gy = Math.floor(my / BLOCK_SIZE);
+
+  // タップ位置が十字キー領域なら無視
+  var mobileCtrl = document.getElementById('mobileControls');
+  if (mobileCtrl.classList.contains('active')) {
+    var cRect = mobileCtrl.getBoundingClientRect();
+    if (touch.clientX >= cRect.left && touch.clientX <= cRect.right &&
+        touch.clientY >= cRect.top && touch.clientY <= cRect.bottom) {
+      return;
+    }
+  }
+
+  if (gx < 0 || gx >= GRID_SIZE || gy < 0 || gy >= GRID_SIZE) return;
+
+  var hero = state.hero;
+  if (!hero || !hero.alive) return;
+  if (hero.blockId !== state.currentBlock) return;
+
+  // タップでクリック処理
+  pickupItemByClick(gx, gy);
+
+  var clickedObj = null;
+  for (var oi2 = 0; oi2 < state.objects.length; oi2++) {
+    var obj2 = state.objects[oi2];
+    if (obj2.blockId !== hero.blockId) continue;
+    if (obj2.x === gx && obj2.y === gy) {
+      clickedObj = obj2;
+      break;
+    }
+  }
+
+  if (state.wolf && state.wolf.alive && state.wolf.blockId === hero.blockId) {
+    if (state.wolf.x === gx && state.wolf.y === gy) {
+      useItemOnObject('狼');
+      return;
+    }
+  }
+
+  if (clickedObj) {
+    useItemOnObject(clickedObj.type);
+  }
+}, { passive: false });
+
+// ---- ★ スマホ用十字キー ----
+function setupDpad() {
+  var upBtn = document.getElementById('dpad-up');
+  var downBtn = document.getElementById('dpad-down');
+  var leftBtn = document.getElementById('dpad-left');
+  var rightBtn = document.getElementById('dpad-right');
+
+  function setupButton(btn, dx, dy) {
+    var intervalId = null;
+    var timeoutId = null;
+
+    function startMove() {
+      moveHero(dx, dy);
+      if (intervalId) clearInterval(intervalId);
+      intervalId = setInterval(function() { moveHero(dx, dy); }, 120);
+    }
+
+    function stopMove() {
+      if (intervalId) { clearInterval(intervalId); intervalId = null; }
+      if (timeoutId) { clearTimeout(timeoutId); timeoutId = null; }
+    }
+
+    btn.addEventListener('mousedown', function(e) {
+      e.preventDefault();
+      startMove();
+    });
+    btn.addEventListener('mouseup', stopMove);
+    btn.addEventListener('mouseleave', stopMove);
+
+    btn.addEventListener('touchstart', function(e) {
+      e.preventDefault();
+      startMove();
+    }, { passive: false });
+    btn.addEventListener('touchend', function(e) {
+      e.preventDefault();
+      stopMove();
+    }, { passive: false });
+    btn.addEventListener('touchcancel', function(e) {
+      e.preventDefault();
+      stopMove();
+    }, { passive: false });
+  }
+
+  setupButton(upBtn, 0, -1);
+  setupButton(downBtn, 0, 1);
+  setupButton(leftBtn, -1, 0);
+  setupButton(rightBtn, 1, 0);
+}
+
+// ---- ★ スマホ操作トグル ----
+mobileToggle.addEventListener('click', function() {
+  var isActive = mobileControls.classList.toggle('active');
+  tapHint.classList.toggle('active');
+  mobileToggle.classList.toggle('active');
+  mobileToggle.textContent = isActive ? '⌨️ キーボード' : '📱 スマホ操作';
+  if (isActive) {
+    addLog('📱 スマホ操作モード ON (十字キー + タップクリック)');
+  } else {
+    addLog('⌨️ キーボードモード ON');
+  }
+});
+
+// ---- ボタン ----
+btnDrop.addEventListener('click', dropItem);
+
+// ---- 起動 ----
+loadImages(function() {
+  setupDpad();
+  initGame();
+});
+
+})();
 </script>
 </body>
 </html>
