@@ -22,6 +22,7 @@ body { background:#1a1a2e; display:flex; justify-content:center; align-items:cen
 #controls button { background:#333366; border:1px solid #555599; color:#ccd; padding:4px 12px; border-radius:3px; font-size:12px; cursor:pointer; font-family:inherit; touch-action:manipulation; }
 #controls button:hover { background:#444488; }
 #controls button:active { background:#222255; }
+#controls button.active-mode { background:#885533; border-color:#cc8844; color:#ffdd99; }
 #bottomBar { display:flex; justify-content:space-between; margin-top:10px; color:#88aacc; font-size:13px; padding:0 4px; flex-wrap:wrap; gap:4px; }
 #dayDisplay { color:#ffaa66; font-weight:bold; }
 #msgPopup { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:rgba(0,0,0,0.92); border:3px solid #ffcc44; border-radius:12px; padding:25px 40px; color:#fff; text-align:center; display:none; z-index:100; pointer-events:auto; min-width:200px; }
@@ -114,6 +115,37 @@ body { background:#1a1a2e; display:flex; justify-content:center; align-items:cen
 }
 #tapHint.active { display:block; }
 
+/* ===== モブ操作矢印 ===== */
+#mobArrowOverlay {
+  position:absolute;
+  top:0;
+  left:0;
+  width:100%;
+  height:100%;
+  pointer-events:none;
+  z-index:60;
+}
+.mob-arrow {
+  position:absolute;
+  width:30px;
+  height:30px;
+  background:rgba(255,200,50,0.85);
+  border:2px solid #ffdd44;
+  border-radius:50%;
+  color:#000;
+  font-size:18px;
+  font-weight:bold;
+  text-align:center;
+  line-height:26px;
+  cursor:pointer;
+  pointer-events:auto;
+  box-shadow:0 0 12px rgba(255,200,0,0.6);
+  transform:translate(-50%, -50%);
+  z-index:70;
+  touch-action:manipulation;
+}
+.mob-arrow:active { background:rgba(255,220,80,0.95); transform:translate(-50%, -50%) scale(0.9); }
+
 /* ===== レスポンシブ ===== */
 @media (max-width:700px) {
   #mainArea { flex-direction:column; align-items:center; }
@@ -130,6 +162,7 @@ body { background:#1a1a2e; display:flex; justify-content:center; align-items:cen
   #dpad #dpad-right { top:37px; }
   #dpad #dpad-center { top:37px; left:37px; width:36px; height:36px; line-height:36px; font-size:10px; }
   #infoPanel { font-size:12px; padding:8px; }
+  .mob-arrow { width:24px; height:24px; font-size:14px; line-height:22px; }
 }
 </style>
 </head>
@@ -156,6 +189,9 @@ body { background:#1a1a2e; display:flex; justify-content:center; align-items:cen
 </div>
 </div>
 <div id="tapHint">タップでクリック</div>
+
+<!-- モブ操作矢印オーバーレイ -->
+<div id="mobArrowOverlay"></div>
 </div>
 
 <div id="infoPanel">
@@ -168,6 +204,7 @@ body { background:#1a1a2e; display:flex; justify-content:center; align-items:cen
 <div id="controls">
 <button id="btnDrop">📤 落とす</button>
 <button id="mobileToggle">📱 スマホ操作</button>
+<button id="btnMobControl">🔄 モブ操作</button>
 </div>
 </div>
 </div>
@@ -179,12 +216,7 @@ body { background:#1a1a2e; display:flex; justify-content:center; align-items:cen
 
 <script>
 // ============================================================
-// 7日間サバイバルゲーム (完全版)
-// ・品クールダウン5秒
-// ・狼から逃げるジェイソン＆熊
-// ・納品アイテムは3日後に復活 (品1〜8除く)
-// ・斧・銃は画像表示
-// ・スマホ用十字キー＋タップクリック
+// 7日間サバイバルゲーム (完全版 + モブ操作モード)
 // ============================================================
 
 (function(){
@@ -230,8 +262,6 @@ var CHARACTERS = {
 
 var MOB_NAMES = ['加藤','松本','坪池','市川','青笹','角田','木元','山崎'];
 var HERO_NAME = '紅葉';
-
-// 品番号 → 森ブロックID マッピング (0=森8, 1=森7, 2=森6, 3=森5, 4=小屋, 5=森4, 6=森3, 7=森2, 8=森1)
 var ITEM_BLOCK_MAP = [8,7,6,5,3,2,1,0];
 
 var imageCache = {};
@@ -241,24 +271,15 @@ var totalImages = 0;
 function loadImages(callback) {
   var names = [];
   for (var key in IMG_FILES) {
-    if (IMG_FILES.hasOwnProperty(key)) {
-      names.push(key);
-    }
+    if (IMG_FILES.hasOwnProperty(key)) names.push(key);
   }
   totalImages = names.length;
   imagesLoaded = 0;
-
   for (var i = 0; i < names.length; i++) {
     var name = names[i];
     var img = new Image();
-    img.onload = function() {
-      imagesLoaded++;
-      if (imagesLoaded >= totalImages) { callback(); }
-    };
-    img.onerror = function() {
-      imagesLoaded++;
-      if (imagesLoaded >= totalImages) { callback(); }
-    };
+    img.onload = function() { imagesLoaded++; if (imagesLoaded >= totalImages) callback(); };
+    img.onerror = function() { imagesLoaded++; if (imagesLoaded >= totalImages) callback(); };
     img.src = IMG_FILES[name];
     imageCache[name] = img;
   }
@@ -270,6 +291,7 @@ function getImage(name) {
   return null;
 }
 
+// ---- 状態 ----
 var state = {
   day: 1,
   dayElapsed: 0,
@@ -299,8 +321,11 @@ var state = {
   jasonKillCooldown: 0,
   bearKillCooldown: 0,
   isGameLoopRunning: false,
-  // ★ 納品アイテム復活用
-  pendingRespawn: []
+  pendingRespawn: [],
+  // ★ モブ操作モード
+  mobControlMode: false,
+  selectedMob: null,
+  arrowDirections: []  // [{dx, dy, x, y}]
 };
 
 var canvas = document.getElementById('mapCanvas');
@@ -320,6 +345,8 @@ var btnDrop = document.getElementById('btnDrop');
 var mobileToggle = document.getElementById('mobileToggle');
 var mobileControls = document.getElementById('mobileControls');
 var tapHint = document.getElementById('tapHint');
+var btnMobControl = document.getElementById('btnMobControl');
+var arrowOverlay = document.getElementById('mobArrowOverlay');
 
 function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
 
@@ -350,10 +377,8 @@ function gridToBlock(row, col) {
 
 function moveCharacter(entity, dx, dy) {
   if (!entity || !entity.alive) return false;
-
   var nx = entity.x + dx;
   var ny = entity.y + dy;
-
   if (nx >= 0 && nx < GRID_SIZE && ny >= 0 && ny < GRID_SIZE) {
     if (state.blockMap[entity.blockId] && state.blockMap[entity.blockId][ny] &&
         state.blockMap[entity.blockId][ny][nx] === 'tree') {
@@ -363,34 +388,22 @@ function moveCharacter(entity, dx, dy) {
     entity.y = ny;
     return true;
   }
-
   var g = blockToGrid(entity.blockId);
-  var newRow = g.row;
-  var newCol = g.col;
-  var newX = nx;
-  var newY = ny;
-
+  var newRow = g.row, newCol = g.col, newX = nx, newY = ny;
   if (nx < 0) { newCol--; newX = GRID_SIZE - 1; }
   else if (nx >= GRID_SIZE) { newCol++; newX = 0; }
   else if (ny < 0) { newRow--; newY = GRID_SIZE - 1; }
   else if (ny >= GRID_SIZE) { newRow++; newY = 0; }
-
   var newBlock = gridToBlock(newRow, newCol);
   if (newBlock < 0 || newBlock > 8) return false;
-
   if (state.blockMap[newBlock] && state.blockMap[newBlock][newY] &&
       state.blockMap[newBlock][newY][newX] === 'tree') {
     return false;
   }
-
   entity.blockId = newBlock;
   entity.x = newX;
   entity.y = newY;
-
-  if (entity === state.hero) {
-    state.currentBlock = newBlock;
-  }
-
+  if (entity === state.hero) state.currentBlock = newBlock;
   return true;
 }
 
@@ -417,6 +430,11 @@ function initGame() {
   state.isGameLoopRunning = true;
   state.frameCount = 0;
   state.pendingRespawn = [];
+  state.mobControlMode = false;
+  state.selectedMob = null;
+  state.arrowDirections = [];
+  btnMobControl.classList.remove('active-mode');
+  clearArrows();
 
   var days = [1,2,3,4,5,6,7];
   state.bearAttackDays = [];
@@ -576,7 +594,6 @@ function spawnItems() {
   state.items = [];
   var itemTypes = ['材','斧','銃','餌','堀'];
 
-  // 品1〜品8 (モブ用) … 森1→品1, 森2→品2, …
   for (var i = 0; i < 8; i++) {
     var bid = ITEM_BLOCK_MAP[i];
     state.items.push({
@@ -587,7 +604,6 @@ function spawnItems() {
     });
   }
 
-  // 品10〜品80 (主人公用) … 森1→品10, 森2→品20, …
   for (var i = 0; i < 8; i++) {
     var bid2 = ITEM_BLOCK_MAP[i];
     state.items.push({
@@ -598,7 +614,6 @@ function spawnItems() {
     });
   }
 
-  // 材・斧・銃・餌・堀 (全ブロックランダム)
   var allBlocks = [0,1,2,3,4,5,6,7,8];
   for (var ti = 0; ti < itemTypes.length; ti++) {
     var bid3 = allBlocks[rand(0, allBlocks.length - 1)];
@@ -611,7 +626,6 @@ function spawnItems() {
   }
 }
 
-// ---- モブタスク ----
 function assignMobTask(mob) {
   if (!mob.alive || mob.hasDelivered) return;
   var targetName = '品' + (mob.taskId + 1);
@@ -745,7 +759,7 @@ function updateMobs() {
   }
 }
 
-// ---- ★ 狼から逃げる処理 ----
+// ---- 狼から逃げる ----
 function fleeFromWolf(entity) {
   if (!state.wolf || !state.wolf.alive) return false;
   if (entity.blockId !== state.wolf.blockId) return false;
@@ -759,9 +773,7 @@ function fleeFromWolf(entity) {
   } else {
     my = dy > 0 ? 1 : -1;
   }
-  // 逃げる方向に移動を試みる
   if (moveCharacter(entity, mx, my)) return true;
-  // 失敗したら別の方向を試す
   var attempts = [
     [mx, 0], [0, my], [-mx, 0], [0, -my],
     [mx, my], [-mx, my], [mx, -my], [-mx, -my]
@@ -774,7 +786,6 @@ function fleeFromWolf(entity) {
 
 // ---- 敵AI ----
 function updateEnemies() {
-  // ジェイソン
   if (state.jason && state.jason.alive) {
     var jSpeed = 10 + (state.day - 1) * 10;
     if (state.jason.speed !== jSpeed) state.jason.speed = jSpeed;
@@ -785,15 +796,9 @@ function updateEnemies() {
       state.jason.moveCooldown = Math.max(1, Math.floor(12 / (state.jason.speed / 10)));
 
       var hero = state.hero;
-
-      // ★ 狼が同じブロックにいる → 狼から逃げる (最優先)
       if (state.wolf && state.wolf.alive && state.jason.blockId === state.wolf.blockId) {
-        var fled = fleeFromWolf(state.jason);
-        if (fled) {
-          // 逃げた後も引き続き処理
-        }
+        fleeFromWolf(state.jason);
       }
-      // 狼がいない or 逃げられなかった → 主人公を追跡
       else if (hero && hero.alive) {
         if (state.jason.blockId === hero.blockId) {
           var jdx = hero.x - state.jason.x;
@@ -830,7 +835,6 @@ function updateEnemies() {
     if (state.jasonKillCooldown > 0) state.jasonKillCooldown--;
   }
 
-  // 熊
   var isBearAttackDay = false;
   for (var d = 0; d < state.bearAttackDays.length; d++) {
     if (state.bearAttackDays[d] === state.day) isBearAttackDay = true;
@@ -843,12 +847,9 @@ function updateEnemies() {
       state.bear.moveCooldown = 3;
 
       var hero2 = state.hero;
-
-      // ★ 狼が同じブロックにいる → 狼から逃げる (最優先)
       if (state.wolf && state.wolf.alive && state.bear.blockId === state.wolf.blockId) {
         fleeFromWolf(state.bear);
       }
-      // 襲撃日かつ狼がいない/逃げられなかった → 主人公を追跡
       else if (hero2 && hero2.alive && isBearAttackDay) {
         if (state.bear.blockId === hero2.blockId) {
           var bdx = hero2.x - state.bear.x;
@@ -889,7 +890,6 @@ function updateEnemies() {
     if (state.bearKillCooldown > 0) state.bearKillCooldown--;
   }
 
-  // 狼 (ランダム)
   if (state.wolf && state.wolf.alive) {
     if (state.wolf.moveCooldown > 0) {
       state.wolf.moveCooldown--;
@@ -959,18 +959,12 @@ function pickupItemByClick(gx, gy) {
   addLog('⚠️ そこにアイテムはありません');
 }
 
-// ---- ★ 納品アイテム復活処理 ----
+// ---- 復活処理 ----
 function scheduleRespawn(itemName, blockId) {
-  // 品1〜品8 は復活させない
   if (/^品[1-8]$/.test(itemName)) return;
-
-  // すでに pendingRespawn に同じアイテムがないかチェック
   for (var i = 0; i < state.pendingRespawn.length; i++) {
-    if (state.pendingRespawn[i].name === itemName && state.pendingRespawn[i].blockId === blockId) {
-      return;
-    }
+    if (state.pendingRespawn[i].name === itemName && state.pendingRespawn[i].blockId === blockId) return;
   }
-
   var respawnDay = state.day + 3;
   state.pendingRespawn.push({
     name: itemName,
@@ -985,35 +979,24 @@ function processRespawn() {
   var remaining = [];
   for (var i = 0; i < state.pendingRespawn.length; i++) {
     var p = state.pendingRespawn[i];
-    if (p.respawnDay <= state.day) {
-      toRespawn.push(p);
-    } else {
-      remaining.push(p);
-    }
+    if (p.respawnDay <= state.day) toRespawn.push(p);
+    else remaining.push(p);
   }
   state.pendingRespawn = remaining;
 
   for (var j = 0; j < toRespawn.length; j++) {
     var item = toRespawn[j];
-    // 品10〜品80 は固定ブロックに復活、それ以外はランダムブロック
     var blockId = item.blockId;
     if (/^品[1-9][0-9]$/.test(item.name)) {
-      // 品番号からブロックを特定
       var num = parseInt(item.name.replace('品', ''), 10);
       var idx = (num / 10) - 1;
-      if (idx >= 0 && idx < 8) {
-        blockId = ITEM_BLOCK_MAP[idx];
-      } else {
-        blockId = rand(0, 8);
-        if (blockId === 4) blockId = 0;
-      }
+      if (idx >= 0 && idx < 8) blockId = ITEM_BLOCK_MAP[idx];
+      else blockId = rand(0, 8);
+      if (blockId === 4) blockId = 0;
     } else {
-      // 材・斧・銃・餌・堀 → ランダムブロック
       var allBlocks = [0,1,2,3,4,5,6,7,8];
       blockId = allBlocks[rand(0, allBlocks.length - 1)];
     }
-
-    // 既に同じアイテムが存在しないかチェック
     var exists = false;
     for (var k = 0; k < state.items.length; k++) {
       if (state.items[k].name === item.name && state.items[k].blockId === blockId) {
@@ -1044,7 +1027,6 @@ function useItemOnObject(objType) {
   var hero = state.hero;
   var itemName = state.heroItem;
 
-  // 餌→狼
   if (itemName === '餌' && objType === '狼') {
     if (state.wolf && state.wolf.alive && state.wolf.blockId === hero.blockId) {
       if (Math.abs(state.wolf.x - hero.x) <= 1 && Math.abs(state.wolf.y - hero.y) <= 1) {
@@ -1054,7 +1036,6 @@ function useItemOnObject(objType) {
         state.heroItem = null;
         state.wolf.alive = false;
         addLog('✅ 餌で狼を懐かせた！ +1ポイント');
-        // ★ 復活予約 (品1〜8以外)
         scheduleRespawn(consumedName, consumedBlock);
         updateUI();
         return;
@@ -1101,7 +1082,6 @@ function useItemOnObject(objType) {
     return;
   }
 
-  // ★ 使用: クールダウン5秒
   obj.used = true;
   obj.cooldown = 5;
 
@@ -1112,9 +1092,7 @@ function useItemOnObject(objType) {
   state.heroItem = null;
   addLog('✅ ' + itemName + ' を使って +1ポイント！ (クールダウン5秒)');
 
-  // ★ 復活予約 (品1〜8以外)
   scheduleRespawn(consumedName2, consumedBlock2);
-
   updateUI();
 }
 
@@ -1155,14 +1133,11 @@ function startDayTimer() {
       addLog('🌙 夜になった...');
     }
 
-    // オブジェクトクールダウン更新
     for (var i = 0; i < state.objects.length; i++) {
       var obj = state.objects[i];
       if (obj.cooldown > 0) {
         obj.cooldown--;
-        if (obj.cooldown === 0) {
-          obj.used = false;
-        }
+        if (obj.cooldown === 0) obj.used = false;
       }
     }
 
@@ -1185,18 +1160,13 @@ function nextDay() {
   var jSpeed = 10 + (state.day - 1) * 10;
   addLog('📈 ' + state.day + '日目: ジェイソンの速度が ' + jSpeed + ' になった');
 
-  // ★ 復活処理
   processRespawn();
 
-  // モブ再割り当て
   for (var i = 0; i < state.mobs.length; i++) {
     var mob = state.mobs[i];
-    if (mob.alive && !mob.hasDelivered) {
-      assignMobTask(mob);
-    }
+    if (mob.alive && !mob.hasDelivered) assignMobTask(mob);
   }
 
-  // 品10〜品80 再補充 (品1〜品8は再補充しない)
   for (var b = 0; b < 8; b++) {
     var bid = ITEM_BLOCK_MAP[b];
     var itemName = '品' + ((b + 1) * 10);
@@ -1205,7 +1175,6 @@ function nextDay() {
       if (state.items[it].name === itemName) { exists = true; break; }
     }
     if (!exists) {
-      // まだpendingRespawnにないかチェック
       var pending = false;
       for (var p = 0; p < state.pendingRespawn.length; p++) {
         if (state.pendingRespawn[p].name === itemName) { pending = true; break; }
@@ -1221,7 +1190,6 @@ function nextDay() {
     }
   }
 
-  // 小屋オブジェクトリセット
   for (var oi = 0; oi < state.objects.length; oi++) {
     state.objects[oi].used = false;
     state.objects[oi].cooldown = 0;
@@ -1269,7 +1237,6 @@ function endGame() {
   }
 }
 
-// ---- ポップアップ ----
 function showPopup(title, desc, btnText, callback) {
   popupTitle.textContent = title;
   popupDesc.textContent = desc;
@@ -1280,7 +1247,6 @@ function showPopup(title, desc, btnText, callback) {
 
 function hidePopup() { popup.style.display = 'none'; }
 
-// ---- UI更新 ----
 function updateUI() {
   dispDay.textContent = state.day + ' / 7';
   dispPoints.textContent = state.points;
@@ -1292,204 +1258,136 @@ function updateUI() {
   }
 }
 
-// ---- メインループ ----
-function gameLoop() {
-  if (!state.isGameLoopRunning && state.gameOver) {
-    render();
-    state.animFrame = requestAnimationFrame(gameLoop);
+// ---- ★ モブ操作モード ----
+function clearArrows() {
+  arrowOverlay.innerHTML = '';
+  state.arrowDirections = [];
+  state.selectedMob = null;
+}
+
+function showMobArrows(mob) {
+  clearArrows();
+  if (!mob || !mob.alive) return;
+  state.selectedMob = mob;
+
+  var directions = [
+    { dx: 0, dy: -1, label: '↑' },
+    { dx: 0, dy: 1, label: '↓' },
+    { dx: -1, dy: 0, label: '←' },
+    { dx: 1, dy: 0, label: '→' }
+  ];
+
+  var validDirs = [];
+  for (var i = 0; i < directions.length; i++) {
+    var d = directions[i];
+    var nx = mob.x + d.dx;
+    var ny = mob.y + d.dy;
+    // 範囲チェック
+    if (nx < 0 || nx >= GRID_SIZE || ny < 0 || ny >= GRID_SIZE) {
+      // ブロック移動可能かチェック（端を超える場合）
+      var g = blockToGrid(mob.blockId);
+      var newRow = g.row, newCol = g.col;
+      var newX = nx, newY = ny;
+      if (nx < 0) { newCol--; newX = GRID_SIZE - 1; }
+      else if (nx >= GRID_SIZE) { newCol++; newX = 0; }
+      else if (ny < 0) { newRow--; newY = GRID_SIZE - 1; }
+      else if (ny >= GRID_SIZE) { newRow++; newY = 0; }
+      var newBlock = gridToBlock(newRow, newCol);
+      if (newBlock < 0 || newBlock > 8) continue;
+      if (state.blockMap[newBlock] && state.blockMap[newBlock][newY] &&
+          state.blockMap[newBlock][newY][newX] === 'tree') continue;
+      validDirs.push({ dx: d.dx, dy: d.dy, label: d.label, x: nx, y: ny });
+    } else {
+      // 範囲内
+      if (state.blockMap[mob.blockId] && state.blockMap[mob.blockId][ny] &&
+          state.blockMap[mob.blockId][ny][nx] === 'tree') continue;
+      validDirs.push({ dx: d.dx, dy: d.dy, label: d.label, x: nx, y: ny });
+    }
+  }
+
+  if (validDirs.length === 0) {
+    addLog('⚠️ ' + mob.name + ' は動ける方向がありません');
     return;
   }
 
-  state.frameCount++;
+  state.arrowDirections = validDirs;
 
-  if (!state.gameOver) {
-    if (state.frameCount % 3 === 0) updateMobs();
-    if (state.frameCount % 4 === 0) updateEnemies();
-  }
+  // オーバーレイに矢印を配置
+  var wrapRect = document.getElementById('mapWrap').getBoundingClientRect();
+  var canvasRect = canvas.getBoundingClientRect();
+  var offsetX = canvasRect.left - wrapRect.left;
+  var offsetY = canvasRect.top - wrapRect.top;
 
-  render();
-  state.animFrame = requestAnimationFrame(gameLoop);
-}
+  for (var j = 0; j < validDirs.length; j++) {
+    var dir = validDirs[j];
+    var arrowX = (mob.x + dir.dx * 1.2) * BLOCK_SIZE + BLOCK_SIZE/2;
+    var arrowY = (mob.y + dir.dy * 1.2) * BLOCK_SIZE + BLOCK_SIZE/2;
 
-// ---- ★ 描画 (斧・銃は画像表示) ----
-function render() {
-  ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-
-  var blockId = state.currentBlock;
-
-  ctx.fillStyle = blockId === 4 ? '#8B7D6B' : '#2d5a27';
-  ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-
-  ctx.strokeStyle = 'rgba(0,0,0,0.12)';
-  ctx.lineWidth = 0.5;
-  for (var gx = 0; gx <= GRID_SIZE; gx++) {
-    ctx.beginPath();
-    ctx.moveTo(gx * BLOCK_SIZE, 0);
-    ctx.lineTo(gx * BLOCK_SIZE, CANVAS_SIZE);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(0, gx * BLOCK_SIZE);
-    ctx.lineTo(CANVAS_SIZE, gx * BLOCK_SIZE);
-    ctx.stroke();
-  }
-
-  // 木
-  if (blockId !== 4) {
-    for (var y = 0; y < GRID_SIZE; y++) {
-      for (var x = 0; x < GRID_SIZE; x++) {
-        if (state.blockMap[blockId] && state.blockMap[blockId][y] && state.blockMap[blockId][y][x] === 'tree') {
-          ctx.fillStyle = '#1a3d1a';
-          ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
-          ctx.fillStyle = '#2a5a2a';
-          ctx.fillRect(x * BLOCK_SIZE + 4, y * BLOCK_SIZE + 4, BLOCK_SIZE - 8, BLOCK_SIZE - 8);
-          ctx.fillStyle = '#3a7a3a';
-          ctx.font = '14px "MS Gothic"';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText('木', x * BLOCK_SIZE + BLOCK_SIZE/2, y * BLOCK_SIZE + BLOCK_SIZE/2);
+    var arrow = document.createElement('div');
+    arrow.className = 'mob-arrow';
+    arrow.style.left = (offsetX + arrowX) + 'px';
+    arrow.style.top = (offsetY + arrowY) + 'px';
+    arrow.textContent = dir.label;
+    arrow.dataset.dx = dir.dx;
+    arrow.dataset.dy = dir.dy;
+    arrow.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var dx = parseInt(this.dataset.dx, 10);
+      var dy = parseInt(this.dataset.dy, 10);
+      if (state.selectedMob && state.selectedMob.alive) {
+        var moved = moveCharacter(state.selectedMob, dx, dy);
+        if (moved) {
+          addLog('🔄 ' + state.selectedMob.name + ' を移動させた');
+          // 移動後、選択を解除して矢印を消す
+          clearArrows();
+          btnMobControl.classList.remove('active-mode');
+          state.mobControlMode = false;
+          updateUI();
+        } else {
+          addLog('⚠️ 移動できませんでした');
         }
       }
-    }
-  }
-
-  // 小屋オブジェクト
-  if (blockId === 4) {
-    for (var oi = 0; oi < state.objects.length; oi++) {
-      var obj = state.objects[oi];
-      if (obj.blockId !== blockId) continue;
-      var px = obj.x * BLOCK_SIZE;
-      var py = obj.y * BLOCK_SIZE;
-      var isCooling = obj.cooldown > 0;
-      ctx.fillStyle = obj.used ? (isCooling ? '#664444' : '#555') : '#3a3a5a';
-      ctx.fillRect(px + 2, py + 2, BLOCK_SIZE - 4, BLOCK_SIZE - 4);
-      ctx.strokeStyle = obj.used ? (isCooling ? '#884444' : '#777') : '#88aaff';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(px + 2, py + 2, BLOCK_SIZE - 4, BLOCK_SIZE - 4);
-      ctx.fillStyle = obj.used ? (isCooling ? '#aa6666' : '#888') : '#ffffff';
-      ctx.font = '12px "MS Gothic"';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      var label = obj.type;
-      if (obj.type === '窓') label = '密';
-      if (obj.type === '樽') label = '椅';
-      ctx.fillText(label, px + BLOCK_SIZE/2, py + BLOCK_SIZE/2);
-      if (isCooling) {
-        ctx.fillStyle = '#ff6644';
-        ctx.font = '8px "MS Gothic"';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'bottom';
-        ctx.fillText(obj.cooldown + 's', px + BLOCK_SIZE/2, py + BLOCK_SIZE);
+    });
+    // タッチ対応
+    arrow.addEventListener('touchstart', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      var dx = parseInt(this.dataset.dx, 10);
+      var dy = parseInt(this.dataset.dy, 10);
+      if (state.selectedMob && state.selectedMob.alive) {
+        var moved = moveCharacter(state.selectedMob, dx, dy);
+        if (moved) {
+          addLog('🔄 ' + state.selectedMob.name + ' を移動させた');
+          clearArrows();
+          btnMobControl.classList.remove('active-mode');
+          state.mobControlMode = false;
+          updateUI();
+        } else {
+          addLog('⚠️ 移動できませんでした');
+        }
       }
-    }
-  }
+    }, { passive: false });
 
-  // ★ アイテム (斧・銃は画像表示)
-  for (var ii = 0; ii < state.items.length; ii++) {
-    var item = state.items[ii];
-    if (item.blockId !== blockId) continue;
-    var px2 = item.x * BLOCK_SIZE;
-    var py2 = item.y * BLOCK_SIZE;
-
-    // 斧と銃は画像表示
-    if (item.name === '斧' || item.name === '銃') {
-      var img = getImage(item.name);
-      if (img) {
-        ctx.drawImage(img, px2, py2, BLOCK_SIZE, BLOCK_SIZE);
-        continue;
-      }
-    }
-
-    // その他は従来通り
-    ctx.fillStyle = '#ffdd44';
-    ctx.fillRect(px2 + 4, py2 + 4, BLOCK_SIZE - 8, BLOCK_SIZE - 8);
-    ctx.fillStyle = '#000';
-    ctx.font = '10px "MS Gothic"';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    var label2 = item.name;
-    if (label2.length > 4) label2 = label2.substring(0, 4);
-    ctx.fillText(label2, px2 + BLOCK_SIZE/2, py2 + BLOCK_SIZE/2);
+    arrowOverlay.appendChild(arrow);
   }
-
-  // キャラクター
-  var allChars = [];
-  if (state.hero && state.hero.alive && state.hero.blockId === blockId) {
-    allChars.push({ name: state.hero.img, x: state.hero.x, y: state.hero.y });
-  }
-  for (var mi3 = 0; mi3 < state.mobs.length; mi3++) {
-    var mob3 = state.mobs[mi3];
-    if (mob3.alive && mob3.blockId === blockId) {
-      allChars.push({ name: mob3.img, x: mob3.x, y: mob3.y });
-    }
-  }
-  if (state.jason && state.jason.alive && state.jason.blockId === blockId) {
-    allChars.push({ name: state.jason.img, x: state.jason.x, y: state.jason.y });
-  }
-  if (state.bear && state.bear.alive && state.bear.blockId === blockId) {
-    allChars.push({ name: state.bear.img, x: state.bear.x, y: state.bear.y });
-  }
-  if (state.wolf && state.wolf.alive && state.wolf.blockId === blockId) {
-    allChars.push({ name: state.wolf.img, x: state.wolf.x, y: state.wolf.y });
-  }
-
-  for (var ci = 0; ci < allChars.length; ci++) {
-    var ch = allChars[ci];
-    var px3 = ch.x * BLOCK_SIZE;
-    var py3 = ch.y * BLOCK_SIZE;
-    var img = getImage(ch.name);
-    if (img) {
-      ctx.drawImage(img, px3, py3, BLOCK_SIZE, BLOCK_SIZE);
-    } else {
-      var colors = {
-        '紅葉': '#aa44ff',
-        '加藤': '#ff6644',
-        '松本': '#ff6644',
-        '坪池': '#ff6644',
-        '市川': '#ff6644',
-        '青笹': '#ff6644',
-        '角田': '#ff6644',
-        '木元': '#ff6644',
-        '山崎': '#ff6644',
-        'ジェイソン': '#ff0000',
-        '熊': '#8B4513',
-        '狼': '#888888'
-      };
-      var color = colors[ch.name] || '#888';
-      ctx.fillStyle = color;
-      ctx.fillRect(px3 + 2, py3 + 2, BLOCK_SIZE - 4, BLOCK_SIZE - 4);
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(px3 + 2, py3 + 2, BLOCK_SIZE - 4, BLOCK_SIZE - 4);
-      ctx.fillStyle = '#fff';
-      ctx.font = 'bold 12px "MS Gothic"';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      var label3 = ch.name;
-      if (label3.length > 2) label3 = label3.substring(0, 2);
-      ctx.fillText(label3, px3 + BLOCK_SIZE/2, py3 + BLOCK_SIZE/2);
-    }
-  }
-
-  ctx.fillStyle = 'rgba(255,255,255,0.25)';
-  ctx.font = '10px "MS Gothic"';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'top';
-  ctx.fillText(BLOCK_NAMES[blockId], 4, 4);
 }
 
-// ---- キーボード ----
-document.addEventListener('keydown', function(e) {
-  var key = e.key;
-  var arrowKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
-  if (arrowKeys.indexOf(key) >= 0) {
-    e.preventDefault();
-    var dir = { ArrowUp: [0,-1], ArrowDown: [0,1], ArrowLeft: [-1,0], ArrowRight: [1,0] };
-    var d = dir[key];
-    moveHero(d[0], d[1]);
+// ---- モブ操作モード切り替え ----
+btnMobControl.addEventListener('click', function() {
+  if (state.gameOver) return;
+  state.mobControlMode = !state.mobControlMode;
+  if (state.mobControlMode) {
+    btnMobControl.classList.add('active-mode');
+    addLog('🔄 モブ操作モード ON (モブをクリックして矢印を表示)');
+    clearArrows();
+  } else {
+    btnMobControl.classList.remove('active-mode');
+    clearArrows();
+    addLog('🔄 モブ操作モード OFF');
   }
 });
 
-// ---- マウスクリック ----
+// ---- キャンバスクリック（モブ操作モード時はモブ選択優先） ----
 canvas.addEventListener('click', function(e) {
   if (state.gameOver) return;
   var rect = canvas.getBoundingClientRect();
@@ -1505,6 +1403,37 @@ canvas.addEventListener('click', function(e) {
   if (!hero || !hero.alive) return;
   if (hero.blockId !== state.currentBlock) return;
 
+  // ★ モブ操作モード中
+  if (state.mobControlMode) {
+    // クリック位置にモブがいるかチェック
+    var clickedMob = null;
+    for (var i = 0; i < state.mobs.length; i++) {
+      var mob = state.mobs[i];
+      if (!mob.alive) continue;
+      if (mob.blockId === state.currentBlock && mob.x === gx && mob.y === gy) {
+        clickedMob = mob;
+        break;
+      }
+    }
+    if (clickedMob) {
+      // すでに同じモブが選択されていたら解除
+      if (state.selectedMob === clickedMob) {
+        clearArrows();
+        addLog('🔄 ' + clickedMob.name + ' の選択を解除');
+        return;
+      }
+      showMobArrows(clickedMob);
+      addLog('🔄 ' + clickedMob.name + ' を選択 (矢印をクリックして移動)');
+      return;
+    } else {
+      // モブがいない場所をクリック → 解除
+      clearArrows();
+      addLog('🔄 モブ選択解除');
+      return;
+    }
+  }
+
+  // ---- 通常モード ----
   pickupItemByClick(gx, gy);
 
   var clickedObj = null;
@@ -1529,10 +1458,19 @@ canvas.addEventListener('click', function(e) {
   }
 });
 
-// ---- ★ スマホ用タッチ対応 ----
-var touchStartX = 0, touchStartY = 0;
-var isTouching = false;
+// ---- キーボード ----
+document.addEventListener('keydown', function(e) {
+  var key = e.key;
+  var arrowKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+  if (arrowKeys.indexOf(key) >= 0) {
+    e.preventDefault();
+    var dir = { ArrowUp: [0,-1], ArrowDown: [0,1], ArrowLeft: [-1,0], ArrowRight: [1,0] };
+    var d = dir[key];
+    moveHero(d[0], d[1]);
+  }
+});
 
+// ---- スマホ用タッチ ----
 canvas.addEventListener('touchstart', function(e) {
   e.preventDefault();
   var touch = e.touches[0];
@@ -1545,7 +1483,6 @@ canvas.addEventListener('touchstart', function(e) {
   var gx = Math.floor(mx / BLOCK_SIZE);
   var gy = Math.floor(my / BLOCK_SIZE);
 
-  // タップ位置が十字キー領域なら無視
   var mobileCtrl = document.getElementById('mobileControls');
   if (mobileCtrl.classList.contains('active')) {
     var cRect = mobileCtrl.getBoundingClientRect();
@@ -1561,7 +1498,34 @@ canvas.addEventListener('touchstart', function(e) {
   if (!hero || !hero.alive) return;
   if (hero.blockId !== state.currentBlock) return;
 
-  // タップでクリック処理
+  // ★ モブ操作モード中
+  if (state.mobControlMode) {
+    var clickedMob = null;
+    for (var i = 0; i < state.mobs.length; i++) {
+      var mob = state.mobs[i];
+      if (!mob.alive) continue;
+      if (mob.blockId === state.currentBlock && mob.x === gx && mob.y === gy) {
+        clickedMob = mob;
+        break;
+      }
+    }
+    if (clickedMob) {
+      if (state.selectedMob === clickedMob) {
+        clearArrows();
+        addLog('🔄 ' + clickedMob.name + ' の選択を解除');
+        return;
+      }
+      showMobArrows(clickedMob);
+      addLog('🔄 ' + clickedMob.name + ' を選択 (矢印をクリックして移動)');
+      return;
+    } else {
+      clearArrows();
+      addLog('🔄 モブ選択解除');
+      return;
+    }
+  }
+
+  // 通常モード
   pickupItemByClick(gx, gy);
 
   var clickedObj = null;
@@ -1586,7 +1550,7 @@ canvas.addEventListener('touchstart', function(e) {
   }
 }, { passive: false });
 
-// ---- ★ スマホ用十字キー ----
+// ---- スマホ用十字キー ----
 function setupDpad() {
   var upBtn = document.getElementById('dpad-up');
   var downBtn = document.getElementById('dpad-down');
@@ -1595,7 +1559,6 @@ function setupDpad() {
 
   function setupButton(btn, dx, dy) {
     var intervalId = null;
-    var timeoutId = null;
 
     function startMove() {
       moveHero(dx, dy);
@@ -1605,7 +1568,6 @@ function setupDpad() {
 
     function stopMove() {
       if (intervalId) { clearInterval(intervalId); intervalId = null; }
-      if (timeoutId) { clearTimeout(timeoutId); timeoutId = null; }
     }
 
     btn.addEventListener('mousedown', function(e) {
@@ -1635,7 +1597,7 @@ function setupDpad() {
   setupButton(rightBtn, 1, 0);
 }
 
-// ---- ★ スマホ操作トグル ----
+// ---- スマホ操作トグル ----
 mobileToggle.addEventListener('click', function() {
   var isActive = mobileControls.classList.toggle('active');
   tapHint.classList.toggle('active');
