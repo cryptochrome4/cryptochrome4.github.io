@@ -228,7 +228,7 @@ body { background:#1a1a2e; display:flex; justify-content:center; align-items:cen
 
 <script>
 // ============================================================
-// 7日間サバイバルゲーム (完全版 + 裏切り者・補強減らし・銃モード)
+// 7日間サバイバルゲーム (完全版 - 役割ラベル非表示)
 // ============================================================
 
 (function(){
@@ -278,11 +278,10 @@ var MOB_NAMES = ['加藤','松本','坪池','市川','青笹','角田','木元',
 var HERO_NAME = '紅葉';
 var ITEM_BLOCK_MAP = [8,7,6,5,3,2,1,0];
 
-// ★ モブ役割タイプ
 var MOB_ROLE = {
   NORMAL: 0,
-  TRAITOR: 1,      // 裏切り者（納品後、小屋で襲う）
-  SABOTEUR: 2      // 補強減らし（納品後、毎日-1ポイント）
+  TRAITOR: 1,
+  SABOTEUR: 2
 };
 
 var imageCache = {};
@@ -317,7 +316,6 @@ function getImage(name) {
   return null;
 }
 
-// ---- 状態 ----
 var state = {
   day: 1,
   dayElapsed: 0,
@@ -353,11 +351,9 @@ var state = {
   arrowDirections: [],
   axeMode: false,
   gunMode: false,
-  // ★ 役割関連
   traitorIndex: -1,
   saboteurIndex: -1,
   enemyWolf: false,
-  // ★ 銃で撃ったフラグ
   gunShotCooldown: 0
 };
 
@@ -443,14 +439,11 @@ function moveCharacter(entity, dx, dy) {
   return true;
 }
 
-// ---- ★ 役割割り当て ----
 function assignRoles() {
-  // 裏切り者（1人）と補強減らし（1人）をランダムに選ぶ（別々の人）
   var available = [];
   for (var i = 0; i < state.mobs.length; i++) {
     available.push(i);
   }
-  // シャッフル
   for (var i = available.length - 1; i > 0; i--) {
     var j = rand(0, i);
     var tmp = available[i];
@@ -460,16 +453,15 @@ function assignRoles() {
   state.traitorIndex = available[0];
   state.saboteurIndex = available[1];
   
-  // モブに役割を設定
   for (var i = 0; i < state.mobs.length; i++) {
     var mob = state.mobs[i];
     if (i === state.traitorIndex) {
       mob.role = MOB_ROLE.TRAITOR;
-      mob.roleActive = false; // 納品後に発動
+      mob.roleActive = false;
       addLog('🔴 ' + mob.name + ' は裏切り者です（納品後、小屋で襲う）');
     } else if (i === state.saboteurIndex) {
       mob.role = MOB_ROLE.SABOTEUR;
-      mob.roleActive = false; // 納品後に発動
+      mob.roleActive = false;
       addLog('🟠 ' + mob.name + ' は補強減らしです（納品後、毎日-1ポイント）');
     } else {
       mob.role = MOB_ROLE.NORMAL;
@@ -477,7 +469,6 @@ function assignRoles() {
   }
 }
 
-// ---- ★ 銃モードボタン ----
 btnGunMode.addEventListener('click', function() {
   if (state.gameOver) {
     addLog('⚠️ ゲームが終了しています');
@@ -499,7 +490,6 @@ btnGunMode.addEventListener('click', function() {
   }
 });
 
-// ---- ★ 銃で撃つ処理 ----
 function shootGun(gx, gy) {
   if (state.gunShotCooldown > 0) {
     addLog('⚠️ クールダウン中 (' + state.gunShotCooldown + 'フレーム)');
@@ -516,21 +506,14 @@ function shootGun(gx, gy) {
   var hero = state.hero;
   var targetBlock = hero.blockId;
   
-  // クリック位置がどのブロックか判定（主人公のブロックのみ有効）
-  // ただし、クリックした場所が別ブロックの場合は無視
   if (gx < 0 || gx >= GRID_SIZE || gy < 0 || gy >= GRID_SIZE) {
     addLog('⚠️ 範囲外です');
     return;
   }
   
-  // クリック位置のブロックが主人公のブロックと同じかチェック
-  // 注: canvasは現在のブロックを表示しているので、そのまま使用
-  
-  // ★ ターゲットを探す（同じブロック内でクリック位置にいるキャラ）
   var target = null;
   var targetType = '';
   
-  // モブをチェック
   for (var i = 0; i < state.mobs.length; i++) {
     var mob = state.mobs[i];
     if (!mob.alive) continue;
@@ -542,7 +525,6 @@ function shootGun(gx, gy) {
     }
   }
   
-  // ジェイソン（撃てない）
   if (!target && state.jason && state.jason.alive && state.jason.blockId === targetBlock &&
       state.jason.x === gx && state.jason.y === gy) {
     addLog('⚠️ ジェイソンには銃が効かない');
@@ -550,7 +532,6 @@ function shootGun(gx, gy) {
     return;
   }
   
-  // 熊（撃てない）
   if (!target && state.bear && state.bear.alive && state.bear.blockId === targetBlock &&
       state.bear.x === gx && state.bear.y === gy) {
     addLog('⚠️ 熊には銃が効かない');
@@ -558,13 +539,11 @@ function shootGun(gx, gy) {
     return;
   }
   
-  // 狼（撃てないが敵になる）
   if (!target && state.wolf && state.wolf.alive && state.wolf.blockId === targetBlock &&
       state.wolf.x === gx && state.wolf.y === gy) {
     if (state.enemyWolf) {
       addLog('⚠️ 敵狼には銃が効かない');
     } else {
-      // ★ 狼が敵になる
       state.enemyWolf = true;
       state.wolf.img = '敵狼';
       state.wolf.speed = 60;
@@ -574,15 +553,11 @@ function shootGun(gx, gy) {
     return;
   }
   
-  // ★ ターゲットがモブの場合
   if (target && targetType === 'mob') {
     var mob = target;
     
-    // 裏切り者 または 補強減らし の場合 → 殺せる（銃で）
     if (mob.role === MOB_ROLE.TRAITOR || mob.role === MOB_ROLE.SABOTEUR) {
-      // 役割がアクティブ（納品済み）の場合のみ殺せる
       if (mob.roleActive) {
-        // 殺す
         mob.alive = false;
         state.mobAlive--;
         if (mob.role === MOB_ROLE.TRAITOR) {
@@ -600,7 +575,6 @@ function shootGun(gx, gy) {
       }
     }
     
-    // ★ 通常のモブを誤って撃った場合 → -1ポイント
     if (mob.role === MOB_ROLE.NORMAL && mob.hasDelivered) {
       state.points = Math.max(0, state.points - 1);
       mob.alive = false;
@@ -616,12 +590,10 @@ function shootGun(gx, gy) {
     }
   }
   
-  // 何もなかった
   addLog('🔫 撃ったが何も当たらなかった');
   state.gunShotCooldown = 10;
 }
 
-// ---- ★ 補強減らし処理 ----
 function applySabotage() {
   for (var i = 0; i < state.mobs.length; i++) {
     var mob = state.mobs[i];
@@ -633,7 +605,6 @@ function applySabotage() {
   }
 }
 
-// ---- ★ 裏切り者の攻撃処理 ----
 function traitorAttack() {
   var hero = state.hero;
   if (!hero || !hero.alive) return;
@@ -644,13 +615,9 @@ function traitorAttack() {
     if (mob.role !== MOB_ROLE.TRAITOR) continue;
     if (!mob.roleActive) continue;
     
-    // 小屋（ブロック4）にいる場合のみ襲う
     if (mob.blockId !== 4) continue;
-    
-    // 主人公も小屋にいるか
     if (hero.blockId !== 4) continue;
     
-    // 距離チェック（隣接）
     if (Math.abs(mob.x - hero.x) <= 1 && Math.abs(mob.y - hero.y) <= 1) {
       addLog('🔴 ' + mob.name + '（裏切り者）が襲ってきた！');
       killHero(mob.name + '（裏切り者）');
@@ -659,13 +626,10 @@ function traitorAttack() {
   }
 }
 
-// ---- ★ サボタージュの毎日処理 ----
 function dailySabotage() {
-  // 各日の始まりに実行（nextDay内で呼び出す）
   applySabotage();
 }
 
-// ---- ★ 裏切り者と補強減らしが納品されたときの処理 ----
 function onMobDelivered(mob) {
   if (mob.role === MOB_ROLE.TRAITOR) {
     mob.roleActive = true;
@@ -676,7 +640,6 @@ function onMobDelivered(mob) {
   }
 }
 
-// ---- 初期化 ----
 function initGame() {
   console.log('=== initGame 開始 ===');
   if (state.animFrame) { cancelAnimationFrame(state.animFrame); state.animFrame = null; }
@@ -809,7 +772,6 @@ function initGame() {
     state.mobs.push(mob);
   }
 
-  // ★ 役割割り当て（納品前に設定）
   assignRoles();
 
   var jasonBlock = rand(0, 8);
@@ -878,7 +840,6 @@ function initGame() {
   gameLoop();
 }
 
-// ---- アイテム生成 ----
 function spawnItems() {
   state.items = [];
   var itemTypes = ['材','斧','銃','餌','堀'];
@@ -997,7 +958,6 @@ function forceDeliverMob(mob) {
   mob.state = 'delivered';
   state.points += 1;
   
-  // ★ 役割発動
   onMobDelivered(mob);
   
   addLog('🚀 ' + mob.name + ' を強制納品しました！ +1ポイント');
@@ -1005,7 +965,6 @@ function forceDeliverMob(mob) {
   return true;
 }
 
-// ---- モブAI ----
 function updateMobs() {
   for (var i = 0; i < state.mobs.length; i++) {
     var mob = state.mobs[i];
@@ -1013,9 +972,7 @@ function updateMobs() {
 
     if (mob.hasDelivered) {
       mob.hasItem = false;
-      // ★ 裏切り者は小屋で待機（主人公を狙う）
       if (mob.role === MOB_ROLE.TRAITOR && mob.roleActive) {
-        // 主人公が小屋にいる場合のみ近づく
         var hero = state.hero;
         if (hero && hero.alive && hero.blockId === 4 && mob.blockId === 4) {
           var dx = hero.x - mob.x;
@@ -1032,11 +989,9 @@ function updateMobs() {
         continue;
       }
       
-      // ★ 補強減らしは主人公から逃げる（銃を持っている場合）
       if (mob.role === MOB_ROLE.SABOTEUR && mob.roleActive) {
         var hero2 = state.hero;
         if (hero2 && hero2.alive && state.heroItem === '銃') {
-          // 主人公から逃げる
           if (mob.blockId === hero2.blockId) {
             var dx2 = mob.x - hero2.x;
             var dy2 = mob.y - hero2.y;
@@ -1048,7 +1003,6 @@ function updateMobs() {
             }
             moveCharacter(mob, mx2, my2);
           } else {
-            // 主人公のブロックから逃げる
             var dir = getDirectionToBlock(mob, hero2.blockId);
             if (dir) {
               moveCharacter(mob, -dir.dx, -dir.dy);
@@ -1121,7 +1075,6 @@ function updateMobs() {
           mob.hasItem = false;
           state.points += 1;
           
-          // ★ 役割発動
           onMobDelivered(mob);
           
           addLog('✅ ' + mob.name + ' 納品完了！ +1ポイント');
@@ -1144,7 +1097,6 @@ function updateMobs() {
   }
 }
 
-// ---- 狼から逃げる ----
 function fleeFromWolf(entity) {
   if (!state.wolf || !state.wolf.alive) return false;
   if (entity.blockId !== state.wolf.blockId) return false;
@@ -1169,7 +1121,6 @@ function fleeFromWolf(entity) {
   return false;
 }
 
-// ---- 敵AI ----
 function updateEnemies() {
   if (state.jason && state.jason.alive) {
     var jSpeed = 10 + (state.day - 1) * 10;
@@ -1275,7 +1226,6 @@ function updateEnemies() {
     if (state.bearKillCooldown > 0) state.bearKillCooldown--;
   }
 
-  // ★ 狼（敵狼モードでは主人公を追跡）
   if (state.wolf && state.wolf.alive) {
     if (state.wolf.moveCooldown > 0) {
       state.wolf.moveCooldown--;
@@ -1284,7 +1234,6 @@ function updateEnemies() {
       
       var hero3 = state.hero;
       if (state.enemyWolf && hero3 && hero3.alive) {
-        // 敵狼 → 主人公を追跡
         if (state.wolf.blockId === hero3.blockId) {
           var wdx = hero3.x - state.wolf.x;
           var wdy = hero3.y - state.wolf.y;
@@ -1311,7 +1260,6 @@ function updateEnemies() {
   }
 }
 
-// ---- 殺害処理 ----
 function killHero(killer) {
   if (!state.hero || !state.hero.alive) return;
   state.hero.alive = false;
@@ -1334,7 +1282,6 @@ function killMob(mob, killer) {
   updateUI();
 }
 
-// ---- 主人公移動 ----
 function moveHero(dx, dy) {
   if (state.gameOver || state.paused) return;
   var hero = state.hero;
@@ -1343,7 +1290,6 @@ function moveHero(dx, dy) {
   updateUI();
 }
 
-// ---- クリックでアイテム拾い ----
 function pickupItemByClick(gx, gy) {
   var hero = state.hero;
   if (!hero || !hero.alive) return;
@@ -1369,7 +1315,6 @@ function pickupItemByClick(gx, gy) {
   addLog('⚠️ そこにアイテムはありません');
 }
 
-// ---- 復活処理 ----
 function scheduleRespawn(itemName, blockId) {
   if (/^品[1-8]$/.test(itemName)) return;
   for (var i = 0; i < state.pendingRespawn.length; i++) {
@@ -1426,7 +1371,6 @@ function processRespawn() {
   }
 }
 
-// ---- アイテム使用 ----
 function useItemOnObject(objType) {
   if (!state.hero || !state.hero.alive) return;
   if (!state.heroItem) {
@@ -1506,7 +1450,6 @@ function useItemOnObject(objType) {
   updateUI();
 }
 
-// ---- アイテムを落とす ----
 function dropItem() {
   if (!state.heroItem) {
     addLog('⚠️ 持っているアイテムがない');
@@ -1524,7 +1467,6 @@ function dropItem() {
   updateUI();
 }
 
-// ---- タイマー ----
 function startDayTimer() {
   if (state.dayTimerInterval) { clearInterval(state.dayTimerInterval); state.dayTimerInterval = null; }
   state.dayElapsed = 0;
@@ -1557,7 +1499,6 @@ function startDayTimer() {
   }, 1000);
 }
 
-// ---- 日付更新 ----
 function nextDay() {
   if (state.dayTimerInterval) { clearInterval(state.dayTimerInterval); state.dayTimerInterval = null; }
   state.day++;
@@ -1570,7 +1511,6 @@ function nextDay() {
   var jSpeed = 10 + (state.day - 1) * 10;
   addLog('📈 ' + state.day + '日目: ジェイソンの速度が ' + jSpeed + ' になった');
 
-  // ★ 補強減らしの処理（毎日）
   dailySabotage();
 
   processRespawn();
@@ -1615,7 +1555,6 @@ function nextDay() {
   startDayTimer();
 }
 
-// ---- ゲーム終了 ----
 function endGame() {
   if (state.gameOver) return;
   state.isGameLoopRunning = false;
@@ -1682,7 +1621,6 @@ function updateUI() {
   }
 }
 
-// ---- モブ操作モード ----
 function clearArrows() {
   arrowOverlay.innerHTML = '';
   state.arrowDirections = [];
@@ -1830,7 +1768,6 @@ function showMobArrows(mob) {
   }
 }
 
-// ---- モブ操作モード切り替え ----
 btnMobControl.addEventListener('click', function() {
   if (state.gameOver) return;
   state.mobControlMode = !state.mobControlMode;
@@ -1845,7 +1782,6 @@ btnMobControl.addEventListener('click', function() {
   }
 });
 
-// ---- 斧モードボタン ----
 btnAxeMode.addEventListener('click', function() {
   if (state.gameOver) {
     addLog('⚠️ ゲームが終了しています');
@@ -1867,7 +1803,6 @@ btnAxeMode.addEventListener('click', function() {
   }
 });
 
-// ---- 強制納品ボタン ----
 btnForceDeliver.addEventListener('click', function() {
   if (state.gameOver) {
     addLog('⚠️ ゲームが終了しています');
@@ -1894,7 +1829,6 @@ btnForceDeliver.addEventListener('click', function() {
   }
 });
 
-// ---- ★★★ キャンバスクリック（斧モード・銃モード対応） ★★★ ----
 canvas.addEventListener('click', function(e) {
   console.log('=== クリックイベント ===');
   if (state.gameOver) return;
@@ -1915,13 +1849,11 @@ canvas.addEventListener('click', function(e) {
     return;
   }
 
-  // ★★★ 銃モード中（最優先） ★★★
   if (state.gunMode) {
     shootGun(gx, gy);
     return;
   }
 
-  // ★★★ 斧モード中 ★★★
   if (state.axeMode) {
     if (state.heroItem !== '斧') {
       addLog('⚠️ 斧を持っていません');
@@ -1954,7 +1886,6 @@ canvas.addEventListener('click', function(e) {
     }
   }
 
-  // ---- 以下、通常モード ----
   if (state.mobControlMode) {
     var clickedMob = null;
     for (var i = 0; i < state.mobs.length; i++) {
@@ -2005,7 +1936,6 @@ canvas.addEventListener('click', function(e) {
   }
 });
 
-// ---- render() 関数 ----
 function render() {
   if (state.frameCount % 60 === 0) {
     console.log('=== render デバッグ ===');
@@ -2123,12 +2053,6 @@ function render() {
   for (var mi3 = 0; mi3 < state.mobs.length; mi3++) {
     var mob3 = state.mobs[mi3];
     if (mob3.alive && mob3.blockId === blockId) {
-      var roleLabel = '';
-      if (mob3.role === MOB_ROLE.TRAITOR && mob3.roleActive) roleLabel = '🔴';
-      else if (mob3.role === MOB_ROLE.TRAITOR) roleLabel = '🔴(未)';
-      else if (mob3.role === MOB_ROLE.SABOTEUR && mob3.roleActive) roleLabel = '🟠';
-      else if (mob3.role === MOB_ROLE.SABOTEUR) roleLabel = '🟠(未)';
-      
       allChars.push({ 
         name: mob3.img, 
         x: mob3.x, 
@@ -2137,7 +2061,6 @@ function render() {
         hasItem: mob3.hasItem || false,
         mobName: mob3.name,
         hasDelivered: mob3.hasDelivered,
-        roleLabel: roleLabel,
         role: mob3.role,
         roleActive: mob3.roleActive
       });
@@ -2199,15 +2122,6 @@ function render() {
       ctx.fillText(label3, px3 + BLOCK_SIZE/2, py3 + BLOCK_SIZE/2);
     }
 
-    // ★ 役割ラベル表示（モブのみ）
-    if (!ch.isHero && ch.roleLabel) {
-      ctx.fillStyle = ch.role === MOB_ROLE.TRAITOR ? '#ff4444' : '#ff8844';
-      ctx.font = 'bold 10px "MS Gothic"';
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'bottom';
-      ctx.fillText(ch.roleLabel, px3 + 2, py3 + BLOCK_SIZE - 2);
-    }
-
     if (ch.hasItem === true && ch.isHero === false) {
       ctx.strokeStyle = '#aa44ff';
       ctx.lineWidth = 3;
@@ -2240,7 +2154,6 @@ function render() {
   ctx.fillText(BLOCK_NAMES[blockId], 4, 4);
 }
 
-// ---- キーボード ----
 document.addEventListener('keydown', function(e) {
   var key = e.key;
   var arrowKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
@@ -2252,7 +2165,6 @@ document.addEventListener('keydown', function(e) {
   }
 });
 
-// ---- スマホ用タッチ ----
 canvas.addEventListener('touchstart', function(e) {
   e.preventDefault();
   var touch = e.touches[0];
@@ -2283,13 +2195,11 @@ canvas.addEventListener('touchstart', function(e) {
     return;
   }
 
-  // 銃モード
   if (state.gunMode) {
     shootGun(gx, gy);
     return;
   }
 
-  // 斧モード
   if (state.axeMode) {
     if (state.heroItem !== '斧') {
       addLog('⚠️ 斧を持っていません');
@@ -2368,7 +2278,6 @@ canvas.addEventListener('touchstart', function(e) {
   }
 }, { passive: false });
 
-// ---- スマホ用十字キー ----
 function setupDpad() {
   var upBtn = document.getElementById('dpad-up');
   var downBtn = document.getElementById('dpad-down');
@@ -2415,7 +2324,6 @@ function setupDpad() {
   setupButton(rightBtn, 1, 0);
 }
 
-// ---- スマホ操作トグル ----
 mobileToggle.addEventListener('click', function() {
   var isActive = mobileControls.classList.toggle('active');
   tapHint.classList.toggle('active');
@@ -2428,10 +2336,8 @@ mobileToggle.addEventListener('click', function() {
   }
 });
 
-// ---- ボタン ----
 btnDrop.addEventListener('click', dropItem);
 
-// ---- メインループ ----
 function gameLoop() {
   if (!state.isGameLoopRunning && state.gameOver) {
     render();
@@ -2444,7 +2350,6 @@ function gameLoop() {
   if (state.gunShotCooldown > 0) state.gunShotCooldown--;
 
   if (!state.gameOver) {
-    // ★ 裏切り者の攻撃チェック（毎フレーム）
     traitorAttack();
     
     if (state.frameCount % 3 === 0) updateMobs();
@@ -2455,7 +2360,6 @@ function gameLoop() {
   state.animFrame = requestAnimationFrame(gameLoop);
 }
 
-// ---- 起動 ----
 loadImages(function() {
   console.log('=== 画像読み込み完了 ===');
   setupDpad();
