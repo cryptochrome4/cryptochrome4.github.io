@@ -24,6 +24,7 @@ body { background:#1a1a2e; display:flex; justify-content:center; align-items:cen
 #controls button:active { background:#222255; }
 #controls button.active-mode { background:#885533; border-color:#cc8844; color:#ffdd99; }
 #controls button.danger-mode { background:#883333; border-color:#cc4444; color:#ff9999; }
+#controls button.axe-active { background:#558833; border-color:#88cc66; color:#ddffbb; }
 #bottomBar { display:flex; justify-content:space-between; margin-top:10px; color:#88aacc; font-size:13px; padding:0 4px; flex-wrap:wrap; gap:4px; }
 #dayDisplay { color:#ffaa66; font-weight:bold; }
 #msgPopup { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:rgba(0,0,0,0.92); border:3px solid #ffcc44; border-radius:12px; padding:25px 40px; color:#fff; text-align:center; display:none; z-index:100; pointer-events:auto; min-width:200px; }
@@ -213,6 +214,7 @@ body { background:#1a1a2e; display:flex; justify-content:center; align-items:cen
 <button id="mobileToggle">📱 スマホ操作</button>
 <button id="btnMobControl">🔄 モブ操作</button>
 <button id="btnForceDeliver" class="danger-mode">🚀 強制納品</button>
+<button id="btnAxeMode">🪓 斧モード</button>
 </div>
 </div>
 </div>
@@ -224,7 +226,7 @@ body { background:#1a1a2e; display:flex; justify-content:center; align-items:cen
 
 <script>
 // ============================================================
-// 7日間サバイバルゲーム (完全版 + 強制納品)
+// 7日間サバイバルゲーム (完全版 + 斧モード)
 // ============================================================
 
 (function(){
@@ -337,7 +339,9 @@ var state = {
   pendingRespawn: [],
   mobControlMode: false,
   selectedMob: null,
-  arrowDirections: []
+  arrowDirections: [],
+  // ★ 斧モード
+  axeMode: false
 };
 
 var canvas = document.getElementById('mapCanvas');
@@ -359,6 +363,7 @@ var mobileControls = document.getElementById('mobileControls');
 var tapHint = document.getElementById('tapHint');
 var btnMobControl = document.getElementById('btnMobControl');
 var btnForceDeliver = document.getElementById('btnForceDeliver');
+var btnAxeMode = document.getElementById('btnAxeMode');
 var arrowOverlay = document.getElementById('mobArrowOverlay');
 
 function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
@@ -447,7 +452,10 @@ function initGame() {
   state.mobControlMode = false;
   state.selectedMob = null;
   state.arrowDirections = [];
+  state.axeMode = false;
   btnMobControl.classList.remove('active-mode');
+  btnAxeMode.classList.remove('axe-active');
+  btnAxeMode.textContent = '🪓 斧モード';
   clearArrows();
 
   var days = [1,2,3,4,5,6,7];
@@ -646,7 +654,6 @@ function spawnItems() {
 
 function assignMobTask(mob) {
   if (!mob.alive || mob.hasDelivered) return;
-  // ★ すでにアイテムを持っている場合は納品タスクを優先
   if (mob.hasItem) {
     mob.state = 'moving_to_hut';
     mob.targetX = 3;
@@ -698,7 +705,6 @@ function getObjectAt(blockId, x, y, type) {
   return null;
 }
 
-// ---- ★ 強制納品関数 ----
 function forceDeliverMob(mob) {
   if (!mob || !mob.alive) return false;
   if (!mob.hasItem) {
@@ -710,7 +716,6 @@ function forceDeliverMob(mob) {
     return false;
   }
   
-  // 小屋の品をチェック
   var hutItem = getObjectAt(4, 3, 5, '品');
   if (!hutItem) {
     addLog('⚠️ 小屋の品が見つかりません');
@@ -721,7 +726,6 @@ function forceDeliverMob(mob) {
     return false;
   }
   
-  // ★ 強制納品！位置関係なく即座に納品
   hutItem.used = true;
   hutItem.cooldown = 5;
   mob.hasDelivered = true;
@@ -733,14 +737,35 @@ function forceDeliverMob(mob) {
   return true;
 }
 
-// ---- ★ 強制納品ボタン ----
+// ---- ★ 斧モードボタン ----
+btnAxeMode.addEventListener('click', function() {
+  if (state.gameOver) {
+    addLog('⚠️ ゲームが終了しています');
+    return;
+  }
+  if (state.heroItem !== '斧') {
+    addLog('⚠️ 斧を持っていません');
+    return;
+  }
+  state.axeMode = !state.axeMode;
+  if (state.axeMode) {
+    btnAxeMode.classList.add('axe-active');
+    btnAxeMode.textContent = '🪓 斧モード ON';
+    addLog('🪓 斧モード ON (木をクリックして破壊)');
+  } else {
+    btnAxeMode.classList.remove('axe-active');
+    btnAxeMode.textContent = '🪓 斧モード';
+    addLog('🪓 斧モード OFF');
+  }
+});
+
+// ---- 強制納品ボタン ----
 btnForceDeliver.addEventListener('click', function() {
   if (state.gameOver) {
     addLog('⚠️ ゲームが終了しています');
     return;
   }
   
-  // 紫枠（アイテム所持）のモブを探す
   var targetMob = null;
   for (var i = 0; i < state.mobs.length; i++) {
     var mob = state.mobs[i];
@@ -766,14 +791,6 @@ function updateMobs() {
   for (var i = 0; i < state.mobs.length; i++) {
     var mob = state.mobs[i];
     if (!mob.alive) continue;
-
-    // ★ スタック検出: アイテムを持っていて動かない場合
-    if (mob.hasItem && !mob.hasDelivered) {
-      var prevX = mob.x;
-      var prevY = mob.y;
-      // 次のフレームで位置が変わらなかったらスタックカウント増加
-      // (実際の移動は後で行われるので、ここではフラグのみ)
-    }
 
     if (mob.hasDelivered) {
       mob.hasItem = false;
@@ -851,9 +868,6 @@ function updateMobs() {
           if (mx2 !== 0 || my2 !== 0) moveCharacter(mob, mx2, my2);
         }
       } else {
-        // ★ 小屋の品が使えない場合でも、強制納品ボタンで対応可能にするため
-        // ここでは何もしない（ユーザーが強制納品ボタンを使う）
-        // ただし、無限ループを防ぐため少し待機
         mob.moveCooldown = 5;
       }
     } else {
@@ -1351,6 +1365,7 @@ function showPopup(title, desc, btnText, callback) {
 
 function hidePopup() { popup.style.display = 'none'; }
 
+// ---- ★ updateUI（斧モード自動OFF対応） ----
 function updateUI() {
   dispDay.textContent = state.day + ' / 7';
   dispPoints.textContent = state.points;
@@ -1359,6 +1374,13 @@ function updateUI() {
   if (!state.gameOver) {
     var remaining = DAY_DURATION - state.dayElapsed;
     dayDisplay.textContent = '🌅 ' + state.day + '日目 (' + Math.max(0, remaining) + '秒)';
+  }
+  
+  // ★ 斧を持っていないのに斧モードがONならOFFにする
+  if (state.axeMode && state.heroItem !== '斧') {
+    state.axeMode = false;
+    btnAxeMode.classList.remove('axe-active');
+    btnAxeMode.textContent = '🪓 斧モード';
   }
 }
 
@@ -1406,7 +1428,6 @@ function showMobArrows(mob) {
     }
   }
 
-  // ★ アイテムを持っている場合は「強制納品」矢印を追加
   if (mob.hasItem && !mob.hasDelivered) {
     validDirs.push({ 
       dx: 0, dy: 0, 
@@ -1448,7 +1469,6 @@ function showMobArrows(mob) {
       e.stopPropagation();
       var isDeliver = this.dataset.isDeliver === 'true';
       if (isDeliver) {
-        // ★ 強制納品
         if (state.selectedMob && state.selectedMob.alive) {
           var success = forceDeliverMob(state.selectedMob);
           if (success) {
@@ -1527,7 +1547,7 @@ btnMobControl.addEventListener('click', function() {
   }
 });
 
-// ---- キャンバスクリック ----
+// ---- ★★★ キャンバスクリック（斧モード対応） ★★★ ----
 canvas.addEventListener('click', function(e) {
   console.log('=== クリックイベント ===');
   if (state.gameOver) return;
@@ -1549,6 +1569,46 @@ canvas.addEventListener('click', function(e) {
     return;
   }
 
+  // ★★★ 斧モード中 ★★★
+  if (state.axeMode) {
+    // 斧を持っているか再確認
+    if (state.heroItem !== '斧') {
+      addLog('⚠️ 斧を持っていません');
+      state.axeMode = false;
+      btnAxeMode.classList.remove('axe-active');
+      btnAxeMode.textContent = '🪓 斧モード';
+      return;
+    }
+    
+    // クリック位置が木かチェック
+    if (state.blockMap[hero.blockId] && 
+        state.blockMap[hero.blockId][gy] && 
+        state.blockMap[hero.blockId][gy][gx] === 'tree') {
+      
+      // 木を破壊
+      state.blockMap[hero.blockId][gy][gx] = null;
+      addLog('🪓 木を破壊した！');
+      
+      // 1/6の確率で斧が壊れる
+      if (rand(1, 6) === 1) {
+        state.heroItem = null;
+        addLog('💔 斧が壊れた！');
+      }
+      
+      // 斧モードOFF（1回のみ）
+      state.axeMode = false;
+      btnAxeMode.classList.remove('axe-active');
+      btnAxeMode.textContent = '🪓 斧モード';
+      updateUI();
+      return;
+    } else {
+      addLog('⚠️ そこには木がありません');
+      // 斧モードは維持（キャンセルするには再度ボタンを押す）
+      return;
+    }
+  }
+
+  // ---- 以下、通常モード ----
   if (state.mobControlMode) {
     var clickedMob = null;
     for (var i = 0; i < state.mobs.length; i++) {
@@ -1599,7 +1659,7 @@ canvas.addEventListener('click', function(e) {
   }
 });
 
-// ---- render() 関数（モブ所持品の紫枠表示） ----
+// ---- render() 関数 ----
 function render() {
   if (state.frameCount % 60 === 0) {
     console.log('=== render デバッグ ===');
@@ -1783,7 +1843,6 @@ function render() {
       ctx.fillText(label3, px3 + BLOCK_SIZE/2, py3 + BLOCK_SIZE/2);
     }
 
-    // ★ モブがアイテムを持っている場合、紫枠で囲む
     if (ch.hasItem === true && ch.isHero === false) {
       ctx.strokeStyle = '#aa44ff';
       ctx.lineWidth = 3;
@@ -1799,7 +1858,6 @@ function render() {
       ctx.fillText('◆', px3 + BLOCK_SIZE - 2, py3 + 1);
     }
     
-    // ★ 納品済みモブは緑枠
     if (ch.hasDelivered === true && ch.isHero === false) {
       ctx.strokeStyle = '#44ff88';
       ctx.lineWidth = 2;
@@ -1858,6 +1916,35 @@ canvas.addEventListener('touchstart', function(e) {
   if (hero.blockId !== state.currentBlock) {
     state.currentBlock = hero.blockId;
     return;
+  }
+
+  // ★ 斧モード中
+  if (state.axeMode) {
+    if (state.heroItem !== '斧') {
+      addLog('⚠️ 斧を持っていません');
+      state.axeMode = false;
+      btnAxeMode.classList.remove('axe-active');
+      btnAxeMode.textContent = '🪓 斧モード';
+      return;
+    }
+    if (state.blockMap[hero.blockId] && 
+        state.blockMap[hero.blockId][gy] && 
+        state.blockMap[hero.blockId][gy][gx] === 'tree') {
+      state.blockMap[hero.blockId][gy][gx] = null;
+      addLog('🪓 木を破壊した！');
+      if (rand(1, 6) === 1) {
+        state.heroItem = null;
+        addLog('💔 斧が壊れた！');
+      }
+      state.axeMode = false;
+      btnAxeMode.classList.remove('axe-active');
+      btnAxeMode.textContent = '🪓 斧モード';
+      updateUI();
+      return;
+    } else {
+      addLog('⚠️ そこには木がありません');
+      return;
+    }
   }
 
   if (state.mobControlMode) {
