@@ -23,6 +23,7 @@ body { background:#1a1a2e; display:flex; justify-content:center; align-items:cen
 #controls button:hover { background:#444488; }
 #controls button:active { background:#222255; }
 #controls button.active-mode { background:#885533; border-color:#cc8844; color:#ffdd99; }
+#controls button.danger-mode { background:#883333; border-color:#cc4444; color:#ff9999; }
 #bottomBar { display:flex; justify-content:space-between; margin-top:10px; color:#88aacc; font-size:13px; padding:0 4px; flex-wrap:wrap; gap:4px; }
 #dayDisplay { color:#ffaa66; font-weight:bold; }
 #msgPopup { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:rgba(0,0,0,0.92); border:3px solid #ffcc44; border-radius:12px; padding:25px 40px; color:#fff; text-align:center; display:none; z-index:100; pointer-events:auto; min-width:200px; }
@@ -145,6 +146,12 @@ body { background:#1a1a2e; display:flex; justify-content:center; align-items:cen
   touch-action:manipulation;
 }
 .mob-arrow:active { background:rgba(255,220,80,0.95); transform:translate(-50%, -50%) scale(0.9); }
+.mob-arrow.deliver {
+  background:rgba(170,68,255,0.85);
+  border-color:#aa44ff;
+  box-shadow:0 0 16px rgba(170,68,255,0.8);
+  color:#fff;
+}
 
 /* ===== レスポンシブ ===== */
 @media (max-width:700px) {
@@ -205,6 +212,7 @@ body { background:#1a1a2e; display:flex; justify-content:center; align-items:cen
 <button id="btnDrop">📤 落とす</button>
 <button id="mobileToggle">📱 スマホ操作</button>
 <button id="btnMobControl">🔄 モブ操作</button>
+<button id="btnForceDeliver" class="danger-mode">🚀 強制納品</button>
 </div>
 </div>
 </div>
@@ -216,7 +224,7 @@ body { background:#1a1a2e; display:flex; justify-content:center; align-items:cen
 
 <script>
 // ============================================================
-// 7日間サバイバルゲーム (完全版 + モブ所持品視覚化)
+// 7日間サバイバルゲーム (完全版 + 強制納品)
 // ============================================================
 
 (function(){
@@ -350,6 +358,7 @@ var mobileToggle = document.getElementById('mobileToggle');
 var mobileControls = document.getElementById('mobileControls');
 var tapHint = document.getElementById('tapHint');
 var btnMobControl = document.getElementById('btnMobControl');
+var btnForceDeliver = document.getElementById('btnForceDeliver');
 var arrowOverlay = document.getElementById('mobArrowOverlay');
 
 function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
@@ -521,13 +530,13 @@ function initGame() {
       alive: true,
       taskId: mi2,
       hasDelivered: false,
-      // ★ 所持アイテムフラグ
       hasItem: false,
       targetX: null,
       targetY: null,
       targetBlock: null,
       state: 'idle',
-      moveCooldown: 0
+      moveCooldown: 0,
+      stuckFrames: 0
     };
     state.mobs.push(mob);
   }
@@ -637,6 +646,15 @@ function spawnItems() {
 
 function assignMobTask(mob) {
   if (!mob.alive || mob.hasDelivered) return;
+  // ★ すでにアイテムを持っている場合は納品タスクを優先
+  if (mob.hasItem) {
+    mob.state = 'moving_to_hut';
+    mob.targetX = 3;
+    mob.targetY = 5;
+    mob.targetBlock = 4;
+    return;
+  }
+  
   var targetName = '品' + (mob.taskId + 1);
   var targetItem = null;
   for (var i = 0; i < state.items.length; i++) {
@@ -680,14 +698,84 @@ function getObjectAt(blockId, x, y, type) {
   return null;
 }
 
+// ---- ★ 強制納品関数 ----
+function forceDeliverMob(mob) {
+  if (!mob || !mob.alive) return false;
+  if (!mob.hasItem) {
+    addLog('⚠️ ' + mob.name + ' はアイテムを持っていません');
+    return false;
+  }
+  if (mob.hasDelivered) {
+    addLog('⚠️ ' + mob.name + ' はすでに納品済みです');
+    return false;
+  }
+  
+  // 小屋の品をチェック
+  var hutItem = getObjectAt(4, 3, 5, '品');
+  if (!hutItem) {
+    addLog('⚠️ 小屋の品が見つかりません');
+    return false;
+  }
+  if (hutItem.used) {
+    addLog('⚠️ 小屋の品は現在クールダウン中です (残り ' + hutItem.cooldown + '秒)');
+    return false;
+  }
+  
+  // ★ 強制納品！位置関係なく即座に納品
+  hutItem.used = true;
+  hutItem.cooldown = 5;
+  mob.hasDelivered = true;
+  mob.hasItem = false;
+  mob.state = 'delivered';
+  state.points += 1;
+  addLog('🚀 ' + mob.name + ' を強制納品しました！ +1ポイント');
+  updateUI();
+  return true;
+}
+
+// ---- ★ 強制納品ボタン ----
+btnForceDeliver.addEventListener('click', function() {
+  if (state.gameOver) {
+    addLog('⚠️ ゲームが終了しています');
+    return;
+  }
+  
+  // 紫枠（アイテム所持）のモブを探す
+  var targetMob = null;
+  for (var i = 0; i < state.mobs.length; i++) {
+    var mob = state.mobs[i];
+    if (mob.alive && mob.hasItem && !mob.hasDelivered) {
+      targetMob = mob;
+      break;
+    }
+  }
+  
+  if (!targetMob) {
+    addLog('⚠️ 強制納品できるモブがいません（紫枠のモブを探してください）');
+    return;
+  }
+  
+  var success = forceDeliverMob(targetMob);
+  if (success) {
+    addLog('✅ ' + targetMob.name + ' を強制納品しました！');
+  }
+});
+
 // ---- モブAI ----
 function updateMobs() {
   for (var i = 0; i < state.mobs.length; i++) {
     var mob = state.mobs[i];
     if (!mob.alive) continue;
 
+    // ★ スタック検出: アイテムを持っていて動かない場合
+    if (mob.hasItem && !mob.hasDelivered) {
+      var prevX = mob.x;
+      var prevY = mob.y;
+      // 次のフレームで位置が変わらなかったらスタックカウント増加
+      // (実際の移動は後で行われるので、ここではフラグのみ)
+    }
+
     if (mob.hasDelivered) {
-      // 納品済み → アイテムを持っていない
       mob.hasItem = false;
       if (state.frameCount % 8 === 0) {
         var dirs = [[0,-1],[0,1],[-1,0],[1,0]];
@@ -719,7 +807,7 @@ function updateMobs() {
         }
         if (idx >= 0) {
           state.items.splice(idx, 1);
-          mob.hasItem = true; // ★ アイテムを所持
+          mob.hasItem = true;
           mob.state = 'moving_to_hut';
           mob.targetX = 3;
           mob.targetY = 5;
@@ -749,7 +837,7 @@ function updateMobs() {
           hutItem.used = true;
           hutItem.cooldown = 5;
           mob.hasDelivered = true;
-          mob.hasItem = false; // ★ 納品したのでアイテム消える
+          mob.hasItem = false;
           state.points += 1;
           addLog('✅ ' + mob.name + ' 納品完了！ +1ポイント');
           updateUI();
@@ -763,9 +851,10 @@ function updateMobs() {
           if (mx2 !== 0 || my2 !== 0) moveCharacter(mob, mx2, my2);
         }
       } else {
-        mob.hasDelivered = true;
-        mob.hasItem = false;
-        mob.state = 'delivered';
+        // ★ 小屋の品が使えない場合でも、強制納品ボタンで対応可能にするため
+        // ここでは何もしない（ユーザーが強制納品ボタンを使う）
+        // ただし、無限ループを防ぐため少し待機
+        mob.moveCooldown = 5;
       }
     } else {
       assignMobTask(mob);
@@ -1317,6 +1406,17 @@ function showMobArrows(mob) {
     }
   }
 
+  // ★ アイテムを持っている場合は「強制納品」矢印を追加
+  if (mob.hasItem && !mob.hasDelivered) {
+    validDirs.push({ 
+      dx: 0, dy: 0, 
+      label: '📦', 
+      x: mob.x, 
+      y: mob.y,
+      isDeliver: true 
+    });
+  }
+
   if (validDirs.length === 0) {
     addLog('⚠️ ' + mob.name + ' は動ける方向がありません');
     return;
@@ -1331,18 +1431,36 @@ function showMobArrows(mob) {
 
   for (var j = 0; j < validDirs.length; j++) {
     var dir = validDirs[j];
-    var arrowX = (mob.x + dir.dx * 1.2) * BLOCK_SIZE + BLOCK_SIZE/2;
-    var arrowY = (mob.y + dir.dy * 1.2) * BLOCK_SIZE + BLOCK_SIZE/2;
+    var arrowX = (mob.x + (dir.dx || 0) * 1.2) * BLOCK_SIZE + BLOCK_SIZE/2;
+    var arrowY = (mob.y + (dir.dy || 0) * 1.2) * BLOCK_SIZE + BLOCK_SIZE/2;
 
     var arrow = document.createElement('div');
     arrow.className = 'mob-arrow';
+    if (dir.isDeliver) arrow.classList.add('deliver');
     arrow.style.left = (offsetX + arrowX) + 'px';
     arrow.style.top = (offsetY + arrowY) + 'px';
     arrow.textContent = dir.label;
-    arrow.dataset.dx = dir.dx;
-    arrow.dataset.dy = dir.dy;
+    arrow.dataset.dx = dir.dx || 0;
+    arrow.dataset.dy = dir.dy || 0;
+    arrow.dataset.isDeliver = dir.isDeliver ? 'true' : 'false';
+    
     arrow.addEventListener('click', function(e) {
       e.stopPropagation();
+      var isDeliver = this.dataset.isDeliver === 'true';
+      if (isDeliver) {
+        // ★ 強制納品
+        if (state.selectedMob && state.selectedMob.alive) {
+          var success = forceDeliverMob(state.selectedMob);
+          if (success) {
+            clearArrows();
+            btnMobControl.classList.remove('active-mode');
+            state.mobControlMode = false;
+            updateUI();
+          }
+        }
+        return;
+      }
+      
       var dx = parseInt(this.dataset.dx, 10);
       var dy = parseInt(this.dataset.dy, 10);
       if (state.selectedMob && state.selectedMob.alive) {
@@ -1361,6 +1479,19 @@ function showMobArrows(mob) {
     arrow.addEventListener('touchstart', function(e) {
       e.preventDefault();
       e.stopPropagation();
+      var isDeliver = this.dataset.isDeliver === 'true';
+      if (isDeliver) {
+        if (state.selectedMob && state.selectedMob.alive) {
+          var success = forceDeliverMob(state.selectedMob);
+          if (success) {
+            clearArrows();
+            btnMobControl.classList.remove('active-mode');
+            state.mobControlMode = false;
+            updateUI();
+          }
+        }
+        return;
+      }
       var dx = parseInt(this.dataset.dx, 10);
       var dy = parseInt(this.dataset.dy, 10);
       if (state.selectedMob && state.selectedMob.alive) {
@@ -1468,9 +1599,8 @@ canvas.addEventListener('click', function(e) {
   }
 });
 
-// ---- ★★★ 修正: render() 関数（モブ所持品の紫枠表示） ----
+// ---- render() 関数（モブ所持品の紫枠表示） ----
 function render() {
-  // デバッグ出力（1秒に1回）
   if (state.frameCount % 60 === 0) {
     console.log('=== render デバッグ ===');
     console.log('currentBlock:', state.currentBlock);
@@ -1483,18 +1613,15 @@ function render() {
 
   ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
-  // 強制修正: 主人公のブロックに合わせる
   if (state.hero && state.hero.alive) {
     state.currentBlock = state.hero.blockId;
   }
 
   var blockId = state.currentBlock;
 
-  // ---- 背景 ----
   ctx.fillStyle = blockId === 4 ? '#8B7D6B' : '#2d5a27';
   ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
-  // ---- グリッド線 ----
   ctx.strokeStyle = 'rgba(0,0,0,0.12)';
   ctx.lineWidth = 0.5;
   for (var gx = 0; gx <= GRID_SIZE; gx++) {
@@ -1508,7 +1635,6 @@ function render() {
     ctx.stroke();
   }
 
-  // ---- 木 ----
   if (blockId !== 4) {
     for (var y = 0; y < GRID_SIZE; y++) {
       for (var x = 0; x < GRID_SIZE; x++) {
@@ -1527,7 +1653,6 @@ function render() {
     }
   }
 
-  // ---- 小屋オブジェクト ----
   if (blockId === 4) {
     for (var oi = 0; oi < state.objects.length; oi++) {
       var obj = state.objects[oi];
@@ -1558,7 +1683,6 @@ function render() {
     }
   }
 
-  // ---- アイテム ----
   for (var ii = 0; ii < state.items.length; ii++) {
     var item = state.items[ii];
     if (item.blockId !== blockId) continue;
@@ -1584,7 +1708,6 @@ function render() {
     ctx.fillText(label2, px2 + BLOCK_SIZE/2, py2 + BLOCK_SIZE/2);
   }
 
-  // ---- ★★★ キャラクター描画（モブ所持品は紫枠） ★★★ ----
   var allChars = [];
 
   if (state.hero && state.hero.alive && state.hero.blockId === blockId) {
@@ -1600,7 +1723,8 @@ function render() {
         y: mob3.y, 
         isHero: false, 
         hasItem: mob3.hasItem || false,
-        mobName: mob3.name
+        mobName: mob3.name,
+        hasDelivered: mob3.hasDelivered
       });
     }
   }
@@ -1621,7 +1745,6 @@ function render() {
     console.warn('⚠️ 描画するキャラクターが0です');
   }
 
-  // キャラクター描画
   for (var ci = 0; ci < allChars.length; ci++) {
     var ch = allChars[ci];
     var px3 = ch.x * BLOCK_SIZE;
@@ -1660,25 +1783,33 @@ function render() {
       ctx.fillText(label3, px3 + BLOCK_SIZE/2, py3 + BLOCK_SIZE/2);
     }
 
-    // ★★★ モブがアイテムを持っている場合、紫枠で囲む ★★★
+    // ★ モブがアイテムを持っている場合、紫枠で囲む
     if (ch.hasItem === true && ch.isHero === false) {
       ctx.strokeStyle = '#aa44ff';
       ctx.lineWidth = 3;
       ctx.shadowColor = '#aa44ff';
-      ctx.shadowBlur = 8;
+      ctx.shadowBlur = 10;
       ctx.strokeRect(px3, py3, BLOCK_SIZE, BLOCK_SIZE);
       ctx.shadowBlur = 0;
       
-      // 小さな「品」マークを右上に表示
       ctx.fillStyle = '#aa44ff';
       ctx.font = 'bold 10px "MS Gothic"';
       ctx.textAlign = 'right';
       ctx.textBaseline = 'top';
       ctx.fillText('◆', px3 + BLOCK_SIZE - 2, py3 + 1);
     }
+    
+    // ★ 納品済みモブは緑枠
+    if (ch.hasDelivered === true && ch.isHero === false) {
+      ctx.strokeStyle = '#44ff88';
+      ctx.lineWidth = 2;
+      ctx.shadowColor = '#44ff88';
+      ctx.shadowBlur = 6;
+      ctx.strokeRect(px3, py3, BLOCK_SIZE, BLOCK_SIZE);
+      ctx.shadowBlur = 0;
+    }
   }
 
-  // ---- ブロック名 ----
   ctx.fillStyle = 'rgba(255,255,255,0.25)';
   ctx.font = '10px "MS Gothic"';
   ctx.textAlign = 'left';
