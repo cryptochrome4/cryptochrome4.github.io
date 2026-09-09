@@ -1,57 +1,2424 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>画像表示</title>
-    <style>
-        body {
-            margin: 0;
-            min-height: 100vh;
-            background-color: #f0f2f5;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-family: sans-serif;
-        }
-        .container {
-            background: white;
-            padding: 20px;
-            border-radius: 16px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.1);
-            max-width: 90vw;
-            max-height: 90vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        img {
-            max-width: 100%;
-            max-height: 80vh;
-            display: block;
-            border-radius: 8px;
-        }
-        .caption {
-            position: fixed;
-            bottom: 20px;
-            left: 0;
-            right: 0;
-            text-align: center;
-            color: #666;
-            font-size: 14px;
-            background: rgba(255,255,255,0.7);
-            padding: 6px 12px;
-            width: fit-content;
-            margin: 0 auto;
-            border-radius: 30px;
-            backdrop-filter: blur(4px);
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>7日間サバイバル</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; user-select:none; -webkit-touch-callout:none; }
+body { background:#1a1a2e; display:flex; justify-content:center; align-items:center; min-height:100vh; font-family:'MS Gothic',monospace; touch-action:pan-y; }
+#gameContainer { background:#2d2d44; padding:15px; border-radius:10px; box-shadow:0 0 30px rgba(0,0,0,0.8); max-width:100%; }
+#mainArea { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
+#mapWrap { background:#1a1a2e; border:3px solid #444; border-radius:5px; padding:4px; position:relative; touch-action:none; }
+#mapCanvas { display:block; background:#2d5a27; image-rendering:pixelated; cursor:default; touch-action:none; width:320px; height:320px; }
+#infoPanel { width:220px; background:#1a1a2e; border:2px solid #444; border-radius:5px; padding:12px; color:#aaf; font-size:13px; line-height:1.7; flex-shrink:0; }
+#infoPanel .title { color:#ffcc66; font-size:15px; font-weight:bold; text-align:center; border-bottom:1px solid #444; padding-bottom:6px; margin-bottom:8px; }
+#infoPanel .stat { display:flex; justify-content:space-between; padding:2px 0; border-bottom:1px solid #333; }
+#infoPanel .stat .label { color:#99bbdd; }
+#infoPanel .stat .value { color:#ffdd99; font-weight:bold; }
+#logArea { background:#0d0d1a; border:1px solid #333; border-radius:3px; padding:4px 6px; height:90px; overflow-y:auto; font-size:12px; color:#88cc88; margin-top:6px; }
+#logArea .log-entry { border-bottom:1px solid #222; padding:1px 0; }
+#controls { display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; }
+#controls button { background:#333366; border:1px solid #555599; color:#ccd; padding:4px 12px; border-radius:3px; font-size:12px; cursor:pointer; font-family:inherit; touch-action:manipulation; }
+#controls button:hover { background:#444488; }
+#controls button:active { background:#222255; }
+#controls button.active-mode { background:#885533; border-color:#cc8844; color:#ffdd99; }
+#controls button.danger-mode { background:#883333; border-color:#cc4444; color:#ff9999; }
+#controls button.axe-active { background:#558833; border-color:#88cc66; color:#ddffbb; }
+#controls button.gun-active { background:#884488; border-color:#cc66cc; color:#ffddff; }
+#bottomBar { display:flex; justify-content:space-between; margin-top:10px; color:#88aacc; font-size:13px; padding:0 4px; flex-wrap:wrap; gap:4px; }
+#dayDisplay { color:#ffaa66; font-weight:bold; }
+#msgPopup { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:rgba(0,0,0,0.92); border:3px solid #ffcc44; border-radius:12px; padding:25px 40px; color:#fff; text-align:center; display:none; z-index:100; pointer-events:auto; min-width:200px; }
+#msgPopup h2 { color:#ffcc44; font-size:26px; margin-bottom:10px; }
+#msgPopup p { font-size:15px; color:#ddd; margin-bottom:16px; }
+#msgPopup .btn { background:#ffcc44; border:none; padding:8px 32px; border-radius:6px; font-size:16px; font-weight:bold; cursor:pointer; color:#1a1a2e; touch-action:manipulation; }
+#msgPopup .btn:hover { background:#ffdd66; }
+.night-overlay { position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,30,0.55); pointer-events:none; display:none; border-radius:3px; }
+
+/* ===== スマホ用十字キー ===== */
+#mobileControls {
+  position:absolute;
+  bottom:10px;
+  left:10px;
+  display:none;
+  z-index:50;
+  touch-action:none;
+  pointer-events:none;
+}
+#mobileControls.active { display:block; pointer-events:auto; }
+#dpad {
+  position:relative;
+  width:130px;
+  height:130px;
+  touch-action:none;
+}
+#dpad button {
+  position:absolute;
+  width:44px;
+  height:44px;
+  background:rgba(255,255,255,0.25);
+  border:2px solid rgba(255,255,255,0.5);
+  border-radius:8px;
+  color:#fff;
+  font-size:22px;
+  text-align:center;
+  line-height:40px;
+  cursor:pointer;
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
+  user-select:none;
+  font-weight:bold;
+  text-shadow:0 0 6px rgba(0,0,0,0.8);
+}
+#dpad button:active { background:rgba(255,255,255,0.5); }
+#dpad #dpad-up { top:0; left:43px; }
+#dpad #dpad-down { bottom:0; left:43px; }
+#dpad #dpad-left { top:43px; left:0; }
+#dpad #dpad-right { top:43px; right:0; }
+#dpad #dpad-center {
+  top:43px;
+  left:43px;
+  width:44px;
+  height:44px;
+  background:rgba(255,255,255,0.10);
+  border:1px solid rgba(255,255,255,0.2);
+  border-radius:50%;
+  font-size:12px;
+  line-height:44px;
+  color:rgba(255,255,255,0.3);
+  pointer-events:none;
+}
+
+#mobileToggle {
+  background:#444488;
+  border:1px solid #6666aa;
+  color:#ccd;
+  padding:4px 12px;
+  border-radius:3px;
+  font-size:12px;
+  cursor:pointer;
+  font-family:inherit;
+  touch-action:manipulation;
+}
+#mobileToggle:active { background:#555599; }
+#mobileToggle.active { background:#558844; border-color:#66aa66; }
+
+/* ===== スマホ用タップクリック案内 ===== */
+#tapHint {
+  position:absolute;
+  bottom:10px;
+  right:10px;
+  color:rgba(255,255,255,0.2);
+  font-size:10px;
+  display:none;
+  pointer-events:none;
+  z-index:40;
+  text-align:right;
+  line-height:1.3;
+}
+#tapHint.active { display:block; }
+
+/* ===== モブ操作矢印 ===== */
+#mobArrowOverlay {
+  position:absolute;
+  top:0;
+  left:0;
+  width:100%;
+  height:100%;
+  pointer-events:none;
+  z-index:60;
+}
+.mob-arrow {
+  position:absolute;
+  width:30px;
+  height:30px;
+  background:rgba(255,200,50,0.85);
+  border:2px solid #ffdd44;
+  border-radius:50%;
+  color:#000;
+  font-size:18px;
+  font-weight:bold;
+  text-align:center;
+  line-height:26px;
+  cursor:pointer;
+  pointer-events:auto;
+  box-shadow:0 0 12px rgba(255,200,0,0.6);
+  transform:translate(-50%, -50%);
+  z-index:70;
+  touch-action:manipulation;
+}
+.mob-arrow:active { background:rgba(255,220,80,0.95); transform:translate(-50%, -50%) scale(0.9); }
+.mob-arrow.deliver {
+  background:rgba(170,68,255,0.85);
+  border-color:#aa44ff;
+  box-shadow:0 0 16px rgba(170,68,255,0.8);
+  color:#fff;
+}
+
+/* ===== レスポンシブ ===== */
+@media (max-width:700px) {
+  #mainArea { flex-direction:column; align-items:center; }
+  #infoPanel { width:100%; max-width:320px; }
+  #mapCanvas { width:320px; height:320px; }
+}
+@media (max-width:400px) {
+  #mapCanvas { width:280px; height:280px; }
+  #dpad { width:110px; height:110px; }
+  #dpad button { width:36px; height:36px; font-size:18px; line-height:34px; }
+  #dpad #dpad-up { left:37px; }
+  #dpad #dpad-down { left:37px; }
+  #dpad #dpad-left { top:37px; }
+  #dpad #dpad-right { top:37px; }
+  #dpad #dpad-center { top:37px; left:37px; width:36px; height:36px; line-height:36px; font-size:10px; }
+  #infoPanel { font-size:12px; padding:8px; }
+  .mob-arrow { width:24px; height:24px; font-size:14px; line-height:22px; }
+}
+</style>
 </head>
 <body>
-    <div class="container">
-        <img src="img174wolf.svg" alt="Wolf SVG Image">
-    </div>
-    <div class="caption">🐺 img174wolf.svg</div>
+<div id="gameContainer">
+<div id="mainArea">
+<div id="mapWrap">
+<canvas id="mapCanvas" width="320" height="320"></canvas>
+<div class="night-overlay" id="nightOverlay"></div>
+<div id="msgPopup">
+<h2 id="popupTitle"></h2>
+<p id="popupDesc"></p>
+<button class="btn" id="popupBtn">OK</button>
+</div>
+
+<!-- スマホ用十字キー -->
+<div id="mobileControls">
+<div id="dpad">
+<button id="dpad-up">▲</button>
+<button id="dpad-down">▼</button>
+<button id="dpad-left">◀</button>
+<button id="dpad-right">▶</button>
+<div id="dpad-center">✚</div>
+</div>
+</div>
+<div id="tapHint">タップでクリック</div>
+
+<!-- モブ操作矢印オーバーレイ -->
+<div id="mobArrowOverlay"></div>
+</div>
+
+<div id="infoPanel">
+<div class="title">📋 情報パネル</div>
+<div class="stat"><span class="label">📅 日数</span><span class="value" id="dispDay">1 / 7</span></div>
+<div class="stat"><span class="label">🔰 補強ポイント</span><span class="value" id="dispPoints">0</span></div>
+<div class="stat"><span class="label">📦 所持アイテム</span><span class="value" id="dispItem">なし</span></div>
+<div class="stat"><span class="label">👥 生存モブ</span><span class="value" id="dispMobAlive">8 / 8</span></div>
+<div id="logArea"><div style="color:#667;font-size:11px;">— ログ —</div></div>
+<div id="controls">
+<button id="btnDrop">📤 落とす</button>
+<button id="mobileToggle">📱 スマホ操作</button>
+<button id="btnMobControl">🔄 モブ操作</button>
+<button id="btnForceDeliver" class="danger-mode">🚀 強制納品</button>
+<button id="btnAxeMode">🪓 斧モード</button>
+<button id="btnGunMode">🔫 銃モード</button>
+</div>
+</div>
+</div>
+<div id="bottomBar">
+<span id="dayDisplay">🌅 1日目 (30秒)</span>
+<span>⬆⬇⬅➡ 移動</span>
+</div>
+</div>
+
+<script>
+// ============================================================
+// 7日間サバイバルゲーム (裏切り者逃走優先度修正版)
+// ============================================================
+
+(function(){
+"use strict";
+
+var BLOCK_SIZE = 32;
+var GRID_SIZE = 10;
+var CANVAS_SIZE = 320;
+var DAY_DURATION = 30;
+var MAX_DAYS = 7;
+
+var IMG_FILES = {
+  '加藤': 'img154streamer.jpg',
+  '松本': 'img155streamer.jpg',
+  '坪池': 'img156streamer.jpg',
+  '市川': 'img157youtuber.jpg',
+  '青笹': 'img158nontitle.jpg',
+  '角田': 'img159streamer.jpg',
+  '木元': 'img160artist.jpg',
+  '山崎': 'img161streamer.jpg',
+  '紅葉': 'img162feat.jpg',
+  'ジェイソン': 'img163enemy.jpg',
+  '熊': 'img164bear.jpg',
+  '狼': 'img165wolf.jpg',
+  '敵狼': 'img174wolf.jpg',
+  '斧': 'img166axe.jpg',
+  '銃': 'img167gun.jpg'
+};
+
+var CHARACTERS = {
+  '加藤': { speed: 40, img: '加藤' },
+  '松本': { speed: 60, img: '松本' },
+  '坪池': { speed: 70, img: '坪池' },
+  '市川': { speed: 30, img: '市川' },
+  '青笹': { speed: 80, img: '青笹' },
+  '角田': { speed: 20, img: '角田' },
+  '木元': { speed: 50, img: '木元' },
+  '山崎': { speed: 10, img: '山崎' },
+  '紅葉': { speed: 70, img: '紅葉' },
+  'ジェイソン': { speed: 10, img: 'ジェイソン' },
+  '熊': { speed: 50, img: '熊' },
+  '狼': { speed: 40, img: '狼' },
+  '敵狼': { speed: 60, img: '敵狼' }
+};
+
+var MOB_NAMES = ['加藤','松本','坪池','市川','青笹','角田','木元','山崎'];
+var HERO_NAME = '紅葉';
+var ITEM_BLOCK_MAP = [8,7,6,5,3,2,1,0];
+
+var MOB_ROLE = {
+  NORMAL: 0,
+  TRAITOR: 1,
+  SABOTEUR: 2
+};
+
+var imageCache = {};
+var imagesLoaded = 0;
+var totalImages = 0;
+
+function loadImages(callback) {
+  var names = [];
+  for (var key in IMG_FILES) {
+    if (IMG_FILES.hasOwnProperty(key)) names.push(key);
+  }
+  totalImages = names.length;
+  imagesLoaded = 0;
+  if (totalImages === 0) { callback(); return; }
+  for (var i = 0; i < names.length; i++) {
+    var name = names[i];
+    var img = new Image();
+    img.onload = function() { imagesLoaded++; if (imagesLoaded >= totalImages) callback(); };
+    img.onerror = function() { 
+      console.warn('画像読み込み失敗:', this.src);
+      imagesLoaded++; 
+      if (imagesLoaded >= totalImages) callback(); 
+    };
+    img.src = IMG_FILES[name];
+    imageCache[name] = img;
+  }
+}
+
+function getImage(name) {
+  var img = imageCache[name];
+  if (img && img.complete && img.naturalWidth > 0) return img;
+  return null;
+}
+
+var state = {
+  day: 1,
+  dayElapsed: 0,
+  points: 0,
+  gameOver: false,
+  gameWon: false,
+  paused: false,
+  night: false,
+  hero: null,
+  mobs: [],
+  jason: null,
+  bear: null,
+  wolf: null,
+  items: [],
+  objects: [],
+  heroItem: null,
+  mobAlive: 8,
+  blockMap: [],
+  currentBlock: 4,
+  logs: [],
+  jasonPoints: 0,
+  bearAttackDays: [],
+  dayStartTime: 0,
+  animFrame: null,
+  dayTimerInterval: null,
+  frameCount: 0,
+  jasonKillCooldown: 0,
+  bearKillCooldown: 0,
+  isGameLoopRunning: false,
+  pendingRespawn: [],
+  mobControlMode: false,
+  selectedMob: null,
+  arrowDirections: [],
+  axeMode: false,
+  gunMode: false,
+  traitorIndex: -1,
+  saboteurIndex: -1,
+  enemyWolf: false,
+  gunShotCooldown: 0
+};
+
+var canvas = document.getElementById('mapCanvas');
+var ctx = canvas.getContext('2d');
+var nightOverlay = document.getElementById('nightOverlay');
+var popup = document.getElementById('msgPopup');
+var popupTitle = document.getElementById('popupTitle');
+var popupDesc = document.getElementById('popupDesc');
+var popupBtn = document.getElementById('popupBtn');
+var dispDay = document.getElementById('dispDay');
+var dispPoints = document.getElementById('dispPoints');
+var dispItem = document.getElementById('dispItem');
+var dispMobAlive = document.getElementById('dispMobAlive');
+var logArea = document.getElementById('logArea');
+var dayDisplay = document.getElementById('dayDisplay');
+var btnDrop = document.getElementById('btnDrop');
+var mobileToggle = document.getElementById('mobileToggle');
+var mobileControls = document.getElementById('mobileControls');
+var tapHint = document.getElementById('tapHint');
+var btnMobControl = document.getElementById('btnMobControl');
+var btnForceDeliver = document.getElementById('btnForceDeliver');
+var btnAxeMode = document.getElementById('btnAxeMode');
+var btnGunMode = document.getElementById('btnGunMode');
+var arrowOverlay = document.getElementById('mobArrowOverlay');
+
+function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+function addLog(msg) {
+  state.logs.unshift(msg);
+  if (state.logs.length > 50) state.logs.pop();
+  renderLog();
+}
+
+function renderLog() {
+  var html = '<div style="color:#667;font-size:11px;">— ログ —</div>';
+  for (var i = 0; i < Math.min(state.logs.length, 12); i++) {
+    html += '<div class="log-entry">' + state.logs[i] + '</div>';
+  }
+  logArea.innerHTML = html;
+}
+
+var BLOCK_NAMES = ['森8','森7','森6','森5','小屋','森4','森3','森2','森1'];
+
+function blockToGrid(blockId) {
+  return { row: Math.floor(blockId / 3), col: blockId % 3 };
+}
+
+function gridToBlock(row, col) {
+  if (row < 0 || row > 2 || col < 0 || col > 2) return -1;
+  return row * 3 + col;
+}
+
+function moveCharacter(entity, dx, dy) {
+  if (!entity || !entity.alive) return false;
+  var nx = entity.x + dx;
+  var ny = entity.y + dy;
+  if (nx >= 0 && nx < GRID_SIZE && ny >= 0 && ny < GRID_SIZE) {
+    if (state.blockMap[entity.blockId] && state.blockMap[entity.blockId][ny] &&
+        state.blockMap[entity.blockId][ny][nx] === 'tree') {
+      return false;
+    }
+    entity.x = nx;
+    entity.y = ny;
+    return true;
+  }
+  var g = blockToGrid(entity.blockId);
+  var newRow = g.row, newCol = g.col, newX = nx, newY = ny;
+  if (nx < 0) { newCol--; newX = GRID_SIZE - 1; }
+  else if (nx >= GRID_SIZE) { newCol++; newX = 0; }
+  else if (ny < 0) { newRow--; newY = GRID_SIZE - 1; }
+  else if (ny >= GRID_SIZE) { newRow++; newY = 0; }
+  var newBlock = gridToBlock(newRow, newCol);
+  if (newBlock < 0 || newBlock > 8) return false;
+  if (state.blockMap[newBlock] && state.blockMap[newBlock][newY] &&
+      state.blockMap[newBlock][newY][newX] === 'tree') {
+    return false;
+  }
+  entity.blockId = newBlock;
+  entity.x = newX;
+  entity.y = newY;
+  if (entity === state.hero) state.currentBlock = newBlock;
+  return true;
+}
+
+function assignRoles() {
+  var available = [];
+  for (var i = 0; i < state.mobs.length; i++) {
+    available.push(i);
+  }
+  for (var i = available.length - 1; i > 0; i--) {
+    var j = rand(0, i);
+    var tmp = available[i];
+    available[i] = available[j];
+    available[j] = tmp;
+  }
+  state.traitorIndex = available[0];
+  state.saboteurIndex = available[1];
+  
+  for (var i = 0; i < state.mobs.length; i++) {
+    var mob = state.mobs[i];
+    if (i === state.traitorIndex) {
+      mob.role = MOB_ROLE.TRAITOR;
+      mob.roleActive = false;
+      addLog('🔴 ' + mob.name + ' は裏切り者です（納品後、小屋で襲う）');
+    } else if (i === state.saboteurIndex) {
+      mob.role = MOB_ROLE.SABOTEUR;
+      mob.roleActive = false;
+      addLog('🟠 ' + mob.name + ' は補強減らしです（納品後、毎日-1ポイント）');
+    } else {
+      mob.role = MOB_ROLE.NORMAL;
+    }
+  }
+}
+
+btnGunMode.addEventListener('click', function() {
+  if (state.gameOver) {
+    addLog('⚠️ ゲームが終了しています');
+    return;
+  }
+  if (state.heroItem !== '銃') {
+    addLog('⚠️ 銃を持っていません');
+    return;
+  }
+  state.gunMode = !state.gunMode;
+  if (state.gunMode) {
+    btnGunMode.classList.add('gun-active');
+    btnGunMode.textContent = '🔫 銃モード ON';
+    addLog('🔫 銃モード ON (クリックで発射)');
+  } else {
+    btnGunMode.classList.remove('gun-active');
+    btnGunMode.textContent = '🔫 銃モード';
+    addLog('🔫 銃モード OFF');
+  }
+});
+
+function shootGun(gx, gy) {
+  if (state.gunShotCooldown > 0) {
+    addLog('⚠️ クールダウン中 (' + state.gunShotCooldown + 'フレーム)');
+    return;
+  }
+  if (state.heroItem !== '銃') {
+    addLog('⚠️ 銃を持っていません');
+    state.gunMode = false;
+    btnGunMode.classList.remove('gun-active');
+    btnGunMode.textContent = '🔫 銃モード';
+    return;
+  }
+  
+  var hero = state.hero;
+  var targetBlock = hero.blockId;
+  
+  if (gx < 0 || gx >= GRID_SIZE || gy < 0 || gy >= GRID_SIZE) {
+    addLog('⚠️ 範囲外です');
+    return;
+  }
+  
+  var target = null;
+  var targetType = '';
+  
+  for (var i = 0; i < state.mobs.length; i++) {
+    var mob = state.mobs[i];
+    if (!mob.alive) continue;
+    if (mob.blockId !== targetBlock) continue;
+    if (mob.x === gx && mob.y === gy) {
+      target = mob;
+      targetType = 'mob';
+      break;
+    }
+  }
+  
+  if (!target && state.jason && state.jason.alive && state.jason.blockId === targetBlock &&
+      state.jason.x === gx && state.jason.y === gy) {
+    addLog('⚠️ ジェイソンには銃が効かない');
+    state.gunShotCooldown = 10;
+    return;
+  }
+  
+  if (!target && state.bear && state.bear.alive && state.bear.blockId === targetBlock &&
+      state.bear.x === gx && state.bear.y === gy) {
+    addLog('⚠️ 熊には銃が効かない');
+    state.gunShotCooldown = 10;
+    return;
+  }
+  
+  if (!target && state.wolf && state.wolf.alive && state.wolf.blockId === targetBlock &&
+      state.wolf.x === gx && state.wolf.y === gy) {
+    if (state.enemyWolf) {
+      addLog('⚠️ 敵狼には銃が効かない');
+    } else {
+      state.enemyWolf = true;
+      state.wolf.img = '敵狼';
+      state.wolf.speed = 60;
+      addLog('🐺 狼が敵になった！ (img174wolf.jpg)');
+    }
+    state.gunShotCooldown = 10;
+    return;
+  }
+  
+  if (target && targetType === 'mob') {
+    var mob = target;
+    
+    if (mob.role === MOB_ROLE.TRAITOR || mob.role === MOB_ROLE.SABOTEUR) {
+      if (mob.roleActive) {
+        mob.alive = false;
+        state.mobAlive--;
+        if (mob.role === MOB_ROLE.TRAITOR) {
+          addLog('🔫 ' + mob.name + '（裏切り者）を銃で処刑した！');
+        } else {
+          addLog('🔫 ' + mob.name + '（補強減らし）を銃で処刑した！');
+        }
+        state.gunShotCooldown = 15;
+        updateUI();
+        return;
+      } else {
+        addLog('⚠️ ' + mob.name + ' はまだ納品前です（役割未発動）');
+        state.gunShotCooldown = 10;
+        return;
+      }
+    }
+    
+    if (mob.role === MOB_ROLE.NORMAL && mob.hasDelivered) {
+      state.points = Math.max(0, state.points - 1);
+      mob.alive = false;
+      state.mobAlive--;
+      addLog('💔 誤って ' + mob.name + ' を撃ってしまった！ -1ポイント');
+      state.gunShotCooldown = 15;
+      updateUI();
+      return;
+    } else if (mob.role === MOB_ROLE.NORMAL && !mob.hasDelivered) {
+      addLog('⚠️ ' + mob.name + ' は納品前です（殺しても意味がありません）');
+      state.gunShotCooldown = 10;
+      return;
+    }
+  }
+  
+  addLog('🔫 撃ったが何も当たらなかった');
+  state.gunShotCooldown = 10;
+}
+
+function applySabotage() {
+  for (var i = 0; i < state.mobs.length; i++) {
+    var mob = state.mobs[i];
+    if (mob.alive && mob.role === MOB_ROLE.SABOTEUR && mob.roleActive) {
+      state.points = Math.max(0, state.points - 1);
+      addLog('🟠 ' + mob.name + ' が補強ポイントを1減らした！');
+      updateUI();
+    }
+  }
+}
+
+function traitorAttack() {
+  var hero = state.hero;
+  if (!hero || !hero.alive) return;
+  
+  for (var i = 0; i < state.mobs.length; i++) {
+    var mob = state.mobs[i];
+    if (!mob.alive) continue;
+    if (mob.role !== MOB_ROLE.TRAITOR) continue;
+    if (!mob.roleActive) continue;
+    
+    if (mob.blockId !== 4) continue;
+    if (hero.blockId !== 4) continue;
+    
+    if (Math.abs(mob.x - hero.x) <= 1 && Math.abs(mob.y - hero.y) <= 1) {
+      addLog('🔴 ' + mob.name + '（裏切り者）が襲ってきた！');
+      killHero(mob.name + '（裏切り者）');
+      return;
+    }
+  }
+}
+
+function dailySabotage() {
+  applySabotage();
+}
+
+function onMobDelivered(mob) {
+  if (mob.role === MOB_ROLE.TRAITOR) {
+    mob.roleActive = true;
+    addLog('🔴 ' + mob.name + '（裏切り者）が覚醒した！');
+  } else if (mob.role === MOB_ROLE.SABOTEUR) {
+    mob.roleActive = true;
+    addLog('🟠 ' + mob.name + '（補強減らし）が活動を開始した！');
+  }
+}
+
+function initGame() {
+  console.log('=== initGame 開始 ===');
+  if (state.animFrame) { cancelAnimationFrame(state.animFrame); state.animFrame = null; }
+  if (state.dayTimerInterval) { clearInterval(state.dayTimerInterval); state.dayTimerInterval = null; }
+
+  state.day = 1;
+  state.dayElapsed = 0;
+  state.points = 0;
+  state.gameOver = false;
+  state.gameWon = false;
+  state.night = false;
+  state.heroItem = null;
+  state.mobAlive = 8;
+  state.logs = [];
+  state.jasonPoints = 0;
+  state.items = [];
+  state.objects = [];
+  state.jasonKillCooldown = 0;
+  state.bearKillCooldown = 0;
+  state.currentBlock = 4;
+  state.isGameLoopRunning = true;
+  state.frameCount = 0;
+  state.pendingRespawn = [];
+  state.mobControlMode = false;
+  state.selectedMob = null;
+  state.arrowDirections = [];
+  state.axeMode = false;
+  state.gunMode = false;
+  state.traitorIndex = -1;
+  state.saboteurIndex = -1;
+  state.enemyWolf = false;
+  state.gunShotCooldown = 0;
+  btnMobControl.classList.remove('active-mode');
+  btnAxeMode.classList.remove('axe-active');
+  btnAxeMode.textContent = '🪓 斧モード';
+  btnGunMode.classList.remove('gun-active');
+  btnGunMode.textContent = '🔫 銃モード';
+  clearArrows();
+
+  var days = [1,2,3,4,5,6,7];
+  state.bearAttackDays = [];
+  var shuffled = days.slice();
+  for (var i = shuffled.length - 1; i > 0; i--) {
+    var j = rand(0, i);
+    var tmp = shuffled[i];
+    shuffled[i] = shuffled[j];
+    shuffled[j] = tmp;
+  }
+  state.bearAttackDays = shuffled.slice(0, 2);
+  addLog('🐻 熊の襲撃日: ' + state.bearAttackDays.join(', ') + '日目');
+
+  state.jasonPoints = rand(15, 20);
+  addLog('🔪 ジェイソンポイント: ' + state.jasonPoints);
+
+  state.blockMap = [];
+  for (var b = 0; b < 9; b++) {
+    state.blockMap[b] = [];
+    for (var y = 0; y < GRID_SIZE; y++) {
+      state.blockMap[b][y] = [];
+      for (var x = 0; x < GRID_SIZE; x++) {
+        state.blockMap[b][y][x] = null;
+      }
+    }
+  }
+
+  for (var b2 = 0; b2 < 9; b2++) {
+    if (b2 === 4) continue;
+    for (var t = 0; t < 3; t++) {
+      var tx, ty;
+      var attempts = 0;
+      do {
+        tx = rand(0, 8);
+        ty = rand(0, 8);
+        attempts++;
+      } while (attempts < 50 && state.blockMap[b2][ty][tx] !== null);
+      if (state.blockMap[b2][ty][tx] === null) {
+        state.blockMap[b2][ty][tx] = 'tree';
+        if (ty + 1 < GRID_SIZE && state.blockMap[b2][ty+1][tx] === null) {
+          state.blockMap[b2][ty+1][tx] = 'tree';
+        }
+      }
+    }
+  }
+
+  state.hero = {
+    name: HERO_NAME,
+    x: rand(3, 6),
+    y: rand(3, 6),
+    blockId: 4,
+    speed: CHARACTERS[HERO_NAME].speed,
+    img: CHARACTERS[HERO_NAME].img,
+    alive: true
+  };
+  console.log('主人公初期位置:', state.hero.x, state.hero.y, 'ブロック:', state.hero.blockId);
+
+  var mobPositions = [
+    {x:1,y:1},{x:8,y:1},{x:1,y:8},{x:8,y:8},
+    {x:2,y:0},{x:7,y:0},{x:0,y:2},{x:0,y:7}
+  ];
+  state.mobs = [];
+  var shuffledMobs = MOB_NAMES.slice();
+  for (var mi = shuffledMobs.length - 1; mi > 0; mi--) {
+    var mj = rand(0, mi);
+    var mt = shuffledMobs[mi];
+    shuffledMobs[mi] = shuffledMobs[mj];
+    shuffledMobs[mj] = mt;
+  }
+  for (var mi2 = 0; mi2 < 8; mi2++) {
+    var pos = mobPositions[mi2 % mobPositions.length];
+    var mob = {
+      name: shuffledMobs[mi2],
+      x: pos.x,
+      y: pos.y,
+      blockId: 4,
+      speed: CHARACTERS[shuffledMobs[mi2]].speed,
+      img: CHARACTERS[shuffledMobs[mi2]].img,
+      alive: true,
+      taskId: mi2,
+      hasDelivered: false,
+      hasItem: false,
+      targetX: null,
+      targetY: null,
+      targetBlock: null,
+      state: 'idle',
+      moveCooldown: 0,
+      stuckFrames: 0,
+      role: MOB_ROLE.NORMAL,
+      roleActive: false
+    };
+    state.mobs.push(mob);
+  }
+
+  assignRoles();
+
+  var jasonBlock = rand(0, 8);
+  if (jasonBlock === 4) jasonBlock = 0;
+  state.jason = {
+    name: 'ジェイソン',
+    x: rand(0, 9),
+    y: rand(0, 9),
+    blockId: jasonBlock,
+    speed: 10,
+    img: 'ジェイソン',
+    alive: true,
+    moveCooldown: 0
+  };
+
+  var bearBlock = rand(0, 8);
+  if (bearBlock === 4) bearBlock = 1;
+  state.bear = {
+    name: '熊',
+    x: rand(0, 9),
+    y: rand(0, 9),
+    blockId: bearBlock,
+    speed: 50,
+    img: '熊',
+    alive: true,
+    moveCooldown: 0
+  };
+
+  var wolfBlock = rand(0, 8);
+  if (wolfBlock === 4) wolfBlock = 2;
+  state.wolf = {
+    name: '狼',
+    x: rand(0, 9),
+    y: rand(0, 9),
+    blockId: wolfBlock,
+    speed: 40,
+    img: '狼',
+    alive: true,
+    moveCooldown: 0
+  };
+  state.enemyWolf = false;
+
+  state.objects = [
+    { type: '樽', x: 6, y: 4, blockId: 4, used: false, cooldown: 0 },
+    { type: '箱', x: 7, y: 4, blockId: 4, used: false, cooldown: 0 },
+    { type: '品', x: 3, y: 5, blockId: 4, used: false, cooldown: 0 },
+    { type: '窓', x: 5, y: 5, blockId: 4, used: false, cooldown: 0 },
+    { type: '穴', x: 7, y: 7, blockId: 4, used: false, cooldown: 0 }
+  ];
+
+  spawnItems();
+
+  for (var m = 0; m < state.mobs.length; m++) {
+    assignMobTask(state.mobs[m]);
+  }
+
+  updateUI();
+  renderLog();
+  addLog('🌅 ゲーム開始！ 7日間逃げ切れ！');
+
+  state.dayStartTime = Date.now();
+  startDayTimer();
+
+  if (state.animFrame) cancelAnimationFrame(state.animFrame);
+  state.isGameLoopRunning = true;
+  gameLoop();
+}
+
+function spawnItems() {
+  state.items = [];
+  var itemTypes = ['材','斧','銃','餌','堀'];
+
+  for (var i = 0; i < 8; i++) {
+    var bid = ITEM_BLOCK_MAP[i];
+    state.items.push({
+      name: '品' + (i + 1),
+      x: rand(0, 9),
+      y: rand(0, 9),
+      blockId: bid
+    });
+  }
+
+  for (var i = 0; i < 8; i++) {
+    var bid2 = ITEM_BLOCK_MAP[i];
+    state.items.push({
+      name: '品' + ((i + 1) * 10),
+      x: rand(0, 9),
+      y: rand(0, 9),
+      blockId: bid2
+    });
+  }
+
+  var allBlocks = [0,1,2,3,4,5,6,7,8];
+  for (var ti = 0; ti < itemTypes.length; ti++) {
+    var bid3 = allBlocks[rand(0, allBlocks.length - 1)];
+    state.items.push({
+      name: itemTypes[ti],
+      x: rand(0, 9),
+      y: rand(0, 9),
+      blockId: bid3
+    });
+  }
+  console.log('アイテム生成数:', state.items.length);
+}
+
+function assignMobTask(mob) {
+  if (!mob.alive || mob.hasDelivered) return;
+  if (mob.hasItem) {
+    mob.state = 'moving_to_hut';
+    mob.targetX = 3;
+    mob.targetY = 5;
+    mob.targetBlock = 4;
+    return;
+  }
+  
+  var targetName = '品' + (mob.taskId + 1);
+  var targetItem = null;
+  for (var i = 0; i < state.items.length; i++) {
+    if (state.items[i].name === targetName) {
+      targetItem = state.items[i];
+      break;
+    }
+  }
+  if (targetItem) {
+    mob.targetX = targetItem.x;
+    mob.targetY = targetItem.y;
+    mob.targetBlock = targetItem.blockId;
+    mob.state = 'moving_to_item';
+  } else {
+    mob.state = 'idle';
+  }
+}
+
+function getDirectionToBlock(entity, targetBlock) {
+  var current = blockToGrid(entity.blockId);
+  var target = blockToGrid(targetBlock);
+  var dr = target.row - current.row;
+  var dc = target.col - current.col;
+  if (dr === 0 && dc === 0) return null;
+  if (dc < 0 && entity.x === 0) return { dx: -1, dy: 0 };
+  if (dc > 0 && entity.x === GRID_SIZE - 1) return { dx: 1, dy: 0 };
+  if (dr < 0 && entity.y === 0) return { dx: 0, dy: -1 };
+  if (dr > 0 && entity.y === GRID_SIZE - 1) return { dx: 0, dy: 1 };
+  if (dc < 0) return { dx: -1, dy: 0 };
+  if (dc > 0) return { dx: 1, dy: 0 };
+  if (dr < 0) return { dx: 0, dy: -1 };
+  if (dr > 0) return { dx: 0, dy: 1 };
+  return null;
+}
+
+function getObjectAt(blockId, x, y, type) {
+  for (var i = 0; i < state.objects.length; i++) {
+    var o = state.objects[i];
+    if (o.blockId === blockId && o.x === x && o.y === y && o.type === type) return o;
+  }
+  return null;
+}
+
+function forceDeliverMob(mob) {
+  if (!mob || !mob.alive) return false;
+  if (!mob.hasItem) {
+    addLog('⚠️ ' + mob.name + ' はアイテムを持っていません');
+    return false;
+  }
+  if (mob.hasDelivered) {
+    addLog('⚠️ ' + mob.name + ' はすでに納品済みです');
+    return false;
+  }
+  
+  var hutItem = getObjectAt(4, 3, 5, '品');
+  if (!hutItem) {
+    addLog('⚠️ 小屋の品が見つかりません');
+    return false;
+  }
+  if (hutItem.used) {
+    addLog('⚠️ 小屋の品は現在クールダウン中です (残り ' + hutItem.cooldown + '秒)');
+    return false;
+  }
+  
+  hutItem.used = true;
+  hutItem.cooldown = 5;
+  mob.hasDelivered = true;
+  mob.hasItem = false;
+  mob.state = 'delivered';
+  state.points += 1;
+  
+  onMobDelivered(mob);
+  
+  addLog('🚀 ' + mob.name + ' を強制納品しました！ +1ポイント');
+  updateUI();
+  return true;
+}
+
+// ★★★ 修正: updateMobs() 内の裏切り者処理 ★★★
+function updateMobs() {
+  for (var i = 0; i < state.mobs.length; i++) {
+    var mob = state.mobs[i];
+    if (!mob.alive) continue;
+
+    if (mob.hasDelivered) {
+      mob.hasItem = false;
+      
+      // ★ 裏切り者の行動（逃走優先度付き）
+      if (mob.role === MOB_ROLE.TRAITOR && mob.roleActive) {
+        var hero = state.hero;
+        var shouldFlee = false;
+        var fleeTarget = null;
+        
+        // ★ 優先度1: 熊から逃げる
+        if (state.bear && state.bear.alive && state.bear.blockId === mob.blockId) {
+          shouldFlee = true;
+          fleeTarget = state.bear;
+        }
+        // ★ 優先度2: ジェイソンから逃げる
+        else if (state.jason && state.jason.alive && state.jason.blockId === mob.blockId) {
+          shouldFlee = true;
+          fleeTarget = state.jason;
+        }
+        
+        // 逃げる処理
+        if (shouldFlee && fleeTarget) {
+          var dx = mob.x - fleeTarget.x;
+          var dy = mob.y - fleeTarget.y;
+          var mx = 0, my = 0;
+          if (Math.abs(dx) >= Math.abs(dy)) {
+            mx = dx > 0 ? 1 : -1;
+          } else {
+            my = dy > 0 ? 1 : -1;
+          }
+          // 逃げる方向に移動（壁や木があれば別方向を試す）
+          if (!moveCharacter(mob, mx, my)) {
+            var attempts = [
+              [mx, 0], [0, my], [-mx, 0], [0, -my],
+              [mx, my], [-mx, my], [mx, -my], [-mx, -my]
+            ];
+            for (var a = 0; a < attempts.length; a++) {
+              if (moveCharacter(mob, attempts[a][0], attempts[a][1])) break;
+            }
+          }
+          continue;
+        }
+        
+        // ★ 優先度3: 主人公が小屋にいる → 襲う
+        if (hero && hero.alive && hero.blockId === 4 && mob.blockId === 4) {
+          var dx2 = hero.x - mob.x;
+          var dy2 = hero.y - mob.y;
+          if (Math.abs(dx2) > 1 || Math.abs(dy2) > 1) {
+            var mx2 = 0, my2 = 0;
+            if (dx2 > 0) mx2 = 1;
+            else if (dx2 < 0) mx2 = -1;
+            else if (dy2 > 0) my2 = 1;
+            else if (dy2 < 0) my2 = -1;
+            moveCharacter(mob, mx2, my2);
+          }
+          continue;
+        }
+        
+        // ★ 優先度4: ランダム移動
+        if (state.frameCount % 8 === 0) {
+          var dirs = [[0,-1],[0,1],[-1,0],[1,0]];
+          var d = dirs[rand(0, 3)];
+          moveCharacter(mob, d[0], d[1]);
+        }
+        continue;
+      }
+      
+      // ★ 補強減らしの処理（変更なし）
+      if (mob.role === MOB_ROLE.SABOTEUR && mob.roleActive) {
+        var hero2 = state.hero;
+        if (hero2 && hero2.alive && state.heroItem === '銃') {
+          if (mob.blockId === hero2.blockId) {
+            var dx2 = mob.x - hero2.x;
+            var dy2 = mob.y - hero2.y;
+            var mx2 = 0, my2 = 0;
+            if (Math.abs(dx2) >= Math.abs(dy2)) {
+              mx2 = dx2 > 0 ? 1 : -1;
+            } else {
+              my2 = dy2 > 0 ? 1 : -1;
+            }
+            moveCharacter(mob, mx2, my2);
+          } else {
+            var dir = getDirectionToBlock(mob, hero2.blockId);
+            if (dir) {
+              moveCharacter(mob, -dir.dx, -dir.dy);
+            }
+          }
+          continue;
+        }
+      }
+      
+      // ★ 通常のランダム移動
+      if (state.frameCount % 8 === 0) {
+        var dirs = [[0,-1],[0,1],[-1,0],[1,0]];
+        var d = dirs[rand(0, 3)];
+        moveCharacter(mob, d[0], d[1]);
+      }
+      continue;
+    }
+
+    // ---- 納品前のモブ（変更なし） ----
+    if (mob.moveCooldown > 0) { mob.moveCooldown--; continue; }
+    mob.moveCooldown = 3;
+
+    if (mob.state === 'moving_to_item') {
+      if (mob.blockId !== mob.targetBlock) {
+        var td = getDirectionToBlock(mob, mob.targetBlock);
+        if (td) moveCharacter(mob, td.dx, td.dy);
+        continue;
+      }
+      var dx = mob.targetX - mob.x;
+      var dy = mob.targetY - mob.y;
+      if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) {
+        var idx = -1;
+        for (var j = 0; j < state.items.length; j++) {
+          var it = state.items[j];
+          if (it.name === '品' + (mob.taskId + 1) && it.blockId === mob.blockId &&
+              Math.abs(it.x - mob.x) <= 1 && Math.abs(it.y - mob.y) <= 1) {
+            idx = j; break;
+          }
+        }
+        if (idx >= 0) {
+          state.items.splice(idx, 1);
+          mob.hasItem = true;
+          mob.state = 'moving_to_hut';
+          mob.targetX = 3;
+          mob.targetY = 5;
+          mob.targetBlock = 4;
+          addLog('📦 ' + mob.name + ' が 品' + (mob.taskId + 1) + ' を入手');
+        } else {
+          mob.state = 'idle';
+          assignMobTask(mob);
+        }
+      } else {
+        var mx = 0, my = 0;
+        if (mob.targetX > mob.x) mx = 1;
+        else if (mob.targetX < mob.x) mx = -1;
+        else if (mob.targetY > mob.y) my = 1;
+        else if (mob.targetY < mob.y) my = -1;
+        if (mx !== 0 || my !== 0) moveCharacter(mob, mx, my);
+      }
+    } else if (mob.state === 'moving_to_hut') {
+      if (mob.blockId !== 4) {
+        var td2 = getDirectionToBlock(mob, 4);
+        if (td2) moveCharacter(mob, td2.dx, td2.dy);
+        continue;
+      }
+      var hutItem = getObjectAt(4, 3, 5, '品');
+      if (hutItem && !hutItem.used) {
+        if (Math.abs(3 - mob.x) <= 1 && Math.abs(5 - mob.y) <= 1) {
+          hutItem.used = true;
+          hutItem.cooldown = 5;
+          mob.hasDelivered = true;
+          mob.hasItem = false;
+          state.points += 1;
+          
+          onMobDelivered(mob);
+          
+          addLog('✅ ' + mob.name + ' 納品完了！ +1ポイント');
+          updateUI();
+          mob.state = 'delivered';
+        } else {
+          var mx2 = 0, my2 = 0;
+          if (3 > mob.x) mx2 = 1;
+          else if (3 < mob.x) mx2 = -1;
+          else if (5 > mob.y) my2 = 1;
+          else if (5 < mob.y) my2 = -1;
+          if (mx2 !== 0 || my2 !== 0) moveCharacter(mob, mx2, my2);
+        }
+      } else {
+        mob.moveCooldown = 5;
+      }
+    } else {
+      assignMobTask(mob);
+    }
+  }
+}
+
+function fleeFromWolf(entity) {
+  if (!state.wolf || !state.wolf.alive) return false;
+  if (entity.blockId !== state.wolf.blockId) return false;
+  if (Math.abs(entity.x - state.wolf.x) > 3 || Math.abs(entity.y - state.wolf.y) > 3) return false;
+
+  var dx = entity.x - state.wolf.x;
+  var dy = entity.y - state.wolf.y;
+  var mx = 0, my = 0;
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    mx = dx > 0 ? 1 : -1;
+  } else {
+    my = dy > 0 ? 1 : -1;
+  }
+  if (moveCharacter(entity, mx, my)) return true;
+  var attempts = [
+    [mx, 0], [0, my], [-mx, 0], [0, -my],
+    [mx, my], [-mx, my], [mx, -my], [-mx, -my]
+  ];
+  for (var i = 0; i < attempts.length; i++) {
+    if (moveCharacter(entity, attempts[i][0], attempts[i][1])) return true;
+  }
+  return false;
+}
+
+function updateEnemies() {
+  if (state.jason && state.jason.alive) {
+    var jSpeed = 10 + (state.day - 1) * 10;
+    if (state.jason.speed !== jSpeed) state.jason.speed = jSpeed;
+
+    if (state.jason.moveCooldown > 0) {
+      state.jason.moveCooldown--;
+    } else {
+      state.jason.moveCooldown = Math.max(1, Math.floor(12 / (state.jason.speed / 10)));
+
+      var hero = state.hero;
+      if (state.wolf && state.wolf.alive && state.jason.blockId === state.wolf.blockId) {
+        fleeFromWolf(state.jason);
+      }
+      else if (hero && hero.alive) {
+        if (state.jason.blockId === hero.blockId) {
+          var jdx = hero.x - state.jason.x;
+          var jdy = hero.y - state.jason.y;
+          var jmx = 0, jmy = 0;
+          if (Math.abs(jdx) > Math.abs(jdy)) {
+            jmx = jdx > 0 ? 1 : -1;
+          } else {
+            jmy = jdy > 0 ? 1 : -1;
+          }
+          moveCharacter(state.jason, jmx, jmy);
+          if (Math.abs(state.jason.x - hero.x) <= 0.5 && Math.abs(state.jason.y - hero.y) <= 0.5) {
+            killHero('ジェイソン');
+          }
+        } else {
+          var dir = getDirectionToBlock(state.jason, hero.blockId);
+          if (dir) moveCharacter(state.jason, dir.dx, dir.dy);
+        }
+      }
+    }
+
+    for (var m = 0; m < state.mobs.length; m++) {
+      var mob = state.mobs[m];
+      if (!mob.alive) continue;
+      if (state.jason.blockId === mob.blockId) {
+        if (Math.abs(state.jason.x - mob.x) <= 0.5 && Math.abs(state.jason.y - mob.y) <= 0.5) {
+          if (state.jasonKillCooldown <= 0) {
+            killMob(mob, 'ジェイソン');
+            state.jasonKillCooldown = 20;
+          }
+        }
+      }
+    }
+    if (state.jasonKillCooldown > 0) state.jasonKillCooldown--;
+  }
+
+  var isBearAttackDay = false;
+  for (var d = 0; d < state.bearAttackDays.length; d++) {
+    if (state.bearAttackDays[d] === state.day) isBearAttackDay = true;
+  }
+
+  if (state.bear && state.bear.alive) {
+    if (state.bear.moveCooldown > 0) {
+      state.bear.moveCooldown--;
+    } else {
+      state.bear.moveCooldown = 3;
+
+      var hero2 = state.hero;
+      if (state.wolf && state.wolf.alive && state.bear.blockId === state.wolf.blockId) {
+        fleeFromWolf(state.bear);
+      }
+      else if (hero2 && hero2.alive && isBearAttackDay) {
+        if (state.bear.blockId === hero2.blockId) {
+          var bdx = hero2.x - state.bear.x;
+          var bdy = hero2.y - state.bear.y;
+          var bmx = 0, bmy = 0;
+          if (Math.abs(bdx) > Math.abs(bdy)) {
+            bmx = bdx > 0 ? 1 : -1;
+          } else {
+            bmy = bdy > 0 ? 1 : -1;
+          }
+          moveCharacter(state.bear, bmx, bmy);
+          if (Math.abs(state.bear.x - hero2.x) <= 0.5 && Math.abs(state.bear.y - hero2.y) <= 0.5) {
+            killHero('熊');
+          }
+        } else {
+          var dir2 = getDirectionToBlock(state.bear, hero2.blockId);
+          if (dir2) moveCharacter(state.bear, dir2.dx, dir2.dy);
+        }
+      } else {
+        var dirs = [[0,-1],[0,1],[-1,0],[1,0]];
+        var d2 = dirs[rand(0, 3)];
+        moveCharacter(state.bear, d2[0], d2[1]);
+      }
+    }
+
+    for (var m2 = 0; m2 < state.mobs.length; m2++) {
+      var mob2 = state.mobs[m2];
+      if (!mob2.alive) continue;
+      if (state.bear.blockId === mob2.blockId && isBearAttackDay) {
+        if (Math.abs(state.bear.x - mob2.x) <= 0.5 && Math.abs(state.bear.y - mob2.y) <= 0.5) {
+          if (state.bearKillCooldown <= 0) {
+            killMob(mob2, '熊');
+            state.bearKillCooldown = 20;
+          }
+        }
+      }
+    }
+    if (state.bearKillCooldown > 0) state.bearKillCooldown--;
+  }
+
+  if (state.wolf && state.wolf.alive) {
+    if (state.wolf.moveCooldown > 0) {
+      state.wolf.moveCooldown--;
+    } else {
+      state.wolf.moveCooldown = state.enemyWolf ? 2 : 4;
+      
+      var hero3 = state.hero;
+      if (state.enemyWolf && hero3 && hero3.alive) {
+        if (state.wolf.blockId === hero3.blockId) {
+          var wdx = hero3.x - state.wolf.x;
+          var wdy = hero3.y - state.wolf.y;
+          var wmx = 0, wmy = 0;
+          if (Math.abs(wdx) > Math.abs(wdy)) {
+            wmx = wdx > 0 ? 1 : -1;
+          } else {
+            wmy = wdy > 0 ? 1 : -1;
+          }
+          moveCharacter(state.wolf, wmx, wmy);
+          if (Math.abs(state.wolf.x - hero3.x) <= 0.5 && Math.abs(state.wolf.y - hero3.y) <= 0.5) {
+            killHero('敵狼');
+          }
+        } else {
+          var dir3 = getDirectionToBlock(state.wolf, hero3.blockId);
+          if (dir3) moveCharacter(state.wolf, dir3.dx, dir3.dy);
+        }
+      } else {
+        var dirs2 = [[0,-1],[0,1],[-1,0],[1,0]];
+        var d3 = dirs2[rand(0, 3)];
+        moveCharacter(state.wolf, d3[0], d3[1]);
+      }
+    }
+  }
+}
+
+function killHero(killer) {
+  if (!state.hero || !state.hero.alive) return;
+  state.hero.alive = false;
+  state.gameOver = true;
+  state.isGameLoopRunning = false;
+  if (state.dayTimerInterval) { clearInterval(state.dayTimerInterval); state.dayTimerInterval = null; }
+  addLog('💀 主人公が ' + killer + ' に殺された... ゲームオーバー');
+  showPopup('ゲームオーバー', '主人公が ' + killer + ' に殺されました...', '再挑戦', function() {
+    hidePopup();
+    initGame();
+  });
+}
+
+function killMob(mob, killer) {
+  if (!mob.alive) return;
+  mob.alive = false;
+  mob.hasItem = false;
+  state.mobAlive--;
+  addLog('💀 ' + mob.name + ' が ' + killer + ' に殺された (生存 ' + state.mobAlive + '/8)');
+  updateUI();
+}
+
+function moveHero(dx, dy) {
+  if (state.gameOver || state.paused) return;
+  var hero = state.hero;
+  if (!hero || !hero.alive) return;
+  moveCharacter(hero, dx, dy);
+  updateUI();
+}
+
+function pickupItemByClick(gx, gy) {
+  var hero = state.hero;
+  if (!hero || !hero.alive) return;
+  if (state.heroItem) {
+    addLog('⚠️ すでにアイテムを持っている');
+    return;
+  }
+  if (Math.abs(gx - hero.x) > 1 || Math.abs(gy - hero.y) > 1) {
+    addLog('⚠️ 範囲外です');
+    return;
+  }
+  for (var i = 0; i < state.items.length; i++) {
+    var item = state.items[i];
+    if (item.blockId !== hero.blockId) continue;
+    if (item.x === gx && item.y === gy) {
+      state.heroItem = item.name;
+      state.items.splice(i, 1);
+      addLog('📦 ' + item.name + ' を拾った');
+      updateUI();
+      return;
+    }
+  }
+  addLog('⚠️ そこにアイテムはありません');
+}
+
+function scheduleRespawn(itemName, blockId) {
+  if (/^品[1-8]$/.test(itemName)) return;
+  for (var i = 0; i < state.pendingRespawn.length; i++) {
+    if (state.pendingRespawn[i].name === itemName && state.pendingRespawn[i].blockId === blockId) return;
+  }
+  var respawnDay = state.day + 3;
+  state.pendingRespawn.push({
+    name: itemName,
+    blockId: blockId,
+    respawnDay: respawnDay
+  });
+  addLog('⏳ ' + itemName + ' は ' + respawnDay + '日目に復活します');
+}
+
+function processRespawn() {
+  var toRespawn = [];
+  var remaining = [];
+  for (var i = 0; i < state.pendingRespawn.length; i++) {
+    var p = state.pendingRespawn[i];
+    if (p.respawnDay <= state.day) toRespawn.push(p);
+    else remaining.push(p);
+  }
+  state.pendingRespawn = remaining;
+
+  for (var j = 0; j < toRespawn.length; j++) {
+    var item = toRespawn[j];
+    var blockId = item.blockId;
+    if (/^品[1-9][0-9]$/.test(item.name)) {
+      var num = parseInt(item.name.replace('品', ''), 10);
+      var idx = (num / 10) - 1;
+      if (idx >= 0 && idx < 8) blockId = ITEM_BLOCK_MAP[idx];
+      else blockId = rand(0, 8);
+      if (blockId === 4) blockId = 0;
+    } else {
+      var allBlocks = [0,1,2,3,4,5,6,7,8];
+      blockId = allBlocks[rand(0, allBlocks.length - 1)];
+    }
+    var exists = false;
+    for (var k = 0; k < state.items.length; k++) {
+      if (state.items[k].name === item.name && state.items[k].blockId === blockId) {
+        exists = true;
+        break;
+      }
+    }
+    if (!exists) {
+      state.items.push({
+        name: item.name,
+        x: rand(0, 9),
+        y: rand(0, 9),
+        blockId: blockId
+      });
+      addLog('♻️ ' + item.name + ' が復活しました');
+    }
+  }
+}
+
+function useItemOnObject(objType) {
+  if (!state.hero || !state.hero.alive) return;
+  if (!state.heroItem) {
+    addLog('⚠️ アイテムを持っていない');
+    return;
+  }
+
+  var hero = state.hero;
+  var itemName = state.heroItem;
+
+  if (itemName === '餌' && objType === '狼') {
+    if (state.wolf && state.wolf.alive && state.wolf.blockId === hero.blockId) {
+      if (Math.abs(state.wolf.x - hero.x) <= 1 && Math.abs(state.wolf.y - hero.y) <= 1) {
+        state.points += 1;
+        var consumedBlock = hero.blockId;
+        var consumedName = itemName;
+        state.heroItem = null;
+        state.wolf.alive = false;
+        addLog('✅ 餌で狼を懐かせた！ +1ポイント');
+        scheduleRespawn(consumedName, consumedBlock);
+        updateUI();
+        return;
+      } else {
+        addLog('⚠️ 狼が近くにいない');
+        return;
+      }
+    } else {
+      addLog('⚠️ 狼が近くにいない');
+      return;
+    }
+  }
+
+  var obj = null;
+  for (var i = 0; i < state.objects.length; i++) {
+    var o = state.objects[i];
+    if (o.blockId !== hero.blockId) continue;
+    if (o.type !== objType) continue;
+    if (Math.abs(o.x - hero.x) <= 1 && Math.abs(o.y - hero.y) <= 1) {
+      obj = o;
+      break;
+    }
+  }
+
+  if (!obj) {
+    addLog('⚠️ ' + objType + ' が近くにない');
+    return;
+  }
+
+  if (obj.used) {
+    addLog('⚠️ この' + objType + 'はクールダウン中です (残り ' + obj.cooldown + '秒)');
+    return;
+  }
+
+  var valid = false;
+  if (objType === '窓' && itemName === '材') valid = true;
+  else if (objType === '穴' && itemName === '堀') valid = true;
+  else if (objType === '樽' && itemName === '斧') valid = true;
+  else if (objType === '箱' && itemName === '銃') valid = true;
+  else if (objType === '品' && itemName.indexOf('品') === 0) valid = true;
+
+  if (!valid) {
+    addLog('⚠️ ' + itemName + ' は ' + objType + ' に使えない');
+    return;
+  }
+
+  obj.used = true;
+  obj.cooldown = 5;
+
+  var consumedBlock2 = hero.blockId;
+  var consumedName2 = itemName;
+
+  state.points += 1;
+  state.heroItem = null;
+  addLog('✅ ' + itemName + ' を使って +1ポイント！ (クールダウン5秒)');
+
+  scheduleRespawn(consumedName2, consumedBlock2);
+  updateUI();
+}
+
+function dropItem() {
+  if (!state.heroItem) {
+    addLog('⚠️ 持っているアイテムがない');
+    return;
+  }
+  var hero = state.hero;
+  state.items.push({
+    name: state.heroItem,
+    x: hero.x,
+    y: hero.y,
+    blockId: hero.blockId
+  });
+  addLog('📤 ' + state.heroItem + ' を落とした');
+  state.heroItem = null;
+  updateUI();
+}
+
+function startDayTimer() {
+  if (state.dayTimerInterval) { clearInterval(state.dayTimerInterval); state.dayTimerInterval = null; }
+  state.dayElapsed = 0;
+  state.night = false;
+  nightOverlay.style.display = 'none';
+
+  state.dayTimerInterval = setInterval(function() {
+    if (state.gameOver || state.paused) return;
+    state.dayElapsed++;
+    var remaining = DAY_DURATION - state.dayElapsed;
+    dayDisplay.textContent = '🌅 ' + state.day + '日目 (' + Math.max(0, remaining) + '秒)';
+
+    if (remaining <= 10 && !state.night) {
+      state.night = true;
+      nightOverlay.style.display = 'block';
+      addLog('🌙 夜になった...');
+    }
+
+    for (var i = 0; i < state.objects.length; i++) {
+      var obj = state.objects[i];
+      if (obj.cooldown > 0) {
+        obj.cooldown--;
+        if (obj.cooldown === 0) obj.used = false;
+      }
+    }
+
+    if (state.dayElapsed >= DAY_DURATION) {
+      nextDay();
+    }
+  }, 1000);
+}
+
+function nextDay() {
+  if (state.dayTimerInterval) { clearInterval(state.dayTimerInterval); state.dayTimerInterval = null; }
+  state.day++;
+
+  if (state.day > MAX_DAYS) {
+    endGame();
+    return;
+  }
+
+  var jSpeed = 10 + (state.day - 1) * 10;
+  addLog('📈 ' + state.day + '日目: ジェイソンの速度が ' + jSpeed + ' になった');
+
+  dailySabotage();
+
+  processRespawn();
+
+  for (var i = 0; i < state.mobs.length; i++) {
+    var mob = state.mobs[i];
+    if (mob.alive && !mob.hasDelivered) assignMobTask(mob);
+  }
+
+  for (var b = 0; b < 8; b++) {
+    var bid = ITEM_BLOCK_MAP[b];
+    var itemName = '品' + ((b + 1) * 10);
+    var exists = false;
+    for (var it = 0; it < state.items.length; it++) {
+      if (state.items[it].name === itemName) { exists = true; break; }
+    }
+    if (!exists) {
+      var pending = false;
+      for (var p = 0; p < state.pendingRespawn.length; p++) {
+        if (state.pendingRespawn[p].name === itemName) { pending = true; break; }
+      }
+      if (!pending) {
+        state.items.push({
+          name: itemName,
+          x: rand(0, 9),
+          y: rand(0, 9),
+          blockId: bid
+        });
+      }
+    }
+  }
+
+  for (var oi = 0; oi < state.objects.length; oi++) {
+    state.objects[oi].used = false;
+    state.objects[oi].cooldown = 0;
+  }
+
+  state.dayElapsed = 0;
+  state.night = false;
+  nightOverlay.style.display = 'none';
+  updateUI();
+  startDayTimer();
+}
+
+function endGame() {
+  if (state.gameOver) return;
+  state.isGameLoopRunning = false;
+  if (state.dayTimerInterval) { clearInterval(state.dayTimerInterval); state.dayTimerInterval = null; }
+
+  var totalPoints = state.points;
+  var jasonPts = state.jasonPoints;
+
+  addLog('🏁 7日間終了！ 総ポイント: ' + totalPoints + ' / ジェイソンポイント: ' + jasonPts);
+
+  if (totalPoints > jasonPts) {
+    state.gameWon = true;
+    addLog('🎉 勝利！');
+    showPopup('🎉 勝利！', '補強ポイント ' + totalPoints + ' で ジェイソンポイント ' + jasonPts + ' を上回った！\nrefined.html に移動します', '移動する', function() {
+      hidePopup();
+      window.location.href = 'refined.html';
+    });
+  } else if (totalPoints === jasonPts) {
+    state.gameOver = true;
+    addLog('⚖️ 引き分け... 負け');
+    showPopup('😵 引き分け', '補強ポイント ' + totalPoints + ' で ジェイソンポイント ' + jasonPts + ' と同点...\n負けです', '再挑戦', function() {
+      hidePopup();
+      initGame();
+    });
+  } else {
+    state.gameOver = true;
+    addLog('💀 敗北...');
+    showPopup('💀 敗北', '補強ポイント ' + totalPoints + ' で ジェイソンポイント ' + jasonPts + ' に届かなかった...', '再挑戦', function() {
+      hidePopup();
+      initGame();
+    });
+  }
+}
+
+function showPopup(title, desc, btnText, callback) {
+  popupTitle.textContent = title;
+  popupDesc.textContent = desc;
+  popupBtn.textContent = btnText;
+  popup.style.display = 'block';
+  popupBtn.onclick = callback;
+}
+
+function hidePopup() { popup.style.display = 'none'; }
+
+function updateUI() {
+  dispDay.textContent = state.day + ' / 7';
+  dispPoints.textContent = state.points;
+  dispItem.textContent = state.heroItem || 'なし';
+  dispMobAlive.textContent = state.mobAlive + ' / 8';
+  if (!state.gameOver) {
+    var remaining = DAY_DURATION - state.dayElapsed;
+    dayDisplay.textContent = '🌅 ' + state.day + '日目 (' + Math.max(0, remaining) + '秒)';
+  }
+  
+  if (state.axeMode && state.heroItem !== '斧') {
+    state.axeMode = false;
+    btnAxeMode.classList.remove('axe-active');
+    btnAxeMode.textContent = '🪓 斧モード';
+  }
+  if (state.gunMode && state.heroItem !== '銃') {
+    state.gunMode = false;
+    btnGunMode.classList.remove('gun-active');
+    btnGunMode.textContent = '🔫 銃モード';
+  }
+}
+
+function clearArrows() {
+  arrowOverlay.innerHTML = '';
+  state.arrowDirections = [];
+  state.selectedMob = null;
+}
+
+function showMobArrows(mob) {
+  clearArrows();
+  if (!mob || !mob.alive) return;
+  state.selectedMob = mob;
+
+  var directions = [
+    { dx: 0, dy: -1, label: '↑' },
+    { dx: 0, dy: 1, label: '↓' },
+    { dx: -1, dy: 0, label: '←' },
+    { dx: 1, dy: 0, label: '→' }
+  ];
+
+  var validDirs = [];
+  for (var i = 0; i < directions.length; i++) {
+    var d = directions[i];
+    var nx = mob.x + d.dx;
+    var ny = mob.y + d.dy;
+    if (nx < 0 || nx >= GRID_SIZE || ny < 0 || ny >= GRID_SIZE) {
+      var g = blockToGrid(mob.blockId);
+      var newRow = g.row, newCol = g.col;
+      var newX = nx, newY = ny;
+      if (nx < 0) { newCol--; newX = GRID_SIZE - 1; }
+      else if (nx >= GRID_SIZE) { newCol++; newX = 0; }
+      else if (ny < 0) { newRow--; newY = GRID_SIZE - 1; }
+      else if (ny >= GRID_SIZE) { newRow++; newY = 0; }
+      var newBlock = gridToBlock(newRow, newCol);
+      if (newBlock < 0 || newBlock > 8) continue;
+      if (state.blockMap[newBlock] && state.blockMap[newBlock][newY] &&
+          state.blockMap[newBlock][newY][newX] === 'tree') continue;
+      validDirs.push({ dx: d.dx, dy: d.dy, label: d.label, x: nx, y: ny });
+    } else {
+      if (state.blockMap[mob.blockId] && state.blockMap[mob.blockId][ny] &&
+          state.blockMap[mob.blockId][ny][nx] === 'tree') continue;
+      validDirs.push({ dx: d.dx, dy: d.dy, label: d.label, x: nx, y: ny });
+    }
+  }
+
+  if (mob.hasItem && !mob.hasDelivered) {
+    validDirs.push({ 
+      dx: 0, dy: 0, 
+      label: '📦', 
+      x: mob.x, 
+      y: mob.y,
+      isDeliver: true 
+    });
+  }
+
+  if (validDirs.length === 0) {
+    addLog('⚠️ ' + mob.name + ' は動ける方向がありません');
+    return;
+  }
+
+  state.arrowDirections = validDirs;
+
+  var wrapRect = document.getElementById('mapWrap').getBoundingClientRect();
+  var canvasRect = canvas.getBoundingClientRect();
+  var offsetX = canvasRect.left - wrapRect.left;
+  var offsetY = canvasRect.top - wrapRect.top;
+
+  for (var j = 0; j < validDirs.length; j++) {
+    var dir = validDirs[j];
+    var arrowX = (mob.x + (dir.dx || 0) * 1.2) * BLOCK_SIZE + BLOCK_SIZE/2;
+    var arrowY = (mob.y + (dir.dy || 0) * 1.2) * BLOCK_SIZE + BLOCK_SIZE/2;
+
+    var arrow = document.createElement('div');
+    arrow.className = 'mob-arrow';
+    if (dir.isDeliver) arrow.classList.add('deliver');
+    arrow.style.left = (offsetX + arrowX) + 'px';
+    arrow.style.top = (offsetY + arrowY) + 'px';
+    arrow.textContent = dir.label;
+    arrow.dataset.dx = dir.dx || 0;
+    arrow.dataset.dy = dir.dy || 0;
+    arrow.dataset.isDeliver = dir.isDeliver ? 'true' : 'false';
+    
+    arrow.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var isDeliver = this.dataset.isDeliver === 'true';
+      if (isDeliver) {
+        if (state.selectedMob && state.selectedMob.alive) {
+          var success = forceDeliverMob(state.selectedMob);
+          if (success) {
+            clearArrows();
+            btnMobControl.classList.remove('active-mode');
+            state.mobControlMode = false;
+            updateUI();
+          }
+        }
+        return;
+      }
+      
+      var dx = parseInt(this.dataset.dx, 10);
+      var dy = parseInt(this.dataset.dy, 10);
+      if (state.selectedMob && state.selectedMob.alive) {
+        var moved = moveCharacter(state.selectedMob, dx, dy);
+        if (moved) {
+          addLog('🔄 ' + state.selectedMob.name + ' を移動させた');
+          clearArrows();
+          btnMobControl.classList.remove('active-mode');
+          state.mobControlMode = false;
+          updateUI();
+        } else {
+          addLog('⚠️ 移動できませんでした');
+        }
+      }
+    });
+    arrow.addEventListener('touchstart', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      var isDeliver = this.dataset.isDeliver === 'true';
+      if (isDeliver) {
+        if (state.selectedMob && state.selectedMob.alive) {
+          var success = forceDeliverMob(state.selectedMob);
+          if (success) {
+            clearArrows();
+            btnMobControl.classList.remove('active-mode');
+            state.mobControlMode = false;
+            updateUI();
+          }
+        }
+        return;
+      }
+      var dx = parseInt(this.dataset.dx, 10);
+      var dy = parseInt(this.dataset.dy, 10);
+      if (state.selectedMob && state.selectedMob.alive) {
+        var moved = moveCharacter(state.selectedMob, dx, dy);
+        if (moved) {
+          addLog('🔄 ' + state.selectedMob.name + ' を移動させた');
+          clearArrows();
+          btnMobControl.classList.remove('active-mode');
+          state.mobControlMode = false;
+          updateUI();
+        } else {
+          addLog('⚠️ 移動できませんでした');
+        }
+      }
+    }, { passive: false });
+
+    arrowOverlay.appendChild(arrow);
+  }
+}
+
+btnMobControl.addEventListener('click', function() {
+  if (state.gameOver) return;
+  state.mobControlMode = !state.mobControlMode;
+  if (state.mobControlMode) {
+    btnMobControl.classList.add('active-mode');
+    addLog('🔄 モブ操作モード ON (モブをクリックして矢印を表示)');
+    clearArrows();
+  } else {
+    btnMobControl.classList.remove('active-mode');
+    clearArrows();
+    addLog('🔄 モブ操作モード OFF');
+  }
+});
+
+btnAxeMode.addEventListener('click', function() {
+  if (state.gameOver) {
+    addLog('⚠️ ゲームが終了しています');
+    return;
+  }
+  if (state.heroItem !== '斧') {
+    addLog('⚠️ 斧を持っていません');
+    return;
+  }
+  state.axeMode = !state.axeMode;
+  if (state.axeMode) {
+    btnAxeMode.classList.add('axe-active');
+    btnAxeMode.textContent = '🪓 斧モード ON';
+    addLog('🪓 斧モード ON (木をクリックして破壊)');
+  } else {
+    btnAxeMode.classList.remove('axe-active');
+    btnAxeMode.textContent = '🪓 斧モード';
+    addLog('🪓 斧モード OFF');
+  }
+});
+
+btnForceDeliver.addEventListener('click', function() {
+  if (state.gameOver) {
+    addLog('⚠️ ゲームが終了しています');
+    return;
+  }
+  
+  var targetMob = null;
+  for (var i = 0; i < state.mobs.length; i++) {
+    var mob = state.mobs[i];
+    if (mob.alive && mob.hasItem && !mob.hasDelivered) {
+      targetMob = mob;
+      break;
+    }
+  }
+  
+  if (!targetMob) {
+    addLog('⚠️ 強制納品できるモブがいません（紫枠のモブを探してください）');
+    return;
+  }
+  
+  var success = forceDeliverMob(targetMob);
+  if (success) {
+    addLog('✅ ' + targetMob.name + ' を強制納品しました！');
+  }
+});
+
+canvas.addEventListener('click', function(e) {
+  console.log('=== クリックイベント ===');
+  if (state.gameOver) return;
+  var rect = canvas.getBoundingClientRect();
+  var scaleX = canvas.width / rect.width;
+  var scaleY = canvas.height / rect.height;
+  var mx = (e.clientX - rect.left) * scaleX;
+  var my = (e.clientY - rect.top) * scaleY;
+  var gx = Math.floor(mx / BLOCK_SIZE);
+  var gy = Math.floor(my / BLOCK_SIZE);
+  console.log('クリック位置:', gx, gy);
+  if (gx < 0 || gx >= GRID_SIZE || gy < 0 || gy >= GRID_SIZE) return;
+
+  var hero = state.hero;
+  if (!hero || !hero.alive) return;
+  if (hero.blockId !== state.currentBlock) {
+    state.currentBlock = hero.blockId;
+    return;
+  }
+
+  if (state.gunMode) {
+    shootGun(gx, gy);
+    return;
+  }
+
+  if (state.axeMode) {
+    if (state.heroItem !== '斧') {
+      addLog('⚠️ 斧を持っていません');
+      state.axeMode = false;
+      btnAxeMode.classList.remove('axe-active');
+      btnAxeMode.textContent = '🪓 斧モード';
+      return;
+    }
+    
+    if (state.blockMap[hero.blockId] && 
+        state.blockMap[hero.blockId][gy] && 
+        state.blockMap[hero.blockId][gy][gx] === 'tree') {
+      
+      state.blockMap[hero.blockId][gy][gx] = null;
+      addLog('🪓 木を破壊した！');
+      
+      if (rand(1, 6) === 1) {
+        state.heroItem = null;
+        addLog('💔 斧が壊れた！');
+      }
+      
+      state.axeMode = false;
+      btnAxeMode.classList.remove('axe-active');
+      btnAxeMode.textContent = '🪓 斧モード';
+      updateUI();
+      return;
+    } else {
+      addLog('⚠️ そこには木がありません');
+      return;
+    }
+  }
+
+  if (state.mobControlMode) {
+    var clickedMob = null;
+    for (var i = 0; i < state.mobs.length; i++) {
+      var mob = state.mobs[i];
+      if (!mob.alive) continue;
+      if (mob.blockId === state.currentBlock && mob.x === gx && mob.y === gy) {
+        clickedMob = mob;
+        break;
+      }
+    }
+    if (clickedMob) {
+      if (state.selectedMob === clickedMob) {
+        clearArrows();
+        addLog('🔄 ' + clickedMob.name + ' の選択を解除');
+        return;
+      }
+      showMobArrows(clickedMob);
+      addLog('🔄 ' + clickedMob.name + ' を選択 (矢印をクリックして移動)');
+      return;
+    } else {
+      clearArrows();
+      addLog('🔄 モブ選択解除');
+      return;
+    }
+  }
+
+  pickupItemByClick(gx, gy);
+
+  var clickedObj = null;
+  for (var oi2 = 0; oi2 < state.objects.length; oi2++) {
+    var obj2 = state.objects[oi2];
+    if (obj2.blockId !== hero.blockId) continue;
+    if (obj2.x === gx && obj2.y === gy) {
+      clickedObj = obj2;
+      break;
+    }
+  }
+
+  if (state.wolf && state.wolf.alive && state.wolf.blockId === hero.blockId) {
+    if (state.wolf.x === gx && state.wolf.y === gy) {
+      useItemOnObject('狼');
+      return;
+    }
+  }
+
+  if (clickedObj) {
+    useItemOnObject(clickedObj.type);
+  }
+});
+
+function render() {
+  if (state.frameCount % 60 === 0) {
+    console.log('=== render デバッグ ===');
+    console.log('currentBlock:', state.currentBlock);
+    console.log('hero.blockId:', state.hero ? state.hero.blockId : 'null');
+    console.log('hero.x:', state.hero ? state.hero.x : 'null');
+    console.log('hero.y:', state.hero ? state.hero.y : 'null');
+    console.log('items:', state.items.length);
+    console.log('mobs alive:', state.mobs.filter(function(m) { return m.alive; }).length);
+  }
+
+  ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+  if (state.hero && state.hero.alive) {
+    state.currentBlock = state.hero.blockId;
+  }
+
+  var blockId = state.currentBlock;
+
+  ctx.fillStyle = blockId === 4 ? '#8B7D6B' : '#2d5a27';
+  ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+  ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+  ctx.lineWidth = 0.5;
+  for (var gx = 0; gx <= GRID_SIZE; gx++) {
+    ctx.beginPath();
+    ctx.moveTo(gx * BLOCK_SIZE, 0);
+    ctx.lineTo(gx * BLOCK_SIZE, CANVAS_SIZE);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, gx * BLOCK_SIZE);
+    ctx.lineTo(CANVAS_SIZE, gx * BLOCK_SIZE);
+    ctx.stroke();
+  }
+
+  if (blockId !== 4) {
+    for (var y = 0; y < GRID_SIZE; y++) {
+      for (var x = 0; x < GRID_SIZE; x++) {
+        if (state.blockMap[blockId] && state.blockMap[blockId][y] && state.blockMap[blockId][y][x] === 'tree') {
+          ctx.fillStyle = '#1a3d1a';
+          ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+          ctx.fillStyle = '#2a5a2a';
+          ctx.fillRect(x * BLOCK_SIZE + 4, y * BLOCK_SIZE + 4, BLOCK_SIZE - 8, BLOCK_SIZE - 8);
+          ctx.fillStyle = '#3a7a3a';
+          ctx.font = '14px "MS Gothic"';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('木', x * BLOCK_SIZE + BLOCK_SIZE/2, y * BLOCK_SIZE + BLOCK_SIZE/2);
+        }
+      }
+    }
+  }
+
+  if (blockId === 4) {
+    for (var oi = 0; oi < state.objects.length; oi++) {
+      var obj = state.objects[oi];
+      if (obj.blockId !== blockId) continue;
+      var px = obj.x * BLOCK_SIZE;
+      var py = obj.y * BLOCK_SIZE;
+      var isCooling = obj.cooldown > 0;
+      ctx.fillStyle = obj.used ? (isCooling ? '#664444' : '#555') : '#3a3a5a';
+      ctx.fillRect(px + 2, py + 2, BLOCK_SIZE - 4, BLOCK_SIZE - 4);
+      ctx.strokeStyle = obj.used ? (isCooling ? '#884444' : '#777') : '#88aaff';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(px + 2, py + 2, BLOCK_SIZE - 4, BLOCK_SIZE - 4);
+      ctx.fillStyle = obj.used ? (isCooling ? '#aa6666' : '#888') : '#ffffff';
+      ctx.font = '12px "MS Gothic"';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      var label = obj.type;
+      if (obj.type === '窓') label = '密';
+      if (obj.type === '樽') label = '椅';
+      ctx.fillText(label, px + BLOCK_SIZE/2, py + BLOCK_SIZE/2);
+      if (isCooling) {
+        ctx.fillStyle = '#ff6644';
+        ctx.font = '8px "MS Gothic"';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(obj.cooldown + 's', px + BLOCK_SIZE/2, py + BLOCK_SIZE);
+      }
+    }
+  }
+
+  for (var ii = 0; ii < state.items.length; ii++) {
+    var item = state.items[ii];
+    if (item.blockId !== blockId) continue;
+    var px2 = item.x * BLOCK_SIZE;
+    var py2 = item.y * BLOCK_SIZE;
+
+    if (item.name === '斧' || item.name === '銃') {
+      var img = getImage(item.name);
+      if (img) {
+        ctx.drawImage(img, px2, py2, BLOCK_SIZE, BLOCK_SIZE);
+        continue;
+      }
+    }
+
+    ctx.fillStyle = '#ffdd44';
+    ctx.fillRect(px2 + 4, py2 + 4, BLOCK_SIZE - 8, BLOCK_SIZE - 8);
+    ctx.fillStyle = '#000';
+    ctx.font = '10px "MS Gothic"';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    var label2 = item.name;
+    if (label2.length > 4) label2 = label2.substring(0, 4);
+    ctx.fillText(label2, px2 + BLOCK_SIZE/2, py2 + BLOCK_SIZE/2);
+  }
+
+  var allChars = [];
+
+  if (state.hero && state.hero.alive && state.hero.blockId === blockId) {
+    allChars.push({ name: state.hero.img, x: state.hero.x, y: state.hero.y, isHero: true, hasItem: false });
+  }
+
+  for (var mi3 = 0; mi3 < state.mobs.length; mi3++) {
+    var mob3 = state.mobs[mi3];
+    if (mob3.alive && mob3.blockId === blockId) {
+      allChars.push({ 
+        name: mob3.img, 
+        x: mob3.x, 
+        y: mob3.y, 
+        isHero: false, 
+        hasItem: mob3.hasItem || false,
+        mobName: mob3.name,
+        hasDelivered: mob3.hasDelivered,
+        role: mob3.role,
+        roleActive: mob3.roleActive
+      });
+    }
+  }
+
+  if (state.jason && state.jason.alive && state.jason.blockId === blockId) {
+    allChars.push({ name: state.jason.img, x: state.jason.x, y: state.jason.y, isHero: false, hasItem: false });
+  }
+
+  if (state.bear && state.bear.alive && state.bear.blockId === blockId) {
+    allChars.push({ name: state.bear.img, x: state.bear.x, y: state.bear.y, isHero: false, hasItem: false });
+  }
+
+  if (state.wolf && state.wolf.alive && state.wolf.blockId === blockId) {
+    allChars.push({ name: state.wolf.img, x: state.wolf.x, y: state.wolf.y, isHero: false, hasItem: false });
+  }
+
+  if (allChars.length === 0 && state.frameCount % 60 === 0) {
+    console.warn('⚠️ 描画するキャラクターが0です');
+  }
+
+  for (var ci = 0; ci < allChars.length; ci++) {
+    var ch = allChars[ci];
+    var px3 = ch.x * BLOCK_SIZE;
+    var py3 = ch.y * BLOCK_SIZE;
+
+    var img = getImage(ch.name);
+    if (img) {
+      ctx.drawImage(img, px3, py3, BLOCK_SIZE, BLOCK_SIZE);
+    } else {
+      var colors = {
+        '紅葉': '#aa44ff',
+        '加藤': '#ff6644',
+        '松本': '#ff6644',
+        '坪池': '#ff6644',
+        '市川': '#ff6644',
+        '青笹': '#ff6644',
+        '角田': '#ff6644',
+        '木元': '#ff6644',
+        '山崎': '#ff6644',
+        'ジェイソン': '#ff0000',
+        '熊': '#8B4513',
+        '狼': '#888888',
+        '敵狼': '#cc3333'
+      };
+      var color = colors[ch.name] || '#888';
+      ctx.fillStyle = color;
+      ctx.fillRect(px3 + 2, py3 + 2, BLOCK_SIZE - 4, BLOCK_SIZE - 4);
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(px3 + 2, py3 + 2, BLOCK_SIZE - 4, BLOCK_SIZE - 4);
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 12px "MS Gothic"';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      var label3 = ch.name;
+      if (label3.length > 2) label3 = label3.substring(0, 2);
+      ctx.fillText(label3, px3 + BLOCK_SIZE/2, py3 + BLOCK_SIZE/2);
+    }
+
+    if (ch.hasItem === true && ch.isHero === false) {
+      ctx.strokeStyle = '#aa44ff';
+      ctx.lineWidth = 3;
+      ctx.shadowColor = '#aa44ff';
+      ctx.shadowBlur = 10;
+      ctx.strokeRect(px3, py3, BLOCK_SIZE, BLOCK_SIZE);
+      ctx.shadowBlur = 0;
+      
+      ctx.fillStyle = '#aa44ff';
+      ctx.font = 'bold 10px "MS Gothic"';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'top';
+      ctx.fillText('◆', px3 + BLOCK_SIZE - 2, py3 + 1);
+    }
+    
+    if (ch.hasDelivered === true && ch.isHero === false) {
+      ctx.strokeStyle = '#44ff88';
+      ctx.lineWidth = 2;
+      ctx.shadowColor = '#44ff88';
+      ctx.shadowBlur = 6;
+      ctx.strokeRect(px3, py3, BLOCK_SIZE, BLOCK_SIZE);
+      ctx.shadowBlur = 0;
+    }
+  }
+
+  ctx.fillStyle = 'rgba(255,255,255,0.25)';
+  ctx.font = '10px "MS Gothic"';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText(BLOCK_NAMES[blockId], 4, 4);
+}
+
+document.addEventListener('keydown', function(e) {
+  var key = e.key;
+  var arrowKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+  if (arrowKeys.indexOf(key) >= 0) {
+    e.preventDefault();
+    var dir = { ArrowUp: [0,-1], ArrowDown: [0,1], ArrowLeft: [-1,0], ArrowRight: [1,0] };
+    var d = dir[key];
+    moveHero(d[0], d[1]);
+  }
+});
+
+canvas.addEventListener('touchstart', function(e) {
+  e.preventDefault();
+  var touch = e.touches[0];
+  if (!touch) return;
+  var rect = canvas.getBoundingClientRect();
+  var scaleX = canvas.width / rect.width;
+  var scaleY = canvas.height / rect.height;
+  var mx = (touch.clientX - rect.left) * scaleX;
+  var my = (touch.clientY - rect.top) * scaleY;
+  var gx = Math.floor(mx / BLOCK_SIZE);
+  var gy = Math.floor(my / BLOCK_SIZE);
+
+  var mobileCtrl = document.getElementById('mobileControls');
+  if (mobileCtrl.classList.contains('active')) {
+    var cRect = mobileCtrl.getBoundingClientRect();
+    if (touch.clientX >= cRect.left && touch.clientX <= cRect.right &&
+        touch.clientY >= cRect.top && touch.clientY <= cRect.bottom) {
+      return;
+    }
+  }
+
+  if (gx < 0 || gx >= GRID_SIZE || gy < 0 || gy >= GRID_SIZE) return;
+
+  var hero = state.hero;
+  if (!hero || !hero.alive) return;
+  if (hero.blockId !== state.currentBlock) {
+    state.currentBlock = hero.blockId;
+    return;
+  }
+
+  if (state.gunMode) {
+    shootGun(gx, gy);
+    return;
+  }
+
+  if (state.axeMode) {
+    if (state.heroItem !== '斧') {
+      addLog('⚠️ 斧を持っていません');
+      state.axeMode = false;
+      btnAxeMode.classList.remove('axe-active');
+      btnAxeMode.textContent = '🪓 斧モード';
+      return;
+    }
+    if (state.blockMap[hero.blockId] && 
+        state.blockMap[hero.blockId][gy] && 
+        state.blockMap[hero.blockId][gy][gx] === 'tree') {
+      state.blockMap[hero.blockId][gy][gx] = null;
+      addLog('🪓 木を破壊した！');
+      if (rand(1, 6) === 1) {
+        state.heroItem = null;
+        addLog('💔 斧が壊れた！');
+      }
+      state.axeMode = false;
+      btnAxeMode.classList.remove('axe-active');
+      btnAxeMode.textContent = '🪓 斧モード';
+      updateUI();
+      return;
+    } else {
+      addLog('⚠️ そこには木がありません');
+      return;
+    }
+  }
+
+  if (state.mobControlMode) {
+    var clickedMob = null;
+    for (var i = 0; i < state.mobs.length; i++) {
+      var mob = state.mobs[i];
+      if (!mob.alive) continue;
+      if (mob.blockId === state.currentBlock && mob.x === gx && mob.y === gy) {
+        clickedMob = mob;
+        break;
+      }
+    }
+    if (clickedMob) {
+      if (state.selectedMob === clickedMob) {
+        clearArrows();
+        addLog('🔄 ' + clickedMob.name + ' の選択を解除');
+        return;
+      }
+      showMobArrows(clickedMob);
+      addLog('🔄 ' + clickedMob.name + ' を選択 (矢印をクリックして移動)');
+      return;
+    } else {
+      clearArrows();
+      addLog('🔄 モブ選択解除');
+      return;
+    }
+  }
+
+  pickupItemByClick(gx, gy);
+
+  var clickedObj = null;
+  for (var oi2 = 0; oi2 < state.objects.length; oi2++) {
+    var obj2 = state.objects[oi2];
+    if (obj2.blockId !== hero.blockId) continue;
+    if (obj2.x === gx && obj2.y === gy) {
+      clickedObj = obj2;
+      break;
+    }
+  }
+
+  if (state.wolf && state.wolf.alive && state.wolf.blockId === hero.blockId) {
+    if (state.wolf.x === gx && state.wolf.y === gy) {
+      useItemOnObject('狼');
+      return;
+    }
+  }
+
+  if (clickedObj) {
+    useItemOnObject(clickedObj.type);
+  }
+}, { passive: false });
+
+function setupDpad() {
+  var upBtn = document.getElementById('dpad-up');
+  var downBtn = document.getElementById('dpad-down');
+  var leftBtn = document.getElementById('dpad-left');
+  var rightBtn = document.getElementById('dpad-right');
+
+  function setupButton(btn, dx, dy) {
+    var intervalId = null;
+
+    function startMove() {
+      moveHero(dx, dy);
+      if (intervalId) clearInterval(intervalId);
+      intervalId = setInterval(function() { moveHero(dx, dy); }, 120);
+    }
+
+    function stopMove() {
+      if (intervalId) { clearInterval(intervalId); intervalId = null; }
+    }
+
+    btn.addEventListener('mousedown', function(e) {
+      e.preventDefault();
+      startMove();
+    });
+    btn.addEventListener('mouseup', stopMove);
+    btn.addEventListener('mouseleave', stopMove);
+
+    btn.addEventListener('touchstart', function(e) {
+      e.preventDefault();
+      startMove();
+    }, { passive: false });
+    btn.addEventListener('touchend', function(e) {
+      e.preventDefault();
+      stopMove();
+    }, { passive: false });
+    btn.addEventListener('touchcancel', function(e) {
+      e.preventDefault();
+      stopMove();
+    }, { passive: false });
+  }
+
+  setupButton(upBtn, 0, -1);
+  setupButton(downBtn, 0, 1);
+  setupButton(leftBtn, -1, 0);
+  setupButton(rightBtn, 1, 0);
+}
+
+mobileToggle.addEventListener('click', function() {
+  var isActive = mobileControls.classList.toggle('active');
+  tapHint.classList.toggle('active');
+  mobileToggle.classList.toggle('active');
+  mobileToggle.textContent = isActive ? '⌨️ キーボード' : '📱 スマホ操作';
+  if (isActive) {
+    addLog('📱 スマホ操作モード ON (十字キー + タップクリック)');
+  } else {
+    addLog('⌨️ キーボードモード ON');
+  }
+});
+
+btnDrop.addEventListener('click', dropItem);
+
+function gameLoop() {
+  if (!state.isGameLoopRunning && state.gameOver) {
+    render();
+    state.animFrame = requestAnimationFrame(gameLoop);
+    return;
+  }
+
+  state.frameCount++;
+
+  if (state.gunShotCooldown > 0) state.gunShotCooldown--;
+
+  if (!state.gameOver) {
+    traitorAttack();
+    
+    if (state.frameCount % 3 === 0) updateMobs();
+    if (state.frameCount % 4 === 0) updateEnemies();
+  }
+
+  render();
+  state.animFrame = requestAnimationFrame(gameLoop);
+}
+
+loadImages(function() {
+  console.log('=== 画像読み込み完了 ===');
+  setupDpad();
+  initGame();
+});
+
+})();
+</script>
 </body>
 </html>
