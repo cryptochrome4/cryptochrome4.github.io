@@ -94,6 +94,12 @@
             box-shadow: 0 2px 0 #4f3d1a;
         }
         button:active { transform: translateY(4px); border-bottom-width: 2px; }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+            border-bottom-width: 6px !important;
+        }
         .footer {
             margin-top: 12px;
             text-align: center;
@@ -113,13 +119,20 @@
             color: #d4d4e8;
         }
         .stream-badge {
-            background: #9147ff;
-            color: white;
+            background: #555;
+            color: #aaa;
             border-radius: 40px;
             padding: 4px 18px;
             font-weight: bold;
+            cursor: not-allowed;
+            transition: 0.3s;
+        }
+        .stream-badge.unlocked {
+            background: #9147ff;
+            color: white;
             cursor: pointer;
         }
+        .stream-badge.unlocked:hover { opacity: 0.85; }
         .gameover-msg {
             position: absolute;
             top: 50%; left: 50%;
@@ -215,7 +228,7 @@
             padding-top: 14px;
         }
 
-        /* 学習オーバーレイ (study.html 誘導) - 左下の勉強ボタン用 */
+        /* 学習オーバーレイ (study.html 誘導) */
         .study-overlay {
             display: none;
             position: fixed;
@@ -348,6 +361,14 @@
             100% { opacity: 0; transform: translateY(-20px); }
         }
 
+        .coin-counter {
+            background: #2b241b;
+            padding: 4px 18px;
+            border-radius: 40px;
+            color: #ffd78a;
+            font-size: 16px;
+        }
+
         @media (max-width: 640px) { .twitch-chat { width: 120px; height: 250px; right: 4px; top: 6px; } }
     </style>
 </head>
@@ -356,7 +377,7 @@
         <div class="canvas-wrap">
             <canvas id="gameCanvas" width="800" height="400"></canvas>
             <div id="gameoverMsg" class="gameover-msg">💀 GAME OVER</div>
-            <!-- クリア後の誘導オーバーレイ (ゲーム非表示) -->
+            <!-- クリア後の誘導オーバーレイ -->
             <div id="clearOverlay" class="clear-overlay">
                 <div class="clear-card">
                     <div class="big-icon">🏆</div>
@@ -372,8 +393,9 @@
             <div id="twitchChat" class="twitch-chat"></div>
         </div>
         <div class="info">
-            <span>🍄 マウス操作 配信モード</span>
+            <span>🍄 マウス操作</span>
             <span id="scoreDisplay">🟡 0</span>
+            <span class="coin-counter" id="coinCounter">🪙 0 / 1000</span>
             <div class="controls">
                 <button class="mouse-btn left-btn" id="leftBtn">◀</button>
                 <button class="mouse-btn jump-btn" id="jumpBtn">▲ ジャンプ</button>
@@ -383,12 +405,12 @@
         </div>
         <div class="footer">
             <span class="mouse-hint">🖱 左右ボタンで移動 / ジャンプ</span>
-            <span class="stream-badge" id="streamToggleBtn">📡 配信モード OFF</span>
+            <span class="stream-badge" id="streamToggleBtn">🔒 配信モード (コイン1000)</span>
             <span>🏁 旗でクリア！</span>
         </div>
     </div>
 
-    <!-- 学習オーバーレイ (左下の勉強ボタン用) -->
+    <!-- 学習オーバーレイ -->
     <div id="studyOverlay" class="study-overlay">
         <div class="study-card">
             <div class="big-icon">📚</div>
@@ -403,10 +425,11 @@
 
     <script>
         (function() {
-            // ---------- ゲーム部分 ----------
+            // ---------- DOM ----------
             var canvas = document.getElementById('gameCanvas');
             var ctx = canvas.getContext('2d');
             var scoreSpan = document.getElementById('scoreDisplay');
+            var coinCounter = document.getElementById('coinCounter');
             var resetBtn = document.getElementById('resetBtn');
             var studyOverlay = document.getElementById('studyOverlay');
             var studyCloseBtn = document.getElementById('studyCloseBtn');
@@ -421,10 +444,13 @@
             var streamToggleBtn = document.getElementById('streamToggleBtn');
             var twitchChat = document.getElementById('twitchChat');
 
+            // ---------- 状態 ----------
             var isStudyMode = false;
             var isStreaming = false;
             var chatInterval = null;
             var isClearOverlayActive = false;
+            var totalCoinsCollected = 0;       // 累計コイン数 (リセットでリセット)
+            var streamUnlocked = false;
 
             // ★ コメントリスト (100個以上)
             var commentPool = [
@@ -463,6 +489,7 @@
                 jumpPressed: false
             };
 
+            // ---------- ステージ構築 ----------
             function buildStage() {
                 game.platforms = [ { x: 0, y: 330, w: 800, h: 70 } ];
                 game.platforms.push(
@@ -499,9 +526,27 @@
                 gameoverMsg.style.display = 'none';
                 clearOverlay.classList.remove('active');
                 isClearOverlayActive = false;
-                updateScore();
+                // 累計コインはリセットしない (ゲームリセットでも維持)
+                updateUI();
             }
 
+            // ---------- UI更新 ----------
+            function updateUI() {
+                scoreSpan.textContent = '🟡 ' + game.score;
+                coinCounter.textContent = '🪙 ' + totalCoinsCollected + ' / 1000';
+                // 配信モード解除判定
+                if (totalCoinsCollected >= 1000 && !streamUnlocked) {
+                    streamUnlocked = true;
+                    streamToggleBtn.className = 'stream-badge unlocked';
+                    streamToggleBtn.textContent = '📡 配信モード OFF';
+                    // 配信モードがオフならOFF表示
+                    if (!isStreaming) {
+                        streamToggleBtn.textContent = '📡 配信モード OFF';
+                    }
+                }
+            }
+
+            // ---------- 物理更新 ----------
             function updatePhysics() {
                 if (game.gameClear || game.gameOver) return;
                 var m = game.mario;
@@ -539,16 +584,21 @@
                 if (m.x < 0) m.x = 0;
                 if (m.x + m.w > 800) m.x = 800 - m.w;
                 if (m.y > 400) { setGameOver(); return; }
+
+                // コイン取得
                 for (var k = 0; k < game.coins.length; k++) {
                     var coin = game.coins[k];
                     if (coin.collected) continue;
                     if (m.x + m.w > coin.x && m.x < coin.x + coin.w && m.y + m.h > coin.y && m.y < coin.y + coin.h) {
                         coin.collected = true;
                         game.score += 100;
-                        updateScore();
+                        totalCoinsCollected++;
+                        updateUI();
                         if (isStreaming) addChatLine("🪙 コインGET！ +100");
                     }
                 }
+
+                // エネミー
                 for (var e = 0; e < game.enemies.length; e++) {
                     var enemy = game.enemies[e];
                     if (!enemy.alive) continue;
@@ -573,7 +623,7 @@
                         if (m.vy > 0 && m.y + m.h - enemy.y < 20) {
                             enemy.alive = false;
                             game.score += 200;
-                            updateScore();
+                            updateUI();
                             m.vy = -5;
                             if (isStreaming) addChatLine("💥 クリボーを踏んだ！ +200");
                         } else {
@@ -583,6 +633,8 @@
                         }
                     }
                 }
+
+                // フラグ
                 var f = game.flag;
                 if (m.x + m.w > f.x + 4 && m.x < f.x + f.w - 4 && m.y + m.h > f.y + 8 && m.y < f.y + f.h - 8) {
                     game.gameClear = true;
@@ -600,7 +652,7 @@
                 if (isStreaming) addChatLine("💀 GAME OVER リスタートしよう");
             }
 
-            // 描画
+            // ---------- 描画 ----------
             function draw() {
                 if (isClearOverlayActive) {
                     ctx.clearRect(0, 0, 800, 400);
@@ -685,7 +737,7 @@
                 ctx.translate(m.x + m.w/2, m.y + m.h/2);
                 if (m.facing < 0) ctx.scale(-1, 1);
                 ctx.translate(-m.w/2, -m.h/2);
-                if (isStreaming) {
+                if (isStreaming && streamUnlocked) {
                     ctx.strokeStyle = '#666';
                     ctx.lineWidth = 3;
                     ctx.beginPath();
@@ -730,7 +782,7 @@
                     ctx.font = 'bold 28px sans-serif';
                     ctx.fillText('🎉 CLEAR!', 300, 120);
                 }
-                if (isStreaming) {
+                if (isStreaming && streamUnlocked) {
                     ctx.fillStyle = 'rgba(100,65,165,0.7)';
                     ctx.fillRect(8, 8, 100, 24);
                     ctx.fillStyle = '#fff';
@@ -748,10 +800,7 @@
                 ctx.fill();
             }
 
-            function updateScore() {
-                scoreSpan.textContent = '🟡 ' + game.score;
-            }
-
+            // ---------- ゲーム制御 ----------
             function resetGame() {
                 isStudyMode = false;
                 studyOverlay.classList.remove('active');
@@ -764,43 +813,36 @@
                 game.leftPressed = false;
                 game.rightPressed = false;
                 game.jumpPressed = false;
-                updateScore();
-                if (isStreaming) {
+                updateUI();
+                if (isStreaming && streamUnlocked) {
                     twitchChat.innerHTML = '';
                     addChatLine('🔄 ゲームリセット！');
                 }
             }
 
-            // クリアオーバーレイ表示 (ゲーム非表示)
             function showClearOverlay() {
                 isClearOverlayActive = true;
                 clearOverlay.classList.add('active');
             }
 
-            // クリアオーバーレイ閉じる
             clearCloseBtn.addEventListener('click', function() {
                 resetGame();
             });
-
-            // 同じタブでdeed.htmlへ移動 (クリア画面)
             clearRedirectBtn.addEventListener('click', function() {
                 window.location.href = 'deed.html';
             });
 
-            // 勉強オーバーレイ (studyOverlay)
             studyCloseBtn.addEventListener('click', function() {
                 studyOverlay.classList.remove('active');
                 isStudyMode = false;
             });
-
-            // 同じタブでdeed.htmlへ移動 (勉強画面)
             studyRedirectBtn.addEventListener('click', function() {
                 window.location.href = 'deed.html';
             });
 
-            // ---- Twitch風コメント（4文字ごとに分割） ----
+            // ---------- Twitchコメント ----------
             function addChatLine(msg) {
-                if (!isStreaming) return;
+                if (!isStreaming || !streamUnlocked) return;
                 var username = 'viewer' + Math.floor(Math.random() * 1000);
                 var chunks = [];
                 for (var i = 0; i < msg.length; i += 4) {
@@ -823,13 +865,21 @@
             }
 
             function randomComment() {
-                if (!isStreaming) return;
+                if (!isStreaming || !streamUnlocked) return;
                 var idx = Math.floor(Math.random() * commentPool.length);
                 addChatLine(commentPool[idx]);
             }
 
-            // 配信モード切り替え
+            // ---------- 配信モード切り替え ----------
             function toggleStream() {
+                if (!streamUnlocked) {
+                    // ロック中はトースト表示
+                    streamToggleBtn.textContent = '🔒 コイン1000必要';
+                    setTimeout(function() {
+                        streamToggleBtn.textContent = '🔒 配信モード (コイン1000)';
+                    }, 1500);
+                    return;
+                }
                 isStreaming = !isStreaming;
                 streamToggleBtn.textContent = isStreaming ? '📡 配信モード ON' : '📡 配信モード OFF';
                 twitchChat.classList.toggle('active', isStreaming);
@@ -849,7 +899,7 @@
 
             streamToggleBtn.addEventListener('click', toggleStream);
 
-            // イベント
+            // ---------- イベント ----------
             leftBtn.addEventListener('mousedown', function(e) { e.preventDefault(); game.leftPressed = true; });
             leftBtn.addEventListener('mouseup', function(e) { e.preventDefault(); game.leftPressed = false; });
             leftBtn.addEventListener('mouseleave', function(e) { game.leftPressed = false; });
@@ -862,7 +912,7 @@
             });
             resetBtn.addEventListener('click', resetGame);
 
-            // ゲームループ
+            // ---------- ゲームループ ----------
             function gameLoop() {
                 if (!game.gameClear && !game.gameOver) {
                     updatePhysics();
@@ -875,12 +925,14 @@
                 requestAnimationFrame(gameLoop);
             }
 
+            // ---------- 初期化 ----------
             buildStage();
-            updateScore();
+            updateUI();
             gameLoop();
 
             twitchChat.classList.remove('active');
-            streamToggleBtn.textContent = '📡 配信モード OFF';
+            streamToggleBtn.className = 'stream-badge';
+            streamToggleBtn.textContent = '🔒 配信モード (コイン1000)';
             if (chatInterval) clearInterval(chatInterval);
             chatInterval = null;
 
