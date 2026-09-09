@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>棒人間の釣りゲーム 〜サンマを釣れ！〜</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: linear-gradient(145deg, #0b3d5a 0%, #1b6b8f 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', Roboto, system-ui, sans-serif;
+        }
+        .game-container {
+            background: #2b7a9c;
+            padding: 20px 30px 35px;
+            border-radius: 60px 60px 40px 40px;
+            box-shadow: 0 20px 30px rgba(0,0,0,0.6), inset 0 2px 5px rgba(255,255,255,0.3);
+            border-bottom: 8px solid #1a4e66;
+        }
+        .canvas-wrapper {
+            background: #7fc3db;
+            border-radius: 40px 40px 20px 20px;
+            padding: 12px 12px 0 12px;
+            box-shadow: inset 0 0 0 3px #3a8aa8, inset 0 0 15px #1f5f7a;
+        }
+        canvas {
+            display: block;
+            margin: 0 auto;
+            width: 800px;
+            height: 450px;
+            border-radius: 30px 30px 16px 16px;
+            background: #9ad0e6;
+            box-shadow: inset 0 0 30px #3a7a94;
+            cursor: pointer;
+        }
+        .control-panel {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 18px;
+            gap: 12px;
+        }
+        .field-selector {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .field-btn {
+            background: #e5f3fa;
+            border: none;
+            border-radius: 40px;
+            padding: 8px 18px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: #145267;
+            box-shadow: 0 4px 0 #718b96, 0 3px 8px rgba(0,0,0,0.2);
+            transition: 0.05s linear;
+            cursor: pointer;
+            letter-spacing: 0.3px;
+        }
+        .field-btn.active {
+            background: #feda75;
+            box-shadow: 0 4px 0 #a57c2e;
+            transform: translateY(1px);
+            color: #1f3d47;
+        }
+        .field-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 0px 0 #718b96;
+        }
+        .action-area {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: #1a5f7a;
+            padding: 5px 20px 5px 18px;
+            border-radius: 80px;
+            box-shadow: inset 0 3px 8px rgba(0,0,0,0.4);
+        }
+        .fish-count {
+            color: #f5ffd3;
+            font-weight: bold;
+            font-size: 1.2rem;
+            text-shadow: 0 2px 3px black;
+            background: #0b384b;
+            padding: 4px 18px;
+            border-radius: 40px;
+            letter-spacing: 1px;
+        }
+        .catch-btn {
+            background: #fdbb3a;
+            border: none;
+            border-radius: 60px;
+            padding: 12px 32px;
+            font-weight: 800;
+            font-size: 1.3rem;
+            color: #1d3b44;
+            box-shadow: 0 6px 0 #8f6b1f, 0 6px 12px black;
+            transition: 0.04s linear;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+        }
+        .catch-btn:active {
+            transform: translateY(6px);
+            box-shadow: 0 0px 0 #8f6b1f;
+        }
+        .catch-btn:disabled {
+            opacity: 0.5;
+            transform: translateY(3px);
+            box-shadow: 0 3px 0 #5f491b;
+            pointer-events: none;
+        }
+        .message-box {
+            font-size: 0.95rem;
+            background: #09303f;
+            padding: 6px 22px;
+            border-radius: 30px;
+            color: #cfeefb;
+            font-weight: 500;
+            min-width: 140px;
+            text-align: center;
+            box-shadow: inset 0 0 10px #08222e;
+        }
+        .win-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(5px);
+            justify-content: center;
+            align-items: center;
+            z-index: 999;
+        }
+        .win-overlay.show {
+            display: flex;
+        }
+        .win-card {
+            background: #edf9fc;
+            padding: 30px 50px 50px;
+            border-radius: 70px 70px 40px 40px;
+            text-align: center;
+            box-shadow: 0 30px 40px rgba(0,0,0,0.8);
+            max-width: 480px;
+            border: 4px solid #f5c542;
+        }
+        .win-card h1 {
+            font-size: 3.5rem;
+            margin: 0 0 5px;
+            color: #d48c2b;
+            text-shadow: 0 4px 0 #7a581d;
+        }
+        .win-card p {
+            font-size: 1.2rem;
+            color: #1a4d5e;
+        }
+        .win-card .study-link {
+            display: inline-block;
+            margin-top: 25px;
+            background: #1f7a5c;
+            color: white;
+            font-weight: bold;
+            font-size: 1.7rem;
+            padding: 16px 48px;
+            border-radius: 80px;
+            text-decoration: none;
+            box-shadow: 0 8px 0 #0a3d2e;
+            transition: 0.08s linear;
+            letter-spacing: 2px;
+        }
+        .win-card .study-link:active {
+            transform: translateY(8px);
+            box-shadow: 0 0px 0 #0a3d2e;
+        }
+        .footer {
+            margin-top: 10px;
+            color: #bbdef0;
+            font-size: 0.8rem;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<div class="game-container">
+    <div class="canvas-wrapper">
+        <canvas id="gameCanvas" width="800" height="450"></canvas>
+    </div>
+
+    <div class="control-panel">
+        <div class="field-selector">
+            <button class="field-btn" data-field="river_up">川上流</button>
+            <button class="field-btn" data-field="river_mid">川中流</button>
+            <button class="field-btn" data-field="river_down">川下流</button>
+            <button class="field-btn" data-field="sea_shallow">海浅場</button>
+            <button class="field-btn" data-field="sea_deep">海深場</button>
+        </div>
+        <div class="action-area">
+            <span class="fish-count" id="fishCountDisplay">🐟 0</span>
+            <button class="catch-btn" id="catchBtn">🎣 釣る！</button>
+        </div>
+        <div class="message-box" id="messageBox">サンマを狙え！</div>
+    </div>
+    <div class="footer">棒人間の釣り · サンマが勝利条件</div>
+</div>
+
+<!-- 勝利オーバーレイ -->
+<div class="win-overlay" id="winOverlay">
+    <div class="win-card">
+        <h1>🏆 サンマ !</h1>
+        <p>見事サンマを釣り上げた！<br>あなたは正しい場所を選んだ。</p>
+        <a href="#" class="study-link" id="studyLink">📖 study.html へ</a>
+        <p style="margin-top: 18px; font-size:0.9rem; color:#3b6c7a;">※ 釣りゲームは非表示になります</p>
+    </div>
+</div>
+
+<script>
+    (function(){
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // ----- フィールド定義 (サンマ出現率 現実に近い調整) -----
+        // サンマは基本的に海の深場・沖合に多いが、ここでは海深場で高確率、浅場でもまれに。
+        // 川ではほぼ釣れない (現実に即して)
+        const FIELD_FISH = {
+            river_up:   { sanmaRate: 0.01,  fishPool: ['ヤマメ', 'イワナ', 'アユ', 'カジカ'], color: '#4d8f7a' },
+            river_mid:  { sanmaRate: 0.02,  fishPool: ['ヤマメ', 'アユ', 'オイカワ', 'ウグイ'], color: '#3f8a7a' },
+            river_down: { sanmaRate: 0.03,  fishPool: ['ボラ', 'ハゼ', 'ウグイ', 'スズキ'], color: '#3f7a7a' },
+            sea_shallow:{ sanmaRate: 0.18,  fishPool: ['サバ', 'イワシ', 'アジ', 'カレイ', 'タイ'], color: '#2f7a9a' },
+            sea_deep:   { sanmaRate: 0.42,  fishPool: ['サンマ', 'マグロ', 'カツオ', 'ブリ', 'サメ'], color: '#1f5f8a' }
+        };
+
+        // 現在のフィールド
+        let currentField = 'sea_deep';  // デフォルトは海深場 (サンマ狙い)
+        let currentFishList = [];
+        let caughtFish = [];            // 釣った魚の名前リスト
+        let fishCount = 0;            // 釣った総数 (表示用)
+        let isWaitingForBite = false;  // 餌に魚がきたか
+        let biteFishName = '';         // ヒットした魚の名前
+        let catchCooldown = false;
+        let winTriggered = false;
+
+        // DOM
+        const messageBox = document.getElementById('messageBox');
+        const fishCountDisplay = document.getElementById('fishCountDisplay');
+        const catchBtn = document.getElementById('catchBtn');
+        const winOverlay = document.getElementById('winOverlay');
+        const studyLink = document.getElementById('studyLink');
+
+        // フィールドボタン
+        const fieldBtns = document.querySelectorAll('.field-btn');
+
+        // ----- 初期化: フィールド選択 & 描画 -----
+        function setField(fieldKey) {
+            if (winTriggered) return;
+            currentField = fieldKey;
+            // アクティブ表示
+            fieldBtns.forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.dataset.field === fieldKey) btn.classList.add('active');
+            });
+            // 魚リスト更新
+            const fieldData = FIELD_FISH[fieldKey];
+            currentFishList = fieldData.fishPool.slice();
+            // メッセージ更新
+            const fieldName = {
+                river_up:'川上流', river_mid:'川中流', river_down:'川下流',
+                sea_shallow:'海浅場', sea_deep:'海深場'
+            }[fieldKey] || '不明';
+            messageBox.textContent = `📍 ${fieldName} · サンマ率 ${Math.round(fieldData.sanmaRate*100)}%`;
+            // 待機状態リセット
+            isWaitingForBite = false;
+            biteFishName = '';
+            catchBtn.disabled = false;
+            drawGame();
+        }
+
+        // ----- 描画 (棒人間・魚・フィールド) -----
+        function drawGame() {
+            ctx.clearRect(0, 0, 800, 450);
+
+            // 背景 (水の表現)
+            const grad = ctx.createLinearGradient(0, 0, 0, 450);
+            grad.addColorStop(0, '#9fd0e6');
+            grad.addColorStop(0.7, '#6aaec9');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, 800, 450);
+
+            // 波模様
+            ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+            ctx.lineWidth = 2;
+            for (let i=0; i<6; i++) {
+                ctx.beginPath();
+                ctx.moveTo(0, 50 + i*60);
+                for (let x=0; x<=800; x+=10) {
+                    ctx.lineTo(x, 50 + i*60 + 8*Math.sin(x/40 + i*1.2 + Date.now()/2000));
+                }
+                ctx.stroke();
+            }
+
+            // フィールドごとの装飾 (簡易)
+            const field = currentField;
+            ctx.font = 'bold 15px "Segoe UI", sans-serif';
+            ctx.fillStyle = '#044c5e';
+            ctx.shadowColor = 'rgba(0,0,0,0.2)';
+            ctx.shadowBlur = 6;
+            ctx.fillText(`🐟 ${FIELD_FISH[field].fishPool.join(' · ')}`, 40, 40);
+            ctx.shadowBlur = 0;
+
+            // ---- 棒人間 (釣り人) ----
+            // 頭
+            ctx.beginPath();
+            ctx.arc(140, 280, 20, 0, 2*Math.PI);
+            ctx.fillStyle = '#f7d9a0';
+            ctx.fill();
+            ctx.strokeStyle = '#3d2b1a';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // 胴体
+            ctx.beginPath();
+            ctx.moveTo(140, 300);
+            ctx.lineTo(140, 370);
+            ctx.strokeStyle = '#3d2b1a';
+            ctx.lineWidth = 4;
+            ctx.stroke();
+
+            // 腕 (釣竿を持つ)
+            ctx.beginPath();
+            ctx.moveTo(140, 315);
+            ctx.lineTo(190, 280);
+            ctx.stroke();
+            // 竿
+            ctx.beginPath();
+            ctx.moveTo(190, 280);
+            ctx.lineTo(260, 210);
+            ctx.strokeStyle = '#6b4a2e';
+            ctx.lineWidth = 6;
+            ctx.stroke();
+            // 糸
+            ctx.beginPath();
+            ctx.moveTo(260, 210);
+            ctx.lineTo(360, 260);
+            ctx.strokeStyle = '#c0c0c0';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            // 浮き
+            ctx.beginPath();
+            ctx.arc(360, 260, 10, 0, 2*Math.PI);
+            ctx.fillStyle = '#e03a3a';
+            ctx.fill();
+            ctx.strokeStyle = '#8a2b2b';
+            ctx.stroke();
+            // 足
+            ctx.beginPath();
+            ctx.moveTo(140, 370);
+            ctx.lineTo(120, 410);
+            ctx.moveTo(140, 370);
+            ctx.lineTo(160, 410);
+            ctx.strokeStyle = '#3d2b1a';
+            ctx.lineWidth = 4;
+            ctx.stroke();
+
+            // ---- 魚の表示 (餌に来ている魚) ----
+            if (isWaitingForBite && biteFishName) {
+                // 魚のイラスト (餌に食いついた)
+                const fishX = 430, fishY = 250;
+                ctx.shadowColor = 'rgba(0,0,0,0.3)';
+                ctx.shadowBlur = 16;
+                // 魚の体
+                ctx.beginPath();
+                ctx.ellipse(fishX, fishY, 34, 18, 0, 0, Math.PI*2);
+                ctx.fillStyle = '#ddbb77';
+                ctx.fill();
+                ctx.strokeStyle = '#5f4a2a';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                // 目
+                ctx.beginPath();
+                ctx.arc(fishX+12, fishY-4, 5, 0, 2*Math.PI);
+                ctx.fillStyle = '#f0f0f0';
+                ctx.fill();
+                ctx.fillStyle = '#222';
+                ctx.beginPath();
+                ctx.arc(fishX+14, fishY-6, 2.5, 0, 2*Math.PI);
+                ctx.fill();
+                // 尾びれ
+                ctx.beginPath();
+                ctx.moveTo(fishX-34, fishY);
+                ctx.lineTo(fishX-50, fishY-20);
+                ctx.lineTo(fishX-50, fishY+20);
+                ctx.closePath();
+                ctx.fillStyle = '#b8955a';
+                ctx.fill();
+                ctx.strokeStyle = '#5f4a2a';
+                ctx.stroke();
+                // 名前表示
+                ctx.shadowBlur = 0;
+                ctx.font = 'bold 15px sans-serif';
+                ctx.fillStyle = '#0b1f2b';
+                ctx.fillText(`🐟 ${biteFishName} が来た！`, 400, 150);
+            } else {
+                // 待機中は「餌を待つ」表示
+                ctx.font = 'italic 18px sans-serif';
+                ctx.fillStyle = '#1f424f';
+                ctx.fillText('🎣 餌を垂らしている...', 400, 150);
+            }
+
+            // 釣った魚のカウンター表示 (キャンバス内にも)
+            ctx.font = 'bold 18px "Segoe UI"';
+            ctx.fillStyle = '#02212b';
+            ctx.fillText(`釣果: ${fishCount}匹`, 650, 50);
+        }
+
+        // アニメーションループ (波の動き用)
+        let animFrame = null;
+        function animate() {
+            drawGame();
+            animFrame = requestAnimationFrame(animate);
+        }
+
+        // ----- 釣りアクション (餌に魚が来る → 釣るボタンでキャッチ) -----
+        function triggerBite() {
+            if (winTriggered) return;
+            if (catchCooldown) return;
+            if (isWaitingForBite) return; // 既に魚が来ている
+
+            const fieldData = FIELD_FISH[currentField];
+            // 魚リストからランダム選択 (サンマ率で抽選)
+            const rand = Math.random();
+            let selectedFish = '';
+            if (rand < fieldData.sanmaRate) {
+                selectedFish = 'サンマ';
+            } else {
+                // サンマ以外の魚をプールから抽選 (サンマを除外)
+                const poolWithoutSanma = fieldData.fishPool.filter(f => f !== 'サンマ');
+                if (poolWithoutSanma.length === 0) {
+                    // 万が一全部サンマだったら (ありえない)
+                    selectedFish = fieldData.fishPool[0] || 'イワシ';
+                } else {
+                    selectedFish = poolWithoutSanma[Math.floor(Math.random() * poolWithoutSanma.length)];
+                }
+            }
+
+            // 餌にきた！
+            isWaitingForBite = true;
+            biteFishName = selectedFish;
+            messageBox.textContent = `🐡 ${biteFishName} がヒット！ 釣るボタンを連打！`;
+            catchBtn.disabled = false;
+            drawGame();
+        }
+
+        // 釣る (連打)
+        function performCatch() {
+            if (winTriggered) return;
+            if (!isWaitingForBite) {
+                // 餌に来てないのに釣ろうとしたら、餌を投げ直す (ゲーム性)
+                messageBox.textContent = '💤 まだ魚が来てないよ... 待ってみよう';
+                return;
+            }
+            if (catchCooldown) return;
+
+            // 釣った！
+            const caughtName = biteFishName;
+            // 魚をリストに追加 (サンマ判定)
+            caughtFish.push(caughtName);
+            fishCount++;
+            fishCountDisplay.textContent = `🐟 ${fishCount}`;
+
+            // サンマチェック
+            if (caughtName === 'サンマ') {
+                // 勝利！
+                winTriggered = true;
+                isWaitingForBite = false;
+                biteFishName = '';
+                catchBtn.disabled = true;
+                messageBox.textContent = '🎉 サンマを釣った！ 勝利！';
+                drawGame();
+                // オーバーレイ表示 (study.html 誘導)
+                winOverlay.classList.add('show');
+                // study.html リンク設定 (実際のファイルに飛ばす)
+                studyLink.href = 'study.html';
+                return;
+            }
+
+            // サンマ以外: 釣れた魚を表示してリセット
+            messageBox.textContent = `✅ ${caughtName} を釣った！ また餌を待つ`;
+            isWaitingForBite = false;
+            biteFishName = '';
+            catchBtn.disabled = true;  // 一旦無効にして、次のバイトを待つ
+
+            // クールダウンなしで次のバイトへ (0.6秒後に次の魚)
+            catchCooldown = true;
+            setTimeout(() => {
+                catchCooldown = false;
+                if (!winTriggered && !isWaitingForBite) {
+                    // 次の餌を自動で呼ぶ
+                    triggerBite();
+                }
+            }, 500);
+
+            drawGame();
+        }
+
+        // フィールド変更時はバイト状態をリセットして、新しい餌を呼ぶ
+        function resetAndStartBite() {
+            if (winTriggered) return;
+            isWaitingForBite = false;
+            biteFishName = '';
+            catchBtn.disabled = true;
+            // 少し遅れて餌を呼ぶ
+            setTimeout(() => {
+                if (!winTriggered) {
+                    triggerBite();
+                }
+            }, 300);
+            drawGame();
+        }
+
+        // ----- イベントリスナー -----
+        catchBtn.addEventListener('click', performCatch);
+
+        fieldBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                if (winTriggered) return;
+                const field = e.target.dataset.field;
+                setField(field);
+                resetAndStartBite();
+            });
+        });
+
+        // ----- 初期表示 -----
+        function initGame() {
+            // デフォルト選択: 海深場
+            document.querySelector('.field-btn[data-field="sea_deep"]').classList.add('active');
+            setField('sea_deep');
+            // 最初の餌
+            setTimeout(() => {
+                if (!winTriggered) triggerBite();
+            }, 400);
+            animate();
+        }
+
+        initGame();
+
+        // クリーンアップ
+        window.addEventListener('beforeunload', ()=> {
+            if (animFrame) cancelAnimationFrame(animFrame);
+        });
+
+        // 隠し機能: フィールドによってサンマ率が変わることを勉強用に明示
+        console.log('サンマ出現率: 川上流1%, 川中流2%, 川下流3%, 海浅場18%, 海深場42% (現実準拠)');
+    })();
+</script>
+</body>
+</html>
