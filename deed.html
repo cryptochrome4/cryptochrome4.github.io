@@ -110,7 +110,8 @@
       text-shadow: 0 2px 3px #00000055;
       min-height: 3.8rem;
     }
-    /* 4択エリア：最初は非表示 */
+
+    /* ===== 選択肢エリア（最初は非表示） ===== */
     .choices-wrapper {
       max-height: 0;
       overflow: hidden;
@@ -152,6 +153,43 @@
       margin-right: 12px;
       font-size: 0.95rem;
     }
+
+    /* ===== 選択肢を表示するボタン ===== */
+    .show-choices-btn {
+      display: inline-block;
+      background: #2a3150;
+      border: 2px solid #b4944b;
+      color: #f5e3b0;
+      font-weight: bold;
+      padding: 12px 32px;
+      border-radius: 60px;
+      font-size: 1.1rem;
+      cursor: pointer;
+      transition: all 0.15s;
+      box-shadow: 0 4px 0 #0b0e16, 0 4px 12px #00000066;
+      letter-spacing: 1px;
+      margin: 8px 0 14px;
+      width: 100%;
+      text-align: center;
+      background: linear-gradient(145deg, #2f3652, #1b2137);
+    }
+    .show-choices-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 0 #0b0e16, 0 8px 18px #00000099;
+      background: #3a4161;
+      border-color: #dbb85a;
+    }
+    .show-choices-btn:active {
+      transform: translateY(4px);
+      box-shadow: 0 2px 0 #0b0e16;
+    }
+    .show-choices-btn.revealed {
+      background: #1f3a2a;
+      border-color: #7ab87a;
+      color: #b8e0b8;
+    }
+
+    /* ===== 答えボックス（クリックで答え＋解説） ===== */
     .answer-box {
       background: #101522;
       border-left: 6px solid #c9a84c;
@@ -214,6 +252,14 @@
       text-align: right;
       font-style: italic;
     }
+
+    /* 答えボタンが非アクティブ（選択肢が出てないと押せない） */
+    .answer-box.disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
     .nav-area {
       display: flex;
       justify-content: space-between;
@@ -301,6 +347,9 @@
     </div>
     <div class="question-text" id="questionText">問題文がここに表示されます。</div>
 
+    <!-- 選択肢を表示するボタン（最初は「選択肢を表示」） -->
+    <button class="show-choices-btn" id="showChoicesBtn">🔍 選択肢を表示</button>
+
     <!-- 4択エリア：デフォルトで閉じてる -->
     <div class="choices-wrapper" id="choicesWrapper">
       <div class="choices-grid" id="choicesGrid">
@@ -311,17 +360,17 @@
       </div>
     </div>
 
-    <!-- 答え＋解説 (クリックで展開) -->
-    <div class="answer-box" id="answerBox">
+    <!-- 答え＋解説 (クリックで展開) 最初はdisabled -->
+    <div class="answer-box disabled" id="answerBox">
       <div class="answer-label" id="answerToggle">
-        <span>💡 答えと選択肢を表示</span>
+        <span>💡 答えを表示</span>
         <span class="icon">▼</span>
       </div>
       <div class="answer-content" id="answerContent">
         <div class="correct-answer" id="correctAnswerText">✅ 正解：ここに正解</div>
         <div class="explanation" id="explanationText">📖 解説がここに入ります。</div>
       </div>
-      <div class="click-hint">※ クリックで選択肢＆答え・解説が表示</div>
+      <div class="click-hint">※ クリックで答え＆解説</div>
     </div>
   </div>
 
@@ -461,10 +510,12 @@
     const totalQual = quizData.length;
     const totalQuestions = totalQual * 4;
 
+    // DOM
     const qualBadge = document.getElementById('qualificationBadge');
     const qNumberDisplay = document.getElementById('qNumberDisplay');
     const qCategoryDisplay = document.getElementById('qCategoryDisplay');
     const questionText = document.getElementById('questionText');
+    const showChoicesBtn = document.getElementById('showChoicesBtn');
     const choicesWrapper = document.getElementById('choicesWrapper');
     const choicesGrid = document.getElementById('choicesGrid');
     const answerBox = document.getElementById('answerBox');
@@ -478,6 +529,7 @@
     const nextBtn = document.getElementById('nextBtn');
 
     const labels = ['A', 'B', 'C', 'D'];
+    let choicesRevealed = false;  // 選択肢が表示されているか
 
     function renderQuestion() {
       const qual = quizData[currentQualIndex];
@@ -488,7 +540,7 @@
       qCategoryDisplay.textContent = `📌 ${qual.category}`;
       questionText.textContent = q.q;
 
-      // 4択のテキストをセット（表示は閉じたまま）
+      // 4択テキストをセット
       const choiceItems = choicesGrid.querySelectorAll('.choice-item');
       choiceItems.forEach((item, idx) => {
         item.querySelector('.choice-text').textContent = q.choices[idx] || '---';
@@ -499,10 +551,13 @@
       correctAnswerText.innerHTML = `✅ 正解：${correctLetter}. ${q.choices[q.ans]}`;
       explanationText.textContent = `📖 ${q.exp}`;
 
-      // 4択を閉じる
+      // 選択肢・答えを全て閉じる
       choicesWrapper.classList.remove('open');
-      // 答えボックスも閉じる
       answerBox.classList.remove('open');
+      answerBox.classList.add('disabled');
+      choicesRevealed = false;
+      showChoicesBtn.textContent = '🔍 選択肢を表示';
+      showChoicesBtn.classList.remove('revealed');
       const icon = answerToggle.querySelector('.icon');
       icon.textContent = '▼';
 
@@ -510,13 +565,42 @@
       const globalIndex = currentQualIndex * 4 + currentQIndex + 1;
       questionCounter.textContent = globalIndex;
       totalQuestionsSpan.textContent = totalQuestions;
-
       progressText.textContent = `資格 ${currentQualIndex + 1} / ${totalQual}`;
 
       prevBtn.disabled = (currentQualIndex === 0 && currentQIndex === 0);
       const isLast = (currentQualIndex === totalQual - 1 && currentQIndex === 3);
       nextBtn.disabled = isLast;
       nextBtn.textContent = isLast ? '🏁 完了' : '次へ ▶';
+    }
+
+    // 選択肢表示トグル
+    function toggleChoices() {
+      if (choicesRevealed) {
+        // 選択肢を閉じる → 答えも閉じる
+        choicesWrapper.classList.remove('open');
+        answerBox.classList.remove('open');
+        answerBox.classList.add('disabled');
+        choicesRevealed = false;
+        showChoicesBtn.textContent = '🔍 選択肢を表示';
+        showChoicesBtn.classList.remove('revealed');
+        const icon = answerToggle.querySelector('.icon');
+        icon.textContent = '▼';
+      } else {
+        // 選択肢を開く → 答えボタンを有効化
+        choicesWrapper.classList.add('open');
+        answerBox.classList.remove('disabled');
+        choicesRevealed = true;
+        showChoicesBtn.textContent = '🙈 選択肢を隠す';
+        showChoicesBtn.classList.add('revealed');
+      }
+    }
+
+    // 答え表示トグル
+    function toggleAnswer() {
+      if (!choicesRevealed) return; // 選択肢が出てないと押せない
+      const isOpen = answerBox.classList.toggle('open');
+      const icon = answerToggle.querySelector('.icon');
+      icon.textContent = isOpen ? '▲' : '▼';
     }
 
     function goNext() {
@@ -547,20 +631,16 @@
       document.querySelector('.container').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
-    // 答え表示トグル（クリックで4択＋答え・解説が一度に開く）
+    // イベント
+    showChoicesBtn.addEventListener('click', toggleChoices);
+
     answerToggle.addEventListener('click', function(e) {
       e.stopPropagation();
-      // 4択を開く
-      choicesWrapper.classList.toggle('open');
-      // 答えボックスを開く
-      const isOpen = answerBox.classList.toggle('open');
-      const icon = answerToggle.querySelector('.icon');
-      icon.textContent = isOpen ? '▲' : '▼';
+      toggleAnswer();
     });
-    // ボックス全体クリックでもトグル
     answerBox.addEventListener('click', function(e) {
       if (e.target.closest('.answer-label')) return;
-      answerToggle.click();
+      toggleAnswer();
     });
 
     nextBtn.addEventListener('click', goNext);
