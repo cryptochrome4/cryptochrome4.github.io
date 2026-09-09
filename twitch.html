@@ -117,6 +117,7 @@
             border-radius: 40px;
             padding: 4px 18px;
             font-weight: bold;
+            cursor: pointer;
         }
         .gameover-msg {
             position: absolute;
@@ -234,34 +235,36 @@
         .chat-line {
             color: #fff;
             font-size: 12px;
-            padding: 3px 8px;
+            padding: 2px 8px;
             font-family: 'Segoe UI', 'Arial', sans-serif;
             text-shadow: 0 0 6px #000;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
             opacity: 0.95;
-            animation: chatScroll 8s linear forwards;
+            animation: chatScroll 7s linear forwards;
             position: relative;
             width: 100%;
-            line-height: 1.6;
-            background: rgba(0,0,0,0.3);
-            border-bottom: 1px solid rgba(255,255,255,0.05);
+            line-height: 1.5;
+            background: rgba(0,0,0,0.2);
+            border-bottom: 1px solid rgba(255,255,255,0.04);
             transform: translateY(0);
         }
         .chat-line .username {
             color: #bf94ff;
             font-weight: bold;
-            margin-right: 6px;
+            margin-right: 4px;
+            flex-shrink: 0;
         }
         .chat-line .message {
             color: #f0f0f0;
+            display: inline-block;
         }
         @keyframes chatScroll {
-            0% { opacity: 0; transform: translateY(30px); }
-            8% { opacity: 1; transform: translateY(0); }
-            90% { opacity: 1; transform: translateY(0); }
-            100% { opacity: 0; transform: translateY(-30px); }
+            0% { opacity: 0; transform: translateY(20px); }
+            10% { opacity: 1; transform: translateY(0); }
+            85% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-20px); }
         }
 
         @media (max-width: 640px) { .twitch-chat { width: 120px; height: 250px; right: 4px; top: 6px; } }
@@ -322,11 +325,11 @@
             var twitchChat = document.getElementById('twitchChat');
 
             var isStudyMode = false;
-            var isStreaming = false;          // 配信モードON/OFF
+            var isStreaming = false;
             var chatInterval = null;
             var chatLines = [];
 
-            // ★ コメントリスト (100個以上)
+            // ★ コメントリスト (100個以上) — 長文は4文字ごとに分割表示する仕組み
             var commentPool = [
                 "本物のマリオの世界だ！凄い！", "クリボーがいる！気をつけて！", "やっぱりマリオは神", "配信者かわいい", "ジャンプうますぎ", "コイン取った！", "あのクリボーやばい", "BGMほしい", "スター欲しい", "マリオ頑張れ！",
                 "1UP取って！", "裏道ある？", "無限増殖バグ？", "あっちに隠しブロック", "クリボー踏めるよ", "キノコどこ？", "ファイアマリオになろう", "パワーアップ！", "ここで死んだら笑う", "もっと右！",
@@ -340,7 +343,6 @@
                 "またやろう", "更新待ってる", "次は何する？", "カービィもやって", "ゼルダも", "ポケモンも", "ドンキーも", "メトロイドも", "星のカービィ", "おやすみなさい",
                 "また明日も来ます", "大好き", "フォローした", "通知ON", "リツイートした", "コメントありがとう", "うぃー", "配信者すき", "がんばれマリオ", "クリボーを倒せ！"
             ];
-            // 必要なら100個以上になるようにパディング
             while (commentPool.length < 120) {
                 commentPool.push("✨ マリオ配信最高！ #" + commentPool.length);
             }
@@ -445,7 +447,6 @@
                         coin.collected = true;
                         game.score += 100;
                         updateScore();
-                        // コイン取得時にコメント追加 (配信モードなら)
                         if (isStreaming) addChatLine("🪙 コインGET！ +100");
                     }
                 }
@@ -583,14 +584,12 @@
                 ctx.translate(-m.w/2, -m.h/2);
                 // ★ 配信モードなら自撮り棒＋スマホ
                 if (isStreaming) {
-                    // 自撮り棒
                     ctx.strokeStyle = '#666';
                     ctx.lineWidth = 3;
                     ctx.beginPath();
                     ctx.moveTo(20, -2);
                     ctx.lineTo(38, -20);
                     ctx.stroke();
-                    // スマホ
                     ctx.fillStyle = '#222';
                     ctx.fillRect(34, -26, 16, 24);
                     ctx.fillStyle = '#3a6b9a';
@@ -598,12 +597,10 @@
                     ctx.fillStyle = '#fff';
                     ctx.font = '8px sans-serif';
                     ctx.fillText('📱', 38, -14);
-                    // マリオの帽子（配信者風）
                     ctx.fillStyle = '#e33b3b';
                     ctx.fillRect(2, -6, 24, 12);
                     ctx.fillRect(6, -10, 16, 6);
                 } else {
-                    // 通常マリオ
                     ctx.fillStyle = '#e33b3b';
                     ctx.fillRect(2, -2, 24, 12);
                     ctx.fillRect(6, -6, 16, 6);
@@ -631,7 +628,6 @@
                     ctx.font = 'bold 28px sans-serif';
                     ctx.fillText('🎉 CLEAR!', 300, 120);
                 }
-                // 配信モード表示
                 if (isStreaming) {
                     ctx.fillStyle = 'rgba(100,65,165,0.7)';
                     ctx.fillRect(8, 8, 100, 24);
@@ -683,24 +679,34 @@
                 if (game.mario.x > 700) game.mario.x = 680;
             });
 
-            // study.html 誘導
             document.getElementById('redirectStudyBtn').addEventListener('click', function() {
                 window.open('study.html', '_blank');
             });
 
-            // ---- Twitch風コメント ----
+            // ---- Twitch風コメント（4文字ごとに分割） ----
             function addChatLine(msg) {
                 if (!isStreaming) return;
-                var line = document.createElement('div');
-                line.className = 'chat-line';
                 var username = 'viewer' + Math.floor(Math.random() * 1000);
-                line.innerHTML = '<span class="username">' + username + '</span><span class="message">' + msg + '</span>';
-                twitchChat.appendChild(line);
+                // メッセージを4文字ごとに分割
+                var chunks = [];
+                for (var i = 0; i < msg.length; i += 4) {
+                    chunks.push(msg.substring(i, i + 4));
+                }
+                // 最初のチャンクはユーザー名付き、以降はユーザー名なし
+                chunks.forEach(function(chunk, index) {
+                    var line = document.createElement('div');
+                    line.className = 'chat-line';
+                    if (index === 0) {
+                        line.innerHTML = '<span class="username">' + username + '</span><span class="message">' + chunk + '</span>';
+                    } else {
+                        line.innerHTML = '<span class="message" style="padding-left: 4px;">' + chunk + '</span>';
+                    }
+                    twitchChat.appendChild(line);
+                });
                 // 最大30行まで
                 while (twitchChat.children.length > 30) {
                     twitchChat.removeChild(twitchChat.firstChild);
                 }
-                // スクロール維持
                 twitchChat.scrollTop = twitchChat.scrollHeight;
             }
 
@@ -718,9 +724,8 @@
                 if (isStreaming) {
                     twitchChat.innerHTML = '';
                     addChatLine('🔴 配信開始！ コメントが流れます');
-                    // コメント追加間隔
                     if (chatInterval) clearInterval(chatInterval);
-                    chatInterval = setInterval(randomComment, 2200);
+                    chatInterval = setInterval(randomComment, 3000);
                 } else {
                     if (chatInterval) {
                         clearInterval(chatInterval);
@@ -760,7 +765,6 @@
             updateScore();
             gameLoop();
 
-            // 初期状態では配信モードOFF
             twitchChat.classList.remove('active');
             streamToggleBtn.textContent = '📡 配信モード OFF';
             if (chatInterval) clearInterval(chatInterval);
