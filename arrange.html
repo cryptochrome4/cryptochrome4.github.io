@@ -1,0 +1,1282 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>GRT- テラリア風 〜進化版〜</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+        body {
+            background: #0a0a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+        }
+        #gameWrapper {
+            background: #16213e;
+            padding: 20px;
+            border-radius: 16px;
+            box-shadow: 0 0 60px rgba(0,200,255,0.2);
+            border: 2px solid #0f3460;
+            position: relative;
+        }
+        #canvasContainer {
+            position: relative;
+            width: 800px;
+            height: 500px;
+            overflow: hidden;
+            border: 4px solid #533483;
+            border-radius: 8px;
+            background: #1a1a2e;
+            cursor: crosshair;
+        }
+        #canvas {
+            display: block;
+            background: #1a1a2e;
+            image-rendering: pixelated;
+        }
+        
+        #controls {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            display: grid;
+            grid-template-columns: 60px 60px 60px;
+            grid-template-rows: 60px 60px 60px;
+            gap: 4px;
+            z-index: 10;
+        }
+        .ctrl-btn {
+            background: rgba(45, 45, 68, 0.85);
+            border: 2px solid #6a4c93;
+            color: white;
+            font-size: 24px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: 0.1s;
+            text-align: center;
+            line-height: 60px;
+            font-weight: bold;
+            backdrop-filter: blur(4px);
+            box-shadow: 0 3px 0 rgba(0,0,0,0.5);
+        }
+        .ctrl-btn:active {
+            transform: translateY(3px);
+            box-shadow: none;
+        }
+        .ctrl-btn.left { grid-column: 1; grid-row: 2; }
+        .ctrl-btn.jump { 
+            grid-column: 2; grid-row: 2; 
+            background: rgba(255, 215, 0, 0.3);
+            border-color: #FFD700;
+            font-size: 14px;
+            line-height: 60px;
+        }
+        .ctrl-btn.right { grid-column: 3; grid-row: 2; }
+        .ctrl-btn.dig-down { 
+            grid-column: 2; grid-row: 3;
+            background: rgba(255, 100, 100, 0.3);
+            border-color: #FF6B6B;
+            font-size: 14px;
+            line-height: 60px;
+        }
+        .ctrl-btn.scroll-up { 
+            grid-column: 3; grid-row: 1;
+            background: rgba(100, 200, 255, 0.3);
+            border-color: #4FC3F7;
+            font-size: 16px;
+            line-height: 60px;
+        }
+        .ctrl-btn.scroll-down { 
+            grid-column: 3; grid-row: 3;
+            background: rgba(100, 200, 255, 0.3);
+            border-color: #4FC3F7;
+            font-size: 16px;
+            line-height: 60px;
+        }
+        .ctrl-btn.attack {
+            grid-column: 1; grid-row: 1;
+            background: rgba(255, 50, 50, 0.4);
+            border-color: #FF1744;
+            font-size: 14px;
+            line-height: 60px;
+        }
+
+        #ui {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 12px;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        #grtCounter {
+            color: #ff6b6b;
+            font-size: 20px;
+            background: #1a0a0a;
+            padding: 6px 24px;
+            border-radius: 30px;
+            border: 2px solid #ff6b6b;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        #grtCounter.found {
+            color: #FFD700;
+            border-color: #FFD700;
+            background: #1a1a0a;
+            animation: glow 1s ease-in-out infinite alternate;
+        }
+        @keyframes glow {
+            from { box-shadow: 0 0 10px rgba(255,215,0,0.2); }
+            to { box-shadow: 0 0 30px rgba(255,215,0,0.6); }
+        }
+        #blockCounter {
+            color: #88CCFF;
+            font-size: 16px;
+            background: #0d0d1a;
+            padding: 6px 18px;
+            border-radius: 30px;
+            border: 1px solid #88CCFF;
+        }
+        #hpBar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #ff6b6b;
+            font-size: 14px;
+        }
+        #hpBar .bar {
+            width: 120px;
+            height: 12px;
+            background: #2a1a1a;
+            border-radius: 6px;
+            overflow: hidden;
+            border: 1px solid #ff6b6b;
+        }
+        #hpBar .fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff1744, #ff6b6b);
+            transition: width 0.3s;
+            width: 100%;
+        }
+        #inventory {
+            display: flex;
+            gap: 6px;
+            background: rgba(0,0,0,0.4);
+            padding: 4px 12px;
+            border-radius: 12px;
+            border: 1px solid #444;
+        }
+        #inventory span {
+            color: #aaa;
+            font-size: 14px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: rgba(255,255,255,0.05);
+        }
+        #inventory .active {
+            color: #FFD700;
+            border: 1px solid #FFD700;
+            background: rgba(255,215,0,0.1);
+        }
+        .hint {
+            color: #8899aa;
+            font-size: 12px;
+            text-align: center;
+            margin-top: 8px;
+        }
+        #scoreDisplay {
+            color: #4FC3F7;
+            font-size: 14px;
+        }
+
+        #controllerStatus {
+            color: #4CAF50;
+            font-size: 12px;
+            padding: 2px 12px;
+            border-radius: 12px;
+            border: 1px solid #4CAF50;
+            background: rgba(76,175,80,0.1);
+        }
+
+        /* 勉強サイトモーダル */
+        #studyModal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: #f0f4f8;
+            z-index: 999;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        #studyModal .close-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 30px;
+            background: #ff6b6b;
+            border: none;
+            border-radius: 40px;
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            z-index: 1000;
+            box-shadow: 0 4px 16px rgba(255,107,107,0.4);
+        }
+        #studyModal .close-btn:hover { background: #ff4757; }
+
+        .study-header {
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            color: #FFD700;
+            padding: 30px;
+            border-radius: 16px;
+            text-align: center;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            max-width: 1400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .study-header h1 {
+            font-size: 36px;
+            margin-bottom: 8px;
+        }
+        .study-header p {
+            color: #b0e0ff;
+            font-size: 18px;
+        }
+        .grt-badge {
+            display: inline-block;
+            background: #FFD700;
+            color: #1a1a2e;
+            padding: 4px 20px;
+            border-radius: 30px;
+            font-weight: bold;
+            font-size: 20px;
+            margin-top: 10px;
+        }
+        .study-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .study-card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+            transition: transform 0.2s, box-shadow 0.2s;
+            border-left: 5px solid #FFD700;
+        }
+        .study-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+        }
+        .study-card .number {
+            display: inline-block;
+            background: #1a1a2e;
+            color: #FFD700;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 30px;
+            font-weight: bold;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+        .study-card h2 {
+            font-size: 18px;
+            color: #1a1a2e;
+            margin-bottom: 8px;
+        }
+        .study-card .desc {
+            color: #333;
+            font-size: 14px;
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+        .study-card .soccer {
+            background: #e8f5e9;
+            padding: 12px 14px;
+            border-radius: 10px;
+            border-left: 4px solid #2e7d32;
+            font-size: 14px;
+            color: #1a3a1a;
+            line-height: 1.6;
+        }
+        .study-card .soccer::before {
+            content: '⚽ ';
+            font-size: 16px;
+        }
+        .study-footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 20px;
+            color: #667;
+            border-top: 2px solid #ddd;
+            max-width: 1400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .study-footer .grt {
+            color: #FFD700;
+            font-weight: bold;
+            font-size: 24px;
+        }
+        @media (max-width: 600px) {
+            .study-grid { grid-template-columns: 1fr; }
+            .study-header h1 { font-size: 24px; }
+            #canvasContainer { width: 100%; height: 300px; }
+            #controls { transform: scale(0.7); bottom: -5px; right: -5px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ====== ゲーム部分 ====== -->
+<div id="gameWrapper">
+    <div id="canvasContainer">
+        <canvas id="canvas" width="800" height="500"></canvas>
+        
+        <div id="controls">
+            <div class="ctrl-btn attack" id="attackBtn">⚔️</div>
+            <div class="ctrl-btn scroll-up" id="scrollUp">▲▲</div>
+            <div class="ctrl-btn left" id="moveLeft">◀</div>
+            <div class="ctrl-btn jump" id="jumpBtn">ジャンプ</div>
+            <div class="ctrl-btn right" id="moveRight">▶</div>
+            <div class="ctrl-btn dig-down" id="digDown">▼掘る</div>
+            <div class="ctrl-btn scroll-down" id="scrollDown">▼▼</div>
+        </div>
+    </div>
+
+    <div id="ui">
+        <div id="hpBar">
+            ❤️ <span id="hpText">10/10</span>
+            <div class="bar"><div class="fill" id="hpFill"></div></div>
+        </div>
+        <div id="blockCounter">🧱 0</div>
+        <div id="grtCounter">GRT-</div>
+        <div id="scoreDisplay">💀 0</div>
+        <div id="inventory">
+            <span class="active" id="invPick">⛏️</span>
+            <span id="invSword">🗡️</span>
+            <span id="invPotion">❤️‍🩹</span>
+        </div>
+        <div id="controllerStatus">🎮 未接続</div>
+    </div>
+    <div class="hint">【操作】移動:←→ / ジャンプ:↑ / 攻撃:Z / ツルハシ:クリック / ポーション:X</div>
+</div>
+
+<!-- ====== 勉強サイト ====== -->
+<div id="studyModal">
+    <button class="close-btn" id="closeStudy">✕ ゲームに戻る</button>
+    
+    <div class="study-header">
+        <h1>⚽ GRT データベース完全マスター</h1>
+        <p>画像の15テーマを全て解説！サッカー例え付きでわかりやすく</p>
+        <div class="grt-badge">🎉 GRT+ 発見！</div>
+    </div>
+
+    <div class="study-grid">
+        <!-- 内容は同じなので省略（元のコードをそのまま使用） -->
+        <div class="study-card"><div class="number">1</div><h2>📊 データベース基礎</h2><div class="desc">データベースとは「情報を整理して保存する仕組み」。SQLはそのデータを操作する言語。</div><div class="soccer">データベースはクラブの選手名簿、SQLは監督のホイッスル。「左サイドバックを呼べ！」で即座に選手をピックアップ。</div></div>
+        <div class="study-card"><div class="number">2</div><h2>📝 SQL入門（SELECT・INSERT・UPDATE・DELETE）</h2><div class="desc">SQLの4大命令。データの取得・追加・更新・削除。</div><div class="soccer">SELECT=選手一覧を見る、INSERT=新加入、UPDATE=背番号変更、DELETE=引退。</div></div>
+        <div class="study-card"><div class="number">3</div><h2>🔗 リレーション（テーブル間の関連）</h2><div class="desc">テーブル同士を関連付ける設計。外部キー（ForeignKey）で結ぶ。</div><div class="soccer">選手とポジションの関係。選手テーブルとポジションテーブルを「選手ID」で結ぶ。</div></div>
+        <div class="study-card"><div class="number">4</div><h2>📐 ER図（Entity Relationship Diagram）</h2><div class="desc">テーブルとテーブルの関係を図で表したもの。</div><div class="soccer">試合の戦術ボード。選手（テーブル）の配置とパス回し（リレーション）を図で示す。</div></div>
+        <div class="study-card"><div class="number">5</div><h2>🧹 正規化（データの重複をなくす）</h2><div class="desc">データの重複を排除し、ムダのない構造にすること。</div><div class="soccer">ユニフォーム番号を選手ごとに1つだけにするルール。10番は1人だけ。</div></div>
+        <div class="study-card"><div class="number">6</div><h2>📋 テーブル設計の手順</h2><div class="desc">要件定義→ER図→正規化→実装の流れ。</div><div class="soccer">先発・控え・スタッフを分けて名簿を作る手順。1.要件定義 2.ER図 3.正規化 4.実装。</div></div>
+        <div class="study-card"><div class="number">7</div><h2>🔄 トランザクション</h2><div class="desc">一連の処理をまとめて「成功か失敗か」で扱う。</div><div class="soccer">交代手続き。選手がピッチを去り、新しい選手が入るまでが1つのまとまり。全部成功か全部失敗か。</div></div>
+        <div class="study-card"><div class="number">8</div><h2>🔒 ロック（排他制御）</h2><div class="desc">同時処理での競合を防ぐ。他の人がデータを変更できないようにロックする。</div><div class="soccer">ボールを持っている選手は他者が奪えない状態。更新中は他の人が変更できない。</div></div>
+        <div class="study-card"><div class="number">9</div><h2>⛔ デッドロック</h2><div class="desc">お互いがロックを待ち合って処理が止まる現象。</div><div class="soccer">2人の選手が「先にパスをくれ」と譲らず動けなくなる状態。お互いのロックを待って止まる。</div></div>
+        <div class="study-card"><div class="number">10</div><h2>🏗️ フレームワーク</h2><div class="desc">プログラム開発を効率化する「骨組み」。Rails, Django, Laravelなど。</div><div class="soccer">サッカーのフォーメーション（4-4-2）。配置や役割が決まっていてスムーズに進む。</div></div>
+        <div class="study-card"><div class="number">11</div><h2>📦 パッケージ管理ツール（Gem, pip, npm）</h2><div class="desc">便利なライブラリを管理するツール。</div><div class="soccer">ユニフォームや用具の管理。新しいスパイクが欲しくなったら用具係（パッケージ管理）に頼む。</div></div>
+        <div class="study-card"><div class="number">12</div><h2>📜 バージョン管理（Git）</h2><div class="desc">ソースコードの変更履歴を管理する。Gitが主流。</div><div class="soccer">試合のビデオ分析。過去の試合をいつでも見返せる。誰がいつ変更したか全部記録。</div></div>
+        <div class="study-card"><div class="number">13</div><h2>🐙 GitHub</h2><div class="desc">Gitのリポジトリをオンラインで共有・管理するサービス。</div><div class="soccer">チームの戦術書を共有するクラウド。全選手がいつでも見られる。</div></div>
+        <div class="study-card"><div class="number">14</div><h2>💻 プログラミング言語（Ruby, Python, PHP, Node.js）</h2><div class="desc">それぞれの言語の特徴と使いどころ。</div><div class="soccer">Ruby=司令塔、Python=万能ユーティリティ、PHP=堅実DF、Node.js=スピードスター。</div></div>
+        <div class="study-card"><div class="number">15</div><h2>⚡ JetBrainsエディタ（IDE）</h2><div class="desc">高機能な統合開発環境。IntelliJ IDEA, PyCharm, WebStormなど。</div><div class="soccer">最新鋭のトレーニング施設。コード補完・リファクタリング・デバッグが全部できる。</div></div>
+    </div>
+
+    <div class="study-footer">
+        <div class="grt">🏆 GRT+ 完全制覇！</div>
+        <p style="margin-top: 8px;">全15テーマをマスターして、あなたもデータベースの王将！</p>
+    </div>
+</div>
+
+<script>
+(function() {
+    // ============================================
+    // ゲームコア
+    // ============================================
+    var canvas = document.getElementById('canvas');
+    var ctx = canvas.getContext('2d');
+
+    var WORLD_WIDTH = 60;
+    var WORLD_HEIGHT = 50;
+    var BLOCK = 20;
+
+    var cameraX = 0;
+    var cameraY = 0;
+
+    var AIR = 0, DIRT = 1, GRASS = 2, STONE = 3, WOOD = 4, PLANKS = 5, GRT_BLOCK = 6, COBBLE = 7;
+
+    var world = [];
+    var particles = [];
+    var enemies = [];
+    var items = [];
+
+    var player = { 
+        x: 5, y: 14, 
+        hp: 10, maxHp: 10,
+        inventory: { pickaxe: true, sword: true, potion: 3 },
+        selected: 'pickaxe',
+        attackCooldown: 0,
+        invincible: 0
+    };
+    var velocityY = 0;
+    var onGround = false;
+    var grtFound = false;
+    var blockCount = 0;
+    var killCount = 0;
+    var moveDir = null;
+    var scrollDir = null;
+    var scrollInterval = null;
+    var isJumping = false;
+    var isAttacking = false;
+    var gamepadConnected = false;
+
+    // ---------- ワールド生成 ----------
+    function initWorld() {
+        for (var r = 0; r < WORLD_HEIGHT; r++) {
+            world[r] = [];
+            for (var c = 0; c < WORLD_WIDTH; c++) {
+                world[r][c] = AIR;
+            }
+        }
+
+        // 地表
+        for (var x = 0; x < WORLD_WIDTH; x++) {
+            var height = 15 + Math.floor(Math.random() * 5) + (Math.sin(x/5) * 2);
+            for (var y = height; y < WORLD_HEIGHT; y++) {
+                if (y === height) {
+                    world[y][x] = GRASS;
+                } else if (y < height + 4 + Math.floor(Math.random() * 3)) {
+                    world[y][x] = DIRT;
+                } else {
+                    world[y][x] = STONE;
+                }
+            }
+        }
+
+        // 洞窟
+        for (var i = 0; i < 15; i++) {
+            var cx = 5 + Math.floor(Math.random() * (WORLD_WIDTH - 10));
+            var cy = 20 + Math.floor(Math.random() * 15);
+            var radius = 3 + Math.floor(Math.random() * 4);
+            for (var dy = -radius; dy <= radius; dy++) {
+                for (var dx = -radius; dx <= radius; dx++) {
+                    if (dx*dx + dy*dy < radius*radius) {
+                        var nx = cx + dx, ny = cy + dy;
+                        if (nx > 0 && nx < WORLD_WIDTH-1 && ny > 0 && ny < WORLD_HEIGHT-1) {
+                            if (world[ny][nx] !== GRASS) world[ny][nx] = AIR;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 木
+        for (var i = 0; i < 12; i++) {
+            var tx = 3 + Math.floor(Math.random() * (WORLD_WIDTH - 6));
+            var ty = 14 + Math.floor(Math.random() * 4);
+            if (ty < 18 && world[ty][tx] === GRASS) {
+                for (var h = 0; h < 5; h++) {
+                    if (ty - h >= 0) world[ty - h][tx] = WOOD;
+                }
+                for (var dy = -2; dy <= 2; dy++) {
+                    for (var dx = -2; dx <= 2; dx++) {
+                        if (Math.abs(dx) === 2 && Math.abs(dy) === 2) continue;
+                        var ny = ty - 5 + dy;
+                        var nx = tx + dx;
+                        if (ny >= 0 && ny < WORLD_HEIGHT && nx >= 0 && nx < WORLD_WIDTH) {
+                            if (world[ny][nx] === AIR) world[ny][nx] = PLANKS;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 家
+        buildHouse(12, 12);
+        buildHouse(35, 10);
+        buildHouse(50, 14);
+
+        // GRT配置
+        var placed = false;
+        var attempts = 0;
+        while (!placed && attempts < 2000) {
+            var gx = 5 + Math.floor(Math.random() * (WORLD_WIDTH - 10));
+            var gy = 22 + Math.floor(Math.random() * (WORLD_HEIGHT - 25));
+            if (world[gy] && world[gy][gx] === STONE) {
+                world[gy][gx] = GRT_BLOCK;
+                placed = true;
+                break;
+            }
+            attempts++;
+        }
+        if (!placed) {
+            world[25][15] = GRT_BLOCK;
+        }
+
+        // 敵配置（スライム）
+        for (var i = 0; i < 8; i++) {
+            var ex = 5 + Math.floor(Math.random() * (WORLD_WIDTH - 10));
+            var ey = 20 + Math.floor(Math.random() * 15);
+            if (world[ey] && world[ey][ex] === AIR && world[ey+1] && world[ey+1][ex] !== AIR) {
+                enemies.push({
+                    x: ex, y: ey,
+                    hp: 3,
+                    maxHp: 3,
+                    type: 'slime',
+                    size: 1 + Math.random() * 0.3,
+                    moveTimer: 0,
+                    dir: Math.random() > 0.5 ? 1 : -1
+                });
+            }
+        }
+
+        // プレイヤー位置
+        player.x = 5;
+        player.y = 14;
+        while (player.y < WORLD_HEIGHT && world[player.y][player.x] === AIR) {
+            player.y++;
+        }
+        player.y--;
+        player.hp = player.maxHp;
+        updateUI();
+    }
+
+    function buildHouse(hx, hy) {
+        for (var y = hy - 3; y <= hy; y++) {
+            for (var x = hx - 3; x <= hx + 3; x++) {
+                if (y === hy - 3 || y === hy || x === hx - 3 || x === hx + 3) {
+                    if (x >= 0 && x < WORLD_WIDTH && y >= 0 && y < WORLD_HEIGHT) {
+                        if (world[y][x] === AIR || world[y][x] === GRASS || world[y][x] === DIRT) {
+                            world[y][x] = WOOD;
+                        }
+                    }
+                }
+            }
+        }
+        if (hx >= 0 && hx < WORLD_WIDTH && hy >= 0 && hy < WORLD_HEIGHT) {
+            if (world[hy][hx] === WOOD) world[hy][hx] = AIR;
+        }
+        // 窓
+        if (hx+2 < WORLD_WIDTH && hy-2 >= 0) world[hy-2][hx+2] = AIR;
+        if (hx-2 >= 0 && hy-2 >= 0) world[hy-2][hx-2] = AIR;
+    }
+
+    // ---------- 物理＆戦闘 ----------
+    function isBlocked(x, y) {
+        if (x < 0 || x >= WORLD_WIDTH || y < 0 || y >= WORLD_HEIGHT) return true;
+        var block = world[y][x];
+        return block !== AIR && block !== GRT_BLOCK;
+    }
+
+    function isSolid(x, y) {
+        if (x < 0 || x >= WORLD_WIDTH || y < 0 || y >= WORLD_HEIGHT) return true;
+        return world[y][x] !== AIR;
+    }
+
+    function spawnParticles(x, y, color, count) {
+        for (var i = 0; i < count; i++) {
+            particles.push({
+                x: x + Math.random() * BLOCK,
+                y: y + Math.random() * BLOCK,
+                vx: (Math.random() - 0.5) * 4,
+                vy: (Math.random() - 0.5) * 4 - 2,
+                life: 30 + Math.random() * 20,
+                maxLife: 50,
+                size: 2 + Math.random() * 4,
+                color: color
+            });
+        }
+    }
+
+    function attackEnemies() {
+        if (player.attackCooldown > 0) return;
+        player.attackCooldown = 15;
+        isAttacking = true;
+
+        var range = 1.5;
+        var ax = player.x;
+        var ay = player.y;
+
+        for (var i = enemies.length - 1; i >= 0; i--) {
+            var e = enemies[i];
+            var dx = e.x - ax;
+            var dy = e.y - ay;
+            if (Math.abs(dx) <= range && Math.abs(dy) <= range + 0.5) {
+                e.hp -= 2;
+                spawnParticles(e.x * BLOCK, e.y * BLOCK, '#ff1744', 10);
+                if (e.hp <= 0) {
+                    spawnParticles(e.x * BLOCK, e.y * BLOCK, '#4CAF50', 20);
+                    enemies.splice(i, 1);
+                    killCount++;
+                    blockCount += 2;
+                    updateUI();
+                }
+            }
+        }
+    }
+
+    function usePotion() {
+        if (player.inventory.potion > 0 && player.hp < player.maxHp) {
+            player.inventory.potion--;
+            player.hp = Math.min(player.hp + 4, player.maxHp);
+            spawnParticles(player.x * BLOCK, player.y * BLOCK, '#FFD700', 15);
+            updateUI();
+        }
+    }
+
+    function updatePhysics() {
+        var GRAVITY = 0.4;
+        var JUMP_FORCE = -2.8;
+
+        // 移動
+        if (moveDir === 'left') {
+            var newX = player.x - 1;
+            if (newX >= 0 && !isBlocked(newX, player.y)) {
+                if (player.y + 1 < WORLD_HEIGHT && !isBlocked(newX, player.y + 1)) {
+                    player.x = newX;
+                    player.y = player.y + 1;
+                } else if (!isBlocked(newX, player.y)) {
+                    player.x = newX;
+                }
+            }
+            moveDir = null;
+        }
+        if (moveDir === 'right') {
+            var newX = player.x + 1;
+            if (newX < WORLD_WIDTH && !isBlocked(newX, player.y)) {
+                if (player.y + 1 < WORLD_HEIGHT && !isBlocked(newX, player.y + 1)) {
+                    player.x = newX;
+                    player.y = player.y + 1;
+                } else if (!isBlocked(newX, player.y)) {
+                    player.x = newX;
+                }
+            }
+            moveDir = null;
+        }
+
+        // ジャンプ
+        if (isJumping && onGround) {
+            velocityY = JUMP_FORCE;
+            onGround = false;
+            isJumping = false;
+        }
+
+        velocityY += GRAVITY;
+        if (velocityY > 4) velocityY = 4;
+
+        var newY = player.y + velocityY;
+        var isBlockedFall = false;
+
+        if (newY >= 0 && newY < WORLD_HEIGHT) {
+            if (isBlocked(player.x, Math.floor(newY + 0.5))) {
+                isBlockedFall = true;
+            }
+        }
+
+        if (isBlockedFall || newY >= WORLD_HEIGHT) {
+            if (velocityY > 0) {
+                velocityY = 0;
+                onGround = true;
+            }
+        } else if (newY < 0) {
+            velocityY = 0;
+            newY = 0;
+        } else {
+            player.y = Math.floor(newY + 0.5);
+            onGround = false;
+        }
+
+        if (player.y >= WORLD_HEIGHT) player.y = WORLD_HEIGHT - 1;
+        if (player.y < 0) player.y = 0;
+
+        // GRTチェック
+        if (!grtFound && player.x >= 0 && player.x < WORLD_WIDTH && player.y >= 0 && player.y < WORLD_HEIGHT) {
+            if (world[player.y][player.x] === GRT_BLOCK) {
+                grtFound = true;
+                world[player.y][player.x] = AIR;
+                spawnParticles(player.x * BLOCK, player.y * BLOCK, '#FFD700', 50);
+                updateUI();
+                document.getElementById('studyModal').style.display = 'block';
+            }
+        }
+
+        // 攻撃クールダウン
+        if (player.attackCooldown > 0) player.attackCooldown--;
+        if (player.invincible > 0) player.invincible--;
+
+        // 敵AI
+        for (var i = 0; i < enemies.length; i++) {
+            var e = enemies[i];
+            e.moveTimer++;
+            
+            // プレイヤーに向かって移動
+            var dx = player.x - e.x;
+            var dy = player.y - e.y;
+            var dist = Math.sqrt(dx*dx + dy*dy);
+            
+            if (dist < 8) {
+                if (e.moveTimer % 20 < 10) {
+                    var nx = e.x + (dx > 0 ? 1 : -1);
+                    if (nx >= 0 && nx < WORLD_WIDTH && !isSolid(nx, e.y) && isSolid(nx, e.y+1)) {
+                        e.x = nx;
+                    }
+                }
+                // 攻撃
+                if (dist < 1.2 && e.moveTimer % 30 === 0) {
+                    if (player.invincible === 0) {
+                        player.hp -= 1;
+                        player.invincible = 30;
+                        spawnParticles(player.x * BLOCK, player.y * BLOCK, '#ff1744', 10);
+                        updateUI();
+                        if (player.hp <= 0) {
+                            player.hp = player.maxHp;
+                            player.x = 5;
+                            player.y = 14;
+                            while (player.y < WORLD_HEIGHT && world[player.y][player.x] === AIR) player.y++;
+                            player.y--;
+                            updateUI();
+                        }
+                    }
+                }
+            } else {
+                // ランダムウォーク
+                if (e.moveTimer % 60 === 0) {
+                    e.dir = Math.random() > 0.5 ? 1 : -1;
+                }
+                var nx2 = e.x + e.dir;
+                if (nx2 >= 0 && nx2 < WORLD_WIDTH && !isSolid(nx2, e.y) && isSolid(nx2, e.y+1)) {
+                    e.x = nx2;
+                }
+            }
+        }
+
+        // スクロール
+        if (scrollDir === null) {
+            var targetCamX = player.x * BLOCK + BLOCK/2 - canvas.width / 2;
+            var targetCamY = player.y * BLOCK + BLOCK/2 - canvas.height / 2;
+            cameraX += (targetCamX - cameraX) * 0.1;
+            cameraY += (targetCamY - cameraY) * 0.1;
+        }
+
+        cameraX = Math.max(0, Math.min(WORLD_WIDTH * BLOCK - canvas.width, cameraX));
+        cameraY = Math.max(0, Math.min(WORLD_HEIGHT * BLOCK - canvas.height, cameraY));
+
+        // パーティクル更新
+        for (var i = particles.length - 1; i >= 0; i--) {
+            var p = particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vy += 0.1;
+            p.life--;
+            if (p.life <= 0) particles.splice(i, 1);
+        }
+    }
+
+    // ---------- 描画 ----------
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        var grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        grad.addColorStop(0, '#0a0a1a');
+        grad.addColorStop(0.5, '#1a1a3e');
+        grad.addColorStop(1, '#0d0d1a');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        var startX = Math.max(0, Math.floor(cameraX / BLOCK) - 1);
+        var endX = Math.min(WORLD_WIDTH, Math.ceil((cameraX + canvas.width) / BLOCK) + 1);
+        var startY = Math.max(0, Math.floor(cameraY / BLOCK) - 1);
+        var endY = Math.min(WORLD_HEIGHT, Math.ceil((cameraY + canvas.height) / BLOCK) + 1);
+
+        // ブロック描画
+        for (var r = startY; r < endY; r++) {
+            for (var c = startX; c < endX; c++) {
+                var type = world[r][c];
+                if (type === AIR) continue;
+
+                var x = c * BLOCK - cameraX;
+                var y = r * BLOCK - cameraY;
+                var brightness = Math.max(0.3, 1 - (r - 15) * 0.015);
+
+                switch(type) {
+                    case GRASS: ctx.fillStyle = '#7CB342'; break;
+                    case DIRT: 
+                        var sh = Math.floor(139 * brightness);
+                        ctx.fillStyle = 'rgb(' + sh + ',' + Math.floor(110 * brightness) + ',' + Math.floor(99 * brightness) + ')';
+                        break;
+                    case STONE: 
+                        var sh2 = Math.floor(158 * brightness);
+                        ctx.fillStyle = 'rgb(' + sh2 + ',' + sh2 + ',' + sh2 + ')';
+                        break;
+                    case WOOD: 
+                        var sh3 = Math.floor(161 * brightness);
+                        ctx.fillStyle = 'rgb(' + sh3 + ',' + Math.floor(136 * brightness) + ',' + Math.floor(127 * brightness) + ')';
+                        break;
+                    case PLANKS: 
+                        var sh4 = Math.floor(141 * brightness);
+                        ctx.fillStyle = 'rgb(' + sh4 + ',' + Math.floor(110 * brightness) + ',' + Math.floor(99 * brightness) + ')';
+                        break;
+                    case GRT_BLOCK:
+                        ctx.fillStyle = '#B8860B';
+                        ctx.fillRect(x, y, BLOCK-1, BLOCK-1);
+                        ctx.fillStyle = 'rgba(255,215,0,0.2)';
+                        ctx.shadowColor = '#FFD700';
+                        ctx.shadowBlur = 15;
+                        ctx.fillRect(x+2, y+2, BLOCK-5, BLOCK-5);
+                        ctx.shadowBlur = 0;
+                        continue;
+                    case COBBLE:
+                        var sh5 = Math.floor(128 * brightness);
+                        ctx.fillStyle = 'rgb(' + sh5 + ',' + sh5 + ',' + sh5 + ')';
+                        break;
+                    default: ctx.fillStyle = '#888';
+                }
+                ctx.fillRect(x, y, BLOCK-1, BLOCK-1);
+            }
+        }
+
+        // 敵描画
+        for (var i = 0; i < enemies.length; i++) {
+            var e = enemies[i];
+            var ex = e.x * BLOCK - cameraX;
+            var ey = e.y * BLOCK - cameraY;
+            
+            // スライム
+            var size = BLOCK * 0.8 * e.size;
+            ctx.fillStyle = '#4CAF50';
+            ctx.shadowColor = 'rgba(76,175,80,0.3)';
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            ctx.ellipse(ex + BLOCK/2, ey + BLOCK - 2, size/2, size/3, 0, 0, Math.PI*2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#388E3C';
+            ctx.beginPath();
+            ctx.ellipse(ex + BLOCK/2 - 4, ey + BLOCK - 6, 4, 5, 0, 0, Math.PI*2);
+            ctx.ellipse(ex + BLOCK/2 + 4, ey + BLOCK - 6, 4, 5, 0, 0, Math.PI*2);
+            ctx.fill();
+            
+            // HPバー
+            if (e.hp < e.maxHp) {
+                ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                ctx.fillRect(ex + 2, ey - 4, BLOCK - 4, 3);
+                ctx.fillStyle = '#ff1744';
+                ctx.fillRect(ex + 2, ey - 4, (BLOCK - 4) * (e.hp / e.maxHp), 3);
+            }
+        }
+
+        // アイテム描画（ドロップ）
+        for (var i = 0; i < items.length; i++) {
+            var it = items[i];
+            var ix = it.x * BLOCK - cameraX;
+            var iy = it.y * BLOCK - cameraY + Math.sin(Date.now()/300 + i) * 2;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = it.type === 'potion' ? '#FF6B6B' : '#FFD700';
+            ctx.fillStyle = it.type === 'potion' ? '#ff1744' : '#FFD700';
+            ctx.font = '16px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(it.type === 'potion' ? '❤️' : '⭐', ix + BLOCK/2, iy + BLOCK/2 + 6);
+            ctx.shadowBlur = 0;
+        }
+
+        // パーティクル
+        for (var i = 0; i < particles.length; i++) {
+            var p = particles[i];
+            var alpha = p.life / p.maxLife;
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = p.color;
+            ctx.fillRect(p.x - cameraX, p.y - cameraY, p.size, p.size);
+        }
+        ctx.globalAlpha = 1;
+
+        // プレイヤー
+        var px = player.x * BLOCK - cameraX;
+        var py = player.y * BLOCK - cameraY;
+
+        // 影
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.beginPath();
+        ctx.ellipse(px + BLOCK/2, py + BLOCK - 2, 8, 3, 0, 0, 0, Math.PI*2);
+        ctx.fill();
+
+        // 体
+        var flash = player.invincible > 0 && player.invincible % 6 < 3;
+        if (!flash) {
+            ctx.fillStyle = '#FF6B6B';
+            ctx.shadowColor = 'rgba(255,107,107,0.2)';
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            ctx.arc(px + BLOCK/2, py + BLOCK/2 - 2, 8, 0, Math.PI*2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+
+        // 王冠
+        ctx.fillStyle = '#FFD700';
+        ctx.strokeStyle = '#B8860B';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(px + 5, py + 4);
+        ctx.lineTo(px + BLOCK/2, py - 2);
+        ctx.lineTo(px + BLOCK - 5, py + 4);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#FF1744';
+        ctx.beginPath();
+        ctx.arc(px + BLOCK/2, py - 1, 2, 0, Math.PI*2);
+        ctx.fill();
+
+        // 剣（攻撃時）
+        if (isAttacking) {
+            ctx.strokeStyle = '#FFD700';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(px + BLOCK + 4, py + 2);
+            ctx.lineTo(px + BLOCK + 16, py - 8);
+            ctx.stroke();
+            ctx.fillStyle = '#FFD700';
+            ctx.beginPath();
+            ctx.arc(px + BLOCK + 16, py - 8, 3, 0, Math.PI*2);
+            ctx.fill();
+            isAttacking = false;
+        }
+
+        // インベントリ表示（選択中アイテム）
+        var selectedY = py + BLOCK + 8;
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(px, selectedY, BLOCK, 8);
+        ctx.fillStyle = player.selected === 'pickaxe' ? '#FFD700' : '#666';
+        ctx.fillRect(px + 2, selectedY + 1, 6, 6);
+        ctx.fillStyle = player.selected === 'sword' ? '#FFD700' : '#666';
+        ctx.fillRect(px + 9, selectedY + 1, 6, 6);
+        ctx.fillStyle = player.selected === 'potion' ? '#FFD700' : '#666';
+        ctx.fillRect(px + 16, selectedY + 1, 6, 6);
+
+        // GRT発見メッセージ
+        if (grtFound) {
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#FFD700';
+            ctx.font = 'bold 32px monospace';
+            ctx.textAlign = 'center';
+            ctx.shadowColor = '#FFD700';
+            ctx.shadowBlur = 30;
+            ctx.fillText('🎉 GRT+ 発見！', canvas.width/2, canvas.height/2 - 20);
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = '16px monospace';
+            ctx.fillText('学習サイトを開いています...', canvas.width/2, canvas.height/2 + 40);
+        }
+
+        // ミニマップ
+        drawMinimap();
+
+        // UI情報
+        ctx.fillStyle = 'rgba(255,255,255,0.15)';
+        ctx.font = '10px monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText('X:' + player.x + ' Y:' + player.y + ' | 敵:' + enemies.length, 10, 20);
+    }
+
+    function drawMinimap() {
+        var size = 60;
+        var x = canvas.width - size - 10;
+        var y = 10;
+        var scale = size / Math.max(WORLD_WIDTH, WORLD_HEIGHT);
+        
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(x - 2, y - 2, size + 4, size + 4);
+        ctx.fillStyle = 'rgba(20,20,40,0.8)';
+        ctx.fillRect(x, y, size, size);
+        
+        for (var r = 0; r < WORLD_HEIGHT; r++) {
+            for (var c = 0; c < WORLD_WIDTH; c++) {
+                if (world[r][c] !== AIR) {
+                    var brightness = world[r][c] === GRT_BLOCK ? 1 : 0.3;
+                    ctx.fillStyle = world[r][c] === GRT_BLOCK ? '#FFD700' : 
+                                   world[r][c] === GRASS ? '#4CAF50' :
+                                   world[r][c] === DIRT ? '#8D6E63' :
+                                   world[r][c] === STONE ? '#9E9E9E' : '#666';
+                    ctx.globalAlpha = brightness;
+                    ctx.fillRect(x + c * scale, y + r * scale, Math.ceil(scale), Math.ceil(scale));
+                    ctx.globalAlpha = 1;
+                }
+            }
+        }
+        
+        // プレイヤー位置
+        ctx.fillStyle = '#FF6B6B';
+        ctx.beginPath();
+        ctx.arc(x + player.x * scale + scale/2, y + player.y * scale + scale/2, 2, 0, Math.PI*2);
+        ctx.fill();
+        
+        // GRT位置（発見前のみ）
+        if (!grtFound) {
+            ctx.fillStyle = '#FFD700';
+            ctx.fillRect(x + 15 * scale, y + 25 * scale, 2, 2);
+        }
+    }
+
+    // ---------- 掘る処理 ----------
+    function digBlock() {
+        if (grtFound) return;
+        
+        var rect = canvas.getBoundingClientRect();
+        var scaleX = canvas.width / rect.width;
+        var scaleY = canvas.height / rect.height;
+        var mx = (window._lastMouseX - rect.left) * scaleX;
+        var my = (window._lastMouseY - rect.top) * scaleY;
+        
+        var worldX = Math.floor((mx + cameraX) / BLOCK);
+        var worldY = Math.floor((my + cameraY) / BLOCK);
+
+        if (worldX < 0 || worldX >= WORLD_WIDTH || worldY < 0 || worldY >= WORLD_HEIGHT) return;
+
+        var distX = Math.abs(worldX - player.x);
+        var distY = Math.abs(worldY - player.y);
+        if (distX > 2 || distY > 2) return;
+
+        var block = world[worldY][worldX];
+        if (block === AIR || block === GRT_BLOCK) return;
+
+        var color = block === GRASS ? '#7CB342' : 
+                   block === DIRT ? '#8D6E63' : 
+                   block === STONE ? '#9E9E9E' : 
+                   block === WOOD ? '#A1887F' : '#666';
+        spawnParticles(worldX * BLOCK, worldY * BLOCK, color, 8);
+
+        world[worldY][worldX] = AIR;
+        blockCount++;
+        updateUI();
+    }
+
+    function digDown() {
+        if (grtFound) return;
+        var px = player.x;
+        var py = player.y + 1;
+        if (px < 0 || px >= WORLD_WIDTH || py < 0 || py >= WORLD_HEIGHT) return;
+        if (world[py][px] === AIR || world[py][px] === GRT_BLOCK) return;
+
+        var color = world[py][px] === GRASS ? '#7CB342' : '#8D6E63';
+        spawnParticles(px * BLOCK, py * BLOCK, color, 6);
+        world[py][px] = AIR;
+        blockCount++;
+        player.y = py;
+        updateUI();
+    }
+
+    // ---------- UI更新 ----------
+    function updateUI() {
+        document.getElementById('blockCounter').textContent = '🧱 ' + blockCount;
+        document.getElementById('hpText').textContent = player.hp + '/' + player.maxHp;
+        document.getElementById('hpFill').style.width = (player.hp / player.maxHp * 100) + '%';
+        document.getElementById('scoreDisplay').textContent = '💀 ' + killCount;
+        document.getElementById('inventory').querySelectorAll('span').forEach(function(el) {
+            el.className = '';
+        });
+        var map = { pickaxe: 'invPick', sword: 'invSword', potion: 'invPotion' };
+        if (map[player.selected]) {
+            document.getElementById(map[player.selected]).className = 'active';
+        }
+        var el = document.getElementById('grtCounter');
+        if (grtFound) {
+            el.textContent = 'GRT+';
+            el.className = 'found';
+        } else {
+            el.textContent = 'GRT-';
+            el.className = '';
+        }
+    }
+
+    // ---------- ゲームループ ----------
+    function gameLoop() {
+        updatePhysics();
+        draw();
+        requestAnimationFrame(gameLoop);
+    }
+
+    // ---------- イベント ----------
+    canvas.addEventListener('mousemove', function(e) {
+        window._lastMouseX = e.clientX;
+        window._lastMouseY = e.clientY;
+    });
+
+    canvas.addEventListener('click', function(e) {
+        if (player.selected === 'pickaxe') digBlock();
+    });
+
+    function setupMoveButton(id, dir) {
+        var btn = document.getElementById(id);
+        btn.addEventListener('mousedown', function(e) {
+            e.preventDefault();
+            if (!grtFound) moveDir = dir;
+        });
+        btn.addEventListener('mouseup', function(e) {
+            e.preventDefault();
+            if (moveDir === dir) moveDir = null;
+        });
+        btn.addEventListener('mouseleave', function(e) {
+            if (moveDir === dir) moveDir = null;
+        });
+    }
+
+    function setupScrollButton(id, dir) {
+        var btn = document.getElementById(id);
+        btn.addEventListener('mousedown', function(e) {
+            e.preventDefault();
+            scrollDir = dir;
+            if (scrollInterval) clearInterval(scrollInterval);
+            scrollInterval = setInterval(function() {
+                var delta = (dir === 'up') ? -15 : 15;
+                cameraY += delta;
+                if (cameraY < 0) cameraY = 0;
+                if (cameraY > WORLD_HEIGHT * BLOCK - canvas.height) cameraY = WORLD_HEIGHT * BLOCK - canvas.height;
+            }, 50);
+        });
+        btn.addEventListener('mouseup', function(e) {
+            e.preventDefault();
+            scrollDir = null;
+            if (scrollInterval) {
+                clearInterval(scrollInterval);
+                scrollInterval = null;
+            }
+        });
+        btn.addEventListener('mouseleave', function(e) {
+            scrollDir = null;
+            if (scrollInterval) {
+                clearInterval(scrollInterval);
+                scrollInterval = null;
+            }
+        });
+    }
+
+    setupMoveButton('moveLeft', 'left');
+    setupMoveButton('moveRight', 'right');
+    
+    document.getElementById('jumpBtn').addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        if (!grtFound) isJumping = true;
+    });
+    document.getElementById('jumpBtn').addEventListener('mouseup', function(e) {
+        e.preventDefault();
+    });
+    
+    document.getElementById('digDown').addEventListener('click', function(e) {
+        e.preventDefault();
+        digDown();
+    });
+
+    document.getElementById('attackBtn').addEventListener('click', function(e) {
+        e.preventDefault();
+        if (!grtFound) attackEnemies();
+    });
+
+    setupScrollButton('scrollUp', 'up');
+    setupScrollButton('scrollDown', 'down');
+
+    document.getElementById('closeStudy').addEventListener('click', function() {
+        document.getElementById('studyModal').style.display = 'none';
+    });
+
+    // キーボード
+    var keys = {};
+    document.addEventListener('keydown', function(e) {
+        if (grtFound) return;
+        switch(e.key) {
+            case 'ArrowLeft': moveDir = 'left'; e.preventDefault(); break;
+            case 'ArrowRight': moveDir = 'right'; e.preventDefault(); break;
+            case 'ArrowUp': isJumping = true; e.preventDefault(); break;
+            case 'z': case 'Z': attackEnemies(); e.preventDefault(); break;
+            case 'x': case 'X': usePotion(); e.preventDefault(); break;
+            case '1': player.selected = 'pickaxe'; updateUI(); break;
+            case '2': player.selected = 'sword'; updateUI(); break;
+            case '3': player.selected = 'potion'; updateUI(); break;
+        }
+    });
+    document.addEventListener('keyup', function(e) {
+        switch(e.key) {
+            case 'ArrowLeft': if (moveDir === 'left') moveDir = null; break;
+            case 'ArrowRight': if (moveDir === 'right') moveDir = null; break;
+            case 'ArrowUp': isJumping = false; break;
+        }
+    });
+
+    // コントローラー対応
+    function updateGamepad() {
+        var gp = navigator.getGamepads ? navigator.getGamepads()[0] : null;
+        if (gp) {
+            gamepadConnected = true;
+            document.getElementById('controllerStatus').textContent = '🎮 接続中';
+            document.getElementById('controllerStatus').style.borderColor = '#4CAF50';
+            
+            var deadZone = 0.2;
+            var ax = gp.axes[0] || 0;
+            var ay = gp.axes[1] || 0;
+            
+            if (Math.abs(ax) > deadZone) {
+                moveDir = ax < 0 ? 'left' : 'right';
+            } else if (moveDir === 'left' || moveDir === 'right') {
+                moveDir = null;
+            }
+            
+            if (gp.buttons[0] && gp.buttons[0].pressed) { // Aボタン = ジャンプ
+                isJumping = true;
+            }
+            if (gp.buttons[2] && gp.buttons[2].pressed) { // Xボタン = 攻撃
+                attackEnemies();
+            }
+            if (gp.buttons[3] && gp.buttons[3].pressed) { // Yボタン = ポーション
+                usePotion();
+            }
+            if (gp.buttons[4] && gp.buttons[4].pressed) { // LB = ツルハシ
+                player.selected = 'pickaxe';
+                updateUI();
+            }
+            if (gp.buttons[5] && gp.buttons[5].pressed) { // RB = 剣
+                player.selected = 'sword';
+                updateUI();
+            }
+        } else {
+            if (gamepadConnected) {
+                gamepadConnected = false;
+                document.getElementById('controllerStatus').textContent = '🎮 未接続';
+                document.getElementById('controllerStatus').style.borderColor = '#f44336';
+            }
+        }
+        requestAnimationFrame(updateGamepad);
+    }
+
+    // ---------- 起動 ----------
+    initWorld();
+    updateUI();
+    gameLoop();
+    updateGamepad();
+
+    console.log('🎮 コントローラー対応！矢印キーで移動、Z攻撃、Xポーション');
+    console.log('📦 アイテム: 1=ツルハシ, 2=剣, 3=ポーション');
+
+})();
+</script>
+</body>
+</html>
