@@ -182,7 +182,7 @@
     <label>🎯 CPUランダム枚数: <input type="range" id="cpuRandomCount" min="0" max="47" value="10" /><span class="value-display" id="cpuRandomCountDisplay">10</span></label>
     <label>🏰 自タワーHP: <input type="number" id="playerTowerHp" value="120" min="50" max="500" /></label>
     <label>🏰 CPUタワーHP: <input type="number" id="cpuTowerHp" value="120" min="50" max="500" /></label>
-    <label>⏱️ エリクサー速度（秒/1）: <input type="range" id="elixirSpeed" min="3" max="10" value="3" step="0.5" /><span class="value-display" id="elixirSpeedDisplay">3</span>秒</label>
+    <label>⏱️ エリクサー速度（秒/1）: <input type="range" id="elixirSpeed" min="1" max="10" value="3" step="0.5" /><span class="value-display" id="elixirSpeedDisplay">3</span>秒</label>
   </div>
   <div class="deck-info">
     <span>📋 デッキ枚数: <span class="count" id="deckCount">0</span> / 51</span>
@@ -225,7 +225,7 @@
 
 <script>
 // ============================================================
-// 完全版：前編 + 中編 + 後編 + 修正
+// 完全版：デッキ編集＋試合（タワー攻撃・外枠・速度1秒対応）
 // ============================================================
 
 // ---- UNIT_TYPES（全51タイプ） ----
@@ -418,12 +418,13 @@ function updateBattleEffects() {
   }
 }
 
-// ---- ユニット更新 ----
+// ---- ユニット更新（完全修正版：タワーを攻撃する） ----
 function updateUnit(unit, enemyUnits, enemyTower, team) {
   if (!unit.alive) return;
   if (unit.attackCooldown > 0) unit.attackCooldown--;
   if (unit.key === 'wall') return;
-  
+
+  // ヒーラー
   if (unit.key === 'healer') {
     const allies = team === 'player' ? battleState.playerUnits : battleState.cpuUnits;
     for (let a of allies) {
@@ -438,53 +439,86 @@ function updateUnit(unit, enemyUnits, enemyTower, team) {
     unit.y = Math.max(20, Math.min(480, unit.y));
     return;
   }
-  
+
+  // ターゲット選択（ユニット＋タワー）
   let target = null;
   let closestDist = Infinity;
+
+  // 敵ユニットから最も近いものを探す
   for (let u of enemyUnits) {
     if (!u.alive) continue;
     const d = getDistance(unit, u);
-    if (d < closestDist) { closestDist = d; target = u; }
+    if (d < closestDist) {
+      closestDist = d;
+      target = u;
+    }
   }
+
+  // ★ タワーも候補に入れる（これでタワーを攻撃するようになる）
   const dTower = getDistanceToRect(unit, enemyTower);
-  if (dTower < closestDist) { closestDist = dTower; target = enemyTower; }
+  if (dTower < closestDist) {
+    closestDist = dTower;
+    target = enemyTower;
+  }
   unit.target = target;
-  
+
   if (!target) {
     unit.x += (team === 'player' ? 1 : -1) * unit.speed;
     unit.x = Math.max(20, Math.min(780, unit.x));
     unit.y = Math.max(20, Math.min(480, unit.y));
     return;
   }
-  
-  let dist = target.hp !== undefined ? getDistance(unit, target) : getDistanceToRect(unit, target);
+
+  let dist = (target.hp !== undefined) ? getDistance(unit, target) : getDistanceToRect(unit, target);
+
   if (dist <= unit.range) {
     if (unit.attackCooldown === 0) {
+      // 爆弾兵
       if (unit.key === 'bomber') {
         for (let u of enemyUnits) {
           if (!u.alive) continue;
-          if (getDistance(unit, u) < 70) { u.hp -= 25; if (u.hp <= 0) u.alive = false; addEffect(u.x, u.y, '💥', 20); }
+          if (getDistance(unit, u) < 70) {
+            u.hp -= 25;
+            if (u.hp <= 0) u.alive = false;
+            addEffect(u.x, u.y, '💥', 20);
+          }
         }
         const tower = team === 'player' ? battleState.cpuTower : battleState.playerTower;
-        if (getDistanceToRect(unit, tower) < 70) { tower.hp -= 25; addEffect(tower.x + 30, tower.y + 50, '💥', 20); }
+        if (getDistanceToRect(unit, tower) < 70) {
+          tower.hp -= 25;
+          addEffect(tower.x + 30, tower.y + 50, '💥', 20);
+        }
         unit.alive = false;
         return;
       }
+      // 魔法使い
       if (unit.key === 'mage') {
         for (let u of enemyUnits) {
           if (!u.alive) continue;
-          if (getDistance(unit, u) < 50) { u.hp -= 10; if (u.hp <= 0) u.alive = false; addEffect(u.x, u.y, '✨', 10); }
+          if (getDistance(unit, u) < 50) {
+            u.hp -= 10;
+            if (u.hp <= 0) u.alive = false;
+            addEffect(u.x, u.y, '✨', 10);
+          }
         }
         const tower = team === 'player' ? battleState.cpuTower : battleState.playerTower;
-        if (getDistanceToRect(unit, tower) < 50) { tower.hp -= 5; addEffect(tower.x + 30, tower.y + 50, '✨', 10); }
+        if (getDistanceToRect(unit, tower) < 50) {
+          tower.hp -= 5;
+          addEffect(tower.x + 30, tower.y + 50, '✨', 10);
+        }
         unit.attackCooldown = 30;
         return;
       }
+      // 通常攻撃
       if (target.hp !== undefined) {
         target.hp -= unit.attack;
-        if (target.hp <= 0) { target.alive = false; addEffect(target.x, target.y, '💀', 15); }
+        if (target.hp <= 0) {
+          target.alive = false;
+          addEffect(target.x, target.y, '💀', 15);
+        }
         addEffect(target.x, target.y, '⚔️', 8);
       } else {
+        // ★ タワー攻撃（ここでタワーにダメージ）
         target.hp -= unit.attack;
         if (target.hp < 0) target.hp = 0;
         addEffect(target.x + 30, target.y + 50, '⚔️', 8);
@@ -521,12 +555,14 @@ function tryCpuAction(state) {
   const unit = {
     key: key, x: 700, y: y, hp: def.hp, maxHp: def.hp, attack: def.attack,
     range: def.range, speed: def.speed, size: def.size, icon: def.icon,
-    name: def.name, team: 'cpu', alive: true, attackCooldown: 0, target: null
+    name: def.name, team: 'cpu',
+    bgColor: def.bgColor || null,  // ★ 外枠用に追加
+    alive: true, attackCooldown: 0, target: null
   };
   state.cpuUnits.push(unit);
 }
 
-// ---- 描画 ----
+// ---- 描画（外枠対応） ----
 function drawBattle() {
   const canvas = document.getElementById('battleCanvas');
   if (!canvas) return;
@@ -570,8 +606,19 @@ function drawBattle() {
   drawTower(state.playerTower, 80, 200, true);
   drawTower(state.cpuTower, 660, 200, false);
   
+  // ★ 外枠付きユニット描画
   function drawUnit(u, color) {
     if (!u.alive) return;
+
+    // 外枠（bgColor があれば）
+    if (u.bgColor) {
+      ctx.beginPath();
+      ctx.arc(u.x, u.y, (u.size || 18) + 4, 0, Math.PI * 2);
+      ctx.strokeStyle = u.bgColor;
+      ctx.lineWidth = 4;
+      ctx.stroke();
+    }
+
     ctx.beginPath();
     ctx.arc(u.x, u.y, u.size || 18, 0, Math.PI * 2);
     ctx.fillStyle = color;
@@ -592,6 +639,7 @@ function drawBattle() {
     ctx.fillStyle = hpRatio > 0.5 ? '#2ecc71' : '#e74c3c';
     ctx.fillRect(u.x - barW/2, u.y - (u.size || 18) - 8, barW * hpRatio, barH);
   }
+
   for (let u of state.playerUnits) drawUnit(u, '#3498db');
   for (let u of state.cpuUnits) drawUnit(u, '#e74c3c');
   
@@ -802,6 +850,7 @@ function setupPlayerControls() {
       hp: def.hp, maxHp: def.hp, attack: def.attack,
       range: def.range, speed: def.speed, size: def.size,
       icon: def.icon, name: def.name, team: 'player',
+      bgColor: def.bgColor || null,  // ★ 外枠用に追加
       alive: true, attackCooldown: 0, target: null
     };
     battleState.playerUnits.push(unit);
@@ -861,7 +910,8 @@ document.getElementById('backToDeckBtn').addEventListener('click', () => {
 // ---- 初期化 ----
 startBtn.addEventListener('click', startBattle);
 renderCards();
-console.log('✅ 完全版 起動完了！');
+console.log('✅ 修正完全版 起動完了！');
+console.log('✅ タワー攻撃・外枠・エリクサー1秒対応');
 </script>
 </body>
 </html>
