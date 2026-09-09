@@ -23,6 +23,7 @@
             box-shadow: 0 12px 0 #0f0f1a;
             max-width: 900px;
             width: 100%;
+            position: relative;
         }
         .canvas-wrap {
             position: relative;
@@ -137,7 +138,84 @@
             pointer-events: none;
         }
 
-        /* 学習オーバーレイ → シンプルな誘導ページ */
+        /* クリア後の誘導オーバーレイ (ゲーム非表示) */
+        .clear-overlay {
+            display: none;
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(10, 15, 25, 0.92);
+            backdrop-filter: blur(6px);
+            justify-content: center;
+            align-items: center;
+            z-index: 30;
+            border-radius: 16px;
+            font-family: 'Segoe UI', 'Arial', sans-serif;
+            padding: 20px;
+        }
+        .clear-overlay.active {
+            display: flex;
+        }
+        .clear-card {
+            background: #f0f4f0;
+            max-width: 500px;
+            width: 100%;
+            padding: 40px 35px;
+            border-radius: 40px 20px 40px 20px;
+            box-shadow: 0 30px 50px rgba(0,0,0,0.8);
+            border: 6px solid #f5c542;
+            color: #1a2a1a;
+            text-align: center;
+        }
+        .clear-card h2 {
+            font-size: 34px;
+            border-bottom: 5px dotted #f5c542;
+            padding-bottom: 20px;
+            margin-bottom: 20px;
+            color: #1f4a2f;
+        }
+        .clear-card .big-icon {
+            font-size: 70px;
+            margin: 10px 0;
+        }
+        .clear-card .redirect-btn {
+            background: #3a6b4a;
+            border: none;
+            border-bottom: 6px solid #1f3f2a;
+            color: white;
+            font-weight: bold;
+            font-size: 26px;
+            padding: 16px 40px;
+            border-radius: 60px;
+            cursor: pointer;
+            margin: 20px 0;
+            transition: 0.05s linear;
+            box-shadow: 0 2px 0 #1a2a1a;
+        }
+        .clear-card .redirect-btn:active { transform: translateY(4px); border-bottom-width: 2px; }
+        .clear-card .close-btn {
+            background: #b13e3e;
+            border: none;
+            border-bottom: 6px solid #6e2626;
+            color: white;
+            font-weight: bold;
+            font-size: 22px;
+            padding: 8px 30px;
+            border-radius: 60px;
+            cursor: pointer;
+            margin-top: 14px;
+            transition: 0.05s linear;
+            box-shadow: 0 2px 0 #3d1a1a;
+        }
+        .clear-card .close-btn:active { transform: translateY(4px); border-bottom-width: 2px; }
+        .clear-card .footnote {
+            margin-top: 18px;
+            font-size: 14px;
+            color: #4d5e4d;
+            border-top: 2px dashed #b3c9b3;
+            padding-top: 14px;
+        }
+
+        /* 学習オーバーレイ (study.html 誘導) - 左下の勉強ボタン用 */
         .study-overlay {
             display: none;
             position: fixed;
@@ -150,6 +228,9 @@
             font-family: 'Segoe UI', 'Arial', sans-serif;
             padding: 20px;
             overflow-y: auto;
+        }
+        .study-overlay.active {
+            display: flex;
         }
         .study-card {
             background: #f0f4f0;
@@ -275,6 +356,18 @@
         <div class="canvas-wrap">
             <canvas id="gameCanvas" width="800" height="400"></canvas>
             <div id="gameoverMsg" class="gameover-msg">💀 GAME OVER</div>
+            <!-- クリア後の誘導オーバーレイ (ゲーム非表示) -->
+            <div id="clearOverlay" class="clear-overlay">
+                <div class="clear-card">
+                    <div class="big-icon">🏆</div>
+                    <h2>🎉 ステージクリア！</h2>
+                    <p style="font-size:18px; margin-bottom:18px;">IT用語 × サッカーの解説はこちら</p>
+                    <button class="redirect-btn" id="clearRedirectBtn">⚽ deed.html へ</button>
+                    <br>
+                    <button class="close-btn" id="clearCloseBtn">✕ もう一度プレイ</button>
+                    <div class="footnote">クリックで別タブが開きます (ダミー)</div>
+                </div>
+            </div>
             <!-- Twitch風コメント -->
             <div id="twitchChat" class="twitch-chat"></div>
         </div>
@@ -295,15 +388,15 @@
         </div>
     </div>
 
-    <!-- 学習オーバーレイ (deed.html 誘導) -->
-    <div id="deedOverlay" class="deed-overlay">
+    <!-- 学習オーバーレイ (左下の勉強ボタン用) -->
+    <div id="studyOverlay" class="study-overlay">
         <div class="study-card">
             <div class="big-icon">📚</div>
             <h2>IT用語 × サッカー</h2>
             <p style="font-size:18px; margin-bottom:18px;">15テーマの解説は専用ページへ</p>
-            <button class="redirect-btn" id="redirectStudyBtn">⚽ deed.html へ</button>
+            <button class="redirect-btn" id="studyRedirectBtn">⚽ deed.html へ</button>
             <br>
-            <button id="closeStudyBtn" class="close-btn">✕ ステージに戻る</button>
+            <button id="studyCloseBtn" class="close-btn">✕ 閉じる</button>
             <div class="footnote">クリックで別タブが開きます (ダミー)</div>
         </div>
     </div>
@@ -316,7 +409,11 @@
             var scoreSpan = document.getElementById('scoreDisplay');
             var resetBtn = document.getElementById('resetBtn');
             var studyOverlay = document.getElementById('studyOverlay');
-            var closeStudyBtn = document.getElementById('closeStudyBtn');
+            var studyCloseBtn = document.getElementById('studyCloseBtn');
+            var studyRedirectBtn = document.getElementById('studyRedirectBtn');
+            var clearOverlay = document.getElementById('clearOverlay');
+            var clearRedirectBtn = document.getElementById('clearRedirectBtn');
+            var clearCloseBtn = document.getElementById('clearCloseBtn');
             var gameoverMsg = document.getElementById('gameoverMsg');
             var leftBtn = document.getElementById('leftBtn');
             var rightBtn = document.getElementById('rightBtn');
@@ -327,9 +424,9 @@
             var isStudyMode = false;
             var isStreaming = false;
             var chatInterval = null;
-            var chatLines = [];
+            var isClearOverlayActive = false;
 
-            // ★ コメントリスト (100個以上) — 長文は4文字ごとに分割表示する仕組み
+            // ★ コメントリスト (100個以上)
             var commentPool = [
                 "本物のマリオの世界だ！凄い！", "クリボーがいる！気をつけて！", "やっぱりマリオは神", "配信者かわいい", "ジャンプうますぎ", "コイン取った！", "あのクリボーやばい", "BGMほしい", "スター欲しい", "マリオ頑張れ！",
                 "1UP取って！", "裏道ある？", "無限増殖バグ？", "あっちに隠しブロック", "クリボー踏めるよ", "キノコどこ？", "ファイアマリオになろう", "パワーアップ！", "ここで死んだら笑う", "もっと右！",
@@ -400,6 +497,8 @@
                 game.rightPressed = false;
                 game.jumpPressed = false;
                 gameoverMsg.style.display = 'none';
+                clearOverlay.classList.remove('active');
+                isClearOverlayActive = false;
                 updateScore();
             }
 
@@ -488,7 +587,7 @@
                 if (m.x + m.w > f.x + 4 && m.x < f.x + f.w - 4 && m.y + m.h > f.y + 8 && m.y < f.y + f.h - 8) {
                     game.gameClear = true;
                     if (isStreaming) addChatLine("🏆 クリア！ おめでとう！");
-                    showStudyOverlay();
+                    showClearOverlay();
                 }
                 if (m.vx > 0.2) m.facing = 1;
                 else if (m.vx < -0.2) m.facing = -1;
@@ -503,6 +602,11 @@
 
             // 描画
             function draw() {
+                // クリアオーバーレイがアクティブなら描画しない（ゲーム非表示）
+                if (isClearOverlayActive) {
+                    ctx.clearRect(0, 0, 800, 400);
+                    return;
+                }
                 ctx.clearRect(0, 0, 800, 400);
                 var grad = ctx.createLinearGradient(0, 0, 0, 400);
                 grad.addColorStop(0, '#6fc3ff');
@@ -582,7 +686,6 @@
                 ctx.translate(m.x + m.w/2, m.y + m.h/2);
                 if (m.facing < 0) ctx.scale(-1, 1);
                 ctx.translate(-m.w/2, -m.h/2);
-                // ★ 配信モードなら自撮り棒＋スマホ
                 if (isStreaming) {
                     ctx.strokeStyle = '#666';
                     ctx.lineWidth = 3;
@@ -652,7 +755,9 @@
 
             function resetGame() {
                 isStudyMode = false;
-                studyOverlay.style.display = 'none';
+                studyOverlay.classList.remove('active');
+                clearOverlay.classList.remove('active');
+                isClearOverlayActive = false;
                 buildStage();
                 game.gameClear = false;
                 game.gameOver = false;
@@ -667,32 +772,39 @@
                 }
             }
 
-            // オーバーレイ表示
-            function showStudyOverlay() {
-                isStudyMode = true;
-                studyOverlay.style.display = 'flex';
+            // クリアオーバーレイ表示 (ゲーム非表示)
+            function showClearOverlay() {
+                isClearOverlayActive = true;
+                clearOverlay.classList.add('active');
             }
-            closeStudyBtn.addEventListener('click', function() {
-                isStudyMode = false;
-                studyOverlay.style.display = 'none';
-                game.gameClear = false;
-                if (game.mario.x > 700) game.mario.x = 680;
+
+            // クリアオーバーレイ閉じる
+            clearCloseBtn.addEventListener('click', function() {
+                resetGame();
             });
 
-            document.getElementById('redirectStudyBtn').addEventListener('click', function() {
-                window.open('study.html', '_blank');
+            clearRedirectBtn.addEventListener('click', function() {
+                window.open('deed.html', '_blank');
+            });
+
+            // 勉強オーバーレイ (studyOverlay) は左下の勉強ボタン用
+            studyCloseBtn.addEventListener('click', function() {
+                studyOverlay.classList.remove('active');
+                isStudyMode = false;
+            });
+
+            studyRedirectBtn.addEventListener('click', function() {
+                window.open('deed.html', '_blank');
             });
 
             // ---- Twitch風コメント（4文字ごとに分割） ----
             function addChatLine(msg) {
                 if (!isStreaming) return;
                 var username = 'viewer' + Math.floor(Math.random() * 1000);
-                // メッセージを4文字ごとに分割
                 var chunks = [];
                 for (var i = 0; i < msg.length; i += 4) {
                     chunks.push(msg.substring(i, i + 4));
                 }
-                // 最初のチャンクはユーザー名付き、以降はユーザー名なし
                 chunks.forEach(function(chunk, index) {
                     var line = document.createElement('div');
                     line.className = 'chat-line';
@@ -703,7 +815,6 @@
                     }
                     twitchChat.appendChild(line);
                 });
-                // 最大30行まで
                 while (twitchChat.children.length > 30) {
                     twitchChat.removeChild(twitchChat.firstChild);
                 }
@@ -746,7 +857,7 @@
             rightBtn.addEventListener('mouseleave', function(e) { game.rightPressed = false; });
             jumpBtn.addEventListener('mousedown', function(e) {
                 e.preventDefault();
-                if (!game.gameClear && !game.gameOver && !isStudyMode) { game.jumpPressed = true; }
+                if (!game.gameClear && !game.gameOver && !isStudyMode && !isClearOverlayActive) { game.jumpPressed = true; }
             });
             resetBtn.addEventListener('click', resetGame);
 
@@ -755,8 +866,11 @@
                 if (!game.gameClear && !game.gameOver) {
                     updatePhysics();
                 }
-                if (!isStudyMode) {
+                if (!isStudyMode && !isClearOverlayActive) {
                     draw();
+                } else if (isClearOverlayActive) {
+                    // クリアオーバーレイがアクティブならキャンバスをクリア
+                    ctx.clearRect(0, 0, 800, 400);
                 }
                 requestAnimationFrame(gameLoop);
             }
