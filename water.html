@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>マリリオ · 水のステージ</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+        body {
+            background: #1a1a2e;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Arial', 'メイリオ', sans-serif;
+            touch-action: none;
+            padding: 20px;
+        }
+        .container {
+            background: #2d2d44;
+            padding: 20px 30px 30px;
+            border-radius: 28px;
+            box-shadow: 0 12px 0 #0f0f1a;
+            max-width: 900px;
+            width: 100%;
+            position: relative;
+        }
+        .canvas-wrap {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
+        canvas {
+            display: block;
+            margin: 0 auto;
+            background: #1a3a5a;
+            border: 6px solid #4a3f2b;
+            border-radius: 16px;
+            box-shadow: inset 0 0 0 3px #c9a87c, 0 10px 0 #2b241b;
+            image-rendering: pixelated;
+            width: 100%;
+            height: auto;
+            aspect-ratio: 800/400;
+            cursor: default;
+            touch-action: none;
+        }
+        .info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 16px;
+            color: #f0e6b0;
+            text-shadow: 2px 2px 0 #3d2f1f;
+            font-weight: bold;
+            font-size: 18px;
+            background: #4a3f2b;
+            padding: 10px 20px;
+            border-radius: 60px;
+            border-bottom: 5px solid #2b241b;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .info span { background: #2b241b; padding: 4px 18px; border-radius: 40px; color: #ffd78a; }
+        .controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+        .mouse-btn {
+            background: #5a4f3a;
+            border: none;
+            border-bottom: 5px solid #2b241b;
+            color: #f0e6b0;
+            font-weight: bold;
+            font-size: 20px;
+            padding: 4px 20px;
+            border-radius: 40px;
+            cursor: pointer;
+            transition: 0.05s linear;
+            box-shadow: 0 2px 0 #1f1a12;
+            min-width: 60px;
+        }
+        .mouse-btn:active { transform: translateY(4px); border-bottom-width: 2px; }
+        .mouse-btn.left-btn { background: #3d6b8a; }
+        .mouse-btn.right-btn { background: #8a5a3d; }
+        .mouse-btn.jump-btn { background: #6a8a3d; }
+        button {
+            background: #f5c542;
+            border: none;
+            border-bottom: 6px solid #b47d2a;
+            padding: 8px 28px;
+            border-radius: 60px;
+            font-weight: bold;
+            font-size: 18px;
+            color: #2d2d1c;
+            cursor: pointer;
+            transition: 0.05s linear;
+            box-shadow: 0 2px 0 #4f3d1a;
+        }
+        button:active { transform: translateY(4px); border-bottom-width: 2px; }
+        .footer {
+            margin-top: 12px;
+            text-align: center;
+            color: #8d8da0;
+            font-size: 14px;
+            letter-spacing: 1px;
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        .footer .mouse-hint {
+            display: inline-block;
+            background: #3d3d5a;
+            padding: 4px 16px;
+            border-radius: 40px;
+            color: #d4d4e8;
+        }
+        .stream-badge {
+            background: #555;
+            color: #aaa;
+            border-radius: 40px;
+            padding: 4px 18px;
+            font-weight: bold;
+            cursor: not-allowed;
+            transition: 0.3s;
+        }
+        .stream-badge.unlocked {
+            background: #9147ff;
+            color: white;
+            cursor: pointer;
+        }
+        .stream-badge.unlocked:hover { opacity: 0.85; }
+        .gameover-msg {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8);
+            color: #ff6b6b;
+            font-size: 42px;
+            font-weight: bold;
+            padding: 20px 50px;
+            border-radius: 30px;
+            border: 6px solid #ff6b6b;
+            text-shadow: 0 0 20px #ff0000;
+            z-index: 10;
+            display: none;
+            text-align: center;
+            pointer-events: none;
+        }
+
+        /* クリア後の誘導オーバーレイ */
+        .clear-overlay {
+            display: none;
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(10, 15, 25, 0.92);
+            backdrop-filter: blur(6px);
+            justify-content: center;
+            align-items: center;
+            z-index: 30;
+            border-radius: 16px;
+            font-family: 'Segoe UI', 'Arial', sans-serif;
+            padding: 20px;
+        }
+        .clear-overlay.active {
+            display: flex;
+        }
+        .clear-card {
+            background: #f0f4f0;
+            max-width: 500px;
+            width: 100%;
+            padding: 40px 35px;
+            border-radius: 40px 20px 40px 20px;
+            box-shadow: 0 30px 50px rgba(0,0,0,0.8);
+            border: 6px solid #f5c542;
+            color: #1a2a1a;
+            text-align: center;
+        }
+        .clear-card h2 {
+            font-size: 34px;
+            border-bottom: 5px dotted #f5c542;
+            padding-bottom: 20px;
+            margin-bottom: 20px;
+            color: #1f4a2f;
+        }
+        .clear-card .big-icon {
+            font-size: 70px;
+            margin: 10px 0;
+        }
+        .clear-card .redirect-btn {
+            background: #3a6b4a;
+            border: none;
+            border-bottom: 6px solid #1f3f2a;
+            color: white;
+            font-weight: bold;
+            font-size: 26px;
+            padding: 16px 40px;
+            border-radius: 60px;
+            cursor: pointer;
+            margin: 20px 0;
+            transition: 0.05s linear;
+            box-shadow: 0 2px 0 #1a2a1a;
+        }
+        .clear-card .redirect-btn:active { transform: translateY(4px); border-bottom-width: 2px; }
+        .clear-card .close-btn {
+            background: #b13e3e;
+            border: none;
+            border-bottom: 6px solid #6e2626;
+            color: white;
+            font-weight: bold;
+            font-size: 22px;
+            padding: 8px 30px;
+            border-radius: 60px;
+            cursor: pointer;
+            margin-top: 14px;
+            transition: 0.05s linear;
+            box-shadow: 0 2px 0 #3d1a1a;
+        }
+        .clear-card .close-btn:active { transform: translateY(4px); border-bottom-width: 2px; }
+        .clear-card .footnote {
+            margin-top: 18px;
+            font-size: 14px;
+            color: #4d5e4d;
+            border-top: 2px dashed #b3c9b3;
+            padding-top: 14px;
+        }
+
+        /* Twitch風コメント */
+        .twitch-chat {
+            position: absolute;
+            right: 8px;
+            top: 10px;
+            width: 160px;
+            height: 340px;
+            pointer-events: none;
+            overflow: hidden;
+            border-radius: 12px;
+            background: rgba(0, 0, 0, 0.65);
+            border: 2px solid #6441a5;
+            box-shadow: 0 0 20px rgba(100, 65, 165, 0.5);
+            display: none;
+            z-index: 20;
+            backdrop-filter: blur(2px);
+            padding: 4px 0;
+        }
+        .twitch-chat.active {
+            display: block;
+        }
+        .chat-line {
+            color: #fff;
+            font-size: 12px;
+            padding: 2px 8px;
+            font-family: 'Segoe UI', 'Arial', sans-serif;
+            text-shadow: 0 0 6px #000;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            opacity: 0.95;
+            animation: chatScroll 7s linear forwards;
+            position: relative;
+            width: 100%;
+            line-height: 1.5;
+            background: rgba(0,0,0,0.2);
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            transform: translateY(0);
+        }
+        .chat-line .username {
+            color: #bf94ff;
+            font-weight: bold;
+            margin-right: 4px;
+            flex-shrink: 0;
+        }
+        .chat-line .message {
+            color: #f0f0f0;
+            display: inline-block;
+        }
+        @keyframes chatScroll {
+            0% { opacity: 0; transform: translateY(20px); }
+            10% { opacity: 1; transform: translateY(0); }
+            85% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-20px); }
+        }
+
+        .stage-indicator {
+            background: #2b241b;
+            padding: 4px 18px;
+            border-radius: 40px;
+            color: #7ec8ff;
+            font-size: 16px;
+        }
+
+        @media (max-width: 640px) { .twitch-chat { width: 120px; height: 250px; right: 4px; top: 6px; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="canvas-wrap">
+            <canvas id="gameCanvas" width="800" height="400"></canvas>
+            <div id="gameoverMsg" class="gameover-msg">💀 GAME OVER</div>
+            <div id="clearOverlay" class="clear-overlay">
+                <div class="clear-card">
+                    <div class="big-icon">🏆</div>
+                    <h2>🎉 水のステージクリア！</h2>
+                    <p style="font-size:18px; margin-bottom:18px;">IT用語 × サッカーの解説はこちら</p>
+                    <button class="redirect-btn" id="clearRedirectBtn">⚽ deed.html へ</button>
+                    <br>
+                    <button class="close-btn" id="clearCloseBtn">✕ もう一度プレイ</button>
+                    <div class="footnote">同じタブで移動します</div>
+                </div>
+            </div>
+            <div id="twitchChat" class="twitch-chat"></div>
+        </div>
+        <div class="info">
+            <span class="stage-indicator" id="stageDisplay">🌊 水のステージ</span>
+            <span id="scoreDisplay">🟡 0</span>
+            <div class="controls">
+                <button class="mouse-btn left-btn" id="leftBtn">◀</button>
+                <button class="mouse-btn jump-btn" id="jumpBtn">▲ ジャンプ</button>
+                <button class="mouse-btn right-btn" id="rightBtn">▶</button>
+            </div>
+            <button id="resetBtn">↺ リスタート</button>
+        </div>
+        <div class="footer">
+            <span class="mouse-hint">🖱 左右ボタンで移動 / ジャンプ</span>
+            <span class="stream-badge" id="streamToggleBtn">🔒 配信モード (スコア1000)</span>
+            <span>⚠️ 毒水しぶきに注意！</span>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            // ---------- DOM ----------
+            var canvas = document.getElementById('gameCanvas');
+            var ctx = canvas.getContext('2d');
+            var scoreSpan = document.getElementById('scoreDisplay');
+            var stageDisplay = document.getElementById('stageDisplay');
+            var resetBtn = document.getElementById('resetBtn');
+            var clearOverlay = document.getElementById('clearOverlay');
+            var clearRedirectBtn = document.getElementById('clearRedirectBtn');
+            var clearCloseBtn = document.getElementById('clearCloseBtn');
+            var gameoverMsg = document.getElementById('gameoverMsg');
+            var leftBtn = document.getElementById('leftBtn');
+            var rightBtn = document.getElementById('rightBtn');
+            var jumpBtn = document.getElementById('jumpBtn');
+            var streamToggleBtn = document.getElementById('streamToggleBtn');
+            var twitchChat = document.getElementById('twitchChat');
+
+            // ---------- 状態 ----------
+            var isStreaming = false;
+            var chatInterval = null;
+            var isClearOverlayActive = false;
+            var streamUnlocked = false;
+
+            // ★ コメントリスト
+            var commentPool = [
+                "本物のマリオの世界だ！凄い！", "クリボーがいる！気をつけて！", "やっぱりマリオは神", "配信者かわいい", "ジャンプうますぎ", "コイン取った！", "あのクリボーやばい", "BGMほしい", "スター欲しい", "マリオ頑張れ！",
+                "1UP取って！", "裏道ある？", "無限増殖バグ？", "あっちに隠しブロック", "クリボー踏めるよ", "キノコどこ？", "ファイアマリオになろう", "パワーアップ！", "ここで死んだら笑う", "もっと右！",
+                "旗まであと少し", "タイム気にしなくていいの？", "スーパーマリオ感", "壁キックできる？", "あのクリボー二回踏んだ", "コイン100枚で1UP", "配信楽しい", "ワールド1-1", "おつかれさま", "また明日も見る",
+                "ネ申配信", "マリオ愛してる", "実況うまい", "ポーズしてる？", "敵の動き読めてる", "プロの技", "小学生の頃を思い出す", "クリボーかわいい", "土管入れる？", "あの旗何？",
+                "ゴールしたら終わり？", "もう一回やりたい", "ミスしたら即再開", "テンション上がる", "このゲーム好き", "もっと難しいステージも", "おしゃべり楽しい", "コメント拾ってる", "リアクションいいね", "応援してる",
+                "ガチ勢", "実況神", "マリオTシャツ欲しい", "BGMないけど味がある", "明日も配信して", "寝落ちしそう", "コーヒー飲みながら", "仕事中に観てる", "お昼休憩にぴったり", "癒やされる",
+                "うちの子も観てる", "ファミコン世代にはたまらない", "ドットが良い", "音がないのが逆に良い", "クリボー倒しまくれ", "ジャンプのタイミング", "安全運転で", "ワープゾーン探そう", "どこから来たの？", "マリオの生配信",
+                "世界初かも", "エンタメ性高い", "この後何するの？", "寝る前に観てる", "おやすみ", "また明日", "楽しかった", "また来るね", "コイン全部取れた？", "1000コイン目指して",
+                "あと少しだ！", "がんば", "ファイト", "やったね", "拍手", "素晴らしい", "最高", "感動した", "泣ける", "ありがとう",
+                "またやろう", "更新待ってる", "次は何する？", "カービィもやって", "ゼルダも", "ポケモンも", "ドンキーも", "メトロイドも", "星のカービィ", "おやすみなさい",
+                "また明日も来ます", "大好き", "フォローした", "通知ON", "リツイートした", "コメントありがとう", "うぃー", "配信者すき", "がんばれマリオ", "クリボーを倒せ！"
+            ];
+            while (commentPool.length < 120) {
+                commentPool.push("✨ マリオ配信最高！ #" + commentPool.length);
+            }
+
+            // ゲーム変数
+            var game = {
+                mario: { x: 50, y: 290, w: 28, h: 38, vy: 0, vx: 0, onGround: false, facing: 1 },
+                platforms: [],
+                coins: [],
+                enemies: [],
+                poisonSplashes: [],  // 毒水しぶき { x, y, vy, active }
+                flag: { x: 740, y: 130, w: 24, h: 60, baseY: 330 },
+                gravity: 0.45,
+                friction: 0.82,
+                jumpPower: -8.5,
+                moveSpeed: 3.8,
+                score: 0,
+                gameClear: false,
+                gameOver: false,
+                leftPressed: false,
+                rightPressed: false,
+                jumpPressed: false,
+                splashTimer: 0,
+                splashInterval: 90  // フレーム間隔
+            };
+
+            // ---------- 水のステージ構築 ----------
+            function buildStage() {
+                // 床は水（毒水）なので、足場は浮島のみ
+                game.platforms = [
+                    { x: 0, y: 380, w: 800, h: 20 },  // 水の床（毒水）→ 落ちるとゲームオーバー
+                    { x: 100, y: 310, w: 70, h: 16 },
+                    { x: 220, y: 260, w: 70, h: 16 },
+                    { x: 340, y: 210, w: 70, h: 16 },
+                    { x: 460, y: 250, w: 70, h: 16 },
+                    { x: 580, y: 200, w: 70, h: 16 },
+                    { x: 680, y: 290, w: 80, h: 16 }
+                ];
+                
+                game.coins = [
+                    { x: 115, y: 280, w: 16, h: 16, collected: false },
+                    { x: 235, y: 230, w: 16, h: 16, collected: false },
+                    { x: 355, y: 180, w: 16, h: 16, collected: false },
+                    { x: 475, y: 220, w: 16, h: 16, collected: false },
+                    { x: 595, y: 170, w: 16, h: 16, collected: false },
+                    { x: 695, y: 260, w: 16, h: 16, collected: false },
+                    { x: 730, y: 260, w: 16, h: 16, collected: false }
+                ];
+                
+                game.enemies = [
+                    { x: 150, y: 285, w: 30, h: 30, vx: -0.6, alive: true },
+                    { x: 400, y: 185, w: 30, h: 30, vx: 0.6, alive: true },
+                    { x: 600, y: 175, w: 30, h: 30, vx: -0.5, alive: true }
+                ];
+                
+                game.flag.x = 740;
+                game.flag.y = 130;
+                game.flag.baseY = 330;
+                
+                // 毒水しぶき初期化
+                game.poisonSplashes = [];
+                game.splashTimer = 0;
+                
+                var m = game.mario;
+                m.x = 50; m.y = 280; m.vy = 0; m.vx = 0; m.onGround = false; m.facing = 1;
+                game.score = 0;
+                game.gameClear = false;
+                game.gameOver = false;
+                game.leftPressed = false;
+                game.rightPressed = false;
+                game.jumpPressed = false;
+                gameoverMsg.style.display = 'none';
+                clearOverlay.classList.remove('active');
+                isClearOverlayActive = false;
+                updateUI();
+                stageDisplay.textContent = '🌊 水のステージ';
+            }
+
+            // ---------- UI更新 ----------
+            function updateUI() {
+                scoreSpan.textContent = '🟡 ' + game.score;
+                if (game.score >= 1000 && !streamUnlocked) {
+                    streamUnlocked = true;
+                    streamToggleBtn.className = 'stream-badge unlocked';
+                    streamToggleBtn.textContent = '📡 配信モード OFF';
+                    if (!isStreaming) {
+                        streamToggleBtn.textContent = '📡 配信モード OFF';
+                    }
+                }
+            }
+
+            // ---------- 毒水しぶき生成 ----------
+            function spawnPoisonSplash() {
+                var x = Math.random() * 780 + 10;
+                game.poisonSplashes.push({
+                    x: x,
+                    y: 370,
+                    vy: -2.5 - Math.random() * 2,
+                    active: true,
+                    width: 12,
+                    height: 16
+                });
+            }
+
+            // ---------- 物理更新 ----------
+            function updatePhysics() {
+                if (game.gameClear || game.gameOver) return;
+                var m = game.mario;
+                
+                // 移動
+                if (game.leftPressed) { m.vx = -game.moveSpeed; }
+                else if (game.rightPressed) { m.vx = game.moveSpeed; }
+                else { m.vx *= game.friction; if (Math.abs(m.vx) < 0.1) m.vx = 0; }
+                
+                // ジャンプ
+                if (game.jumpPressed && m.onGround) {
+                    m.vy = game.jumpPower;
+                    m.onGround = false;
+                    game.jumpPressed = false;
+                }
+                
+                m.vy += game.gravity;
+                if (m.vy > 12) m.vy = 12;
+                
+                // X軸移動
+                var newX = m.x + m.vx;
+                for (var i = 0; i < game.platforms.length; i++) {
+                    var p = game.platforms[i];
+                    if (newX < p.x + p.w && newX + m.w > p.x && m.y < p.y + p.h && m.y + m.h > p.y) {
+                        if (m.vx > 0) { newX = p.x - m.w; } else if (m.vx < 0) { newX = p.x + p.w; }
+                        m.vx = 0;
+                        break;
+                    }
+                }
+                m.x = newX;
+                
+                // Y軸移動
+                var newY = m.y + m.vy;
+                m.onGround = false;
+                for (var j = 0; j < game.platforms.length; j++) {
+                    var p2 = game.platforms[j];
+                    if (m.x < p2.x + p2.w && m.x + m.w > p2.x && newY < p2.y + p2.h && newY + m.h > p2.y) {
+                        if (m.vy > 0) { 
+                            newY = p2.y - m.h; 
+                            m.vy = 0; 
+                            m.onGround = true; 
+                        } else if (m.vy < 0) { 
+                            newY = p2.y + p2.h; 
+                            m.vy = 0; 
+                        }
+                        break;
+                    }
+                }
+                m.y = newY;
+                
+                // 左端・右端
+                if (m.x < 0) m.x = 0;
+                if (m.x + m.w > 800) m.x = 800 - m.w;
+                
+                // ★ 水（毒水）に落ちたらゲームオーバー
+                if (m.y + m.h > 380) {
+                    setGameOver();
+                    if (isStreaming) addChatLine("💀 毒水に落ちた！");
+                    return;
+                }
+                
+                // コイン取得
+                for (var k = 0; k < game.coins.length; k++) {
+                    var coin = game.coins[k];
+                    if (coin.collected) continue;
+                    if (m.x + m.w > coin.x && m.x < coin.x + coin.w && m.y + m.h > coin.y && m.y < coin.y + coin.h) {
+                        coin.collected = true;
+                        game.score += 100;
+                        updateUI();
+                        if (isStreaming) addChatLine("🪙 コインGET！ +100");
+                    }
+                }
+                
+                // エネミー
+                for (var e = 0; e < game.enemies.length; e++) {
+                    var enemy = game.enemies[e];
+                    if (!enemy.alive) continue;
+                    enemy.x += enemy.vx;
+                    if (enemy.x < 0) { enemy.x = 0; enemy.vx = Math.abs(enemy.vx); }
+                    if (enemy.x + enemy.w > 800) { enemy.x = 800 - enemy.w; enemy.vx = -Math.abs(enemy.vx); }
+                    
+                    // 足場での反転
+                    for (var pi = 0; pi < game.platforms.length; pi++) {
+                        var pl = game.platforms[pi];
+                        if (enemy.x + enemy.w > pl.x && enemy.x < pl.x + pl.w &&
+                            enemy.y < pl.y + pl.h && enemy.y + enemy.h > pl.y) {
+                            if (enemy.vx > 0 && enemy.x + enemy.w >= pl.x && enemy.x < pl.x) {
+                                enemy.vx = -Math.abs(enemy.vx);
+                            } else if (enemy.vx < 0 && enemy.x <= pl.x + pl.w && enemy.x + enemy.w > pl.x + pl.w) {
+                                enemy.vx = Math.abs(enemy.vx);
+                            }
+                        }
+                    }
+                    
+                    if (m.x + m.w > enemy.x + 4 && m.x < enemy.x + enemy.w - 4 &&
+                        m.y + m.h > enemy.y + 4 && m.y < enemy.y + enemy.h - 4) {
+                        if (m.vy > 0 && m.y + m.h - enemy.y < 20) {
+                            enemy.alive = false;
+                            game.score += 200;
+                            updateUI();
+                            m.vy = -5;
+                            if (isStreaming) addChatLine("💥 クリボーを踏んだ！ +200");
+                        } else {
+                            setGameOver();
+                            if (isStreaming) addChatLine("💀 やられた…");
+                            return;
+                        }
+                    }
+                }
+                
+                // ★ 毒水しぶきの更新
+                game.splashTimer++;
+                if (game.splashTimer >= game.splashInterval) {
+                    game.splashTimer = 0;
+                    spawnPoisonSplash();
+                }
+                
+                for (var s = game.poisonSplashes.length - 1; s >= 0; s--) {
+                    var splash = game.poisonSplashes[s];
+                    splash.y += splash.vy;
+                    // 上に行くほど減速して消える
+                    splash.vy += 0.08;
+                    if (splash.y < 0 || splash.y > 400) {
+                        game.poisonSplashes.splice(s, 1);
+                        continue;
+                    }
+                    // マリオとの当たり判定
+                    if (m.x + m.w > splash.x && m.x < splash.x + splash.width &&
+                        m.y + m.h > splash.y && m.y < splash.y + splash.height) {
+                        setGameOver();
+                        if (isStreaming) addChatLine("☠️ 毒水しぶきに当たった！");
+                        return;
+                    }
+                }
+                
+                // フラグ
+                var f = game.flag;
+                if (m.x + m.w > f.x + 4 && m.x < f.x + f.w - 4 && m.y + m.h > f.y + 8 && m.y < f.y + f.h - 8) {
+                    game.gameClear = true;
+                    if (isStreaming) addChatLine("🏆 水のステージクリア！");
+                    showClearOverlay();
+                }
+                if (m.vx > 0.2) m.facing = 1;
+                else if (m.vx < -0.2) m.facing = -1;
+            }
+
+            function setGameOver() {
+                game.gameOver = true;
+                gameoverMsg.style.display = 'block';
+                if (isStreaming) addChatLine("💀 GAME OVER");
+            }
+
+            // ---------- 描画 ----------
+            function draw() {
+                if (isClearOverlayActive) {
+                    ctx.clearRect(0, 0, 800, 400);
+                    return;
+                }
+                ctx.clearRect(0, 0, 800, 400);
+                
+                // 水中っぽい背景
+                var grad = ctx.createLinearGradient(0, 0, 0, 400);
+                grad.addColorStop(0, '#0a2a4a');
+                grad.addColorStop(0.6, '#1a4a6a');
+                grad.addColorStop(1, '#2a5a7a');
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, 800, 400);
+                
+                // 水泡（装飾）
+                for (var b = 0; b < 20; b++) {
+                    var bx = (b * 43 + 17) % 800;
+                    var by = (b * 31 + 53) % 400;
+                    ctx.fillStyle = 'rgba(100, 200, 255, 0.15)';
+                    ctx.beginPath();
+                    ctx.arc(bx, by, 3 + b % 5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                // 足場
+                for (var i = 0; i < game.platforms.length; i++) {
+                    var p = game.platforms[i];
+                    if (p.y === 380 && p.w === 800) {
+                        // 毒水の床
+                        ctx.fillStyle = '#1a5a3a';
+                        ctx.fillRect(p.x, p.y, p.w, p.h);
+                        ctx.fillStyle = 'rgba(0, 255, 100, 0.2)';
+                        for (var w = 0; w < 800; w += 12) {
+                            var wave = Math.sin(w * 0.1 + Date.now() * 0.002) * 3;
+                            ctx.fillRect(w, p.y + wave, 6, 4);
+                        }
+                        // 毒水警告
+                        ctx.fillStyle = 'rgba(255, 50, 50, 0.3)';
+                        ctx.fillRect(0, p.y - 2, 800, 6);
+                    } else {
+                        // 浮島
+                        ctx.fillStyle = '#8b7a5a';
+                        ctx.fillRect(p.x, p.y, p.w, p.h);
+                        ctx.fillStyle = '#6a5a3a';
+                        ctx.fillRect(p.x + 4, p.y + 4, p.w - 8, 4);
+                        ctx.fillRect(p.x + 4, p.y + p.h - 6, p.w - 8, 4);
+                        ctx.fillStyle = '#5a4a2a';
+                        ctx.fillRect(p.x + 2, p.y + 2, 6, 6);
+                        ctx.fillRect(p.x + p.w - 8, p.y + 2, 6, 6);
+                        // 苔っぽい
+                        ctx.fillStyle = 'rgba(50, 120, 50, 0.3)';
+                        ctx.fillRect(p.x, p.y - 2, p.w, 4);
+                    }
+                }
+                
+                // コイン
+                for (var c = 0; c < game.coins.length; c++) {
+                    var coin = game.coins[c];
+                    if (coin.collected) continue;
+                    ctx.fillStyle = '#f5c542';
+                    ctx.shadowColor = '#f5c542';
+                    ctx.shadowBlur = 12;
+                    ctx.beginPath();
+                    ctx.arc(coin.x + 8, coin.y + 8, 10, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#f0d050';
+                    ctx.shadowBlur = 4;
+                    ctx.beginPath();
+                    ctx.arc(coin.x + 8, coin.y + 8, 6, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                }
+                
+                // エネミー
+                for (var e = 0; e < game.enemies.length; e++) {
+                    var enemy = game.enemies[e];
+                    if (!enemy.alive) continue;
+                    ctx.fillStyle = '#8b5a3a';
+                    ctx.fillRect(enemy.x, enemy.y, enemy.w, enemy.h);
+                    ctx.fillStyle = '#6a3f2a';
+                    ctx.fillRect(enemy.x + 4, enemy.y + 4, enemy.w - 8, 6);
+                    ctx.fillRect(enemy.x + 4, enemy.y + enemy.h - 10, enemy.w - 8, 6);
+                    ctx.fillStyle = '#fff';
+                    ctx.fillRect(enemy.x + 5, enemy.y + 8, 8, 8);
+                    ctx.fillRect(enemy.x + 17, enemy.y + 8, 8, 8);
+                    ctx.fillStyle = '#222';
+                    ctx.fillRect(enemy.x + 8, enemy.y + 11, 4, 4);
+                    ctx.fillRect(enemy.x + 20, enemy.y + 11, 4, 4);
+                    ctx.fillStyle = '#1a3d7a';
+                    ctx.font = 'bold 14px sans-serif';
+                    ctx.fillText('D', enemy.x + 10, enemy.y + 26);
+                }
+                
+                // 毒水しぶき
+                for (var s = 0; s < game.poisonSplashes.length; s++) {
+                    var splash = game.poisonSplashes[s];
+                    ctx.fillStyle = 'rgba(0, 255, 100, 0.7)';
+                    ctx.shadowColor = '#00ff66';
+                    ctx.shadowBlur = 15;
+                    ctx.fillRect(splash.x, splash.y, splash.width, splash.height);
+                    ctx.fillStyle = 'rgba(0, 200, 80, 0.5)';
+                    ctx.fillRect(splash.x - 2, splash.y + 4, 4, 4);
+                    ctx.fillRect(splash.x + 10, splash.y + 2, 4, 4);
+                    ctx.shadowBlur = 0;
+                }
+                
+                // フラグ
+                var f = game.flag;
+                ctx.fillStyle = '#6a6a6a';
+                ctx.fillRect(f.x + 10, f.y, 6, f.baseY - f.y);
+                ctx.fillStyle = '#c92a2a';
+                ctx.beginPath();
+                ctx.moveTo(f.x + 16, f.y + 6);
+                ctx.lineTo(f.x + 46, f.y + 20);
+                ctx.lineTo(f.x + 16, f.y + 36);
+                ctx.fill();
+                ctx.fillStyle = '#f5e56b';
+                ctx.font = 'bold 18px sans-serif';
+                ctx.fillText('🏁', f.x - 2, f.y + 52);
+                
+                // マリオ
+                var m = game.mario;
+                ctx.save();
+                ctx.translate(m.x + m.w/2, m.y + m.h/2);
+                if (m.facing < 0) ctx.scale(-1, 1);
+                ctx.translate(-m.w/2, -m.h/2);
+                if (isStreaming && streamUnlocked) {
+                    ctx.strokeStyle = '#666';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.moveTo(20, -2);
+                    ctx.lineTo(38, -20);
+                    ctx.stroke();
+                    ctx.fillStyle = '#222';
+                    ctx.fillRect(34, -26, 16, 24);
+                    ctx.fillStyle = '#3a6b9a';
+                    ctx.fillRect(36, -24, 12, 16);
+                    ctx.fillStyle = '#fff';
+                    ctx.font = '8px sans-serif';
+                    ctx.fillText('📱', 38, -14);
+                    ctx.fillStyle = '#e33b3b';
+                    ctx.fillRect(2, -6, 24, 12);
+                    ctx.fillRect(6, -10, 16, 6);
+                } else {
+                    ctx.fillStyle = '#e33b3b';
+                    ctx.fillRect(2, -2, 24, 12);
+                    ctx.fillRect(6, -6, 16, 6);
+                }
+                ctx.fillStyle = '#f7d9b0';
+                ctx.fillRect(4, 10, 20, 14);
+                ctx.fillStyle = '#222';
+                ctx.fillRect(16, 12, 6, 6);
+                ctx.fillRect(6, 12, 6, 6);
+                ctx.fillRect(10, 20, 10, 4);
+                ctx.fillStyle = '#e33b3b';
+                ctx.fillRect(2, 24, 24, 12);
+                ctx.fillStyle = '#f5c542';
+                ctx.fillRect(8, 28, 4, 4);
+                ctx.fillRect(18, 28, 4, 4);
+                ctx.fillStyle = '#2d2d8a';
+                ctx.fillRect(0, 34, 10, 6);
+                ctx.fillRect(18, 34, 10, 6);
+                ctx.restore();
+                
+                ctx.fillStyle = '#7ec8ff';
+                ctx.font = 'bold 20px monospace';
+                ctx.fillText('SCORE: ' + game.score, 620, 36);
+                
+                if (isStreaming && streamUnlocked) {
+                    ctx.fillStyle = 'rgba(100,65,165,0.7)';
+                    ctx.fillRect(8, 8, 100, 24);
+                    ctx.fillStyle = '#fff';
+                    ctx.font = 'bold 14px sans-serif';
+                    ctx.fillText('🔴 LIVE', 16, 26);
+                }
+                
+                // 毒水注意表示
+                ctx.fillStyle = 'rgba(255, 50, 50, 0.5)';
+                ctx.font = 'bold 14px sans-serif';
+                ctx.fillText('⚠️ 毒水注意！', 10, 60);
+            }
+
+            // ---------- ゲーム制御 ----------
+            function resetGame() {
+                clearOverlay.classList.remove('active');
+                isClearOverlayActive = false;
+                buildStage();
+                game.gameClear = false;
+                game.gameOver = false;
+                gameoverMsg.style.display = 'none';
+                game.leftPressed = false;
+                game.rightPressed = false;
+                game.jumpPressed = false;
+                updateUI();
+                if (isStreaming && streamUnlocked) {
+                    twitchChat.innerHTML = '';
+                    addChatLine('🔄 ゲームリセット！');
+                }
+            }
+
+            function showClearOverlay() {
+                isClearOverlayActive = true;
+                clearOverlay.classList.add('active');
+            }
+
+            clearCloseBtn.addEventListener('click', function() {
+                resetGame();
+            });
+            clearRedirectBtn.addEventListener('click', function() {
+                window.location.href = 'deed.html';
+            });
+
+            // ---------- Twitchコメント ----------
+            function addChatLine(msg) {
+                if (!isStreaming || !streamUnlocked) return;
+                var username = 'viewer' + Math.floor(Math.random() * 1000);
+                var chunks = [];
+                for (var i = 0; i < msg.length; i += 4) {
+                    chunks.push(msg.substring(i, i + 4));
+                }
+                chunks.forEach(function(chunk, index) {
+                    var line = document.createElement('div');
+                    line.className = 'chat-line';
+                    if (index === 0) {
+                        line.innerHTML = '<span class="username">' + username + '</span><span class="message">' + chunk + '</span>';
+                    } else {
+                        line.innerHTML = '<span class="message" style="padding-left: 4px;">' + chunk + '</span>';
+                    }
+                    twitchChat.appendChild(line);
+                });
+                while (twitchChat.children.length > 30) {
+                    twitchChat.removeChild(twitchChat.firstChild);
+                }
+                twitchChat.scrollTop = twitchChat.scrollHeight;
+            }
+
+            function randomComment() {
+                if (!isStreaming || !streamUnlocked) return;
+                var idx = Math.floor(Math.random() * commentPool.length);
+                addChatLine(commentPool[idx]);
+            }
+
+            // ---------- 配信モード切り替え ----------
+            function toggleStream() {
+                if (!streamUnlocked) {
+                    streamToggleBtn.textContent = '🔒 スコア1000必要';
+                    setTimeout(function() {
+                        streamToggleBtn.textContent = '🔒 配信モード (スコア1000)';
+                    }, 1500);
+                    return;
+                }
+                isStreaming = !isStreaming;
+                streamToggleBtn.textContent = isStreaming ? '📡 配信モード ON' : '📡 配信モード OFF';
+                twitchChat.classList.toggle('active', isStreaming);
+                if (isStreaming) {
+                    twitchChat.innerHTML = '';
+                    addChatLine('🔴 配信開始！ コメントが流れます');
+                    if (chatInterval) clearInterval(chatInterval);
+                    chatInterval = setInterval(randomComment, 3000);
+                } else {
+                    if (chatInterval) {
+                        clearInterval(chatInterval);
+                        chatInterval = null;
+                    }
+                    twitchChat.innerHTML = '';
+                }
+            }
+
+            streamToggleBtn.addEventListener('click', toggleStream);
+
+            // ---------- イベント ----------
+            leftBtn.addEventListener('mousedown', function(e) { e.preventDefault(); game.leftPressed = true; });
+            leftBtn.addEventListener('mouseup', function(e) { e.preventDefault(); game.leftPressed = false; });
+            leftBtn.addEventListener('mouseleave', function(e) { game.leftPressed = false; });
+            rightBtn.addEventListener('mousedown', function(e) { e.preventDefault(); game.rightPressed = true; });
+            rightBtn.addEventListener('mouseup', function(e) { e.preventDefault(); game.rightPressed = false; });
+            rightBtn.addEventListener('mouseleave', function(e) { game.rightPressed = false; });
+            jumpBtn.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                if (!game.gameClear && !game.gameOver && !isClearOverlayActive) { game.jumpPressed = true; }
+            });
+            resetBtn.addEventListener('click', resetGame);
+
+            // ---------- ゲームループ ----------
+            function gameLoop() {
+                if (!game.gameClear && !game.gameOver) {
+                    updatePhysics();
+                }
+                if (!isClearOverlayActive) {
+                    draw();
+                } else {
+                    ctx.clearRect(0, 0, 800, 400);
+                }
+                requestAnimationFrame(gameLoop);
+            }
+
+            // ---------- 初期化 ----------
+            buildStage();
+            updateUI();
+            gameLoop();
+
+            twitchChat.classList.remove('active');
+            streamToggleBtn.className = 'stream-badge';
+            streamToggleBtn.textContent = '🔒 配信モード (スコア1000)';
+            if (chatInterval) clearInterval(chatInterval);
+            chatInterval = null;
+
+        })();
+    </script>
+</body>
+</html>
