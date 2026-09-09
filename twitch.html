@@ -228,7 +228,7 @@
             padding-top: 14px;
         }
 
-        /* 学習オーバーレイ (study.html 誘導) */
+        /* 学習オーバーレイ */
         .study-overlay {
             display: none;
             position: fixed;
@@ -395,7 +395,7 @@
         <div class="info">
             <span>🍄 マウス操作</span>
             <span id="scoreDisplay">🟡 0</span>
-            <span class="coin-counter" id="coinCounter">🪙 0 / 1000</span>
+            <span class="coin-counter" id="coinCounter">🪙 0 / 10</span>
             <div class="controls">
                 <button class="mouse-btn left-btn" id="leftBtn">◀</button>
                 <button class="mouse-btn jump-btn" id="jumpBtn">▲ ジャンプ</button>
@@ -405,7 +405,7 @@
         </div>
         <div class="footer">
             <span class="mouse-hint">🖱 左右ボタンで移動 / ジャンプ</span>
-            <span class="stream-badge" id="streamToggleBtn">🔒 配信モード (コイン1000)</span>
+            <span class="stream-badge" id="streamToggleBtn">🔒 配信モード (コイン10)</span>
             <span>🏁 旗でクリア！</span>
         </div>
     </div>
@@ -449,7 +449,6 @@
             var isStreaming = false;
             var chatInterval = null;
             var isClearOverlayActive = false;
-            var totalCoinsCollected = 0;       // 累計コイン数 (リセットでリセット)
             var streamUnlocked = false;
 
             // ★ コメントリスト (100個以上)
@@ -526,20 +525,20 @@
                 gameoverMsg.style.display = 'none';
                 clearOverlay.classList.remove('active');
                 isClearOverlayActive = false;
-                // 累計コインはリセットしない (ゲームリセットでも維持)
                 updateUI();
             }
 
             // ---------- UI更新 ----------
             function updateUI() {
                 scoreSpan.textContent = '🟡 ' + game.score;
-                coinCounter.textContent = '🪙 ' + totalCoinsCollected + ' / 1000';
-                // 配信モード解除判定
-                if (totalCoinsCollected >= 1000 && !streamUnlocked) {
+                // コインはスコアを100で割った値 (コイン1枚=100点)
+                var coinCount = Math.floor(game.score / 100);
+                coinCounter.textContent = '🪙 ' + coinCount + ' / 10';
+                // 配信モード解除判定 (コイン10枚 = スコア1000)
+                if (coinCount >= 10 && !streamUnlocked) {
                     streamUnlocked = true;
                     streamToggleBtn.className = 'stream-badge unlocked';
                     streamToggleBtn.textContent = '📡 配信モード OFF';
-                    // 配信モードがオフならOFF表示
                     if (!isStreaming) {
                         streamToggleBtn.textContent = '📡 配信モード OFF';
                     }
@@ -592,7 +591,6 @@
                     if (m.x + m.w > coin.x && m.x < coin.x + coin.w && m.y + m.h > coin.y && m.y < coin.y + coin.h) {
                         coin.collected = true;
                         game.score += 100;
-                        totalCoinsCollected++;
                         updateUI();
                         if (isStreaming) addChatLine("🪙 コインGET！ +100");
                     }
@@ -873,10 +871,9 @@
             // ---------- 配信モード切り替え ----------
             function toggleStream() {
                 if (!streamUnlocked) {
-                    // ロック中はトースト表示
-                    streamToggleBtn.textContent = '🔒 コイン1000必要';
+                    streamToggleBtn.textContent = '🔒 コイン10必要';
                     setTimeout(function() {
-                        streamToggleBtn.textContent = '🔒 配信モード (コイン1000)';
+                        streamToggleBtn.textContent = '🔒 配信モード (コイン10)';
                     }, 1500);
                     return;
                 }
@@ -932,7 +929,7 @@
 
             twitchChat.classList.remove('active');
             streamToggleBtn.className = 'stream-badge';
-            streamToggleBtn.textContent = '🔒 配信モード (コイン1000)';
+            streamToggleBtn.textContent = '🔒 配信モード (コイン10)';
             if (chatInterval) clearInterval(chatInterval);
             chatInterval = null;
 
