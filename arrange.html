@@ -226,7 +226,6 @@
             margin-bottom: 14px;
         }
         
-        /* ★ 弾数選択ボタン */
         .bullet-count-options {
             display: flex;
             justify-content: center;
@@ -625,7 +624,6 @@
 <div id="settingsScreen">
     <div class="screen-bg"></div>
     <div class="content">
-        <!-- 設定1 -->
         <div class="settings-panel">
             <h2>⚙️ SETTINGS</h2>
             
@@ -652,8 +650,8 @@
             
             <div class="setting-row">
                 <label>🐝 蜂蟻HP</label>
-                <input type="range" id="setEnemyHp" min="1" max="10" value="2">
-                <span class="value-display" id="setEnemyHpVal">2</span>
+                <input type="range" id="setEnemyHp" min="1" max="10" value="4">
+                <span class="value-display" id="setEnemyHpVal">4</span>
             </div>
             <div class="setting-hint">高いほど倒しにくい</div>
             
@@ -665,7 +663,6 @@
             <div class="setting-hint">触れた時のダメージ</div>
         </div>
         
-        <!-- ★ 設定2：弾数 -->
         <div class="settings-panel secondary">
             <h2>⚙️ SETTINGS 2</h2>
             
@@ -683,7 +680,6 @@
             </div>
         </div>
         
-        <!-- ボタン -->
         <div class="setting-buttons">
             <button class="settings-btn back" id="backFromSettings">← BACK</button>
             <button class="settings-btn reset" id="resetSettings">RESET</button>
@@ -747,15 +743,15 @@ var settings = {
     enemyCount: 10,
     playerHp: 30,
     playerAtk: 1,
-    enemyHp: 2,
+    enemyHp: 4,
     enemyAtk: 1,
-    bulletCount: 8   // ★ 弾数（デフォ8）
+    bulletCount: 8
 };
 var DEFAULT_SETTINGS = {
     enemyCount: 10,
     playerHp: 30,
     playerAtk: 1,
-    enemyHp: 2,
+    enemyHp: 4,
     enemyAtk: 1,
     bulletCount: 8
 };
@@ -852,7 +848,6 @@ function updateSettingsUI() {
     document.getElementById('setEnemyAtk').value = settings.enemyAtk;
     document.getElementById('setEnemyAtkVal').textContent = settings.enemyAtk;
     
-    // ★ 弾数ボタンのアクティブ状態を更新
     document.querySelectorAll('.bullet-count-btn').forEach(function(btn) {
         var count = parseInt(btn.getAttribute('data-count'));
         if (count === settings.bulletCount) btn.classList.add('active');
@@ -1065,14 +1060,41 @@ function updateAuraButton() {
 function updatePhysics() {
     if (gameOver || grtFound || !gameRunning) return;
     
+    // ★ 左右移動（1ブロックの段差を登れる）
     if (moveDir === 'left') {
         var nx = player.x - 1;
-        if (nx >= 0 && !isSolid(nx, player.y)) player.x = nx;
+        if (nx >= 0) {
+            // 目の前が空気 → 普通に移動
+            if (!isSolid(nx, player.y)) {
+                player.x = nx;
+            }
+            // 目の前が壁 && その上（1マス上）と自分の上も空気 → 段差を登る
+            else if (nx >= 0 && 
+                     !isSolid(nx, player.y - 1) && 
+                     !isSolid(player.x, player.y - 1) &&
+                     player.y - 1 >= 0) {
+                player.x = nx;
+                player.y = player.y - 1;
+            }
+        }
         moveDir = null;
     }
     if (moveDir === 'right') {
         var nx = player.x + 1;
-        if (nx < COLS && !isSolid(nx, player.y)) player.x = nx;
+        if (nx < COLS) {
+            // 目の前が空気 → 普通に移動
+            if (!isSolid(nx, player.y)) {
+                player.x = nx;
+            }
+            // 目の前が壁 && その上（1マス上）と自分の上も空気 → 段差を登る
+            else if (nx < COLS && 
+                     !isSolid(nx, player.y - 1) && 
+                     !isSolid(player.x, player.y - 1) &&
+                     player.y - 1 >= 0) {
+                player.x = nx;
+                player.y = player.y - 1;
+            }
+        }
         moveDir = null;
     }
     
@@ -1285,10 +1307,7 @@ function fireBullets() {
     if (bulletCooldown > 0) return;
     if (charge <= 0) return;
     
-    // ★ 弾数は設定値（チャージ数に関係なく常に一定）
     var bulletCount = settings.bulletCount;
-    
-    // ★ チャージを1だけ消費
     charge--;
     bulletCooldown = 30;
     
@@ -1703,7 +1722,6 @@ document.getElementById('setEnemyAtk').addEventListener('input', function() {
     document.getElementById('setEnemyAtkVal').textContent = this.value;
 });
 
-// ★ 弾数選択ボタン
 document.querySelectorAll('.bullet-count-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
         settings.bulletCount = parseInt(this.getAttribute('data-count'));
@@ -1814,9 +1832,8 @@ gameLoop();
 updateGamepad();
 
 console.log('🎮 タイトル画面からスタート！');
-console.log('✅ 弾数: 常に一定（デフォ8） - チャージは攻撃回数のみ');
-console.log('✅ 設定2で弾数を8/12/16/20に変更可能');
-console.log('✅ 全弾が攻撃判定あり');
+console.log('✅ 蜂蟻HPデフォ: 4');
+console.log('✅ 1ブロックの段差を登れるようになりました');
 </script>
 </body>
 </html>
