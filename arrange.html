@@ -292,12 +292,13 @@
             background: #1a1a2e;
             image-rendering: pixelated;
         }
+        /* ★ 操作パネル：3列 x 2行に拡張（範囲ボタン追加） */
         #controls {
             position: absolute;
             bottom: 10px;
             right: 10px;
             display: grid;
-            grid-template-columns: 60px 60px;
+            grid-template-columns: 60px 60px 60px;
             grid-template-rows: 60px 60px;
             gap: 4px;
             z-index: 10;
@@ -317,6 +318,7 @@
         }
         .ctrl-btn:active { transform: translateY(3px); box-shadow: none; }
         .ctrl-btn.attack {
+            grid-column: 1; grid-row: 1;
             background: rgba(255, 50, 50, 0.4);
             border-color: #FF1744;
             color: #FF1744;
@@ -341,12 +343,29 @@
             border: 2px solid #1a1a2e;
             display: none;
         }
+        /* ★ 範囲表示ボタン */
+        .ctrl-btn.aura-toggle {
+            grid-column: 1; grid-row: 2;
+            background: rgba(100, 100, 150, 0.4);
+            border-color: #8888CC;
+            color: #8888CC;
+            font-size: 24px;
+            transition: all 0.2s;
+        }
+        .ctrl-btn.aura-toggle.active {
+            background: rgba(255, 215, 0, 0.6);
+            border-color: #FFD700;
+            color: #1a1a2e;
+            box-shadow: 0 0 20px rgba(255,215,0,0.6);
+        }
         .ctrl-btn.scroll-up {
+            grid-column: 2; grid-row: 1;
             background: rgba(100, 200, 255, 0.3);
             border-color: #4FC3F7;
             font-size: 16px;
         }
         .ctrl-btn.scroll-down {
+            grid-column: 2; grid-row: 2;
             background: rgba(100, 200, 255, 0.3);
             border-color: #4FC3F7;
             font-size: 16px;
@@ -622,6 +641,7 @@
                     ⚔️
                     <span class="charge-badge" id="chargeBadge">0</span>
                 </div>
+                <div class="ctrl-btn aura-toggle" id="auraToggleBtn">👁️</div>
                 <div class="ctrl-btn scroll-up" id="scrollUp">▲▲</div>
                 <div class="ctrl-btn scroll-down" id="scrollDown">▼▼</div>
             </div>
@@ -638,7 +658,7 @@
             </div>
             <div id="controllerStatus">🎮 未接続</div>
         </div>
-        <div class="hint">【操作】←→移動 / ↑ジャンプ / ↓足元を掘る / クリックで掘る / 赤ボタンで弾発射</div>
+        <div class="hint">【操作】←→移動 / ↑ジャンプ / ↓足元を掘る / クリックで掘る / 赤ボタンで弾発射 / 👁️で範囲表示</div>
     </div>
 </div>
 
@@ -722,8 +742,11 @@ var gameRunning = false;
 // ★ 王将の範囲（壁すり抜け判定の半径）
 var ROYAL_RANGE = 1;
 
-// ★ 蜂蟻の怯み（逃げ）時間（フレーム数）
-var FLEE_DURATION = 90; // 約1.5秒間逃げる
+// ★ オーラ（範囲表示）の表示/非表示（デフォ：OFF）
+var showAura = false;
+
+// ★ 蜂蟻の怯み（逃げ）時間
+var FLEE_DURATION = 90;
 
 // ============================================
 // 画面遷移
@@ -886,7 +909,7 @@ function createWorld() {
                     homeX: ex,
                     homeY: ey,
                     homeRadius: 8 + Math.random() * 6,
-                    fleeTimer: 0  // ★ 怯みタイマー
+                    fleeTimer: 0
                 });
             }
         }
@@ -943,6 +966,9 @@ function resetGame() {
     bulletCooldown = 0;
     isFalling = false;
     fallStartY = 0;
+    // ★ オーラはデフォOFF（リセット時も）
+    showAura = false;
+    updateAuraButton();
     
     createWorld();
     updateUI();
@@ -961,6 +987,13 @@ function isInRoyalRange(x, y) {
     var dx = Math.abs(x - (player.x + 0.5));
     var dy = Math.abs(y - (player.y + 0.5));
     return dx <= ROYAL_RANGE + 0.5 && dy <= ROYAL_RANGE + 0.5;
+}
+
+// ★ オーラボタンの状態更新
+function updateAuraButton() {
+    var btn = document.getElementById('auraToggleBtn');
+    if (showAura) btn.classList.add('active');
+    else btn.classList.remove('active');
 }
 
 // ============================================
@@ -1034,12 +1067,11 @@ function updatePhysics() {
         var dy = player.y - e.y;
         var dist = Math.sqrt(dx*dx + dy*dy);
         
-        // ★ 怯みタイマー処理
+        // 怯みタイマー処理
         if (e.fleeTimer > 0) {
             e.fleeTimer--;
-            // 逃げる（プレイヤーから離れる方向に加速）
             if (dist > 0.1) {
-                e.vx += (dx < 0 ? 0.15 : -0.15);  // プレイヤーと逆方向
+                e.vx += (dx < 0 ? 0.15 : -0.15);
                 e.vy += (dy < 0 ? 0.15 : -0.15);
             }
             e.vx *= 0.92;
@@ -1047,7 +1079,6 @@ function updatePhysics() {
             var fleeSpeed = Math.sqrt(e.vx*e.vx + e.vy*e.vy);
             if (fleeSpeed > 2.5) { e.vx *= 2.5/fleeSpeed; e.vy *= 2.5/fleeSpeed; }
         } else if (dist < 12) {
-            // 通常：プレイヤーを追跡
             e.vx += (dx > 0 ? 0.08 : -0.08);
             e.vy += (dy > 0 ? 0.08 : -0.08);
             e.vx *= 0.95;
@@ -1055,7 +1086,6 @@ function updatePhysics() {
             var speed = Math.sqrt(e.vx*e.vx + e.vy*e.vy);
             if (speed > 1.5) { e.vx *= 1.5/speed; e.vy *= 1.5/speed; }
         } else {
-            // ホームポジション周辺をうろつく
             var hdx = e.homeX - e.x;
             var hdy = e.homeY - e.y;
             e.vx += hdx * 0.005 + (Math.random() - 0.5) * 0.15;
@@ -1079,7 +1109,6 @@ function updatePhysics() {
         if (e.y < 1) { e.y = 1; e.vy = Math.abs(e.vy); }
         if (e.y > ROWS-2) { e.y = ROWS-2; e.vy = -Math.abs(e.vy); }
         
-        // ★ 怯み中は当たり判定なし（触れても安全）
         if (dist < 0.9 && e.fleeTimer <= 0) {
             playerHp -= settings.enemyAtk;
             if (playerHp <= 0) {
@@ -1094,7 +1123,7 @@ function updatePhysics() {
         }
     }
     
-    // ★ 弾：王将の範囲内は壁をすり抜ける
+    // 弾：王将の範囲内は壁をすり抜ける
     for (var i = bullets.length - 1; i >= 0; i--) {
         var b = bullets[i];
         
@@ -1108,7 +1137,6 @@ function updatePhysics() {
             continue;
         }
         
-        // 王将の範囲外なら壁判定あり
         if (!inRoyalRange && isSolid(Math.floor(b.x), Math.floor(b.y))) {
             for (var p = 0; p < 6; p++) {
                 particles.push({
@@ -1135,10 +1163,8 @@ function updatePhysics() {
                 e.hp -= settings.playerAtk;
                 hit = true;
                 
-                // ★ 怯ませる（逃げさせる）
                 if (e.hp > 0) {
                     e.fleeTimer = FLEE_DURATION;
-                    // プレイヤーと逆方向に吹き飛ばす
                     var pdx = e.x - player.x;
                     var pdy = e.y - player.y;
                     var pdist = Math.sqrt(pdx*pdx + pdy*pdy);
@@ -1197,10 +1223,7 @@ function fireBullets() {
     if (bulletCooldown > 0) return;
     if (charge <= 0) return;
     
-    // ★ 弾数は現在のチャージ数（チャージ分だけ同時発射）
     var bulletCount = charge;
-    
-    // ★ 攻撃するとチャージを1だけ消費
     charge--;
     bulletCooldown = 30;
     
@@ -1286,15 +1309,17 @@ function draw() {
         }
     }
     
-    // 王将の範囲を可視化
-    var px = player.x * BW - camera.x;
-    var py = player.y * BW - camera.y;
-    var rangeSize = (ROYAL_RANGE * 2 + 1) * BW;
-    ctx.strokeStyle = 'rgba(255,215,0,' + (0.15 + Math.sin(Date.now()/500) * 0.1) + ')';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([4, 4]);
-    ctx.strokeRect(px - BW + BW/2, py - BW + BW/2, rangeSize, rangeSize);
-    ctx.setLineDash([]);
+    // ★ オーラ表示（ON時のみ、掘り範囲と同じ位置）
+    if (showAura) {
+        var auraX = player.x * BW - camera.x;
+        var auraY = player.y * BW - camera.y;
+        // プレイヤーの左上から1ブロック分外側 = 3x3マス
+        ctx.strokeStyle = 'rgba(255,215,0,' + (0.5 + Math.sin(Date.now()/300) * 0.2) + ')';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 4]);
+        ctx.strokeRect(auraX - BW, auraY - BW, BW * 3, BW * 3);
+        ctx.setLineDash([]);
+    }
     
     for (var i = 0; i < bullets.length; i++) {
         var b = bullets[i];
@@ -1314,7 +1339,6 @@ function draw() {
         var ex = e.x * BW - camera.x;
         var ey = e.y * BW - camera.y;
         
-        // ★ 怯み中は青白く光る
         var isFleeing = e.fleeTimer > 0;
         
         var wingAngle = Math.sin(e.wingPhase) * 0.6;
@@ -1326,7 +1350,6 @@ function draw() {
         ctx.ellipse(ex + BW/2 + 5, ey + BW/2 - 6 - wingAngle * 3, 5, 2, -wingAngle, 0, Math.PI*2);
         ctx.fill();
         
-        // 怯み中は色を変える（青白い）
         ctx.fillStyle = isFleeing ? '#B0C4DE' : '#FFC107';
         ctx.shadowColor = isFleeing ? 'rgba(176,196,222,0.6)' : 'rgba(255,193,7,0.4)';
         ctx.shadowBlur = isFleeing ? 12 : 8;
@@ -1344,7 +1367,6 @@ function draw() {
         ctx.arc(ex + BW/2, ey + BW/2 - 5, 3.5, 0, Math.PI*2);
         ctx.fill();
         
-        // 怯み中は目が青く光る
         ctx.fillStyle = isFleeing ? '#4FC3F7' : '#ff1744';
         ctx.shadowColor = isFleeing ? '#4FC3F7' : '#ff1744';
         ctx.shadowBlur = 6;
@@ -1362,8 +1384,8 @@ function draw() {
         }
     }
     
-    px = player.x * BW - camera.x;
-    py = player.y * BW - camera.y;
+    var px = player.x * BW - camera.x;
+    var py = player.y * BW - camera.y;
     
     ctx.fillStyle = 'rgba(0,0,0,0.3)';
     ctx.beginPath();
@@ -1619,6 +1641,13 @@ document.getElementById('setEnemyAtk').addEventListener('input', function() {
 
 document.getElementById('backToTitleBtn').addEventListener('click', showTitle);
 
+// ★ オーラトグルボタン
+document.getElementById('auraToggleBtn').addEventListener('click', function(e) {
+    e.preventDefault();
+    showAura = !showAura;
+    updateAuraButton();
+});
+
 canvas.addEventListener('mousemove', function(e) {
     lastMouseX = e.clientX;
     lastMouseY = e.clientY;
@@ -1636,6 +1665,12 @@ document.addEventListener('keydown', function(e) {
         case 'ArrowDown': digDown(); e.preventDefault(); break;
         case 'z': case 'Z': fireBullets(); e.preventDefault(); break;
         case ' ': fireBullets(); e.preventDefault(); break;
+        case 'v': case 'V': 
+            // Vキーでもオーラ切替
+            showAura = !showAura;
+            updateAuraButton();
+            e.preventDefault();
+            break;
     }
 });
 document.addEventListener('keyup', function(e) {
@@ -1704,14 +1739,14 @@ function updateGamepad() {
 // 起動
 // ============================================
 updateSettingsUI();
+updateAuraButton();
 showTitle();
 gameLoop();
 updateGamepad();
 
 console.log('🎮 タイトル画面からスタート！');
-console.log('✅ 弾：王将の範囲（周囲1ブロック）は壁をすり抜けて敵に当たる');
-console.log('✅ 蜂蟻：弾に当たると怯んで逃げる（1.5秒後にまた襲う）');
-console.log('✅ チャージ：攻撃すると1だけ消費（残りは保持）');
+console.log('✅ オーラ表示ボタン（👁️）で範囲を表示切替（デフォOFF）');
+console.log('✅ Vキーでもオーラ切替可能');
 </script>
 </body>
 </html>
