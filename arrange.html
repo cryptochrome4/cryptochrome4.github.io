@@ -13,6 +13,7 @@
             height: 100vh;
             font-family: 'Courier New', monospace;
             overflow: hidden;
+            margin: 0;
         }
         #gameWrapper {
             background: #16213e;
@@ -21,6 +22,9 @@
             box-shadow: 0 0 60px rgba(0,200,255,0.2);
             border: 2px solid #0f3460;
             position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
         #canvasContainer {
             position: relative;
@@ -31,6 +35,7 @@
             border-radius: 8px;
             background: #1a1a2e;
             cursor: crosshair;
+            flex-shrink: 0;
         }
         #canvas {
             display: block;
@@ -40,6 +45,7 @@
             height: 500px;
         }
         
+        /* 操作パネル - シンプルに */
         #controls {
             position: absolute;
             bottom: 10px;
@@ -91,6 +97,7 @@
             line-height: 60px;
         }
 
+        /* UIパネル */
         #ui {
             display: flex;
             justify-content: space-between;
@@ -98,6 +105,8 @@
             margin-top: 12px;
             gap: 8px;
             flex-wrap: wrap;
+            width: 100%;
+            padding: 0 4px;
         }
         #grtCounter {
             color: #ff6b6b;
@@ -174,6 +183,7 @@
             font-size: 12px;
             text-align: center;
             margin-top: 8px;
+            width: 100%;
         }
         #scoreDisplay {
             color: #4FC3F7;
@@ -188,7 +198,7 @@
             background: rgba(76,175,80,0.1);
         }
 
-        /* GRT発見後のオーバーレイ */
+        /* 勝利オーバーレイ */
         #victoryOverlay {
             display: none;
             position: fixed;
@@ -233,10 +243,13 @@
             font-size: 14px;
         }
 
-        @media (max-width: 600px) {
-            #canvasContainer { width: 100%; height: 300px; }
-            #controls { transform: scale(0.7); bottom: -5px; right: -5px; }
+        @media (max-width: 850px) {
+            #canvasContainer { width: 100%; height: auto; aspect-ratio: 800/500; }
+            #canvas { width: 100%; height: auto; aspect-ratio: 800/500; }
+            #controls { transform: scale(0.7); bottom: 5px; right: 5px; transform-origin: bottom right; }
             #victoryOverlay .title { font-size: 28px; }
+            #ui { font-size: 12px; gap: 4px; }
+            #hpBar .bar { width: 60px; }
         }
     </style>
 </head>
@@ -283,10 +296,14 @@
 <script>
 (function() {
     // ============================================
-    // ゲームコア
+    // ゲームコア - 確実に描画されるように修正
     // ============================================
     var canvas = document.getElementById('canvas');
     var ctx = canvas.getContext('2d');
+
+    // キャンバスサイズを明示的に設定
+    canvas.width = 800;
+    canvas.height = 500;
 
     var WORLD_WIDTH = 60;
     var WORLD_HEIGHT = 50;
@@ -387,7 +404,7 @@
         buildHouse(35, 10);
         buildHouse(50, 14);
 
-        // GRT配置（必ず見つかるように）
+        // GRT配置
         var placed = false;
         for (var y = 22; y < 30 && !placed; y++) {
             for (var x = 10; x < 20 && !placed; x++) {
@@ -401,7 +418,7 @@
             world[25][15] = GRT_BLOCK;
         }
 
-        // 敵配置（スライム）
+        // 敵
         for (var i = 0; i < 8; i++) {
             var ex = 5 + Math.floor(Math.random() * (WORLD_WIDTH - 10));
             var ey = 20 + Math.floor(Math.random() * 15);
@@ -587,7 +604,7 @@
             }
         }
 
-        // 攻撃クールダウン
+        // クールダウン
         if (player.attackCooldown > 0) player.attackCooldown--;
         if (player.invincible > 0) player.invincible--;
 
@@ -656,10 +673,12 @@
         }
     }
 
-    // ---------- 描画 ----------
+    // ---------- 描画（確実に機能するように） ----------
     function draw() {
+        // 背景をクリア
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+        // グラデーション背景
         var grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
         grad.addColorStop(0, '#0a0a1a');
         grad.addColorStop(0.5, '#1a1a3e');
@@ -667,6 +686,7 @@
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+        // 表示範囲
         var startX = Math.max(0, Math.floor(cameraX / BLOCK) - 1);
         var endX = Math.min(WORLD_WIDTH, Math.ceil((cameraX + canvas.width) / BLOCK) + 1);
         var startY = Math.max(0, Math.floor(cameraY / BLOCK) - 1);
@@ -791,7 +811,7 @@
         ctx.arc(px + BLOCK/2, py - 1, 2, 0, Math.PI*2);
         ctx.fill();
 
-        // 剣（攻撃時）
+        // 攻撃エフェクト
         if (isAttacking) {
             ctx.strokeStyle = '#FFD700';
             ctx.lineWidth = 3;
@@ -810,16 +830,15 @@
         var selectedY = py + BLOCK + 8;
         ctx.fillStyle = 'rgba(0,0,0,0.5)';
         ctx.fillRect(px, selectedY, BLOCK, 8);
+        var labels = ['⛏', '🗡', '❤'];
+        var keys = ['pickaxe', 'sword', 'potion'];
         var colors = { pickaxe: '#FFD700', sword: '#FF6B6B', potion: '#4FC3F7' };
-        var labels = { pickaxe: '⛏', sword: '🗡', potion: '❤' };
-        var idx = 0;
-        for (var key in labels) {
-            ctx.fillStyle = player.selected === key ? colors[key] : '#555';
+        for (var idx = 0; idx < labels.length; idx++) {
+            ctx.fillStyle = player.selected === keys[idx] ? colors[keys[idx]] : '#555';
             ctx.fillRect(px + 2 + idx * 7, selectedY + 1, 6, 6);
-            idx++;
         }
 
-        // GRT発見メッセージ（オーバーレイが表示されるまでの間）
+        // GRT発見メッセージ（オーバーレイ表示前）
         if (grtFound) {
             ctx.fillStyle = 'rgba(0,0,0,0.3)';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -838,6 +857,7 @@
         // ミニマップ
         drawMinimap();
 
+        // 座標表示
         ctx.fillStyle = 'rgba(255,255,255,0.15)';
         ctx.font = '10px monospace';
         ctx.textAlign = 'left';
@@ -858,12 +878,12 @@
         for (var r = 0; r < WORLD_HEIGHT; r++) {
             for (var c = 0; c < WORLD_WIDTH; c++) {
                 if (world[r][c] !== AIR) {
-                    var brightness = world[r][c] === GRT_BLOCK ? 1 : 0.3;
-                    ctx.fillStyle = world[r][c] === GRT_BLOCK ? '#FFD700' : 
-                                   world[r][c] === GRASS ? '#4CAF50' :
-                                   world[r][c] === DIRT ? '#8D6E63' :
-                                   world[r][c] === STONE ? '#9E9E9E' : '#666';
-                    ctx.globalAlpha = brightness;
+                    var color = world[r][c] === GRT_BLOCK ? '#FFD700' : 
+                               world[r][c] === GRASS ? '#4CAF50' :
+                               world[r][c] === DIRT ? '#8D6E63' :
+                               world[r][c] === STONE ? '#9E9E9E' : '#666';
+                    ctx.globalAlpha = world[r][c] === GRT_BLOCK ? 1 : 0.3;
+                    ctx.fillStyle = color;
                     ctx.fillRect(x + c * scale, y + r * scale, Math.ceil(scale), Math.ceil(scale));
                     ctx.globalAlpha = 1;
                 }
@@ -881,7 +901,7 @@
         }
     }
 
-    // ---------- 掘る処理 ----------
+    // ---------- 掘る ----------
     function digBlock() {
         if (grtFound) return;
         
@@ -914,7 +934,7 @@
         updateUI();
     }
 
-    // ---------- UI更新 ----------
+    // ---------- UI ----------
     function updateUI() {
         document.getElementById('blockCounter').textContent = '🧱 ' + blockCount;
         document.getElementById('hpText').textContent = player.hp + '/' + player.maxHp;
@@ -937,7 +957,7 @@
         }
     }
 
-    // ---------- 勝利表示 ----------
+    // ---------- 勝利 ----------
     function showVictory() {
         document.getElementById('victoryStats').textContent = 
             '採掘: ' + blockCount + ' ブロック | 撃破: ' + killCount + ' 体';
@@ -999,12 +1019,10 @@
     setupScrollButton('scrollUp', 'up');
     setupScrollButton('scrollDown', 'down');
 
-    // battery.htmlへ移動（同タブ）
     document.getElementById('goToBattery').addEventListener('click', function() {
         window.location.href = 'battery.html';
     });
 
-    // インベントリクリックでアイテム選択
     document.querySelectorAll('#inventory span').forEach(function(el) {
         el.addEventListener('click', function() {
             var map = { invPick: 'pickaxe', invSword: 'sword', invPotion: 'potion' };
@@ -1069,7 +1087,10 @@
         requestAnimationFrame(updateGamepad);
     }
 
-    // ---------- 起動 ----------
+    // ============================================
+    // 起動
+    // ============================================
+    console.log('🚀 ゲーム起動！');
     initWorld();
     updateUI();
     gameLoop();
