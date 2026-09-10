@@ -166,14 +166,6 @@
     #playerUnitSelector button.active { background: #ffd966; color: #1a2a3a; border-color: #f39c12; }
     #playerUnitSelector .close-btn { background: #c0392b; border: none; border-radius: 20px; padding: 4px 14px; color: white; font-weight: bold; font-size: 12px; cursor: pointer; }
     #battleMessage { text-align: center; color: #ffd966; font-weight: bold; font-size: 14px; padding: 4px; min-height: 24px; }
-    /* ★ モード切替パネル */
-    #targetModePanel { display: flex; gap: 10px; justify-content: center; margin-bottom: 8px; }
-    #targetModePanel .mode-btn { border: 2px solid #5a8a9a; border-radius: 20px; padding: 6px 20px; font-weight: bold; cursor: pointer; transition: 0.1s; font-size: 13px; }
-    #targetModePanel .mode-btn.active { background: #ffd966; color: #1a2a3a; border-color: #f39c12; }
-    /* ★ 難易度パネル */
-    #difficultyPanel { display: flex; gap: 10px; justify-content: center; margin-bottom: 8px; flex-wrap: wrap; }
-    #difficultyPanel .diff-btn { border: 2px solid #5a8a9a; border-radius: 20px; padding: 4px 14px; font-weight: bold; cursor: pointer; font-size: 12px; background: #2c4c5e; color: #ecf0f1; }
-    #difficultyPanel .diff-btn.active { background: #ffd966; color: #1a2a3a; border-color: #f39c12; }
     @media (max-width: 600px) {
       .settings { flex-direction: column; align-items: stretch; }
       .card-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
@@ -208,21 +200,6 @@
     <div style="flex:1;min-width:150px;text-align:center;">💎 <span id="battlePlayerElixir">10</span> / <span id="battleCpuElixir">10</span></div>
     <div style="flex:1;min-width:150px;text-align:right;"><span style="color:#e74c3c;">🔴 CPU</span><br><span id="cpuLastUnitDisplay">-</span></div>
   </div>
-
-  <!-- ★ モード切替 -->
-  <div id="targetModePanel">
-    <button id="modeMonsterBtn" class="mode-btn active">👹 モンスター優先</button>
-    <button id="modeTowerBtn" class="mode-btn">🏰 タワー優先</button>
-  </div>
-
-  <!-- ★ 難易度切替 -->
-  <div id="difficultyPanel">
-    <button class="diff-btn" data-diff="0.5">🟢 イージー</button>
-    <button class="diff-btn active" data-diff="1.0">🟡 ノーマル</button>
-    <button class="diff-btn" data-diff="1.8">🔴 ハード</button>
-    <button class="diff-btn" data-diff="3.0">💀 インフェルノ</button>
-  </div>
-
   <div id="playerUnitSelector"></div>
   <canvas id="battleCanvas" width="800" height="500"></canvas>
   <div id="battleMessage"></div>
@@ -248,7 +225,7 @@
 
 <script>
 // ============================================================
-// 完全版：デッキ編集＋試合（タワー攻撃・外枠・速度1秒・モード切替・難易度）
+// 完全版：デッキ編集＋試合（タワー座標修正済み・自然な挙動）
 // ============================================================
 
 // ---- UNIT_TYPES（全51タイプ） ----
@@ -307,7 +284,6 @@ const UNIT_TYPES = {
 };
 
 const CPU_FIXED = ['iran', 'strait', 'hamas', 'kim'];
-const CATEGORIES = ['基本', '戦術', '特殊', '変則', 'ギミック', 'コンセプト', '超常', 'オリジナル'];
 
 // ---- 状態 ----
 let deck = [];
@@ -318,13 +294,6 @@ let playerSelectedUnit = null;
 let isPlayerDragging = false;
 let playerPreviewUnit = null;
 let battleEffects = [];
-
-// ★ ターゲットモード（案A）
-let targetMode = 'monster';       // プレイヤー用
-let cpuTargetMode = 'monster';    // CPUグローバル用（未使用でもOK）
-
-// ★ 難易度（案C+難易度）
-let cpuDifficulty = 1.0; // 0.5=イージー 1.0=ノーマル 1.8=ハード 3.0=インフェルノ
 
 // ---- DOM参照 ----
 const grid = document.getElementById('cardGrid');
@@ -432,8 +401,9 @@ function buildCpuDeck(randomCount) {
 // ---- 距離計算 ----
 function getDistance(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
 function getDistanceToRect(unit, rect) {
-  const cx = Math.max(rect.x, Math.min(unit.x, rect.x + 60));
-  const cy = Math.max(rect.y, Math.min(unit.y, rect.y + 100));
+  // ★ 修正：rect.w, rect.h を使う
+  const cx = Math.max(rect.x, Math.min(unit.x, rect.x + rect.w));
+  const cy = Math.max(rect.y, Math.min(unit.y, rect.y + rect.h));
   return Math.hypot(unit.x - cx, unit.y - cy);
 }
 
@@ -448,7 +418,7 @@ function updateBattleEffects() {
   }
 }
 
-// ---- ユニット更新（モード対応・完全修正版） ----
+// ---- ユニット更新（シンプル版：最も近い敵を攻撃） ----
 function updateUnit(unit, enemyUnits, enemyTower, team) {
   if (!unit.alive) return;
   if (unit.attackCooldown > 0) unit.attackCooldown--;
@@ -470,45 +440,47 @@ function updateUnit(unit, enemyUnits, enemyTower, team) {
     return;
   }
 
-  // ★ モード決定（プレイヤー / CPU）
-  let mode;
-  if (team === 'player') {
-    mode = targetMode;
-  } else {
-    mode = unit.cpuMode || cpuTargetMode;
-  }
-
-  // ターゲット選択
+  // ★ ターゲット選択：最も近い敵（ユニット or タワー）
   let target = null;
+  let closestDist = Infinity;
 
-  if (mode === 'tower') {
-    // タワー優先：タワーを狙う
-    target = enemyTower;
-  } else {
-    // モンスター優先：最寄りの敵ユニット、いなければタワー
-    let closestDist = Infinity;
-    for (let u of enemyUnits) {
-      if (!u.alive) continue;
-      const d = getDistance(unit, u);
-      if (d < closestDist) {
-        closestDist = d;
-        target = u;
-      }
+  // 敵ユニット
+  for (let u of enemyUnits) {
+    if (!u.alive) continue;
+    const d = getDistance(unit, u);
+    if (d < closestDist) {
+      closestDist = d;
+      target = u;
     }
-    if (!target) target = enemyTower;
   }
+
+  // 敵タワー
+  const dTower = getDistanceToRect(unit, enemyTower);
+  if (dTower < closestDist) {
+    closestDist = dTower;
+    target = enemyTower;
+  }
+
   unit.target = target;
 
   if (!target) {
+    // ターゲットなし → 前進
     unit.x += (team === 'player' ? 1 : -1) * unit.speed;
     unit.x = Math.max(20, Math.min(780, unit.x));
     unit.y = Math.max(20, Math.min(480, unit.y));
     return;
   }
 
-  let dist = (target.hp !== undefined) ? getDistance(unit, target) : getDistanceToRect(unit, target);
+  // 距離判定（ユニット or タワー）
+  let dist;
+  if (target.hp !== undefined) {
+    dist = getDistance(unit, target);
+  } else {
+    dist = getDistanceToRect(unit, target);
+  }
 
   if (dist <= unit.range) {
+    // 攻撃
     if (unit.attackCooldown === 0) {
       // 爆弾兵
       if (unit.key === 'bomber') {
@@ -563,8 +535,19 @@ function updateUnit(unit, enemyUnits, enemyTower, team) {
       unit.attackCooldown = 30;
     }
   } else {
-    const dx = target.x - unit.x;
-    const dy = target.y - unit.y;
+    // ★ 移動：タワーの場合は中心を狙う
+    let targetX, targetY;
+    if (target.hp !== undefined && target.w !== undefined) {
+      // タワー：中心座標
+      targetX = target.x + target.w / 2;
+      targetY = target.y + target.h / 2;
+    } else {
+      // ユニット
+      targetX = target.x;
+      targetY = target.y;
+    }
+    const dx = targetX - unit.x;
+    const dy = targetY - unit.y;
     const len = Math.hypot(dx, dy);
     if (len > 1) {
       unit.x += (dx / len) * unit.speed;
@@ -575,7 +558,7 @@ function updateUnit(unit, enemyUnits, enemyTower, team) {
   unit.y = Math.max(20, Math.min(480, unit.y));
 }
 
-// ---- CPU行動（難易度・モード個性対応） ----
+// ---- CPU行動 ----
 function tryCpuAction(state) {
   if (state.cpuDeck.length === 0) return;
   const affordable = state.cpuDeck.filter(key => {
@@ -589,22 +572,11 @@ function tryCpuAction(state) {
   state.cpuElixir -= def.cost;
   state.cpuLastUnit = key;
   const y = 80 + Math.random() * 340;
-
-  // ★ 難易度に応じたタワー優先率
-  // 0.5 → 10%, 1.0 → 30%, 1.8 → 50%, 3.0 → 70%
-  let towerRate;
-  if (cpuDifficulty <= 0.6) towerRate = 0.1;
-  else if (cpuDifficulty <= 1.2) towerRate = 0.3;
-  else if (cpuDifficulty <= 2.0) towerRate = 0.5;
-  else towerRate = 0.7;
-  const cpuMode = Math.random() < towerRate ? 'tower' : 'monster';
-
   const unit = {
     key: key, x: 700, y: y, hp: def.hp, maxHp: def.hp, attack: def.attack,
     range: def.range, speed: def.speed, size: def.size, icon: def.icon,
     name: def.name, team: 'cpu',
     bgColor: def.bgColor || null,
-    cpuMode: cpuMode,  // ★ CPU個性
     alive: true, attackCooldown: 0, target: null
   };
   state.cpuUnits.push(unit);
@@ -651,8 +623,8 @@ function drawBattle() {
     ctx.font = '12px sans-serif';
     ctx.fillText(`${Math.floor(tower.hp)}/${tower.maxHp}`, x + 30, y - 10);
   }
-  drawTower(state.playerTower, 80, 200, true);
-  drawTower(state.cpuTower, 660, 200, false);
+  drawTower(state.playerTower, state.playerTower.x, state.playerTower.y, true);
+  drawTower(state.cpuTower, state.cpuTower.x, state.cpuTower.y, false);
   
   function drawUnit(u, color) {
     if (!u.alive) return;
@@ -764,8 +736,6 @@ function showVictory(winner) {
   document.getElementById('hpPanel').style.display = 'none';
   document.getElementById('playerUnitSelector').style.display = 'none';
   document.getElementById('battleMessage').style.display = 'none';
-  document.getElementById('targetModePanel').style.display = 'none';
-  document.getElementById('difficultyPanel').style.display = 'none';
   document.getElementById('victoryScreen').style.display = 'block';
   document.getElementById('oracleBtn').onclick = () => { window.location.href = 'toll.html'; };
 }
@@ -782,9 +752,7 @@ function battleLoop() {
   state.playerElixir = Math.min(state.maxElixir, state.playerElixir + elixirPerFrame);
   state.cpuElixir = Math.min(state.maxElixir, state.cpuElixir + elixirPerFrame);
   
-  // ★ 難易度に応じてCPUの行動頻度を変える
-  const cpuActionInterval = Math.max(4, Math.round(12 / cpuDifficulty));
-  if (state.frameCount % cpuActionInterval === 0) tryCpuAction(state);
+  if (state.frameCount % 12 === 0) tryCpuAction(state);
   
   for (let i = state.playerUnits.length - 1; i >= 0; i--) {
     const u = state.playerUnits[i];
@@ -912,7 +880,7 @@ function setupPlayerControls() {
   });
 }
 
-// ---- 試合開始 ----
+// ---- 試合開始（★タワー座標修正） ----
 function startBattle() {
   const cpuRandomCount = parseInt(cpuRandomInput.value);
   const playerTowerHp = parseInt(playerTowerHpInput.value) || 120;
@@ -926,8 +894,9 @@ function startBattle() {
     cpuDeck: cpuDeck,
     playerElixir: 10, cpuElixir: 10, maxElixir: 10,
     playerUnits: [], cpuUnits: [],
-    playerTower: { hp: playerTowerHp, maxHp: playerTowerHp },
-    cpuTower: { hp: cpuTowerHp, maxHp: cpuTowerHp },
+    // ★ タワーに x, y, w, h を追加
+    playerTower: { x: 80, y: 200, w: 60, h: 100, hp: playerTowerHp, maxHp: playerTowerHp },
+    cpuTower: { x: 660, y: 200, w: 60, h: 100, hp: cpuTowerHp, maxHp: cpuTowerHp },
     elixirSpeed: elixirSpeed,
     gameOver: false, winner: null,
     playerLastUnit: null, cpuLastUnit: null,
@@ -942,8 +911,6 @@ function startBattle() {
   document.getElementById('hpPanel').style.display = 'flex';
   document.getElementById('playerUnitSelector').style.display = 'flex';
   document.getElementById('battleMessage').style.display = 'block';
-  document.getElementById('targetModePanel').style.display = 'flex';
-  document.getElementById('difficultyPanel').style.display = 'flex';
   document.getElementById('victoryScreen').style.display = 'none';
   
   setupPlayerControls();
@@ -960,32 +927,11 @@ document.getElementById('backToDeckBtn').addEventListener('click', () => {
   document.getElementById('deckEditor').style.display = 'block';
 });
 
-// ---- ★ モード切替ボタン ----
-document.getElementById('modeMonsterBtn').addEventListener('click', () => {
-  targetMode = 'monster';
-  document.getElementById('modeMonsterBtn').classList.add('active');
-  document.getElementById('modeTowerBtn').classList.remove('active');
-});
-document.getElementById('modeTowerBtn').addEventListener('click', () => {
-  targetMode = 'tower';
-  document.getElementById('modeTowerBtn').classList.add('active');
-  document.getElementById('modeMonsterBtn').classList.remove('active');
-});
-
-// ---- ★ 難易度切替ボタン ----
-document.querySelectorAll('.diff-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    cpuDifficulty = parseFloat(btn.dataset.diff);
-  });
-});
-
 // ---- 初期化 ----
 startBtn.addEventListener('click', startBattle);
 renderCards();
 console.log('✅ 完全版 起動完了！');
-console.log('✅ モード切替・難易度・CPU個性 実装済み');
+console.log('✅ タワー座標修正済み・自然な挙動');
 </script>
 </body>
 </html>
