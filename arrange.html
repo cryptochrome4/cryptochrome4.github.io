@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>GRT- テラリア風</title>
+    <title>GRT- テラリア風 〜アリ地獄〜</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
         body {
@@ -164,6 +164,14 @@
             border: 1px solid #4CAF50;
             background: rgba(76,175,80,0.1);
         }
+        #enemyCounter {
+            color: #ff6b6b;
+            font-size: 14px;
+            background: #1a0a0a;
+            padding: 4px 14px;
+            border-radius: 20px;
+            border: 1px solid #ff6b6b;
+        }
         #victoryOverlay {
             display: none;
             position: fixed;
@@ -219,6 +227,7 @@
         <div id="blockCounter">🧱 0</div>
         <div id="grtCounter">GRT-</div>
         <div id="scoreDisplay">💀 0</div>
+        <div id="enemyCounter">🐜 0</div>
         <div id="inventory">
             <span class="active" id="invPick">⛏️</span>
             <span id="invSword">🗡️</span>
@@ -226,7 +235,7 @@
         </div>
         <div id="controllerStatus">🎮 未接続</div>
     </div>
-    <div class="hint">【操作】←→移動 / ↑ジャンプ / クリックで掘る（王将の周囲） / ↓で足元を掘る / Z攻撃 / Xポーション</div>
+    <div class="hint">【操作】←→移動 / ↑ジャンプ / ↓足元を掘る / クリックで周囲を掘る / Z攻撃 / Xポーション</div>
 </div>
 
 <div id="victoryOverlay">
@@ -238,19 +247,16 @@
 
 <script>
 // ============================================
-// 完全版ゲーム - 全機能復元
+// アリ地獄モード - 敵がうじゃうじゃ
 // ============================================
 
-// ---- キャンバス ----
 var canvas = document.getElementById('canvas');
 var ctx = canvas.getContext('2d');
 
-// ---- 定数 ----
 var W = 800, H = 500;
 var BW = 20;
 var COLS = 60, ROWS = 50;
 
-// ---- ゲーム状態 ----
 var world = [];
 var player = { x: 5, y: 14 };
 var camera = { x: 0, y: 0 };
@@ -302,15 +308,50 @@ function createWorld() {
         }
     }
     
-    // GRT
-    world[24][15] = 6;
+    // ★ GRTを地下深くにランダム配置（確率アップ）
+    var grtPlaced = false;
+    for (var attempts = 0; attempts < 500 && !grtPlaced; attempts++) {
+        var gx = 5 + Math.floor(Math.random() * (COLS - 10));
+        var gy = 25 + Math.floor(Math.random() * (ROWS - 30)); // 地下深く
+        if (world[gy] && world[gy][gx] === 3) { // 石の中に配置
+            world[gy][gx] = 6;
+            grtPlaced = true;
+            // ★ GRTの周囲に敵を大量配置
+            for (var i = 0; i < 15; i++) {
+                var ex = gx + Math.floor(Math.random() * 7) - 3;
+                var ey = gy + Math.floor(Math.random() * 7) - 3;
+                if (ex >= 0 && ex < COLS && ey >= 0 && ey < ROWS && world[ey][ex] === 0) {
+                    enemies.push({ x: ex, y: ey, hp: 3, maxHp: 3, timer: Math.random() * 100, dir: Math.random() > 0.5 ? 1 : -1, speed: 0.5 + Math.random() * 0.5 });
+                }
+            }
+        }
+    }
+    if (!grtPlaced) {
+        world[30][15] = 6;
+        for (var i = 0; i < 15; i++) {
+            var ex = 15 + Math.floor(Math.random() * 7) - 3;
+            var ey = 30 + Math.floor(Math.random() * 7) - 3;
+            if (ex >= 0 && ex < COLS && ey >= 0 && ey < ROWS && world[ey][ex] === 0) {
+                enemies.push({ x: ex, y: ey, hp: 3, maxHp: 3, timer: Math.random() * 100, dir: Math.random() > 0.5 ? 1 : -1, speed: 0.5 + Math.random() * 0.5 });
+            }
+        }
+    }
     
-    // 敵
-    for (var i = 0; i < 6; i++) {
-        var ex = 8 + Math.floor(Math.random() * (COLS - 16));
-        var ey = 20 + Math.floor(Math.random() * 10);
+    // ★ 敵を大量に配置（地上・地下問わず）
+    var enemyCount = 40 + Math.floor(Math.random() * 30); // 40〜70匹
+    for (var i = 0; i < enemyCount; i++) {
+        var ex = 3 + Math.floor(Math.random() * (COLS - 6));
+        var ey = 12 + Math.floor(Math.random() * (ROWS - 15));
+        // 敵が配置できる条件：空気ブロックで、下が固体
         if (world[ey] && world[ey][ex] === 0 && world[ey+1] && world[ey+1][ex] !== 0) {
-            enemies.push({ x: ex, y: ey, hp: 3, maxHp: 3, timer: 0, dir: 1 });
+            enemies.push({
+                x: ex, y: ey,
+                hp: 2 + Math.floor(Math.random() * 3),
+                maxHp: 4,
+                timer: Math.random() * 100,
+                dir: Math.random() > 0.5 ? 1 : -1,
+                speed: 0.3 + Math.random() * 0.7
+            });
         }
     }
     
@@ -329,7 +370,7 @@ function isSolid(x, y) {
 
 // ---- 物理更新 ----
 function updatePhysics() {
-    // 移動（左右は移動専用）
+    // 移動
     if (moveDir === 'left') {
         var nx = player.x - 1;
         if (nx >= 0 && !isSolid(nx, player.y)) {
@@ -357,7 +398,7 @@ function updatePhysics() {
     
     // ジャンプ
     if (isJumping && onGround) {
-        vy = -3;
+        vy = -3.2;
         onGround = false;
         isJumping = false;
     }
@@ -383,25 +424,35 @@ function updatePhysics() {
     if (attackCooldown > 0) attackCooldown--;
     if (invincible > 0) invincible--;
     
-    // 敵AI
+    // ★ 敵AI（高速・集団行動）
     for (var i = 0; i < enemies.length; i++) {
         var e = enemies[i];
         e.timer++;
+        
         var dx = player.x - e.x;
         var dy = player.y - e.y;
         var dist = Math.sqrt(dx*dx + dy*dy);
         
-        if (dist < 8) {
-            if (e.timer % 20 < 10) {
-                var nx = e.x + (dx > 0 ? 1 : -1);
-                if (nx >= 0 && nx < COLS && !isSolid(nx, e.y) && isSolid(nx, e.y+1)) {
-                    e.x = nx;
-                }
+        // プレイヤーに向かって移動（群れで襲う）
+        if (dist < 12) {
+            // 横移動（プレイヤーに向かう）
+            var moveX = 0;
+            if (Math.abs(dx) > 0.5) {
+                moveX = dx > 0 ? 1 : -1;
             }
-            if (dist < 1.2 && e.timer % 30 === 0) {
+            var nx = e.x + moveX;
+            // 移動可能なら移動
+            if (nx >= 0 && nx < COLS && !isSolid(nx, e.y) && isSolid(nx, e.y+1)) {
+                e.x = nx;
+            } else if (!isSolid(nx, e.y)) {
+                e.x = nx;
+            }
+            
+            // 攻撃（近くに来たら）
+            if (dist < 1.2 && e.timer % 25 === 0) {
                 if (invincible === 0) {
                     playerHp--;
-                    invincible = 30;
+                    invincible = 25;
                     if (playerHp <= 0) {
                         playerHp = maxHp;
                         player.x = 5;
@@ -413,10 +464,24 @@ function updatePhysics() {
                 }
             }
         } else {
-            if (e.timer % 60 === 0) e.dir = Math.random() > 0.5 ? 1 : -1;
+            // ランダムウォーク
+            if (e.timer % 80 === 0) e.dir = Math.random() > 0.5 ? 1 : -1;
             var nx = e.x + e.dir;
             if (nx >= 0 && nx < COLS && !isSolid(nx, e.y) && isSolid(nx, e.y+1)) {
                 e.x = nx;
+            }
+        }
+        
+        // 仲間が近くにいたら連携（群れ効果）
+        for (var j = 0; j < enemies.length; j++) {
+            if (i === j) continue;
+            var other = enemies[j];
+            var ddx = other.x - e.x;
+            var ddy = other.y - e.y;
+            var ddist = Math.sqrt(ddx*ddx + ddy*ddy);
+            if (ddist < 1.5) {
+                // 混雑を避ける
+                if (ddx !== 0) e.x -= ddx * 0.1;
             }
         }
     }
@@ -428,6 +493,9 @@ function updatePhysics() {
     camera.y += (ty - camera.y) * 0.1;
     camera.x = Math.max(0, Math.min(COLS * BW - W, camera.x));
     camera.y = Math.max(0, Math.min(ROWS * BW - H, camera.y));
+    
+    // 敵カウント更新
+    document.getElementById('enemyCounter').textContent = '🐜 ' + enemies.length;
 }
 
 // ---- 描画 ----
@@ -457,7 +525,10 @@ function draw() {
                     ctx.fillStyle = '#B8860B';
                     ctx.fillRect(x, y, BW-1, BW-1);
                     ctx.fillStyle = 'rgba(255,215,0,0.3)';
+                    ctx.shadowColor = '#FFD700';
+                    ctx.shadowBlur = 15;
                     ctx.fillRect(x+2, y+2, BW-5, BW-5);
+                    ctx.shadowBlur = 0;
                     continue;
                 default: ctx.fillStyle = '#888';
             }
@@ -465,20 +536,34 @@ function draw() {
         }
     }
     
-    // 敵
+    // ★ 敵（アリのようにたくさん）
     for (var i = 0; i < enemies.length; i++) {
         var e = enemies[i];
         var ex = e.x * BW - camera.x;
         var ey = e.y * BW - camera.y;
-        ctx.fillStyle = '#4CAF50';
+        
+        // 体（赤色で目立つ）
+        ctx.fillStyle = '#D32F2F';
+        ctx.shadowColor = 'rgba(211,47,47,0.3)';
+        ctx.shadowBlur = 5;
         ctx.beginPath();
-        ctx.ellipse(ex + BW/2, ey + BW - 2, 8, 6, 0, 0, Math.PI*2);
+        ctx.ellipse(ex + BW/2, ey + BW - 2, 7, 5, 0, 0, Math.PI*2);
         ctx.fill();
-        ctx.fillStyle = '#2E7D32';
+        ctx.shadowBlur = 0;
+        
+        // 目（白）
+        ctx.fillStyle = 'white';
         ctx.beginPath();
-        ctx.arc(ex + BW/2 - 4, ey + BW - 6, 3, 0, Math.PI*2);
-        ctx.arc(ex + BW/2 + 4, ey + BW - 6, 3, 0, Math.PI*2);
+        ctx.arc(ex + BW/2 - 3, ey + BW - 5, 2, 0, Math.PI*2);
+        ctx.arc(ex + BW/2 + 3, ey + BW - 5, 2, 0, Math.PI*2);
         ctx.fill();
+        ctx.fillStyle = 'black';
+        ctx.beginPath();
+        ctx.arc(ex + BW/2 - 3 + (e.dir > 0 ? 1 : -1), ey + BW - 4, 1, 0, Math.PI*2);
+        ctx.arc(ex + BW/2 + 3 + (e.dir > 0 ? 1 : -1), ey + BW - 4, 1, 0, Math.PI*2);
+        ctx.fill();
+        
+        // HPバー
         if (e.hp < e.maxHp) {
             ctx.fillStyle = 'rgba(0,0,0,0.5)';
             ctx.fillRect(ex + 2, ey - 4, BW - 4, 3);
@@ -498,9 +583,12 @@ function draw() {
     
     if (!(invincible > 0 && invincible % 6 < 3)) {
         ctx.fillStyle = '#FF6B6B';
+        ctx.shadowColor = 'rgba(255,107,107,0.2)';
+        ctx.shadowBlur = 10;
         ctx.beginPath();
         ctx.arc(px + BW/2, py + BW/2 - 2, 7, 0, Math.PI*2);
         ctx.fill();
+        ctx.shadowBlur = 0;
     }
     
     ctx.fillStyle = '#FFD700';
@@ -546,18 +634,26 @@ function drawMinimap() {
         }
     }
     
+    // 敵を赤点で表示
+    for (var i = 0; i < enemies.length; i++) {
+        var e = enemies[i];
+        ctx.fillStyle = '#FF1744';
+        ctx.globalAlpha = 0.6;
+        ctx.fillRect(mx + e.x * sc, my + e.y * sc, Math.ceil(sc), Math.ceil(sc));
+        ctx.globalAlpha = 1;
+    }
+    
     ctx.fillStyle = '#FF6B6B';
     ctx.beginPath();
     ctx.arc(mx + player.x * sc + sc/2, my + player.y * sc + sc/2, 2, 0, Math.PI*2);
     ctx.fill();
 }
 
-// ---- ★ 掘る機能（クリック掘り） ----
+// ---- 掘る ----
 function digBlock() {
     if (grtFound) return;
     if (selectedItem !== 'pickaxe') return;
     
-    // マウス位置からワールド座標を計算
     var rect = canvas.getBoundingClientRect();
     var scaleX = canvas.width / rect.width;
     var scaleY = canvas.height / rect.height;
@@ -569,7 +665,6 @@ function digBlock() {
     
     if (worldX < 0 || worldX >= COLS || worldY < 0 || worldY >= ROWS) return;
     
-    // ★ 王将の周囲1ブロック範囲のみ掘れる
     var distX = Math.abs(worldX - player.x);
     var distY = Math.abs(worldY - player.y);
     if (distX > 1 || distY > 1) return;
@@ -582,7 +677,6 @@ function digBlock() {
     updateUI();
 }
 
-// ---- ★ 足元を掘る（↓ボタン） ----
 function digDown() {
     if (grtFound) return;
     if (selectedItem !== 'pickaxe') return;
@@ -604,8 +698,9 @@ function attackEnemy() {
     if (attackCooldown > 0 || grtFound) return;
     if (selectedItem !== 'sword') return;
     
-    attackCooldown = 15;
+    attackCooldown = 12;
     
+    var hitCount = 0;
     for (var i = enemies.length - 1; i >= 0; i--) {
         var e = enemies[i];
         if (Math.abs(e.x - player.x) <= 1.5 && Math.abs(e.y - player.y) <= 1.5) {
@@ -614,8 +709,24 @@ function attackEnemy() {
                 enemies.splice(i, 1);
                 killCount++;
                 blockCount += 2;
+                hitCount++;
                 updateUI();
             }
+        }
+    }
+    if (hitCount > 0) {
+        // 周囲にパーティクル
+        for (var p = 0; p < 10; p++) {
+            particles.push({
+                x: player.x * BW + BW/2 + (Math.random() - 0.5) * 20,
+                y: player.y * BW + BW/2 + (Math.random() - 0.5) * 20,
+                vx: (Math.random() - 0.5) * 4,
+                vy: (Math.random() - 0.5) * 4 - 2,
+                life: 20 + Math.random() * 10,
+                maxLife: 30,
+                size: 2 + Math.random() * 3,
+                color: '#FF1744'
+            });
         }
     }
 }
@@ -626,6 +737,18 @@ function usePotion() {
         hpPotions--;
         playerHp = Math.min(playerHp + 4, maxHp);
         updateUI();
+        for (var p = 0; p < 15; p++) {
+            particles.push({
+                x: player.x * BW + BW/2 + (Math.random() - 0.5) * 20,
+                y: player.y * BW + BW/2 + (Math.random() - 0.5) * 20,
+                vx: (Math.random() - 0.5) * 3,
+                vy: (Math.random() - 0.5) * 3 - 3,
+                life: 30 + Math.random() * 20,
+                maxLife: 50,
+                size: 3 + Math.random() * 4,
+                color: '#FFD700'
+            });
+        }
     }
 }
 
@@ -635,6 +758,7 @@ function updateUI() {
     document.getElementById('hpFill').style.width = (playerHp / maxHp * 100) + '%';
     document.getElementById('blockCounter').textContent = '🧱 ' + blockCount;
     document.getElementById('scoreDisplay').textContent = '💀 ' + killCount;
+    document.getElementById('enemyCounter').textContent = '🐜 ' + enemies.length;
     
     var map = { pickaxe: 'invPick', sword: 'invSword', potion: 'invPotion' };
     document.querySelectorAll('#inventory span').forEach(function(el) { el.className = ''; });
@@ -655,30 +779,50 @@ function showVictory() {
 // ---- ゲームループ ----
 function gameLoop() {
     updatePhysics();
+    
+    // パーティクル更新
+    for (var i = particles.length - 1; i >= 0; i--) {
+        var p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.1;
+        p.life--;
+        if (p.life <= 0) particles.splice(i, 1);
+    }
+    
+    // パーティクル描画（draw内でやると重いので別途）
     draw();
+    
+    // パーティクルを別途描画
+    for (var i = 0; i < particles.length; i++) {
+        var p = particles[i];
+        var alpha = p.life / p.maxLife;
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = p.color;
+        ctx.fillRect(p.x - camera.x, p.y - camera.y, p.size, p.size);
+    }
+    ctx.globalAlpha = 1;
+    
     requestAnimationFrame(gameLoop);
 }
 
 // ---- イベント設定 ----
-// マウス位置記録
 canvas.addEventListener('mousemove', function(e) {
     lastMouseX = e.clientX;
     lastMouseY = e.clientY;
 });
 
-// ★ クリックで掘る
 canvas.addEventListener('click', function(e) {
     digBlock();
 });
 
-// キーボード
 document.addEventListener('keydown', function(e) {
     if (grtFound) return;
     switch(e.key) {
         case 'ArrowLeft': moveDir = 'left'; e.preventDefault(); break;
         case 'ArrowRight': moveDir = 'right'; e.preventDefault(); break;
         case 'ArrowUp': isJumping = true; e.preventDefault(); break;
-        case 'ArrowDown': digDown(); e.preventDefault(); break; // ★ 下キーで足元を掘る
+        case 'ArrowDown': digDown(); e.preventDefault(); break;
         case 'z': case 'Z': attackEnemy(); e.preventDefault(); break;
         case 'x': case 'X': usePotion(); e.preventDefault(); break;
         case '1': selectedItem = 'pickaxe'; updateUI(); break;
@@ -694,7 +838,6 @@ document.addEventListener('keyup', function(e) {
     }
 });
 
-// ボタン
 document.getElementById('attackBtn').addEventListener('click', function(e) {
     e.preventDefault();
     attackEnemy();
@@ -715,7 +858,6 @@ document.getElementById('goToBattery').addEventListener('click', function() {
     window.location.href = 'battery.html';
 });
 
-// インベントリクリック
 document.querySelectorAll('#inventory span').forEach(function(el) {
     el.addEventListener('click', function() {
         var map = { invPick: 'pickaxe', invSword: 'sword', invPotion: 'potion' };
@@ -723,7 +865,7 @@ document.querySelectorAll('#inventory span').forEach(function(el) {
     });
 });
 
-// ---- コントローラー対応 ----
+// ---- コントローラー ----
 function updateGamepad() {
     var gp = navigator.getGamepads ? navigator.getGamepads()[0] : null;
     if (gp) {
@@ -740,11 +882,7 @@ function updateGamepad() {
             moveDir = null;
         }
         
-        // ★ コントローラーの下ボタンで足元を掘る
-        if (ay > deadZone) {
-            digDown();
-        }
-        
+        if (ay > deadZone) { digDown(); }
         if (gp.buttons[0] && gp.buttons[0].pressed) { isJumping = true; }
         if (gp.buttons[2] && gp.buttons[2].pressed) { attackEnemy(); }
         if (gp.buttons[3] && gp.buttons[3].pressed) { usePotion(); }
@@ -763,10 +901,9 @@ updateUI();
 gameLoop();
 updateGamepad();
 
-console.log('🎮 ゲーム起動！');
+console.log('🐜 アリ地獄モード起動！敵がうじゃうじゃ');
 console.log('←→移動 / ↑ジャンプ / ↓足元を掘る');
-console.log('クリックで周囲のブロックを掘る（王将の範囲）');
-console.log('Z攻撃 / Xポーション / 1,2,3でアイテム切替');
+console.log('クリックで周囲を掘る / Z攻撃 / Xポーション');
 </script>
 </body>
 </html>
