@@ -719,6 +719,12 @@ var FALL_DAMAGE_THRESHOLD = 5;
 
 var gameRunning = false;
 
+// ★ 王将の範囲（壁すり抜け判定の半径）
+var ROYAL_RANGE = 1;
+
+// ★ 蜂蟻の怯み（逃げ）時間（フレーム数）
+var FLEE_DURATION = 90; // 約1.5秒間逃げる
+
 // ============================================
 // 画面遷移
 // ============================================
@@ -879,7 +885,8 @@ function createWorld() {
                     wingPhase: Math.random() * Math.PI * 2,
                     homeX: ex,
                     homeY: ey,
-                    homeRadius: 8 + Math.random() * 6
+                    homeRadius: 8 + Math.random() * 6,
+                    fleeTimer: 0  // ★ 怯みタイマー
                 });
             }
         }
@@ -898,7 +905,8 @@ function createWorld() {
                 timer: Math.random() * 100,
                 wingPhase: Math.random() * Math.PI * 2,
                 homeX: ex, homeY: ey,
-                homeRadius: 10 + Math.random() * 8
+                homeRadius: 10 + Math.random() * 8,
+                fleeTimer: 0
             });
         }
     }
@@ -946,6 +954,13 @@ function resetGame() {
 function isSolid(x, y) {
     if (x < 0 || x >= COLS || y < 0 || y >= ROWS) return true;
     return world[y][x] !== 0 && world[y][x] !== 6;
+}
+
+// ★ 王将の範囲内かどうかを判定
+function isInRoyalRange(x, y) {
+    var dx = Math.abs(x - (player.x + 0.5));
+    var dy = Math.abs(y - (player.y + 0.5));
+    return dx <= ROYAL_RANGE + 0.5 && dy <= ROYAL_RANGE + 0.5;
 }
 
 // ============================================
@@ -1019,7 +1034,20 @@ function updatePhysics() {
         var dy = player.y - e.y;
         var dist = Math.sqrt(dx*dx + dy*dy);
         
-        if (dist < 12) {
+        // ★ 怯みタイマー処理
+        if (e.fleeTimer > 0) {
+            e.fleeTimer--;
+            // 逃げる（プレイヤーから離れる方向に加速）
+            if (dist > 0.1) {
+                e.vx += (dx < 0 ? 0.15 : -0.15);  // プレイヤーと逆方向
+                e.vy += (dy < 0 ? 0.15 : -0.15);
+            }
+            e.vx *= 0.92;
+            e.vy *= 0.92;
+            var fleeSpeed = Math.sqrt(e.vx*e.vx + e.vy*e.vy);
+            if (fleeSpeed > 2.5) { e.vx *= 2.5/fleeSpeed; e.vy *= 2.5/fleeSpeed; }
+        } else if (dist < 12) {
+            // 通常：プレイヤーを追跡
             e.vx += (dx > 0 ? 0.08 : -0.08);
             e.vy += (dy > 0 ? 0.08 : -0.08);
             e.vx *= 0.95;
@@ -1027,6 +1055,7 @@ function updatePhysics() {
             var speed = Math.sqrt(e.vx*e.vx + e.vy*e.vy);
             if (speed > 1.5) { e.vx *= 1.5/speed; e.vy *= 1.5/speed; }
         } else {
+            // ホームポジション周辺をうろつく
             var hdx = e.homeX - e.x;
             var hdy = e.homeY - e.y;
             e.vx += hdx * 0.005 + (Math.random() - 0.5) * 0.15;
@@ -1037,17 +1066,21 @@ function updatePhysics() {
             if (speed2 > 0.8) { e.vx *= 0.8/speed2; e.vy *= 0.8/speed2; }
         }
         
-        // ★ 蜂蟻は壁を無視して自由に飛び回る（ブロックの中にも入れる）
-        e.x += e.vx;
-        e.y += e.vy;
+        var nx = e.x + e.vx;
+        var ny2 = e.y + e.vy;
         
-        // 範囲制限のみ
+        if (isSolid(Math.floor(nx), Math.floor(e.y))) e.vx = -e.vx * 0.8;
+        else e.x = nx;
+        if (isSolid(Math.floor(e.x), Math.floor(ny2))) e.vy = -e.vy * 0.8;
+        else e.y = ny2;
+        
         if (e.x < 1) { e.x = 1; e.vx = Math.abs(e.vx); }
         if (e.x > COLS-2) { e.x = COLS-2; e.vx = -Math.abs(e.vx); }
         if (e.y < 1) { e.y = 1; e.vy = Math.abs(e.vy); }
         if (e.y > ROWS-2) { e.y = ROWS-2; e.vy = -Math.abs(e.vy); }
         
-        if (dist < 0.9) {
+        // ★ 怯み中は当たり判定なし（触れても安全）
+        if (dist < 0.9 && e.fleeTimer <= 0) {
             playerHp -= settings.enemyAtk;
             if (playerHp <= 0) {
                 gameOver = true;
@@ -1061,22 +1094,38 @@ function updatePhysics() {
         }
     }
     
-    // ★★★ 弾：壁を完全に無視して飛ぶ ★★★
-    // 蜂蟻に当たるか画面外に出るまで消えない
+    // ★ 弾：王将の範囲内は壁をすり抜ける
     for (var i = bullets.length - 1; i >= 0; i--) {
         var b = bullets[i];
         
-        // 進む
+        var inRoyalRange = isInRoyalRange(b.x, b.y);
+        
         b.x += b.vx;
         b.y += b.vy;
         
-        // 画面外に出たら削除
         if (b.x < -5 || b.x > COLS + 5 || b.y < -5 || b.y > ROWS + 5) {
             bullets.splice(i, 1);
             continue;
         }
         
-        // 敵に当たったかチェック（壁は無視）
+        // 王将の範囲外なら壁判定あり
+        if (!inRoyalRange && isSolid(Math.floor(b.x), Math.floor(b.y))) {
+            for (var p = 0; p < 6; p++) {
+                particles.push({
+                    x: b.x * BW + BW/2,
+                    y: b.y * BW + BW/2,
+                    vx: (Math.random() - 0.5) * 3,
+                    vy: (Math.random() - 0.5) * 3,
+                    life: 10 + Math.random() * 10,
+                    maxLife: 20,
+                    size: 2 + Math.random() * 2,
+                    color: '#FFD700'
+                });
+            }
+            bullets.splice(i, 1);
+            continue;
+        }
+        
         var hit = false;
         for (var j = enemies.length - 1; j >= 0; j--) {
             var e = enemies[j];
@@ -1085,6 +1134,20 @@ function updatePhysics() {
             if (dx*dx + dy*dy < 1.0) {
                 e.hp -= settings.playerAtk;
                 hit = true;
+                
+                // ★ 怯ませる（逃げさせる）
+                if (e.hp > 0) {
+                    e.fleeTimer = FLEE_DURATION;
+                    // プレイヤーと逆方向に吹き飛ばす
+                    var pdx = e.x - player.x;
+                    var pdy = e.y - player.y;
+                    var pdist = Math.sqrt(pdx*pdx + pdy*pdy);
+                    if (pdist > 0.1) {
+                        e.vx = (pdx / pdist) * 2.5;
+                        e.vy = (pdy / pdist) * 2.5;
+                    }
+                }
+                
                 for (var p = 0; p < 5; p++) {
                     particles.push({
                         x: b.x * BW + BW/2,
@@ -1134,8 +1197,11 @@ function fireBullets() {
     if (bulletCooldown > 0) return;
     if (charge <= 0) return;
     
+    // ★ 弾数は現在のチャージ数（チャージ分だけ同時発射）
     var bulletCount = charge;
-    charge = 0;
+    
+    // ★ 攻撃するとチャージを1だけ消費
+    charge--;
     bulletCooldown = 30;
     
     for (var i = 0; i < bulletCount; i++) {
@@ -1220,14 +1286,39 @@ function draw() {
         }
     }
     
-    // 蜂蟻（ブロックより手前に描画して見えるように）
+    // 王将の範囲を可視化
+    var px = player.x * BW - camera.x;
+    var py = player.y * BW - camera.y;
+    var rangeSize = (ROYAL_RANGE * 2 + 1) * BW;
+    ctx.strokeStyle = 'rgba(255,215,0,' + (0.15 + Math.sin(Date.now()/500) * 0.1) + ')';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([4, 4]);
+    ctx.strokeRect(px - BW + BW/2, py - BW + BW/2, rangeSize, rangeSize);
+    ctx.setLineDash([]);
+    
+    for (var i = 0; i < bullets.length; i++) {
+        var b = bullets[i];
+        var bx = b.x * BW - camera.x;
+        var by = b.y * BW - camera.y;
+        ctx.fillStyle = '#FFD700';
+        ctx.shadowColor = '#FFD700';
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.arc(bx + BW/2, by + BW/2, 4, 0, Math.PI*2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+    }
+    
     for (var i = 0; i < enemies.length; i++) {
         var e = enemies[i];
         var ex = e.x * BW - camera.x;
         var ey = e.y * BW - camera.y;
         
+        // ★ 怯み中は青白く光る
+        var isFleeing = e.fleeTimer > 0;
+        
         var wingAngle = Math.sin(e.wingPhase) * 0.6;
-        ctx.fillStyle = 'rgba(255,255,255,0.4)';
+        ctx.fillStyle = isFleeing ? 'rgba(200,220,255,0.6)' : 'rgba(255,255,255,0.4)';
         ctx.beginPath();
         ctx.ellipse(ex + BW/2 - 5, ey + BW/2 - 6 + wingAngle * 3, 5, 2, wingAngle, 0, Math.PI*2);
         ctx.fill();
@@ -1235,9 +1326,10 @@ function draw() {
         ctx.ellipse(ex + BW/2 + 5, ey + BW/2 - 6 - wingAngle * 3, 5, 2, -wingAngle, 0, Math.PI*2);
         ctx.fill();
         
-        ctx.fillStyle = '#FFC107';
-        ctx.shadowColor = 'rgba(255,193,7,0.4)';
-        ctx.shadowBlur = 8;
+        // 怯み中は色を変える（青白い）
+        ctx.fillStyle = isFleeing ? '#B0C4DE' : '#FFC107';
+        ctx.shadowColor = isFleeing ? 'rgba(176,196,222,0.6)' : 'rgba(255,193,7,0.4)';
+        ctx.shadowBlur = isFleeing ? 12 : 8;
         ctx.beginPath();
         ctx.ellipse(ex + BW/2, ey + BW/2, 7, 5, 0, 0, Math.PI*2);
         ctx.fill();
@@ -1252,8 +1344,9 @@ function draw() {
         ctx.arc(ex + BW/2, ey + BW/2 - 5, 3.5, 0, Math.PI*2);
         ctx.fill();
         
-        ctx.fillStyle = '#ff1744';
-        ctx.shadowColor = '#ff1744';
+        // 怯み中は目が青く光る
+        ctx.fillStyle = isFleeing ? '#4FC3F7' : '#ff1744';
+        ctx.shadowColor = isFleeing ? '#4FC3F7' : '#ff1744';
         ctx.shadowBlur = 6;
         ctx.beginPath();
         ctx.arc(ex + BW/2 - 1.5, ey + BW/2 - 6, 1.2, 0, Math.PI*2);
@@ -1269,22 +1362,8 @@ function draw() {
         }
     }
     
-    // 弾（蜂蟻より手前に描画）
-    for (var i = 0; i < bullets.length; i++) {
-        var b = bullets[i];
-        var bx = b.x * BW - camera.x;
-        var by = b.y * BW - camera.y;
-        ctx.fillStyle = '#FFD700';
-        ctx.shadowColor = '#FFD700';
-        ctx.shadowBlur = 12;
-        ctx.beginPath();
-        ctx.arc(bx + BW/2, by + BW/2, 5, 0, Math.PI*2);
-        ctx.fill();
-        ctx.shadowBlur = 0;
-    }
-    
-    var px = player.x * BW - camera.x;
-    var py = player.y * BW - camera.y;
+    px = player.x * BW - camera.x;
+    py = player.y * BW - camera.y;
     
     ctx.fillStyle = 'rgba(0,0,0,0.3)';
     ctx.beginPath();
@@ -1630,7 +1709,9 @@ gameLoop();
 updateGamepad();
 
 console.log('🎮 タイトル画面からスタート！');
-console.log('✅ 弾：壁を完全に無視して蜂蟻に当たる（無敵ポジションなし）');
+console.log('✅ 弾：王将の範囲（周囲1ブロック）は壁をすり抜けて敵に当たる');
+console.log('✅ 蜂蟻：弾に当たると怯んで逃げる（1.5秒後にまた襲う）');
+console.log('✅ チャージ：攻撃すると1だけ消費（残りは保持）');
 </script>
 </body>
 </html>
