@@ -26,6 +26,7 @@
             border: 4px solid #533483;
             border-radius: 8px;
             background: #1a1a2e;
+            cursor: crosshair;
         }
         #canvas {
             display: block;
@@ -138,6 +139,7 @@
             padding: 2px 8px;
             border-radius: 4px;
             background: rgba(255,255,255,0.05);
+            cursor: pointer;
         }
         #inventory .active {
             color: #FFD700;
@@ -224,7 +226,7 @@
         </div>
         <div id="controllerStatus">🎮 未接続</div>
     </div>
-    <div class="hint">【操作】矢印キー移動 / ジャンプ↑ / 攻撃Z / クリックで掘る / ポーションX</div>
+    <div class="hint">【操作】←→移動 / ↑ジャンプ / クリックで掘る（王将の周囲） / ↓で足元を掘る / Z攻撃 / Xポーション</div>
 </div>
 
 <div id="victoryOverlay">
@@ -236,16 +238,16 @@
 
 <script>
 // ============================================
-// シンプルで確実に動くゲーム
+// 完全版ゲーム - 全機能復元
 // ============================================
 
-// ---- キャンバス取得 ----
+// ---- キャンバス ----
 var canvas = document.getElementById('canvas');
 var ctx = canvas.getContext('2d');
 
 // ---- 定数 ----
 var W = 800, H = 500;
-var BW = 20; // ブロックサイズ
+var BW = 20;
 var COLS = 60, ROWS = 50;
 
 // ---- ゲーム状態 ----
@@ -267,10 +269,11 @@ var invincible = 0;
 var attackCooldown = 0;
 var selectedItem = 'pickaxe';
 var hpPotions = 3;
+var lastMouseX = 0;
+var lastMouseY = 0;
 
 // ---- ワールド生成 ----
 function createWorld() {
-    // 空の世界
     for (var r = 0; r < ROWS; r++) {
         world[r] = [];
         for (var c = 0; c < COLS; c++) {
@@ -282,9 +285,9 @@ function createWorld() {
     for (var x = 0; x < COLS; x++) {
         var h = 15 + Math.floor(Math.random() * 5);
         for (var y = h; y < ROWS; y++) {
-            if (y === h) world[y][x] = 2; // 草
-            else if (y < h + 4) world[y][x] = 1; // 土
-            else world[y][x] = 3; // 石
+            if (y === h) world[y][x] = 2;
+            else if (y < h + 4) world[y][x] = 1;
+            else world[y][x] = 3;
         }
     }
     
@@ -299,7 +302,7 @@ function createWorld() {
         }
     }
     
-    // GRTを配置（必ず見つかる位置）
+    // GRT
     world[24][15] = 6;
     
     // 敵
@@ -311,7 +314,7 @@ function createWorld() {
         }
     }
     
-    // プレイヤー位置
+    // プレイヤー
     player.x = 5;
     player.y = 14;
     while (player.y < ROWS && world[player.y][player.x] === 0) player.y++;
@@ -326,7 +329,7 @@ function isSolid(x, y) {
 
 // ---- 物理更新 ----
 function updatePhysics() {
-    // 移動
+    // 移動（左右は移動専用）
     if (moveDir === 'left') {
         var nx = player.x - 1;
         if (nx >= 0 && !isSolid(nx, player.y)) {
@@ -359,16 +362,12 @@ function updatePhysics() {
         isJumping = false;
     }
     
-    // 重力
     vy += 0.4;
     if (vy > 3) vy = 3;
     
     var ny = player.y + vy;
     if (isSolid(player.x, Math.floor(ny + 0.5))) {
-        if (vy > 0) {
-            vy = 0;
-            onGround = true;
-        }
+        if (vy > 0) { vy = 0; onGround = true; }
     } else if (ny >= 0 && ny < ROWS) {
         player.y = Math.floor(ny + 0.5);
         onGround = false;
@@ -381,7 +380,6 @@ function updatePhysics() {
         showVictory();
     }
     
-    // 攻撃クールダウン
     if (attackCooldown > 0) attackCooldown--;
     if (invincible > 0) invincible--;
     
@@ -435,8 +433,6 @@ function updatePhysics() {
 // ---- 描画 ----
 function draw() {
     ctx.clearRect(0, 0, W, H);
-    
-    // 背景
     ctx.fillStyle = '#1a1a2e';
     ctx.fillRect(0, 0, W, H);
     
@@ -445,7 +441,6 @@ function draw() {
     var ex = Math.ceil((camera.x + W) / BW) + 1;
     var ey = Math.ceil((camera.y + H) / BW) + 1;
     
-    // ブロック
     for (var r = sy; r < ey && r < ROWS; r++) {
         for (var c = sx; c < ex && c < COLS; c++) {
             var type = world[r][c];
@@ -496,13 +491,11 @@ function draw() {
     var px = player.x * BW - camera.x;
     var py = player.y * BW - camera.y;
     
-    // 影
     ctx.fillStyle = 'rgba(0,0,0,0.3)';
     ctx.beginPath();
     ctx.ellipse(px + BW/2, py + BW - 2, 7, 3, 0, 0, Math.PI*2);
     ctx.fill();
     
-    // 体
     if (!(invincible > 0 && invincible % 6 < 3)) {
         ctx.fillStyle = '#FF6B6B';
         ctx.beginPath();
@@ -510,7 +503,6 @@ function draw() {
         ctx.fill();
     }
     
-    // 王冠
     ctx.fillStyle = '#FFD700';
     ctx.strokeStyle = '#B8860B';
     ctx.lineWidth = 1.5;
@@ -526,7 +518,6 @@ function draw() {
     ctx.arc(px + BW/2, py - 1, 2, 0, Math.PI*2);
     ctx.fill();
     
-    // ミニマップ
     drawMinimap();
 }
 
@@ -561,21 +552,58 @@ function drawMinimap() {
     ctx.fill();
 }
 
-// ---- 掘る ----
+// ---- ★ 掘る機能（クリック掘り） ----
 function digBlock() {
     if (grtFound) return;
+    if (selectedItem !== 'pickaxe') return;
+    
+    // マウス位置からワールド座標を計算
+    var rect = canvas.getBoundingClientRect();
+    var scaleX = canvas.width / rect.width;
+    var scaleY = canvas.height / rect.height;
+    var mx = (lastMouseX - rect.left) * scaleX;
+    var my = (lastMouseY - rect.top) * scaleY;
+    
+    var worldX = Math.floor((mx + camera.x) / BW);
+    var worldY = Math.floor((my + camera.y) / BW);
+    
+    if (worldX < 0 || worldX >= COLS || worldY < 0 || worldY >= ROWS) return;
+    
+    // ★ 王将の周囲1ブロック範囲のみ掘れる
+    var distX = Math.abs(worldX - player.x);
+    var distY = Math.abs(worldY - player.y);
+    if (distX > 1 || distY > 1) return;
+    
+    var block = world[worldY][worldX];
+    if (block === 0 || block === 6) return;
+    
+    world[worldY][worldX] = 0;
+    blockCount++;
+    updateUI();
+}
+
+// ---- ★ 足元を掘る（↓ボタン） ----
+function digDown() {
+    if (grtFound) return;
+    if (selectedItem !== 'pickaxe') return;
+    
     var px = player.x;
     var py = player.y + 1;
-    if (py >= 0 && py < ROWS && world[py] && world[py][px] !== 0 && world[py][px] !== 6) {
-        world[py][px] = 0;
-        blockCount++;
-        updateUI();
-    }
+    
+    if (px < 0 || px >= COLS || py < 0 || py >= ROWS) return;
+    if (world[py][px] === 0 || world[py][px] === 6) return;
+    
+    world[py][px] = 0;
+    blockCount++;
+    player.y = py;
+    updateUI();
 }
 
 // ---- 攻撃 ----
 function attackEnemy() {
     if (attackCooldown > 0 || grtFound) return;
+    if (selectedItem !== 'sword') return;
+    
     attackCooldown = 15;
     
     for (var i = enemies.length - 1; i >= 0; i--) {
@@ -589,6 +617,15 @@ function attackEnemy() {
                 updateUI();
             }
         }
+    }
+}
+
+// ---- ポーション ----
+function usePotion() {
+    if (hpPotions > 0 && playerHp < maxHp) {
+        hpPotions--;
+        playerHp = Math.min(playerHp + 4, maxHp);
+        updateUI();
     }
 }
 
@@ -623,6 +660,17 @@ function gameLoop() {
 }
 
 // ---- イベント設定 ----
+// マウス位置記録
+canvas.addEventListener('mousemove', function(e) {
+    lastMouseX = e.clientX;
+    lastMouseY = e.clientY;
+});
+
+// ★ クリックで掘る
+canvas.addEventListener('click', function(e) {
+    digBlock();
+});
+
 // キーボード
 document.addEventListener('keydown', function(e) {
     if (grtFound) return;
@@ -630,15 +678,9 @@ document.addEventListener('keydown', function(e) {
         case 'ArrowLeft': moveDir = 'left'; e.preventDefault(); break;
         case 'ArrowRight': moveDir = 'right'; e.preventDefault(); break;
         case 'ArrowUp': isJumping = true; e.preventDefault(); break;
+        case 'ArrowDown': digDown(); e.preventDefault(); break; // ★ 下キーで足元を掘る
         case 'z': case 'Z': attackEnemy(); e.preventDefault(); break;
-        case 'x': case 'X': 
-            if (hpPotions > 0 && playerHp < maxHp) {
-                hpPotions--;
-                playerHp = Math.min(playerHp + 4, maxHp);
-                updateUI();
-            }
-            e.preventDefault();
-            break;
+        case 'x': case 'X': usePotion(); e.preventDefault(); break;
         case '1': selectedItem = 'pickaxe'; updateUI(); break;
         case '2': selectedItem = 'sword'; updateUI(); break;
         case '3': selectedItem = 'potion'; updateUI(); break;
@@ -681,12 +723,50 @@ document.querySelectorAll('#inventory span').forEach(function(el) {
     });
 });
 
+// ---- コントローラー対応 ----
+function updateGamepad() {
+    var gp = navigator.getGamepads ? navigator.getGamepads()[0] : null;
+    if (gp) {
+        document.getElementById('controllerStatus').textContent = '🎮 接続中';
+        document.getElementById('controllerStatus').style.borderColor = '#4CAF50';
+        
+        var deadZone = 0.2;
+        var ax = gp.axes[0] || 0;
+        var ay = gp.axes[1] || 0;
+        
+        if (Math.abs(ax) > deadZone) {
+            moveDir = ax < 0 ? 'left' : 'right';
+        } else if (moveDir === 'left' || moveDir === 'right') {
+            moveDir = null;
+        }
+        
+        // ★ コントローラーの下ボタンで足元を掘る
+        if (ay > deadZone) {
+            digDown();
+        }
+        
+        if (gp.buttons[0] && gp.buttons[0].pressed) { isJumping = true; }
+        if (gp.buttons[2] && gp.buttons[2].pressed) { attackEnemy(); }
+        if (gp.buttons[3] && gp.buttons[3].pressed) { usePotion(); }
+        if (gp.buttons[4] && gp.buttons[4].pressed) { selectedItem = 'pickaxe'; updateUI(); }
+        if (gp.buttons[5] && gp.buttons[5].pressed) { selectedItem = 'sword'; updateUI(); }
+    } else {
+        document.getElementById('controllerStatus').textContent = '🎮 未接続';
+        document.getElementById('controllerStatus').style.borderColor = '#f44336';
+    }
+    requestAnimationFrame(updateGamepad);
+}
+
 // ---- 起動 ----
 createWorld();
 updateUI();
 gameLoop();
+updateGamepad();
 
-console.log('🎮 ゲーム起動！矢印キーで移動、Z攻撃、Xポーション');
+console.log('🎮 ゲーム起動！');
+console.log('←→移動 / ↑ジャンプ / ↓足元を掘る');
+console.log('クリックで周囲のブロックを掘る（王将の範囲）');
+console.log('Z攻撃 / Xポーション / 1,2,3でアイテム切替');
 </script>
 </body>
 </html>
