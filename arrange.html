@@ -728,7 +728,7 @@ var FALL_DAMAGE_THRESHOLD = 5;
 var gameRunning = false;
 
 // ============================================
-// 画面遷移（シンプルに！）
+// 画面遷移
 // ============================================
 function showTitle() {
     gameRunning = false;
@@ -975,10 +975,12 @@ function updatePhysics() {
         moveDir = null;
     }
     
+    // ★ ジャンプ
     if (isJumping && onGround) {
         vy = -3.2;
         onGround = false;
         isJumping = false;
+        isFalling = false; // ★ ジャンプ時は落下判定をリセット
     }
     
     vy += 0.4;
@@ -987,6 +989,7 @@ function updatePhysics() {
     var ny = player.y + vy;
     if (isSolid(player.x, Math.floor(ny + 0.5))) {
         if (vy > 0) {
+            // ★ 着地時の落下ダメージ判定
             if (isFalling) {
                 var fallDist = Math.floor(player.y + vy) - fallStartY;
                 if (fallDist >= FALL_DAMAGE_THRESHOLD) {
@@ -1000,9 +1003,13 @@ function updatePhysics() {
             onGround = true;
         }
     } else if (ny >= 0 && ny < ROWS) {
-        if (!isFalling && vy > 0) {
-            isFalling = true;
-            fallStartY = player.y;
+        // ★ 落下判定の開始（ジャンプ中は無効）
+        if (!isFalling && vy > 0 && onGround === false) {
+            // ジャンプ直後（vy<0）ではない時のみ落下判定を開始
+            if (vy > 0.5) { // 上昇中は除外（ジャンプの頂点を超えた時のみ）
+                isFalling = true;
+                fallStartY = player.y;
+            }
         }
         player.y = Math.floor(ny + 0.5);
         onGround = false;
@@ -1329,6 +1336,7 @@ function draw() {
     
     drawMinimap();
     
+    // ★ 落下注意警告（ジャンプ中は出ない）
     if (isFalling && vy > 1) {
         var currentFall = player.y - fallStartY;
         if (currentFall >= FALL_DAMAGE_THRESHOLD - 2) {
@@ -1522,7 +1530,6 @@ document.getElementById('saveSettings').addEventListener('click', function() {
     showTitle();
 });
 
-// スライダー
 document.getElementById('setEnemyCount').addEventListener('input', function() {
     settings.enemyCount = parseInt(this.value);
     document.getElementById('setEnemyCountVal').textContent = this.value;
@@ -1636,6 +1643,7 @@ gameLoop();
 updateGamepad();
 
 console.log('🎮 タイトル画面からスタート！');
+console.log('✅ ジャンプの落下ダメージは無効化されています');
 </script>
 </body>
 </html>
