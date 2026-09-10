@@ -15,7 +15,6 @@
             overflow: hidden;
         }
         
-        /* ===== 共通の背景設定 ===== */
         .screen-bg {
             position: absolute;
             top: 0; left: 0;
@@ -576,17 +575,17 @@
             
             <div class="setting-row">
                 <label>🐝 蜂蟻の数</label>
-                <input type="range" id="setEnemyCount" min="10" max="400" value="200">
-                <span class="value-display" id="setEnemyCountVal">200</span>
+                <input type="range" id="setEnemyCount" min="10" max="400" value="10">
+                <span class="value-display" id="setEnemyCountVal">10</span>
             </div>
             <div class="setting-hint">少ない＝楽 / 多い＝地獄</div>
             
             <div class="setting-row">
                 <label>❤️ プレイヤーHP</label>
-                <input type="range" id="setPlayerHp" min="1" max="10" value="1">
-                <span class="value-display" id="setPlayerHpVal">1</span>
+                <input type="range" id="setPlayerHp" min="1" max="100" value="30">
+                <span class="value-display" id="setPlayerHpVal">30</span>
             </div>
-            <div class="setting-hint">1＝即死モード / 10＝タフ</div>
+            <div class="setting-hint">1＝即死モード / 100＝超タフ</div>
             
             <div class="setting-row">
                 <label>⚔️ プレイヤー攻撃力</label>
@@ -634,7 +633,7 @@
             </div>
         </div>
         <div id="ui">
-            <div id="hpBar">❤️ <span id="hpText">1/1</span><div class="bar"><div class="fill" id="hpFill"></div></div></div>
+            <div id="hpBar">❤️ <span id="hpText">30/30</span><div class="bar"><div class="fill" id="hpFill"></div></div></div>
             <div id="blockCounter">🧱 0</div>
             <div id="chargeCounter">⚡ 0/10</div>
             <div id="grtCounter">GRT-</div>
@@ -671,15 +670,15 @@
 // ゲーム設定
 // ============================================
 var settings = {
-    enemyCount: 200,
-    playerHp: 1,
+    enemyCount: 10,      // ★ デフォルト10
+    playerHp: 30,        // ★ デフォルト30
     playerAtk: 1,
     enemyHp: 2,
     enemyAtk: 1
 };
 var DEFAULT_SETTINGS = {
-    enemyCount: 200,
-    playerHp: 1,
+    enemyCount: 10,
+    playerHp: 30,
     playerAtk: 1,
     enemyHp: 2,
     enemyAtk: 1
@@ -713,8 +712,8 @@ var selectedItem = 'pickaxe';
 var lastMouseX = 0;
 var lastMouseY = 0;
 
-var playerHp = 1;
-var maxHp = 1;
+var playerHp = 30;
+var maxHp = 30;
 
 var charge = 0;
 var chargeProgress = 0;
@@ -895,7 +894,8 @@ function createWorld() {
         }
     }
     
-    var surfaceCount = Math.floor(settings.enemyCount * 0.08);
+    // 地上の蜂蟻は敵数が少ない時のみ（最低1匹は地上に出す）
+    var surfaceCount = Math.max(1, Math.floor(settings.enemyCount * 0.08));
     for (var i = 0; i < surfaceCount; i++) {
         var ex = 3 + Math.floor(Math.random() * (COLS - 6));
         var ey = 10 + Math.floor(Math.random() * 5);
@@ -975,12 +975,12 @@ function updatePhysics() {
         moveDir = null;
     }
     
-    // ★ ジャンプ
+    // ★ ジャンプ力：約3ブロック（落下ダメージ5ブロック未満に収まる）
     if (isJumping && onGround) {
-        vy = -3.2;
+        vy = -2.2;  // 従来の-3.2から-2.2に変更
         onGround = false;
         isJumping = false;
-        isFalling = false; // ★ ジャンプ時は落下判定をリセット
+        isFalling = false;
     }
     
     vy += 0.4;
@@ -989,7 +989,6 @@ function updatePhysics() {
     var ny = player.y + vy;
     if (isSolid(player.x, Math.floor(ny + 0.5))) {
         if (vy > 0) {
-            // ★ 着地時の落下ダメージ判定
             if (isFalling) {
                 var fallDist = Math.floor(player.y + vy) - fallStartY;
                 if (fallDist >= FALL_DAMAGE_THRESHOLD) {
@@ -1003,10 +1002,8 @@ function updatePhysics() {
             onGround = true;
         }
     } else if (ny >= 0 && ny < ROWS) {
-        // ★ 落下判定の開始（ジャンプ中は無効）
         if (!isFalling && vy > 0 && onGround === false) {
-            // ジャンプ直後（vy<0）ではない時のみ落下判定を開始
-            if (vy > 0.5) { // 上昇中は除外（ジャンプの頂点を超えた時のみ）
+            if (vy > 0.5) {
                 isFalling = true;
                 fallStartY = player.y;
             }
@@ -1078,13 +1075,20 @@ function updatePhysics() {
         }
     }
     
-    // 弾
+    // ★ 弾：壁に当たるまで無限に飛ぶ（life制限を撤廃）
     for (var i = bullets.length - 1; i >= 0; i--) {
         var b = bullets[i];
         b.x += b.vx;
         b.y += b.vy;
-        b.life--;
+        // b.lifeのデクリメントを削除
         
+        // 画面外に出たら削除（念のため）
+        if (b.x < -5 || b.x > COLS + 5 || b.y < -5 || b.y > ROWS + 5) {
+            bullets.splice(i, 1);
+            continue;
+        }
+        
+        // 壁に当たったら消滅
         if (isSolid(Math.floor(b.x), Math.floor(b.y))) {
             bullets.splice(i, 1);
             continue;
@@ -1119,7 +1123,7 @@ function updatePhysics() {
             }
         }
         
-        if (hit || b.life <= 0) bullets.splice(i, 1);
+        if (hit) bullets.splice(i, 1);
     }
     
     var tx = player.x * BW + BW/2 - W/2;
@@ -1157,8 +1161,8 @@ function fireBullets() {
             x: player.x + 0.5,
             y: player.y + 0.5,
             vx: Math.cos(angle) * 0.8,
-            vy: Math.sin(angle) * 0.8,
-            life: 60
+            vy: Math.sin(angle) * 0.8
+            // lifeプロパティ削除
         });
     }
     
@@ -1336,7 +1340,6 @@ function draw() {
     
     drawMinimap();
     
-    // ★ 落下注意警告（ジャンプ中は出ない）
     if (isFalling && vy > 1) {
         var currentFall = player.y - fallStartY;
         if (currentFall >= FALL_DAMAGE_THRESHOLD - 2) {
@@ -1643,7 +1646,10 @@ gameLoop();
 updateGamepad();
 
 console.log('🎮 タイトル画面からスタート！');
-console.log('✅ ジャンプの落下ダメージは無効化されています');
+console.log('✅ ジャンプ力: 約3ブロック（落下ダメージ5ブロック未満）');
+console.log('✅ 蜂蟻デフォルト: 10匹');
+console.log('✅ プレイヤーHPデフォルト: 30 (1〜100で調整可能)');
+console.log('✅ 弾: 壁に当たるまで無限に飛ぶ');
 </script>
 </body>
 </html>
