@@ -292,7 +292,6 @@
             background: #1a1a2e;
             image-rendering: pixelated;
         }
-        /* ★ 操作パネル：3列 x 2行に拡張（範囲ボタン追加） */
         #controls {
             position: absolute;
             bottom: 10px;
@@ -343,7 +342,6 @@
             border: 2px solid #1a1a2e;
             display: none;
         }
-        /* ★ 範囲表示ボタン */
         .ctrl-btn.aura-toggle {
             grid-column: 1; grid-row: 2;
             background: rgba(100, 100, 150, 0.4);
@@ -739,13 +737,8 @@ var FALL_DAMAGE_THRESHOLD = 5;
 
 var gameRunning = false;
 
-// ★ 王将の範囲（壁すり抜け判定の半径）
 var ROYAL_RANGE = 1;
-
-// ★ オーラ（範囲表示）の表示/非表示（デフォ：OFF）
 var showAura = false;
-
-// ★ 蜂蟻の怯み（逃げ）時間
 var FLEE_DURATION = 90;
 
 // ============================================
@@ -966,7 +959,6 @@ function resetGame() {
     bulletCooldown = 0;
     isFalling = false;
     fallStartY = 0;
-    // ★ オーラはデフォOFF（リセット時も）
     showAura = false;
     updateAuraButton();
     
@@ -982,14 +974,14 @@ function isSolid(x, y) {
     return world[y][x] !== 0 && world[y][x] !== 6;
 }
 
-// ★ 王将の範囲内かどうかを判定
+// 王将の範囲内かどうかを判定
 function isInRoyalRange(x, y) {
     var dx = Math.abs(x - (player.x + 0.5));
     var dy = Math.abs(y - (player.y + 0.5));
     return dx <= ROYAL_RANGE + 0.5 && dy <= ROYAL_RANGE + 0.5;
 }
 
-// ★ オーラボタンの状態更新
+// オーラボタンの状態更新
 function updateAuraButton() {
     var btn = document.getElementById('auraToggleBtn');
     if (showAura) btn.classList.add('active');
@@ -1067,7 +1059,6 @@ function updatePhysics() {
         var dy = player.y - e.y;
         var dist = Math.sqrt(dx*dx + dy*dy);
         
-        // 怯みタイマー処理
         if (e.fleeTimer > 0) {
             e.fleeTimer--;
             if (dist > 0.1) {
@@ -1123,20 +1114,28 @@ function updatePhysics() {
         }
     }
     
-    // 弾：王将の範囲内は壁をすり抜ける
+    // ★★★ 弾の更新 ★★★
+    // 王将の範囲内 → 壁をすり抜ける
+    // 王将の範囲外 → 壁に当たれば消える、壁がなければどこまでも飛ぶ
     for (var i = bullets.length - 1; i >= 0; i--) {
         var b = bullets[i];
         
-        var inRoyalRange = isInRoyalRange(b.x, b.y);
-        
+        // 進む
         b.x += b.vx;
         b.y += b.vy;
         
+        // 画面外に出たら削除
         if (b.x < -5 || b.x > COLS + 5 || b.y < -5 || b.y > ROWS + 5) {
             bullets.splice(i, 1);
             continue;
         }
         
+        // ★ 進んだ後の位置で王将の範囲を判定
+        var inRoyalRange = isInRoyalRange(b.x, b.y);
+        
+        // ★ 王将の範囲外 && 壁に当たった → 消える
+        // 王将の範囲内 → 壁をすり抜ける
+        // 王将の範囲外で壁がない → そのまま飛び続ける
         if (!inRoyalRange && isSolid(Math.floor(b.x), Math.floor(b.y))) {
             for (var p = 0; p < 6; p++) {
                 particles.push({
@@ -1154,12 +1153,13 @@ function updatePhysics() {
             continue;
         }
         
+        // 敵に当たったかチェック
         var hit = false;
         for (var j = enemies.length - 1; j >= 0; j--) {
             var e = enemies[j];
-            var dx = e.x - b.x;
-            var dy = e.y - b.y;
-            if (dx*dx + dy*dy < 1.0) {
+            var edx = e.x - b.x;
+            var edy = e.y - b.y;
+            if (edx*edx + edy*edy < 1.0) {
                 e.hp -= settings.playerAtk;
                 hit = true;
                 
@@ -1309,11 +1309,10 @@ function draw() {
         }
     }
     
-    // ★ オーラ表示（ON時のみ、掘り範囲と同じ位置）
+    // オーラ表示（ON時のみ、掘り範囲と同じ位置）
     if (showAura) {
         var auraX = player.x * BW - camera.x;
         var auraY = player.y * BW - camera.y;
-        // プレイヤーの左上から1ブロック分外側 = 3x3マス
         ctx.strokeStyle = 'rgba(255,215,0,' + (0.5 + Math.sin(Date.now()/300) * 0.2) + ')';
         ctx.lineWidth = 2;
         ctx.setLineDash([4, 4]);
@@ -1641,7 +1640,6 @@ document.getElementById('setEnemyAtk').addEventListener('input', function() {
 
 document.getElementById('backToTitleBtn').addEventListener('click', showTitle);
 
-// ★ オーラトグルボタン
 document.getElementById('auraToggleBtn').addEventListener('click', function(e) {
     e.preventDefault();
     showAura = !showAura;
@@ -1666,7 +1664,6 @@ document.addEventListener('keydown', function(e) {
         case 'z': case 'Z': fireBullets(); e.preventDefault(); break;
         case ' ': fireBullets(); e.preventDefault(); break;
         case 'v': case 'V': 
-            // Vキーでもオーラ切替
             showAura = !showAura;
             updateAuraButton();
             e.preventDefault();
@@ -1708,7 +1705,6 @@ document.getElementById('retryBtn').addEventListener('click', function() {
 });
 document.getElementById('gameOverTitle').addEventListener('click', showTitle);
 
-// コントローラー
 function updateGamepad() {
     var gp = navigator.getGamepads ? navigator.getGamepads()[0] : null;
     var statusEl = document.getElementById('controllerStatus');
@@ -1745,8 +1741,8 @@ gameLoop();
 updateGamepad();
 
 console.log('🎮 タイトル画面からスタート！');
-console.log('✅ オーラ表示ボタン（👁️）で範囲を表示切替（デフォOFF）');
-console.log('✅ Vキーでもオーラ切替可能');
+console.log('✅ 弾：進んだ後の位置で王将の範囲を判定（すり抜けバグ修正）');
+console.log('✅ 王将の範囲内 → 壁すり抜け / 範囲外 → 壁に当たれば消える / 壁なし → どこまでも飛ぶ');
 </script>
 </body>
 </html>
