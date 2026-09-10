@@ -30,7 +30,6 @@
             background: rgba(10, 10, 26, 0.4);
         }
         
-        /* ===== タイトル画面 ===== */
         #titleScreen {
             position: fixed;
             top: 0; left: 0;
@@ -118,7 +117,6 @@
             z-index: 2;
         }
         
-        /* ===== 設定画面 ===== */
         #settingsScreen {
             position: fixed;
             top: 0; left: 0;
@@ -261,7 +259,6 @@
             box-shadow: 0 0 20px rgba(255,215,0,0.4);
         }
         
-        /* ===== ゲーム画面 ===== */
         #gameScreen {
             display: none;
             position: fixed;
@@ -551,7 +548,6 @@
 </head>
 <body>
 
-<!-- ===== タイトル画面 ===== -->
 <div id="titleScreen">
     <div class="screen-bg"></div>
     <div class="content">
@@ -566,7 +562,6 @@
     <div class="version">v1.0</div>
 </div>
 
-<!-- ===== 設定画面 ===== -->
 <div id="settingsScreen">
     <div class="screen-bg"></div>
     <div class="content">
@@ -617,7 +612,6 @@
     </div>
 </div>
 
-<!-- ===== ゲーム画面 ===== -->
 <div id="gameScreen">
     <div id="gameWrapper">
         <div id="canvasContainer">
@@ -648,7 +642,6 @@
     </div>
 </div>
 
-<!-- ===== 勝利/ゲームオーバー ===== -->
 <div id="victoryOverlay">
     <div class="title">🎉 GRT+ 発見！</div>
     <div class="sub">データベースの王将、おめでとうございます！</div>
@@ -670,8 +663,8 @@
 // ゲーム設定
 // ============================================
 var settings = {
-    enemyCount: 10,      // ★ デフォルト10
-    playerHp: 30,        // ★ デフォルト30
+    enemyCount: 10,
+    playerHp: 30,
     playerAtk: 1,
     enemyHp: 2,
     enemyAtk: 1
@@ -725,6 +718,9 @@ var isFalling = false;
 var FALL_DAMAGE_THRESHOLD = 5;
 
 var gameRunning = false;
+
+// ★ 王将の範囲（壁すり抜け判定の半径）
+var ROYAL_RANGE = 1; // 1ブロック分（3×3マス）
 
 // ============================================
 // 画面遷移
@@ -802,7 +798,6 @@ function createWorld() {
         }
     }
     
-    // 巣
     var nestCount = 10 + Math.floor(Math.random() * 8);
     var nestPositions = [];
     
@@ -850,7 +845,6 @@ function createWorld() {
         }
     }
     
-    // GRT
     var grtPlaced = false;
     for (var attempts = 0; attempts < 300 && !grtPlaced; attempts++) {
         var gx = 5 + Math.floor(Math.random() * (COLS - 10));
@@ -894,7 +888,6 @@ function createWorld() {
         }
     }
     
-    // 地上の蜂蟻は敵数が少ない時のみ（最低1匹は地上に出す）
     var surfaceCount = Math.max(1, Math.floor(settings.enemyCount * 0.08));
     for (var i = 0; i < surfaceCount; i++) {
         var ex = 3 + Math.floor(Math.random() * (COLS - 6));
@@ -958,6 +951,13 @@ function isSolid(x, y) {
     return world[y][x] !== 0 && world[y][x] !== 6;
 }
 
+// ★ 王将の範囲内かどうかを判定
+function isInRoyalRange(x, y) {
+    var dx = Math.abs(x - (player.x + 0.5));
+    var dy = Math.abs(y - (player.y + 0.5));
+    return dx <= ROYAL_RANGE + 0.5 && dy <= ROYAL_RANGE + 0.5;
+}
+
 // ============================================
 // 物理更新
 // ============================================
@@ -975,9 +975,8 @@ function updatePhysics() {
         moveDir = null;
     }
     
-    // ★ ジャンプ力：約3ブロック（落下ダメージ5ブロック未満に収まる）
     if (isJumping && onGround) {
-        vy = -2.2;  // 従来の-3.2から-2.2に変更
+        vy = -2.2;
         onGround = false;
         isJumping = false;
         isFalling = false;
@@ -1075,25 +1074,43 @@ function updatePhysics() {
         }
     }
     
-    // ★ 弾：壁に当たるまで無限に飛ぶ（life制限を撤廃）
+    // ★ 弾：王将の範囲内は壁をすり抜ける
     for (var i = bullets.length - 1; i >= 0; i--) {
         var b = bullets[i];
+        
+        // 進む前の位置で王将の範囲内かを確認
+        var inRoyalRange = isInRoyalRange(b.x, b.y);
+        
+        // 進む
         b.x += b.vx;
         b.y += b.vy;
-        // b.lifeのデクリメントを削除
         
-        // 画面外に出たら削除（念のため）
+        // 画面外に出たら削除
         if (b.x < -5 || b.x > COLS + 5 || b.y < -5 || b.y > ROWS + 5) {
             bullets.splice(i, 1);
             continue;
         }
         
-        // 壁に当たったら消滅
-        if (isSolid(Math.floor(b.x), Math.floor(b.y))) {
+        // ★ 王将の範囲外なら壁判定あり、範囲内なら壁を無視
+        if (!inRoyalRange && isSolid(Math.floor(b.x), Math.floor(b.y))) {
+            // 壁に当たった時、ヒットエフェクト
+            for (var p = 0; p < 6; p++) {
+                particles.push({
+                    x: b.x * BW + BW/2,
+                    y: b.y * BW + BW/2,
+                    vx: (Math.random() - 0.5) * 3,
+                    vy: (Math.random() - 0.5) * 3,
+                    life: 10 + Math.random() * 10,
+                    maxLife: 20,
+                    size: 2 + Math.random() * 2,
+                    color: '#FFD700'
+                });
+            }
             bullets.splice(i, 1);
             continue;
         }
         
+        // 敵に当たったかチェック
         var hit = false;
         for (var j = enemies.length - 1; j >= 0; j--) {
             var e = enemies[j];
@@ -1162,7 +1179,6 @@ function fireBullets() {
             y: player.y + 0.5,
             vx: Math.cos(angle) * 0.8,
             vy: Math.sin(angle) * 0.8
-            // lifeプロパティ削除
         });
     }
     
@@ -1238,6 +1254,16 @@ function draw() {
         }
     }
     
+    // ★ 王将の範囲を可視化（薄い金色の枠）
+    var px = player.x * BW - camera.x;
+    var py = player.y * BW - camera.y;
+    var rangeSize = (ROYAL_RANGE * 2 + 1) * BW;
+    ctx.strokeStyle = 'rgba(255,215,0,' + (0.15 + Math.sin(Date.now()/500) * 0.1) + ')';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([4, 4]);
+    ctx.strokeRect(px - BW + BW/2, py - BW + BW/2, rangeSize, rangeSize);
+    ctx.setLineDash([]);
+    
     for (var i = 0; i < bullets.length; i++) {
         var b = bullets[i];
         var bx = b.x * BW - camera.x;
@@ -1299,8 +1325,8 @@ function draw() {
         }
     }
     
-    var px = player.x * BW - camera.x;
-    var py = player.y * BW - camera.y;
+    px = player.x * BW - camera.x;
+    py = player.y * BW - camera.y;
     
     ctx.fillStyle = 'rgba(0,0,0,0.3)';
     ctx.beginPath();
@@ -1646,10 +1672,7 @@ gameLoop();
 updateGamepad();
 
 console.log('🎮 タイトル画面からスタート！');
-console.log('✅ ジャンプ力: 約3ブロック（落下ダメージ5ブロック未満）');
-console.log('✅ 蜂蟻デフォルト: 10匹');
-console.log('✅ プレイヤーHPデフォルト: 30 (1〜100で調整可能)');
-console.log('✅ 弾: 壁に当たるまで無限に飛ぶ');
+console.log('✅ 弾：王将の範囲（周囲1ブロック）は壁をすり抜けて敵に当たる');
 </script>
 </body>
 </html>
