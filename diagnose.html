@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BitFlyer ポートフォリオ・アールヌーヴォー</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,400&family=Zen+Kaku+Gothic+New:wght@300;400;500&display=swap');
+
+  :root {
+    --gold: #c9a84c;
+    --gold-light: #e8d5a3;
+    --deep: #1a1a2e;
+    --deep2: #16213e;
+    --cream: #f5f0e8;
+    --green: #4a7c59;
+    --green-light: #7ba88a;
+    --rose: #b56576;
+    --violet: #6b4c7a;
+    --teal: #3d6b6b;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Cormorant Garamond', 'Zen Kaku Gothic New', serif;
+    background: var(--deep);
+    color: var(--cream);
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  /* Art Nouveau background pattern */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      radial-gradient(ellipse at 20% 30%, rgba(201,168,76,0.06) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 70%, rgba(107,76,122,0.08) 0%, transparent 50%),
+      radial-gradient(ellipse at 50% 50%, rgba(61,107,107,0.05) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Art Nouveau border frame */
+  .frame {
+    position: fixed;
+    inset: 12px;
+    border: 2px solid var(--gold);
+    border-radius: 2px;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0.5;
+  }
+  .frame::before, .frame::after {
+    content: '❦';
+    position: absolute;
+    color: var(--gold);
+    font-size: 1.8rem;
+    opacity: 0.8;
+  }
+  .frame::before { top: -14px; left: 30px; background: var(--deep); padding: 0 8px; }
+  .frame::after { bottom: -14px; right: 30px; background: var(--deep); padding: 0 8px; }
+
+  /* Art Nouveau corner flourishes */
+  .corner {
+    position: fixed;
+    width: 80px; height: 80px;
+    z-index: 2;
+    pointer-events: none;
+    opacity: 0.6;
+  }
+  .corner svg { width: 100%; height: 100%; }
+  .corner.tl { top: 0; left: 0; }
+  .corner.tr { top: 0; right: 0; transform: scaleX(-1); }
+  .corner.bl { bottom: 0; left: 0; transform: scaleY(-1); }
+  .corner.br { bottom: 0; right: 0; transform: scale(-1,-1); }
+
+  .container {
+    position: relative;
+    z-index: 3;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 60px 30px 80px;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 50px;
+  }
+
+  h1 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(2rem, 5vw, 3.2rem);
+    font-weight: 300;
+    letter-spacing: 0.15em;
+    color: var(--gold);
+    text-shadow: 0 0 30px rgba(201,168,76,0.3);
+    margin-bottom: 10px;
+  }
+
+  .subtitle {
+    font-size: 1rem;
+    letter-spacing: 0.3em;
+    color: var(--gold-light);
+    opacity: 0.7;
+    font-weight: 300;
+  }
+
+  .divider {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    margin: 25px 0;
+    color: var(--gold);
+    opacity: 0.6;
+  }
+  .divider::before, .divider::after {
+    content: '';
+    height: 1px;
+    width: 80px;
+    background: linear-gradient(to right, transparent, var(--gold));
+  }
+  .divider::after { background: linear-gradient(to left, transparent, var(--gold)); }
+
+  /* Legend */
+  .legend {
+    display: flex;
+    justify-content: center;
+    gap: 25px;
+    flex-wrap: wrap;
+    margin-bottom: 40px;
+    font-size: 0.85rem;
+    letter-spacing: 0.1em;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--gold-light);
+    opacity: 0.8;
+  }
+  .dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    border: 1.5px solid var(--gold);
+  }
+  .dot.lightning { background: var(--green); }
+  .dot.exchange { background: var(--rose); }
+
+  /* Grid */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 30px;
+  }
+
+  .card {
+    background: linear-gradient(160deg, rgba(22,33,62,0.9), rgba(26,26,46,0.95));
+    border: 1.5px solid rgba(201,168,76,0.35);
+    border-radius: 4px;
+    padding: 30px 25px 25px;
+    position: relative;
+    transition: all 0.4s ease;
+    opacity: 0;
+    transform: translateY(20px);
+    animation: fadeIn 0.6s ease forwards;
+  }
+
+  @keyframes fadeIn {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .card:hover {
+    border-color: rgba(201,168,76,0.7);
+    box-shadow: 0 0 40px rgba(201,168,76,0.1), inset 0 0 30px rgba(201,168,76,0.03);
+    transform: translateY(-3px);
+  }
+
+  /* Art Nouveau top border ornament */
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 50%;
+    transform: translateX(-50%);
+    width: 60%;
+    height: 3px;
+    background: linear-gradient(to right, transparent, var(--gold), transparent);
+    border-radius: 0 0 3px 3px;
+  }
+
+  .card-ornament {
+    position: absolute;
+    top: -10px; left: 50%;
+    transform: translateX(-50%);
+    color: var(--gold);
+    font-size: 1.2rem;
+    background: var(--deep);
+    padding: 0 10px;
+    opacity: 0.8;
+  }
+
+  .card-header {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+
+  .persona-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--gold);
+    letter-spacing: 0.05em;
+    margin-bottom: 5px;
+  }
+
+  .persona-desc {
+    font-size: 0.78rem;
+    color: var(--gold-light);
+    opacity: 0.6;
+    font-style: italic;
+  }
+
+  .total {
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--green-light);
+    margin: 15px 0;
+    padding: 8px 0;
+    border-top: 1px solid rgba(201,168,76,0.15);
+    border-bottom: 1px solid rgba(201,168,76,0.15);
+    letter-spacing: 0.1em;
+  }
+
+  .coin-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .coin-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.88rem;
+  }
+
+  .coin-symbol {
+    width: 55px;
+    font-weight: 600;
+    color: var(--cream);
+    font-family: 'Zen Kaku Gothic New', sans-serif;
+    font-size: 0.82rem;
+    letter-spacing: 0.05em;
+  }
+
+  .coin-bar-wrap {
+    flex: 1;
+    height: 18px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .coin-bar {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    position: relative;
+  }
+
+  .coin-bar.lightning {
+    background: linear-gradient(90deg, rgba(74,124,89,0.4), var(--green-light));
+    border-right: 1px solid var(--green-light);
+  }
+  .coin-bar.exchange {
+    background: linear-gradient(90deg, rgba(181,101,118,0.4), var(--rose));
+    border-right: 1px solid var(--rose);
+  }
+
+  .coin-amount {
+    width: 75px;
+    text-align: right;
+    font-family: 'Zen Kaku Gothic New', sans-serif;
+    font-size: 0.78rem;
+    color: var(--gold-light);
+    font-weight: 400;
+  }
+
+  .coin-pct {
+    width: 45px;
+    text-align: right;
+    font-size: 0.72rem;
+    color: var(--gold);
+    opacity: 0.7;
+    font-family: 'Zen Kaku Gothic New', sans-serif;
+  }
+
+  .badge {
+    font-size: 0.6rem;
+    padding: 1px 5px;
+    border-radius: 2px;
+    letter-spacing: 0.05em;
+    margin-left: 4px;
+    vertical-align: middle;
+    font-family: 'Zen Kaku Gothic New', sans-serif;
+  }
+  .badge.lightning {
+    background: rgba(74,124,89,0.25);
+    color: var(--green-light);
+    border: 1px solid rgba(74,124,89,0.4);
+  }
+  .badge.exchange {
+    background: rgba(181,101,118,0.2);
+    color: var(--rose);
+    border: 1px solid rgba(181,101,118,0.35);
+  }
+
+  footer {
+    text-align: center;
+    margin-top: 60px;
+    font-size: 0.75rem;
+    color: var(--gold-light);
+    opacity: 0.4;
+    letter-spacing: 0.15em;
+  }
+
+  /* Art Nouveau whiplash SVG decorations */
+  .whiplash {
+    position: fixed;
+    z-index: 0;
+    opacity: 0.06;
+    pointer-events: none;
+  }
+
+  @media (max-width: 600px) {
+    .container { padding: 40px 16px 60px; }
+    .grid { grid-template-columns: 1fr; }
+    .frame { inset: 6px; }
+    .coin-symbol { width: 45px; font-size: 0.75rem; }
+    .coin-amount { width: 65px; font-size: 0.72rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Art Nouveau frame -->
+<div class="frame"></div>
+
+<!-- Corner flourishes -->
+<div class="corner tl"><svg viewBox="0 0 80 80" fill="none" stroke="#c9a84c" stroke-width="1.2"><path d="M0 40 Q20 20 40 0 M0 60 Q30 30 60 0 M0 75 Q40 40 75 0"/><circle cx="12" cy="12" r="3" fill="#c9a84c" opacity="0.5"/></svg></div>
+<div class="corner tr"><svg viewBox="0 0 80 80" fill="none" stroke="#c9a84c" stroke-width="1.2"><path d="M0 40 Q20 20 40 0 M0 60 Q30 30 60 0 M0 75 Q40 40 75 0"/><circle cx="12" cy="12" r="3" fill="#c9a84c" opacity="0.5"/></svg></div>
+<div class="corner bl"><svg viewBox="0 0 80 80" fill="none" stroke="#c9a84c" stroke-width="1.2"><path d="M0 40 Q20 20 40 0 M0 60 Q30 30 60 0 M0 75 Q40 40 75 0"/><circle cx="12" cy="12" r="3" fill="#c9a84c" opacity="0.5"/></svg></div>
+<div class="corner br"><svg viewBox="0 0 80 80" fill="none" stroke="#c9a84c" stroke-width="1.2"><path d="M0 40 Q20 20 40 0 M0 60 Q30 30 60 0 M0 75 Q40 40 75 0"/><circle cx="12" cy="12" r="3" fill="#c9a84c" opacity="0.5"/></svg></div>
+
+<!-- Whiplash decorations -->
+<svg class="whiplash" style="top:15%;left:-60px;width:300px;height:400px;" viewBox="0 0 300 400" fill="none" stroke="#c9a84c" stroke-width="1.5">
+  <path d="M150 0 Q250 100 150 200 Q50 300 150 400"/>
+  <path d="M120 0 Q220 100 120 200 Q20 300 120 400"/>
+  <path d="M180 0 Q280 100 180 200 Q80 300 180 400"/>
+</svg>
+<svg class="whiplash" style="bottom:10%;right:-80px;width:350px;height:450px;" viewBox="0 0 350 450" fill="none" stroke="#c9a84c" stroke-width="1.5">
+  <path d="M175 0 Q275 150 175 300 Q75 450 175 450"/>
+  <path d="M145 0 Q245 150 145 300 Q45 450 145 450"/>
+  <path d="M205 0 Q305 150 205 300 Q105 450 205 450"/>
+</svg>
+
+<div class="container">
+  <header>
+    <h1>BitFlyer Portfolio</h1>
+    <div class="divider">❧</div>
+    <p class="subtitle">人物タイプ別 仮想通貨配分</p>
+  </header>
+
+  <div class="legend">
+    <div class="legend-item"><span class="dot lightning"></span>Lightning（手数料安）</div>
+    <div class="legend-item"><span class="dot exchange"></span>販売所（手数料高）</div>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <footer>
+    <p>※ 各タイプは最低3000円以上をいずれかの銘柄に投資</p>
+    <p style="margin-top:6px;">BitFlyer Lightning: BTC / ETH / XRP / XLM ｜ 販売所: その他9銘柄</p>
+  </footer>
+</div>
+
+<script>
+// ============================================================
+// データ定義
+// ============================================================
+
+const COINS = [
+  { symbol: 'BTC',    name: 'Bitcoin',   lightning: true  },
+  { symbol: 'ETH',    name: 'Ethereum',  lightning: true  },
+  { symbol: 'XRP',    name: 'XRP',       lightning: true  },
+  { symbol: 'XLM',    name: 'Stellar',   lightning: true  },
+  { symbol: 'SOL',    name: 'Solana',    lightning: false },
+  { symbol: 'AVAX',   name: 'Avalanche', lightning: false },
+  { symbol: 'LINK',   name: 'Chainlink', lightning: false },
+  { symbol: 'POL',    name: 'Polygon',   lightning: false },
+  { symbol: 'GRT',    name: 'The Graph', lightning: false },
+  { symbol: 'RENDER', name: 'Render',    lightning: false },
+  { symbol: 'DOGE',   name: 'Dogecoin',  lightning: false },
+  { symbol: 'SHIB',   name: 'Shiba Inu', lightning: false },
+  { symbol: 'PEPE',   name: 'Pepe',      lightning: false },
+];
+
+// 各タイプの重み（0 = 買わない、数値が大きいほど多く買う）
+// Lightning銘柄は手数料安なのでやや重みを高めに調整
+const PERSONAS = [
+  {
+    name: '陰キャ公認会計士',
+    desc: 'リスク管理は徹底。でも心はDOGEに揺れる',
+    weights: {
+      BTC: 30, ETH: 25, XRP: 15, XLM: 10,
+      SOL: 8, AVAX: 3, LINK: 5, POL: 2,
+      GRT: 1, RENDER: 1, DOGE: 0, SHIB: 0, PEPE: 0
+    }
+  },
+  {
+    name: '陰キャ社長',
+    desc: 'DeFiとインフラに全振り。でもPEPEは買う',
+    weights: {
+      BTC: 20, ETH: 20, XRP: 5, XLM: 5,
+      SOL: 15, AVAX: 10, LINK: 10, POL: 5,
+      GRT: 3, RENDER: 5, DOGE: 0, SHIB: 0, PEPE: 2
+    }
+  },
+  {
+    name: '土方労働者のパワー系',
+    desc: 'DOGEとSHIBで夢を見る。BTCは貯金',
+    weights: {
+      BTC: 15, ETH: 10, XRP: 10, XLM: 5,
+      SOL: 5, AVAX: 5, LINK: 3, POL: 2,
+      GRT: 0, RENDER: 0, DOGE: 25, SHIB: 15, PEPE: 5
+    }
+  },
+  {
+    name: '入れ墨ラッパーヤンキー',
+    desc: 'PEPEとSHIBで一発逆転。XRPも応援',
+    weights: {
+      BTC: 10, ETH: 10, XRP: 15, XLM: 5,
+      SOL: 5, AVAX: 3, LINK: 2, POL: 0,
+      GRT: 0, RENDER: 0, DOGE: 15, SHIB: 20, PEPE: 15
+    }
+  },
+  {
+    name: '背が高く顔も良しだがポンコツ君',
+    desc: '見た目は完璧。ポートフォリオは謎',
+    weights: {
+      BTC: 15, ETH: 15, XRP: 10, XLM: 10,
+      SOL: 10, AVAX: 5, LINK: 5, POL: 5,
+      GRT: 2, RENDER: 3, DOGE: 5, SHIB: 3, PEPE: 2
+    }
+  },
+  {
+    name: '優等生男子',
+    desc: '教科書通り。BTCとETH中心、たまに冒険',
+    weights: {
+      BTC: 30, ETH: 25, XRP: 10, XLM: 10,
+      SOL: 8, AVAX: 5, LINK: 5, POL: 3,
+      GRT: 1, RENDER: 2, DOGE: 1, SHIB: 0, PEPE: 0
+    }
+  },
+  {
+    name: 'パワハラ気質だか社会性の高い人',
+    desc: '結果を出す。LINKとSOLで攻める',
+    weights: {
+      BTC: 25, ETH: 20, XRP: 10, XLM: 5,
+      SOL: 12, AVAX: 8, LINK: 8, POL: 4,
+      GRT: 2, RENDER: 3, DOGE: 2, SHIB: 1, PEPE: 0
+    }
+  },
+  {
+    name: 'ギャル',
+    desc: 'かわいいコインが好き。DOGEとPEPEは外せない',
+    weights: {
+      BTC: 10, ETH: 10, XRP: 5, XLM: 5,
+      SOL: 8, AVAX: 3, LINK: 2, POL: 2,
+      GRT: 0, RENDER: 0, DOGE: 25, SHIB: 15, PEPE: 15
+    }
+  },
+  {
+    name: '優等生女子',
+    desc: '堅実に。でもRENDERとGRTにちょっと興味',
+    weights: {
+      BTC: 25, ETH: 25, XRP: 10, XLM: 10,
+      SOL: 8, AVAX: 5, LINK: 5, POL: 3,
+      GRT: 3, RENDER: 3, DOGE: 2, SHIB: 1, PEPE: 0
+    }
+  },
+  {
+    name: '上品な女アイドル',
+    desc: 'ファンに優しい。BTCとXLMで安定感',
+    weights: {
+      BTC: 30, ETH: 20, XRP: 10, XLM: 15,
+      SOL: 5, AVAX: 3, LINK: 5, POL: 2,
+      GRT: 1, RENDER: 1, DOGE: 3, SHIB: 2, PEPE: 3
+    }
+  },
+  {
+    name: '女性の権利を主張するバツイチのグラビア女',
+    desc: '自立と自由。SOLとAVAXで攻める',
+    weights: {
+      BTC: 15, ETH: 15, XRP: 10, XLM: 5,
+      SOL: 15, AVAX: 10, LINK: 8, POL: 5,
+      GRT: 3, RENDER: 3, DOGE: 5, SHIB: 3, PEPE: 3
+    }
+  },
+  {
+    name: '工場で働く人',
+    desc: 'コツコツ積み立て。BTCとXRPが柱',
+    weights: {
+      BTC: 25, ETH: 15, XRP: 15, XLM: 10,
+      SOL: 5, AVAX: 5, LINK: 5, POL: 3,
+      GRT: 2, RENDER: 2, DOGE: 5, SHIB: 5, PEPE: 3
+    }
+  },
+  {
+    name: '借金まみれのパチンカス',
+    desc: '一発狙い。PEPEとSHIBとDOGEに全ベット',
+    weights: {
+      BTC: 5, ETH: 5, XRP: 5, XLM: 0,
+      SOL: 5, AVAX: 0, LINK: 0, POL: 0,
+      GRT: 0, RENDER: 0, DOGE: 30, SHIB: 25, PEPE: 25
+    }
+  },
+  {
+    name: '成績優秀の営業マンだがリアリティーショーに参加すると尖ってる人',
+    desc: '普段は堅実、でもSHIBとPEPEに謎の自信',
+    weights: {
+      BTC: 20, ETH: 20, XRP: 10, XLM: 5,
+      SOL: 10, AVAX: 5, LINK: 5, POL: 3,
+      GRT: 2, RENDER: 2, DOGE: 8, SHIB: 5, PEPE: 5
+    }
+  },
+  {
+    name: 'バンドマンのプログラマー',
+    desc: '技術に理解あり。GRTとRENDERは応援',
+    weights: {
+      BTC: 15, ETH: 20, XRP: 5, XLM: 5,
+      SOL: 10, AVAX: 5, LINK: 10, POL: 5,
+      GRT: 8, RENDER: 8, DOGE: 3, SHIB: 3, PEPE: 3
+    }
+  },
+  {
+    name: '親が金持ちの慶応のちゃら男',
+    desc: 'とりあえず全部買う。DOGEで遊ぶ',
+    weights: {
+      BTC: 20, ETH: 15, XRP: 5, XLM: 5,
+      SOL: 10, AVAX: 5, LINK: 5, POL: 5,
+      GRT: 3, RENDER: 3, DOGE: 10, SHIB: 8, PEPE: 6
+    }
+  },
+  {
+    name: '一般的な主婦',
+    desc: '安定第一。BTCとETHとXLMでコツコツ',
+    weights: {
+      BTC: 30, ETH: 25, XRP: 10, XLM: 15,
+      SOL: 5, AVAX: 3, LINK: 3, POL: 2,
+      GRT: 1, RENDER: 1, DOGE: 3, SHIB: 2, PEPE: 0
+    }
+  },
+];
+
+// ============================================================
+// ポートフォリオ計算
+// ============================================================
+
+const TOTAL_BUDGET = 50000; // 各タイプの総投資額（円）
+
+function buildPortfolio(persona) {
+  const weights = persona.weights;
+  const active = COINS.filter(c => (weights[c.symbol] || 0) > 0);
+
+  // 最低3000円保証：アクティブ銘柄数 × 3000 が総額を超えないように
+  const minTotal = active.length * 3000;
+  const budget = Math.max(TOTAL_BUDGET, minTotal);
+
+  const totalWeight = active.reduce((s, c) => s + weights[c.symbol], 0);
+
+  // まず重みで按分
+  let allocs = active.map(c => ({
+    ...c,
+    weight: weights[c.symbol],
+    amount: Math.round((weights[c.symbol] / totalWeight) * budget / 100) * 100 // 100円単位
+  }));
+
+  // 最低3000円を保証
+  allocs.forEach(a => { if (a.amount < 3000) a.amount = 3000; });
+
+  // 合計を再計算し、超過分を比率で調整
+  let sum = allocs.reduce((s, a) => s + a.amount, 0);
+  if (sum > 0) {
+    const scale = budget / sum;
+    allocs.forEach(a => {
+      a.amount = Math.round(a.amount * scale / 100) * 100;
+      if (a.amount < 3000) a.amount = 3000;
+    });
+  }
+
+  // 最終合計
+  const finalTotal = allocs.reduce((s, a) => s + a.amount, 0);
+  const maxAmount = Math.max(...allocs.map(a => a.amount));
+
+  return { allocs, total: finalTotal, maxAmount };
+}
+
+// ============================================================
+// レンダリング
+// ============================================================
+
+const grid = document.getElementById('grid');
+
+PERSONAS.forEach((persona, idx) => {
+  const { allocs, total, maxAmount } = buildPortfolio(persona);
+
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.style.animationDelay = `${idx * 0.08}s`;
+
+  const ornament = document.createElement('div');
+  ornament.className = 'card-ornament';
+  ornament.textContent = '❧';
+  card.appendChild(ornament);
+
+  // ヘッダー
+  const header = document.createElement('div');
+  header.className = 'card-header';
+  header.innerHTML = `
+    <div class="persona-name">${persona.name}</div>
+    <div class="persona-desc">${persona.desc}</div>
+  `;
+  card.appendChild(header);
+
+  // 合計
+  const totalEl = document.createElement('div');
+  totalEl.className = 'total';
+  totalEl.textContent = `総投資額 ¥${total.toLocaleString()}`;
+  card.appendChild(totalEl);
+
+  // コインリスト
+  const list = document.createElement('div');
+  list.className = 'coin-list';
+
+  // 金額の多い順にソート
+  const sorted = [...allocs].sort((a, b) => b.amount - a.amount);
+
+  sorted.forEach(coin => {
+    const pct = ((coin.amount / total) * 100).toFixed(1);
+    const barWidth = maxAmount > 0 ? (coin.amount / maxAmount) * 100 : 0;
+    const typeClass = coin.lightning ? 'lightning' : 'exchange';
+    const badgeText = coin.lightning ? 'L' : '販';
+    const badgeClass = coin.lightning ? 'lightning' : 'exchange';
+
+    const row = document.createElement('div');
+    row.className = 'coin-row';
+    row.innerHTML = `
+      <div class="coin-symbol">${coin.symbol}<span class="badge ${badgeClass}">${badgeText}</span></div>
+      <div class="coin-bar-wrap">
+        <div class="coin-bar ${typeClass}" style="width:0%" data-width="${barWidth}%"></div>
+      </div>
+      <div class="coin-amount">¥${coin.amount.toLocaleString()}</div>
+      <div class="coin-pct">${pct}%</div>
+    `;
+    list.appendChild(row);
+  });
+
+  card.appendChild(list);
+  grid.appendChild(card);
+});
+
+// バーアニメーション
+setTimeout(() => {
+  document.querySelectorAll('.coin-bar').forEach(bar => {
+    bar.style.width = bar.dataset.width;
+  });
+}, 300);
+
+</script>
+</body>
+</html>
