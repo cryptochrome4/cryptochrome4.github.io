@@ -274,6 +274,7 @@
             padding-top: 14px;
         }
 
+        /* pass.html 誘導画面 */
         .clear-overlay {
             display: none;
             position: absolute;
@@ -323,7 +324,7 @@
         }
         .clear-card .redirect-btn:active { transform: translateY(4px); border-bottom-width: 2px; }
 
-        /* エンディングオーバーレイ */
+        /* エンディングオーバーレイ (Canvas静止画 → 画像 → 誘導) */
         .ending-overlay {
             display: none;
             position: absolute;
@@ -334,17 +335,20 @@
             z-index: 35;
             border-radius: 16px;
             font-family: 'Segoe UI', 'Arial', sans-serif;
-            padding: 20px;
+            padding: 0;
             overflow: hidden;
         }
         .ending-overlay.active { display: flex; }
+        .ending-overlay canvas,
         .ending-overlay img {
             width: 100%;
             height: 100%;
             object-fit: cover;
             border-radius: 16px;
             image-rendering: pixelated;
+            display: block;
         }
+        .ending-overlay img { display: none; }
 
         .twitch-chat {
             position: absolute;
@@ -446,8 +450,9 @@
                 </div>
             </div>
 
-            <!-- エンディングオーバーレイ (画像表示) -->
+            <!-- エンディングオーバーレイ (Canvas静止画 → 画像) -->
             <div id="endingOverlay" class="ending-overlay">
+                <canvas id="endingCanvas" width="800" height="400"></canvas>
                 <img id="endingImage" src="img178mario.jpg" alt="Mario saves Peach">
             </div>
 
@@ -475,6 +480,9 @@
             // ---------- DOM ----------
             var canvas = document.getElementById('gameCanvas');
             var ctx = canvas.getContext('2d');
+            var endingCanvas = document.getElementById('endingCanvas');
+            var ectx = endingCanvas.getContext('2d');
+            var endingImage = document.getElementById('endingImage');
             var scoreSpan = document.getElementById('scoreDisplay');
             var stageDisplay = document.getElementById('stageDisplay');
             var stageHint = document.getElementById('stageHint');
@@ -1000,7 +1008,6 @@
                 if ((currentStage === 'land' || currentStage === 'desert' || currentStage === 'ice') && m.y > 400) { setGameOver(); return; }
                 if (currentStage === 'magma' && m.y + m.h > 370) { setGameOver(); return; }
                 
-                // コイン取得
                 for (var k = 0; k < game.coins.length; k++) {
                     var coin = game.coins[k];
                     if (coin.collected) continue;
@@ -1012,7 +1019,6 @@
                     }
                 }
                 
-                // エネミー
                 for (var e = 0; e < game.enemies.length; e++) {
                     var enemy = game.enemies[e];
                     if (!enemy.alive) continue;
@@ -1062,7 +1068,6 @@
                     }
                 }
                 
-                // 毒水しぶき
                 if (currentStage === 'water') {
                     game.splashTimer++;
                     if (game.splashTimer >= game.splashInterval) {
@@ -1084,7 +1089,6 @@
                     }
                 }
                 
-                // 弓矢
                 if (currentStage === 'desert') {
                     for (var a = game.arrows.length - 1; a >= 0; a--) {
                         var arrow = game.arrows[a];
@@ -1103,7 +1107,6 @@
                     }
                 }
                 
-                // 弾丸
                 if (currentStage === 'ice') {
                     for (var b = game.bullets.length - 1; b >= 0; b--) {
                         var bullet = game.bullets[b];
@@ -1123,7 +1126,6 @@
                     }
                 }
                 
-                // マグマステージ
                 if (currentStage === 'magma') {
                     game.lavaTimer++;
                     if (game.lavaTimer >= game.lavaInterval) {
@@ -1221,7 +1223,6 @@
                     }
                 }
                 
-                // フラグ
                 var f = game.flag;
                 if (m.x + m.w > f.x + 4 && m.x < f.x + f.w - 4 && m.y + m.h > f.y + 8 && m.y < f.y + f.h - 8) {
                     game.gameClear = true;
@@ -1287,14 +1288,187 @@
                 resetGame();
             });
 
-            // ---------- エンディング (静止画 → 3秒後に pass.html) ----------
+            // ---------- エンディング (ピーチ救出静止画 → 3秒 → 画像 → 3秒 → 誘導画面) ----------
+            function drawPeachRescueScene() {
+                var w = 800, h = 400;
+                // 背景（夜空）
+                var grad = ectx.createLinearGradient(0, 0, 0, h);
+                grad.addColorStop(0, '#0a0a2a');
+                grad.addColorStop(1, '#1a1a3a');
+                ectx.fillStyle = grad;
+                ectx.fillRect(0, 0, w, h);
+                // 星
+                for (var i = 0; i < 50; i++) {
+                    var sx = (i * 37 + 13) % w;
+                    var sy = (i * 53 + 7) % (h * 0.6);
+                    ectx.fillStyle = 'rgba(255,255,220,' + (0.4 + (i % 5) * 0.12) + ')';
+                    ectx.fillRect(sx, sy, 2, 2);
+                }
+                // 地面
+                ectx.fillStyle = '#2a1a3a';
+                ectx.fillRect(0, h - 60, w, 60);
+                ectx.fillStyle = '#3a2a4a';
+                ectx.fillRect(0, h - 60, w, 4);
+
+                // 壊れた檻
+                var cageX = 500, cageY = h - 180, cageW = 80, cageH = 120;
+                ectx.strokeStyle = '#888';
+                ectx.lineWidth = 4;
+                // 壊れた檻の一部だけ描画
+                ectx.beginPath();
+                ectx.moveTo(cageX, cageY);
+                ectx.lineTo(cageX, cageY + cageH);
+                ectx.moveTo(cageX + cageW, cageY);
+                ectx.lineTo(cageX + cageW, cageY + 40);
+                ectx.stroke();
+                // 破片
+                ectx.strokeStyle = '#666';
+                ectx.lineWidth = 3;
+                ectx.beginPath();
+                ectx.moveTo(cageX + 30, cageY + 20);
+                ectx.lineTo(cageX + 50, cageY + 40);
+                ectx.moveTo(cageX + 60, cageY + 10);
+                ectx.lineTo(cageX + 70, cageY + 30);
+                ectx.stroke();
+
+                // ピーチ（檻の外、喜んでいる）
+                var peachX = 510;
+                var peachY = cageY + 30;
+                // ドレス
+                ectx.fillStyle = '#ff69b4';
+                ectx.beginPath();
+                ectx.moveTo(peachX, peachY + 100);
+                ectx.lineTo(peachX - 20, peachY + 100);
+                ectx.lineTo(peachX - 12, peachY + 60);
+                ectx.lineTo(peachX + 12, peachY + 60);
+                ectx.lineTo(peachX + 20, peachY + 100);
+                ectx.closePath();
+                ectx.fill();
+                // 腕（喜び）
+                ectx.strokeStyle = '#f7d9b0';
+                ectx.lineWidth = 5;
+                ectx.beginPath();
+                ectx.moveTo(peachX - 10, peachY + 70);
+                ectx.lineTo(peachX - 22, peachY + 45);
+                ectx.moveTo(peachX + 10, peachY + 70);
+                ectx.lineTo(peachX + 22, peachY + 45);
+                ectx.stroke();
+                // 頭
+                ectx.fillStyle = '#f7d9b0';
+                ectx.beginPath();
+                ectx.arc(peachX, peachY + 50, 14, 0, Math.PI * 2);
+                ectx.fill();
+                // 髪（金）
+                ectx.fillStyle = '#ffd700';
+                ectx.beginPath();
+                ectx.arc(peachX, peachY + 42, 15, Math.PI, Math.PI * 2);
+                ectx.fill();
+                ectx.fillRect(peachX - 15, peachY + 42, 30, 10);
+                ectx.fillRect(peachX - 17, peachY + 52, 6, 14);
+                ectx.fillRect(peachX + 11, peachY + 52, 6, 14);
+                // 目（笑顔）
+                ectx.strokeStyle = '#222';
+                ectx.lineWidth = 1.5;
+                ectx.beginPath();
+                ectx.arc(peachX - 4, peachY + 50, 2, 0, Math.PI);
+                ectx.arc(peachX + 4, peachY + 50, 2, 0, Math.PI);
+                ectx.stroke();
+                // 口（笑顔）
+                ectx.beginPath();
+                ectx.arc(peachX, peachY + 55, 3, 0, Math.PI);
+                ectx.stroke();
+                // 王冠
+                ectx.fillStyle = '#ffd700';
+                ectx.beginPath();
+                ectx.moveTo(peachX - 10, peachY + 38);
+                ectx.lineTo(peachX - 8, peachY + 30);
+                ectx.lineTo(peachX - 3, peachY + 36);
+                ectx.lineTo(peachX, peachY + 28);
+                ectx.lineTo(peachX + 3, peachY + 36);
+                ectx.lineTo(peachX + 8, peachY + 30);
+                ectx.lineTo(peachX + 10, peachY + 38);
+                ectx.closePath();
+                ectx.fill();
+
+                // マリオ（ピーチの隣）
+                var marioX = 440;
+                var marioY = h - 160;
+                ectx.save();
+                ectx.translate(marioX + 15, marioY + 20);
+                // 帽子
+                ectx.fillStyle = '#e33b3b';
+                ectx.fillRect(-14, -22, 28, 12);
+                ectx.fillRect(-10, -28, 20, 8);
+                // 顔
+                ectx.fillStyle = '#f7d9b0';
+                ectx.fillRect(-12, -10, 24, 16);
+                // 目（笑顔）
+                ectx.strokeStyle = '#222';
+                ectx.lineWidth = 1.5;
+                ectx.beginPath();
+                ectx.arc(-4, -3, 2, 0, Math.PI);
+                ectx.arc(4, -3, 2, 0, Math.PI);
+                ectx.stroke();
+                // 口（笑顔）
+                ectx.beginPath();
+                ectx.arc(0, 3, 3, 0, Math.PI);
+                ectx.stroke();
+                // 体
+                ectx.fillStyle = '#e33b3b';
+                ectx.fillRect(-12, 6, 24, 16);
+                // ボタン
+                ectx.fillStyle = '#f5c542';
+                ectx.fillRect(-6, 12, 3, 3);
+                ectx.fillRect(3, 12, 3, 3);
+                // 足
+                ectx.fillStyle = '#2d2d8a';
+                ectx.fillRect(-12, 22, 10, 6);
+                ectx.fillRect(2, 22, 10, 6);
+                ectx.restore();
+
+                // ハート
+                ectx.fillStyle = '#ff3366';
+                ectx.save();
+                ectx.translate(peachX - 40, peachY - 20);
+                ectx.beginPath();
+                ectx.moveTo(0, 5);
+                ectx.bezierCurveTo(-8, -5, -16, 5, 0, 15);
+                ectx.bezierCurveTo(16, 5, 8, -5, 0, 5);
+                ectx.fill();
+                ectx.restore();
+
+                // テキスト
+                ectx.fillStyle = '#ffd700';
+                ectx.font = 'bold 36px "Segoe UI", sans-serif';
+                ectx.textAlign = 'center';
+                ectx.fillText('Thank you Mario!', w/2, 80);
+                ectx.font = 'bold 22px "Segoe UI", sans-serif';
+                ectx.fillStyle = '#fff';
+                ectx.fillText('Your quest is over.', w/2, 120);
+                ectx.textAlign = 'left';
+            }
+
             function startEnding() {
                 isEndingActive = true;
                 endingOverlay.classList.add('active');
-                // 3秒後に pass.html へ誘導
+                // フェーズ0: ピーチ救出の静止画（Canvas）
+                endingCanvas.style.display = 'block';
+                endingImage.style.display = 'none';
+                drawPeachRescueScene();
+
+                // 3秒後にフェーズ1: 画像表示
                 setTimeout(function() {
-                    window.location.href = 'pass.html';
+                    endingCanvas.style.display = 'none';
+                    endingImage.style.display = 'block';
                 }, 3000);
+
+                // さらに3秒後（合計6秒）にフェーズ2: pass.html誘導画面
+                setTimeout(function() {
+                    endingOverlay.classList.remove('active');
+                    isEndingActive = false;
+                    isClearOverlayActive = true;
+                    clearOverlay.classList.add('active');
+                }, 6000);
             }
 
             // ---------- 描画 ----------
@@ -1401,7 +1575,6 @@
                     }
                 }
                 
-                // プラットフォーム
                 for (var i = 0; i < game.platforms.length; i++) {
                     var p = game.platforms[i];
                     if (p.lava) {
@@ -1525,7 +1698,6 @@
                     }
                 }
                 
-                // コイン
                 for (var c = 0; c < game.coins.length; c++) {
                     var coin = game.coins[c];
                     if (coin.collected) continue;
@@ -1543,7 +1715,6 @@
                     ctx.shadowBlur = 0;
                 }
                 
-                // エネミー
                 for (var e = 0; e < game.enemies.length; e++) {
                     var enemy = game.enemies[e];
                     if (!enemy.alive) continue;
@@ -1600,7 +1771,6 @@
                     }
                 }
                 
-                // クッパ
                 if (currentStage === 'magma' && game.bowser && game.bowser.alive) {
                     var b3 = game.bowser;
                     ctx.fillStyle = '#2a6a2a';
@@ -1684,7 +1854,6 @@
                     }
                 }
                 
-                // 毒水しぶき
                 if (currentStage === 'water') {
                     for (var s = 0; s < game.poisonSplashes.length; s++) {
                         var splash = game.poisonSplashes[s];
@@ -1696,7 +1865,6 @@
                     }
                 }
                 
-                // 弓矢
                 if (currentStage === 'desert') {
                     for (var a = 0; a < game.arrows.length; a++) {
                         var arrow = game.arrows[a];
@@ -1722,7 +1890,6 @@
                     }
                 }
                 
-                // 弾丸
                 if (currentStage === 'ice') {
                     for (var bi = 0; bi < game.bullets.length; bi++) {
                         var bullet = game.bullets[bi];
@@ -1750,7 +1917,6 @@
                     }
                 }
                 
-                // 溶岩柱 + テスラ + ロケット
                 if (currentStage === 'magma') {
                     for (var lc = 0; lc < game.lavaColumns.length; lc++) {
                         var lava = game.lavaColumns[lc];
@@ -1836,7 +2002,6 @@
                     }
                 }
                 
-                // フラグ
                 var f = game.flag;
                 ctx.fillStyle = '#6a6a6a';
                 ctx.fillRect(f.x + 10, f.y, 6, f.baseY - f.y);
@@ -1850,7 +2015,6 @@
                 ctx.font = 'bold 18px sans-serif';
                 ctx.fillText('🏁', f.x - 2, f.y + 52);
                 
-                // マリオ
                 var m = game.mario;
                 ctx.save();
                 ctx.translate(m.x + m.w/2, m.y + m.h/2);
@@ -2038,7 +2202,6 @@
             // ---------- ゲームループ ----------
             function gameLoop() {
                 if (isEndingActive) {
-                    // エンディング中は物理も描画も停止
                     return;
                 }
                 if (!game.gameClear && !game.gameOver && !waitingForStageTransition && !isRetryOverlayActive) {
