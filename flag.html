@@ -25,9 +25,6 @@
             width: 100%;
             position: relative;
         }
-        .container.hidden {
-            display: none;
-        }
         .canvas-wrap {
             position: relative;
             display: inline-block;
@@ -147,44 +144,53 @@
             pointer-events: none;
         }
 
-        /* ============ オープニング画面（独立した全面スクリーン） ============ */
-        .opening-screen {
-            position: fixed;
-            top: 0; left: 0;
-            width: 100vw;
-            height: 100vh;
-            background: #000;
-            z-index: 9999;
+        /* オープニング画面 */
+        .opening-overlay {
+            display: flex;
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: #0a0a1a;
+            justify-content: flex-end;
+            align-items: flex-start;
+            z-index: 40;
+            border-radius: 16px;
             overflow: hidden;
+            padding: 0;
         }
-        .opening-screen.hidden {
+        .opening-overlay.hidden {
             display: none;
         }
-        .opening-screen .bg-img {
+        .opening-overlay .bg-img {
             position: absolute;
             top: 0; left: 0;
             width: 100%;
             height: 100%;
-            object-fit: cover;
+            object-fit: fill;
+            border-radius: 16px;
             image-rendering: pixelated;
-            display: block;
         }
-        /* 「はじめる」：画像と同じコンテナ内に置くことで、ズーム時も一体で挙動 */
-        .opening-screen .start-btn {
+        /* 黄色い枠を削除し、はじめる文字のみ。薄い黄色 + 黒い影 */
+        .opening-overlay .start-btn {
             position: absolute;
-            left: 40px;
-            bottom: 40px;
+            left: 7%;
+            bottom: 20%;
             background: transparent;
             border: none;
-            color: #000;
+            color: #ffee99;
             font-weight: bold;
-            font-size: 32px;
+            font-size: 21px;
             padding: 8px 16px;
+            border-radius: 0;
             cursor: pointer;
-            letter-spacing: 6px;
+            letter-spacing: 4px;
             z-index: 2;
-            font-family: 'Arial', 'メイリオ', sans-serif;
-            text-shadow: 0 0 8px rgba(255,255,255,0.9), 0 0 16px rgba(255,255,255,0.7);
+            text-shadow: 3px 3px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+        }
+        .opening-overlay .start-btn:hover {
+            opacity: 0.85;
+        }
+        .opening-overlay .start-btn:active {
+            transform: translateY(2px);
         }
 
         .stage-transition {
@@ -454,23 +460,21 @@
 
         @media (max-width: 640px) {
             .twitch-chat { width: 120px; height: 250px; right: 4px; top: 6px; }
-            .opening-screen .start-btn { font-size: 24px; left: 20px; bottom: 20px; }
+            .opening-overlay .start-btn { font-size: 22px; left: 20px; bottom: 20px; }
         }
     </style>
 </head>
 <body>
-
-    <!-- ============ オープニング画面（画像＋はじめるボタンを同じコンテナ内に） ============ -->
-    <div id="openingScreen" class="opening-screen">
-        <img class="bg-img" src="img179mario.jpg" alt="Mario Opening">
-        <button id="startBtn" class="start-btn">はじめる</button>
-    </div>
-
-    <!-- ============ ゲーム本体（オープニング中は隠す） ============ -->
-    <div class="container hidden" id="gameContainer">
+    <div class="container">
         <div class="canvas-wrap">
             <canvas id="gameCanvas" width="800" height="400"></canvas>
             <div id="gameoverMsg" class="gameover-msg">💀 GAME OVER</div>
+
+            <!-- オープニング画面 -->
+            <div id="openingOverlay" class="opening-overlay">
+                <img id="openingImage" class="bg-img" src="img179mario.jpg" alt="Mario Opening">
+                <button id="startBtn" class="start-btn">はじめ(GAME START)</button>
+            </div>
             
             <div id="stageTransition" class="stage-transition">
                 <div class="card">
@@ -529,14 +533,13 @@
     <script>
         (function() {
             // ---------- DOM ----------
-            var gameContainer = document.getElementById('gameContainer');
-            var openingScreen = document.getElementById('openingScreen');
-            var startBtn = document.getElementById('startBtn');
             var canvas = document.getElementById('gameCanvas');
             var ctx = canvas.getContext('2d');
             var endingCanvas = document.getElementById('endingCanvas');
             var ectx = endingCanvas.getContext('2d');
             var endingImage = document.getElementById('endingImage');
+            var openingOverlay = document.getElementById('openingOverlay');
+            var startBtn = document.getElementById('startBtn');
             var scoreSpan = document.getElementById('scoreDisplay');
             var stageDisplay = document.getElementById('stageDisplay');
             var stageHint = document.getElementById('stageHint');
@@ -2200,8 +2203,7 @@
             // ---------- オープニング ----------
             startBtn.addEventListener('click', function() {
                 isOpeningActive = false;
-                openingScreen.classList.add('hidden');
-                gameContainer.classList.remove('hidden');
+                openingOverlay.classList.add('hidden');
                 buildLandStage();
                 if (isStreaming && streamUnlocked) {
                     addChatLine('🎮 ゲームスタート！');
@@ -2283,14 +2285,14 @@
 
             // ---------- ゲームループ ----------
             function gameLoop() {
-                if (isOpeningActive) {
-                    requestAnimationFrame(gameLoop);
-                    return;
-                }
                 if (isEndingActive) {
                     if (!endingImageShown) {
                         updateEndingAnimation();
                     }
+                    requestAnimationFrame(gameLoop);
+                    return;
+                }
+                if (isOpeningActive) {
                     requestAnimationFrame(gameLoop);
                     return;
                 }
@@ -2306,6 +2308,7 @@
             }
 
             // ---------- 初期化 ----------
+            // 最初はオープニング画面なので buildLandStage は startBtn クリック時
             updateUI();
             gameLoop();
 
