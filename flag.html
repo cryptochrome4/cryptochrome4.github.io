@@ -25,6 +25,9 @@
             width: 100%;
             position: relative;
         }
+        .container.hidden {
+            display: none;
+        }
         .canvas-wrap {
             position: relative;
             display: inline-block;
@@ -144,52 +147,52 @@
             pointer-events: none;
         }
 
-        /* オープニング画面 */
-        .opening-overlay {
+        /* ============ オープニング（独立した全面スクリーン） ============ */
+        .opening-screen {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #000;
+            z-index: 9999;
             display: flex;
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: #0a0a1a;
-            justify-content: flex-end;
-            align-items: flex-start;
-            z-index: 40;
-            border-radius: 16px;
+            justify-content: center;
+            align-items: center;
             overflow: hidden;
-            padding: 0;
         }
-        .opening-overlay.hidden {
+        .opening-screen.hidden {
             display: none;
         }
-        .opening-overlay .bg-img {
+        .opening-screen .bg-img {
             position: absolute;
             top: 0; left: 0;
             width: 100%;
             height: 100%;
-            object-fit: fill;
-            border-radius: 16px;
+            object-fit: cover;
             image-rendering: pixelated;
             display: block;
         }
-        .opening-overlay .start-btn {
+        .opening-screen .start-btn {
             position: absolute;
-            left: 30px;
-            bottom: 30px;
+            left: 40px;
+            bottom: 40px;
             background: transparent;
             border: none;
             color: #000;
             font-weight: bold;
-            font-size: 28px;
+            font-size: 32px;
             padding: 8px 16px;
             cursor: pointer;
-            letter-spacing: 4px;
+            letter-spacing: 6px;
             z-index: 2;
-            text-shadow: 0 0 6px rgba(255,255,255,0.8), 0 0 12px rgba(255,255,255,0.6);
+            font-family: 'Arial', 'メイリオ', sans-serif;
+            text-shadow: 0 0 8px rgba(255,255,255,0.9), 0 0 16px rgba(255,255,255,0.7);
             transition: 0.1s linear;
         }
-        .opening-overlay .start-btn:hover {
+        .opening-screen .start-btn:hover {
             opacity: 0.7;
         }
-        .opening-overlay .start-btn:active {
+        .opening-screen .start-btn:active {
             transform: scale(0.95);
         }
 
@@ -460,21 +463,23 @@
 
         @media (max-width: 640px) {
             .twitch-chat { width: 120px; height: 250px; right: 4px; top: 6px; }
-            .opening-overlay .start-btn { font-size: 22px; left: 20px; bottom: 20px; }
+            .opening-screen .start-btn { font-size: 24px; left: 20px; bottom: 20px; }
         }
     </style>
 </head>
 <body>
-    <div class="container">
+
+    <!-- ============ オープニング画面（独立した全面スクリーン） ============ -->
+    <div id="openingScreen" class="opening-screen">
+        <img class="bg-img" src="img179mario.jpg" alt="Mario Opening">
+        <button id="startBtn" class="start-btn">はじめる</button>
+    </div>
+
+    <!-- ============ ゲーム本体（オープニング中は隠す） ============ -->
+    <div class="container hidden" id="gameContainer">
         <div class="canvas-wrap">
             <canvas id="gameCanvas" width="800" height="400"></canvas>
             <div id="gameoverMsg" class="gameover-msg">💀 GAME OVER</div>
-
-            <!-- オープニング画面 -->
-            <div id="openingOverlay" class="opening-overlay">
-                <img id="openingImage" class="bg-img" src="img179.jpg" alt="Mario Opening">
-                <button id="startBtn" class="start-btn">はじめる</button>
-            </div>
             
             <div id="stageTransition" class="stage-transition">
                 <div class="card">
@@ -533,13 +538,14 @@
     <script>
         (function() {
             // ---------- DOM ----------
+            var gameContainer = document.getElementById('gameContainer');
+            var openingScreen = document.getElementById('openingScreen');
+            var startBtn = document.getElementById('startBtn');
             var canvas = document.getElementById('gameCanvas');
             var ctx = canvas.getContext('2d');
             var endingCanvas = document.getElementById('endingCanvas');
             var ectx = endingCanvas.getContext('2d');
             var endingImage = document.getElementById('endingImage');
-            var openingOverlay = document.getElementById('openingOverlay');
-            var startBtn = document.getElementById('startBtn');
             var scoreSpan = document.getElementById('scoreDisplay');
             var stageDisplay = document.getElementById('stageDisplay');
             var stageHint = document.getElementById('stageHint');
@@ -2203,7 +2209,8 @@
             // ---------- オープニング ----------
             startBtn.addEventListener('click', function() {
                 isOpeningActive = false;
-                openingOverlay.classList.add('hidden');
+                openingScreen.classList.add('hidden');
+                gameContainer.classList.remove('hidden');
                 buildLandStage();
                 if (isStreaming && streamUnlocked) {
                     addChatLine('🎮 ゲームスタート！');
@@ -2285,14 +2292,14 @@
 
             // ---------- ゲームループ ----------
             function gameLoop() {
+                if (isOpeningActive) {
+                    requestAnimationFrame(gameLoop);
+                    return;
+                }
                 if (isEndingActive) {
                     if (!endingImageShown) {
                         updateEndingAnimation();
                     }
-                    requestAnimationFrame(gameLoop);
-                    return;
-                }
-                if (isOpeningActive) {
                     requestAnimationFrame(gameLoop);
                     return;
                 }
