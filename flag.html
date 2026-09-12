@@ -1,0 +1,2323 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>マリリオ · 5ステージ構成 (ボスステージ)</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+        body {
+            background: #1a1a2e;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Arial', 'メイリオ', sans-serif;
+            touch-action: none;
+            padding: 20px;
+        }
+        .container {
+            background: #2d2d44;
+            padding: 20px 30px 30px;
+            border-radius: 28px;
+            box-shadow: 0 12px 0 #0f0f1a;
+            max-width: 900px;
+            width: 100%;
+            position: relative;
+        }
+        .canvas-wrap {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
+        canvas {
+            display: block;
+            margin: 0 auto;
+            border: 6px solid #4a3f2b;
+            border-radius: 16px;
+            box-shadow: inset 0 0 0 3px #c9a87c, 0 10px 0 #2b241b;
+            image-rendering: pixelated;
+            width: 100%;
+            height: auto;
+            aspect-ratio: 800/400;
+            cursor: default;
+            touch-action: none;
+        }
+        .info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 16px;
+            color: #f0e6b0;
+            text-shadow: 2px 2px 0 #3d2f1f;
+            font-weight: bold;
+            font-size: 18px;
+            background: #4a3f2b;
+            padding: 10px 20px;
+            border-radius: 60px;
+            border-bottom: 5px solid #2b241b;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .info span { background: #2b241b; padding: 4px 18px; border-radius: 40px; color: #ffd78a; }
+        .controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+        .mouse-btn {
+            background: #5a4f3a;
+            border: none;
+            border-bottom: 5px solid #2b241b;
+            color: #f0e6b0;
+            font-weight: bold;
+            font-size: 20px;
+            padding: 4px 20px;
+            border-radius: 40px;
+            cursor: pointer;
+            transition: 0.05s linear;
+            box-shadow: 0 2px 0 #1f1a12;
+            min-width: 60px;
+        }
+        .mouse-btn:active { transform: translateY(4px); border-bottom-width: 2px; }
+        .mouse-btn.left-btn { background: #3d6b8a; }
+        .mouse-btn.right-btn { background: #8a5a3d; }
+        .mouse-btn.jump-btn { background: #6a8a3d; }
+        button {
+            background: #f5c542;
+            border: none;
+            border-bottom: 6px solid #b47d2a;
+            padding: 8px 28px;
+            border-radius: 60px;
+            font-weight: bold;
+            font-size: 18px;
+            color: #2d2d1c;
+            cursor: pointer;
+            transition: 0.05s linear;
+            box-shadow: 0 2px 0 #4f3d1a;
+        }
+        button:active { transform: translateY(4px); border-bottom-width: 2px; }
+        .footer {
+            margin-top: 12px;
+            text-align: center;
+            color: #8d8da0;
+            font-size: 14px;
+            letter-spacing: 1px;
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        .footer .mouse-hint {
+            display: inline-block;
+            background: #3d3d5a;
+            padding: 4px 16px;
+            border-radius: 40px;
+            color: #d4d4e8;
+        }
+        .stream-badge {
+            background: #555;
+            color: #aaa;
+            border-radius: 40px;
+            padding: 4px 18px;
+            font-weight: bold;
+            cursor: not-allowed;
+            transition: 0.3s;
+        }
+        .stream-badge.unlocked {
+            background: #9147ff;
+            color: white;
+            cursor: pointer;
+        }
+        .stream-badge.unlocked:hover { opacity: 0.85; }
+        .gameover-msg {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8);
+            color: #ff6b6b;
+            font-size: 42px;
+            font-weight: bold;
+            padding: 20px 50px;
+            border-radius: 30px;
+            border: 6px solid #ff6b6b;
+            text-shadow: 0 0 20px #ff0000;
+            z-index: 10;
+            display: none;
+            text-align: center;
+            pointer-events: none;
+        }
+
+        /* オープニング画面 */
+        .opening-overlay {
+            display: flex;
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: #0a0a1a;
+            justify-content: flex-end;
+            align-items: flex-start;
+            z-index: 40;
+            border-radius: 16px;
+            overflow: hidden;
+            padding: 0;
+        }
+        .opening-overlay.hidden {
+            display: none;
+        }
+        .opening-overlay .bg-img {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: fill;
+            border-radius: 16px;
+            image-rendering: pixelated;
+            display: block;
+        }
+        .opening-overlay .start-btn {
+            position: absolute;
+            left: 30px;
+            bottom: 30px;
+            background: transparent;
+            border: none;
+            color: #000;
+            font-weight: bold;
+            font-size: 28px;
+            padding: 8px 16px;
+            cursor: pointer;
+            letter-spacing: 4px;
+            z-index: 2;
+            text-shadow: 0 0 6px rgba(255,255,255,0.8), 0 0 12px rgba(255,255,255,0.6);
+            transition: 0.1s linear;
+        }
+        .opening-overlay .start-btn:hover {
+            opacity: 0.7;
+        }
+        .opening-overlay .start-btn:active {
+            transform: scale(0.95);
+        }
+
+        .stage-transition {
+            display: none;
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(10, 15, 25, 0.88);
+            backdrop-filter: blur(4px);
+            justify-content: center;
+            align-items: center;
+            z-index: 25;
+            border-radius: 16px;
+            font-family: 'Segoe UI', 'Arial', sans-serif;
+            padding: 20px;
+        }
+        .stage-transition.active { display: flex; }
+        .stage-transition .card {
+            background: #f0f4f0;
+            max-width: 450px;
+            width: 100%;
+            padding: 40px 35px;
+            border-radius: 40px 20px 40px 20px;
+            box-shadow: 0 30px 50px rgba(0,0,0,0.8);
+            border: 6px solid #f5c542;
+            color: #1a2a1a;
+            text-align: center;
+        }
+        .stage-transition .card h2 {
+            font-size: 32px;
+            border-bottom: 5px dotted #f5c542;
+            padding-bottom: 18px;
+            margin-bottom: 18px;
+            color: #1f4a2f;
+        }
+        .stage-transition .card .big-icon { font-size: 60px; margin: 10px 0; }
+        .stage-transition .card .next-btn {
+            background: #3a6b4a;
+            border: none;
+            border-bottom: 6px solid #1f3f2a;
+            color: white;
+            font-weight: bold;
+            font-size: 24px;
+            padding: 14px 36px;
+            border-radius: 60px;
+            cursor: pointer;
+            margin: 16px 0;
+            transition: 0.05s linear;
+            box-shadow: 0 2px 0 #1a2a1a;
+        }
+        .stage-transition .card .next-btn:active { transform: translateY(4px); border-bottom-width: 2px; }
+
+        .retry-overlay {
+            display: none;
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(10, 15, 25, 0.88);
+            backdrop-filter: blur(4px);
+            justify-content: center;
+            align-items: center;
+            z-index: 26;
+            border-radius: 16px;
+            font-family: 'Segoe UI', 'Arial', sans-serif;
+            padding: 20px;
+        }
+        .retry-overlay.active { display: flex; }
+        .retry-overlay .card {
+            background: #f0f4f0;
+            max-width: 480px;
+            width: 100%;
+            padding: 40px 35px;
+            border-radius: 40px 20px 40px 20px;
+            box-shadow: 0 30px 50px rgba(0,0,0,0.8);
+            border: 6px solid #c92a2a;
+            color: #1a2a1a;
+            text-align: center;
+        }
+        .retry-overlay .card h2 {
+            font-size: 30px;
+            border-bottom: 5px dotted #c92a2a;
+            padding-bottom: 18px;
+            margin-bottom: 18px;
+            color: #6a1a1a;
+        }
+        .retry-overlay .card .big-icon { font-size: 60px; margin: 10px 0; }
+        .retry-overlay .card .retry-btn {
+            background: #3a6b4a;
+            border: none;
+            border-bottom: 6px solid #1f3f2a;
+            color: white;
+            font-weight: bold;
+            font-size: 22px;
+            padding: 14px 30px;
+            border-radius: 60px;
+            cursor: pointer;
+            margin: 8px 0;
+            transition: 0.05s linear;
+            box-shadow: 0 2px 0 #1a2a1a;
+            display: block;
+            width: 100%;
+        }
+        .retry-overlay .card .retry-btn:active { transform: translateY(4px); border-bottom-width: 2px; }
+        .retry-overlay .card .retry-btn:disabled {
+            background: #888;
+            border-bottom-color: #555;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        .retry-overlay .card .giveup-btn {
+            background: #b13e3e;
+            border: none;
+            border-bottom: 6px solid #6e2626;
+            color: white;
+            font-weight: bold;
+            font-size: 20px;
+            padding: 10px 30px;
+            border-radius: 60px;
+            cursor: pointer;
+            margin-top: 8px;
+            transition: 0.05s linear;
+            box-shadow: 0 2px 0 #3d1a1a;
+            display: block;
+            width: 100%;
+        }
+        .retry-overlay .card .giveup-btn:active { transform: translateY(4px); border-bottom-width: 2px; }
+        .retry-overlay .card .footnote {
+            margin-top: 14px;
+            font-size: 14px;
+            color: #4d5e4d;
+            border-top: 2px dashed #b3c9b3;
+            padding-top: 14px;
+        }
+
+        .clear-overlay {
+            display: none;
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(10, 15, 25, 0.92);
+            backdrop-filter: blur(6px);
+            justify-content: center;
+            align-items: center;
+            z-index: 30;
+            border-radius: 16px;
+            font-family: 'Segoe UI', 'Arial', sans-serif;
+            padding: 20px;
+        }
+        .clear-overlay.active { display: flex; }
+        .clear-card {
+            background: #f0f4f0;
+            max-width: 500px;
+            width: 100%;
+            padding: 40px 35px;
+            border-radius: 40px 20px 40px 20px;
+            box-shadow: 0 30px 50px rgba(0,0,0,0.8);
+            border: 6px solid #f5c542;
+            color: #1a2a1a;
+            text-align: center;
+        }
+        .clear-card h2 {
+            font-size: 34px;
+            border-bottom: 5px dotted #f5c542;
+            padding-bottom: 20px;
+            margin-bottom: 20px;
+            color: #1f4a2f;
+        }
+        .clear-card .big-icon { font-size: 70px; margin: 10px 0; }
+        .clear-card .redirect-btn {
+            background: #3a6b4a;
+            border: none;
+            border-bottom: 6px solid #1f3f2a;
+            color: white;
+            font-weight: bold;
+            font-size: 26px;
+            padding: 16px 40px;
+            border-radius: 60px;
+            cursor: pointer;
+            margin: 20px 0;
+            transition: 0.05s linear;
+            box-shadow: 0 2px 0 #1a2a1a;
+        }
+        .clear-card .redirect-btn:active { transform: translateY(4px); border-bottom-width: 2px; }
+
+        .ending-overlay {
+            display: none;
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: #0a0a1a;
+            justify-content: center;
+            align-items: center;
+            z-index: 35;
+            border-radius: 16px;
+            font-family: 'Segoe UI', 'Arial', sans-serif;
+            padding: 0;
+            overflow: hidden;
+        }
+        .ending-overlay.active { display: flex; }
+        .ending-overlay canvas,
+        .ending-overlay img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 16px;
+            image-rendering: pixelated;
+            display: block;
+        }
+        .ending-overlay img { display: none; }
+
+        .twitch-chat {
+            position: absolute;
+            right: 8px;
+            top: 10px;
+            width: 160px;
+            height: 340px;
+            pointer-events: none;
+            overflow: hidden;
+            border-radius: 12px;
+            background: rgba(0, 0, 0, 0.65);
+            border: 2px solid #6441a5;
+            box-shadow: 0 0 20px rgba(100, 65, 165, 0.5);
+            display: none;
+            z-index: 20;
+            backdrop-filter: blur(2px);
+            padding: 4px 0;
+        }
+        .twitch-chat.active { display: block; }
+        .chat-line {
+            color: #fff;
+            font-size: 12px;
+            padding: 2px 8px;
+            font-family: 'Segoe UI', 'Arial', sans-serif;
+            text-shadow: 0 0 6px #000;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            opacity: 0.95;
+            animation: chatScroll 7s linear forwards;
+            position: relative;
+            width: 100%;
+            line-height: 1.5;
+            background: rgba(0,0,0,0.2);
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            transform: translateY(0);
+        }
+        .chat-line .username {
+            color: #bf94ff;
+            font-weight: bold;
+            margin-right: 4px;
+            flex-shrink: 0;
+        }
+        .chat-line .message {
+            color: #f0f0f0;
+            display: inline-block;
+        }
+        @keyframes chatScroll {
+            0% { opacity: 0; transform: translateY(20px); }
+            10% { opacity: 1; transform: translateY(0); }
+            85% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-20px); }
+        }
+
+        .stage-indicator {
+            background: #2b241b;
+            padding: 4px 18px;
+            border-radius: 40px;
+            color: #7ec8ff;
+            font-size: 16px;
+        }
+
+        @media (max-width: 640px) {
+            .twitch-chat { width: 120px; height: 250px; right: 4px; top: 6px; }
+            .opening-overlay .start-btn { font-size: 22px; left: 20px; bottom: 20px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="canvas-wrap">
+            <canvas id="gameCanvas" width="800" height="400"></canvas>
+            <div id="gameoverMsg" class="gameover-msg">💀 GAME OVER</div>
+
+            <!-- オープニング画面 -->
+            <div id="openingOverlay" class="opening-overlay">
+                <img id="openingImage" class="bg-img" src="img179.jpg" alt="Mario Opening">
+                <button id="startBtn" class="start-btn">はじめる</button>
+            </div>
+            
+            <div id="stageTransition" class="stage-transition">
+                <div class="card">
+                    <div class="big-icon" id="transitionIcon">🌊</div>
+                    <h2 id="transitionTitle">ステージ2 水のステージ</h2>
+                    <p id="transitionDesc" style="font-size:18px; margin-bottom:12px;">毒水に落ちたら即ゲームオーバー！<br>毒水しぶきにも注意！</p>
+                    <button class="next-btn" id="stageTransitionBtn">▶ 挑戦する</button>
+                </div>
+            </div>
+
+            <div id="retryOverlay" class="retry-overlay">
+                <div class="card">
+                    <div class="big-icon">💀</div>
+                    <h2>ゲームオーバー</h2>
+                    <p style="font-size:16px; margin-bottom:8px;">コイン1000を支払えば<br>マグマステージからやり直せます</p>
+                    <button class="retry-btn" id="retryBtn">🪙 1000コインでリトライ</button>
+                    <button class="giveup-btn" id="giveupBtn">✕ あきらめる</button>
+                    <div class="footnote" id="retryFootnote">所持スコア: 0</div>
+                </div>
+            </div>
+
+            <div id="clearOverlay" class="clear-overlay">
+                <div class="clear-card">
+                    <div class="big-icon">🏆</div>
+                    <h2>🎉 全ステージクリア！</h2>
+                    <p style="font-size:18px; margin-bottom:18px;">IT用語 × サッカーの解説はこちら</p>
+                    <button class="redirect-btn" id="clearRedirectBtn">⚽ pass.html へ</button>
+                    <div class="footnote">同じタブで移動します</div>
+                </div>
+            </div>
+
+            <div id="endingOverlay" class="ending-overlay">
+                <canvas id="endingCanvas" width="800" height="400"></canvas>
+                <img id="endingImage" src="img178mario.jpg" alt="Mario saves Peach">
+            </div>
+
+            <div id="twitchChat" class="twitch-chat"></div>
+        </div>
+        <div class="info">
+            <span class="stage-indicator" id="stageDisplay">🌿 ステージ1</span>
+            <span id="scoreDisplay">🟡 0</span>
+            <div class="controls">
+                <button class="mouse-btn left-btn" id="leftBtn">◀</button>
+                <button class="mouse-btn jump-btn" id="jumpBtn">▲ ジャンプ</button>
+                <button class="mouse-btn right-btn" id="rightBtn">▶</button>
+            </div>
+            <button id="resetBtn">↺ リスタート</button>
+        </div>
+        <div class="footer">
+            <span class="mouse-hint">🖱 左右ボタンで移動 / ジャンプ</span>
+            <span class="stream-badge" id="streamToggleBtn">🔒 配信モード (スコア1000)</span>
+            <span id="stageHint">🏁 旗で次のステージへ</span>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            // ---------- DOM ----------
+            var canvas = document.getElementById('gameCanvas');
+            var ctx = canvas.getContext('2d');
+            var endingCanvas = document.getElementById('endingCanvas');
+            var ectx = endingCanvas.getContext('2d');
+            var endingImage = document.getElementById('endingImage');
+            var openingOverlay = document.getElementById('openingOverlay');
+            var startBtn = document.getElementById('startBtn');
+            var scoreSpan = document.getElementById('scoreDisplay');
+            var stageDisplay = document.getElementById('stageDisplay');
+            var stageHint = document.getElementById('stageHint');
+            var resetBtn = document.getElementById('resetBtn');
+            var clearOverlay = document.getElementById('clearOverlay');
+            var clearRedirectBtn = document.getElementById('clearRedirectBtn');
+            var stageTransition = document.getElementById('stageTransition');
+            var stageTransitionBtn = document.getElementById('stageTransitionBtn');
+            var transitionIcon = document.getElementById('transitionIcon');
+            var transitionTitle = document.getElementById('transitionTitle');
+            var transitionDesc = document.getElementById('transitionDesc');
+            var retryOverlay = document.getElementById('retryOverlay');
+            var retryBtn = document.getElementById('retryBtn');
+            var giveupBtn = document.getElementById('giveupBtn');
+            var retryFootnote = document.getElementById('retryFootnote');
+            var endingOverlay = document.getElementById('endingOverlay');
+            var gameoverMsg = document.getElementById('gameoverMsg');
+            var leftBtn = document.getElementById('leftBtn');
+            var rightBtn = document.getElementById('rightBtn');
+            var jumpBtn = document.getElementById('jumpBtn');
+            var streamToggleBtn = document.getElementById('streamToggleBtn');
+            var twitchChat = document.getElementById('twitchChat');
+
+            // ---------- 状態 ----------
+            var isStreaming = false;
+            var chatInterval = null;
+            var isClearOverlayActive = false;
+            var streamUnlocked = false;
+            var currentStage = 'land';
+            var waitingForStageTransition = false;
+            var isRetryOverlayActive = false;
+            var isEndingActive = false;
+            var isOpeningActive = true;
+            var endingTimer = 0;
+            var endingPhase = 0;
+            var endingImageShown = false;
+
+            var landComments = [
+                "本物のマリオの世界だ！凄い！", "クリボーがいる！気をつけて！", "やっぱりマリオは神", "配信者かわいい", "ジャンプうますぎ", "コイン取った！", "あのクリボーやばい", "BGMほしい", "スター欲しい", "マリオ頑張れ！",
+                "1UP取って！", "裏道ある？", "無限増殖バグ？", "あっちに隠しブロック", "クリボー踏めるよ", "キノコどこ？", "ファイアマリオになろう", "パワーアップ！", "ここで死んだら笑う", "もっと右！",
+                "旗まであと少し", "タイム気にしなくていいの？", "スーパーマリオ感", "壁キックできる？", "あのクリボー二回踏んだ", "コイン100枚で1UP", "配信楽しい", "ワールド1-1", "おつかれさま", "また明日も見る"
+            ];
+            var waterComments = [
+                "🌊 水のステージだ！", "毒水怖い！", "しぶきに気をつけて！", "浮島ジャンプ難しい", "落ちないで！", "マリオ泳げないの？", "毒水やばい", "クリボーも水に弱い？", "ここが難所", "がんばれ！",
+                "あと少し！", "毒水しぶききた！", "ジャンプのタイミングが命", "右の足場に飛べ！", "コイン取れた！", "このステージ好き", "BGMほしい", "水の音がいい", "クリアできるかな", "もう少しで旗だ！"
+            ];
+            var desertComments = [
+                "🏜️ 砂漠ステージ！", "クリボーが弓で撃ってくる！", "矢に気をつけて！", "砂漠暑そう", "サボテンある？", "弓クリボーやばい", "ジャンプで避けて！", "矢が飛んできた！", "砂嵐きた", "ここが難所",
+                "あと少し！", "弓矢こわい", "クリボー強い", "動きながら避けて", "コイン取れた！", "このステージ好き", "砂漠のBGMほしい", "ラクダいる？", "クリアできるかな", "もう少しで旗だ！"
+            ];
+            var iceComments = [
+                "❄️ 氷のステージ！", "床が滑る！", "デザートイーグルだ！", "銃クリボーやばい！", ".50AE怖い！", "銀色の銃だ！", "黒い銃も！", "滑って止まれない！", "ジャンプで避けて！", "弾が飛んできた！",
+                "あと少し！", "デザートイーグル強すぎ", "クリボー武装しすぎ", "ここが難所", "コイン取れた！", "このステージ好き", "氷のBGMほしい", "ペンギンいる？", "クリアできるかな", "もう少しで旗だ！"
+            ];
+            var magmaComments = [
+                "🌋 マグマステージ！ ボスだ！", "クッパだ！", "イーロン・マスク！？", "テスラが飛んできた！", "SpaceXロケットだ！", "溶岩が下から！", "クリボーもいる！", "避けて！", "ここが最終ステージ", "がんばれ！",
+                "クッパ強い！", "テスラ避けた！", "ロケット怖い", "溶岩注意！", "コイン取れた！", "このステージ好き", "マグマのBGMほしい", "ピーチを救え！", "クリアできるかな", "もう少しで旗だ！",
+                "旗まであと少し！", "クッパ撃破！", "緊張する", "応援してる", "ファイト！", "絶対クリアして", "すごい！", "プロの技", "感動した", "おめでとう！"
+            ];
+            var currentCommentPool = landComments;
+
+            // ゲーム変数
+            var game = {
+                mario: { x: 50, y: 290, w: 28, h: 38, vy: 0, vx: 0, onGround: false, facing: 1 },
+                platforms: [],
+                coins: [],
+                enemies: [],
+                poisonSplashes: [],
+                arrows: [],
+                bullets: [],
+                lavaColumns: [],
+                teslas: [],
+                rockets: [],
+                flag: { x: 740, y: 130, w: 24, h: 60, baseY: 330 },
+                gravity: 0.45,
+                friction: 0.82,
+                jumpPower: -8.5,
+                moveSpeed: 3.8,
+                score: 0,
+                gameClear: false,
+                gameOver: false,
+                leftPressed: false,
+                rightPressed: false,
+                jumpPressed: false,
+                splashTimer: 0,
+                splashInterval: 90,
+                lavaTimer: 0,
+                lavaInterval: 70,
+                bowserTimer: 0,
+                bowserInterval: 140,
+                bowser: null
+            };
+
+            // ---------- ステージ構築 ----------
+            function buildLandStage() {
+                currentStage = 'land';
+                currentCommentPool = landComments;
+                stageDisplay.textContent = '🌿 ステージ1';
+                stageHint.textContent = '🏁 旗で次のステージへ';
+                document.querySelector('.container').style.background = '#2d2d44';
+
+                game.platforms = [ { x: 0, y: 330, w: 800, h: 70 } ];
+                game.platforms.push(
+                    { x: 160, y: 260, w: 80, h: 20 },
+                    { x: 300, y: 200, w: 80, h: 20 },
+                    { x: 480, y: 240, w: 80, h: 20 },
+                    { x: 620, y: 180, w: 80, h: 20 }
+                );
+                game.coins = [
+                    { x: 180, y: 230, w: 16, h: 16, collected: false },
+                    { x: 230, y: 230, w: 16, h: 16, collected: false },
+                    { x: 320, y: 170, w: 16, h: 16, collected: false },
+                    { x: 360, y: 170, w: 16, h: 16, collected: false },
+                    { x: 500, y: 210, w: 16, h: 16, collected: false },
+                    { x: 540, y: 210, w: 16, h: 16, collected: false },
+                    { x: 640, y: 150, w: 16, h: 16, collected: false },
+                    { x: 680, y: 150, w: 16, h: 16, collected: false }
+                ];
+                game.enemies = [
+                    { x: 200, y: 310, w: 30, h: 30, vx: -0.8, alive: true, type: 'walker' },
+                    { x: 520, y: 310, w: 30, h: 30, vx: 0.8, alive: true, type: 'walker' }
+                ];
+                resetTransient();
+                game.flag.x = 740;
+                game.flag.y = 130;
+                game.flag.baseY = 330;
+                var m = game.mario;
+                m.x = 50; m.y = 290; m.vy = 0; m.vx = 0; m.onGround = false; m.facing = 1;
+                prepareStageStart();
+            }
+
+            function buildWaterStage() {
+                currentStage = 'water';
+                currentCommentPool = waterComments;
+                stageDisplay.textContent = '🌊 ステージ2';
+                stageHint.textContent = '⚠️ 毒水に注意！';
+                document.querySelector('.container').style.background = '#1a3a5a';
+
+                game.platforms = [
+                    { x: 0, y: 380, w: 800, h: 20 },
+                    { x: 100, y: 310, w: 70, h: 16 },
+                    { x: 220, y: 260, w: 70, h: 16 },
+                    { x: 340, y: 210, w: 70, h: 16 },
+                    { x: 460, y: 250, w: 70, h: 16 },
+                    { x: 580, y: 200, w: 70, h: 16 },
+                    { x: 680, y: 290, w: 80, h: 16 }
+                ];
+                game.coins = [
+                    { x: 115, y: 280, w: 16, h: 16, collected: false },
+                    { x: 235, y: 230, w: 16, h: 16, collected: false },
+                    { x: 355, y: 180, w: 16, h: 16, collected: false },
+                    { x: 475, y: 220, w: 16, h: 16, collected: false },
+                    { x: 595, y: 170, w: 16, h: 16, collected: false },
+                    { x: 695, y: 260, w: 16, h: 16, collected: false },
+                    { x: 730, y: 260, w: 16, h: 16, collected: false }
+                ];
+                game.enemies = [
+                    { x: 150, y: 285, w: 30, h: 30, vx: -0.6, alive: true, type: 'walker' },
+                    { x: 400, y: 185, w: 30, h: 30, vx: 0.6, alive: true, type: 'walker' },
+                    { x: 600, y: 175, w: 30, h: 30, vx: -0.5, alive: true, type: 'walker' }
+                ];
+                resetTransient();
+                game.flag.x = 740;
+                game.flag.y = 130;
+                game.flag.baseY = 330;
+                var m = game.mario;
+                m.x = 50; m.y = 280; m.vy = 0; m.vx = 0; m.onGround = false; m.facing = 1;
+                prepareStageStart();
+            }
+
+            function buildDesertStage() {
+                currentStage = 'desert';
+                currentCommentPool = desertComments;
+                stageDisplay.textContent = '🏜️ ステージ3';
+                stageHint.textContent = '🏹 弓クリボーに注意！';
+                document.querySelector('.container').style.background = '#3a2a1a';
+
+                game.platforms = [ { x: 0, y: 350, w: 800, h: 50 } ];
+                game.platforms.push(
+                    { x: 130, y: 280, w: 70, h: 16 },
+                    { x: 260, y: 230, w: 70, h: 16 },
+                    { x: 400, y: 280, w: 70, h: 16 },
+                    { x: 520, y: 220, w: 70, h: 16 },
+                    { x: 630, y: 290, w: 80, h: 16 }
+                );
+                game.coins = [
+                    { x: 145, y: 250, w: 16, h: 16, collected: false },
+                    { x: 275, y: 200, w: 16, h: 16, collected: false },
+                    { x: 415, y: 250, w: 16, h: 16, collected: false },
+                    { x: 535, y: 190, w: 16, h: 16, collected: false },
+                    { x: 650, y: 260, w: 16, h: 16, collected: false },
+                    { x: 700, y: 260, w: 16, h: 16, collected: false }
+                ];
+                game.enemies = [
+                    { x: 180, y: 320, w: 30, h: 30, vx: -0.6, alive: true, type: 'walker' },
+                    { x: 450, y: 320, w: 30, h: 30, vx: 0.5, alive: true, type: 'walker' },
+                    { x: 620, y: 160, w: 30, h: 30, vx: 0, alive: true, type: 'archer', shootTimer: 30 },
+                    { x: 340, y: 200, w: 30, h: 30, vx: 0, alive: true, type: 'archer', shootTimer: 60 }
+                ];
+                resetTransient();
+                game.flag.x = 740;
+                game.flag.y = 130;
+                game.flag.baseY = 350;
+                var m = game.mario;
+                m.x = 50; m.y = 310; m.vy = 0; m.vx = 0; m.onGround = false; m.facing = 1;
+                prepareStageStart();
+            }
+
+            function buildIceStage() {
+                currentStage = 'ice';
+                currentCommentPool = iceComments;
+                stageDisplay.textContent = '❄️ ステージ4';
+                stageHint.textContent = '🔫 デザートイーグル注意！';
+                document.querySelector('.container').style.background = '#2a3a4a';
+
+                game.platforms = [ { x: 0, y: 340, w: 800, h: 60 } ];
+                game.platforms.push(
+                    { x: 150, y: 270, w: 70, h: 16 },
+                    { x: 280, y: 220, w: 70, h: 16 },
+                    { x: 420, y: 280, w: 70, h: 16 },
+                    { x: 540, y: 210, w: 70, h: 16 },
+                    { x: 650, y: 280, w: 80, h: 16 }
+                );
+                game.coins = [
+                    { x: 165, y: 240, w: 16, h: 16, collected: false },
+                    { x: 295, y: 190, w: 16, h: 16, collected: false },
+                    { x: 435, y: 250, w: 16, h: 16, collected: false },
+                    { x: 555, y: 180, w: 16, h: 16, collected: false },
+                    { x: 670, y: 250, w: 16, h: 16, collected: false },
+                    { x: 720, y: 250, w: 16, h: 16, collected: false }
+                ];
+                game.enemies = [
+                    { x: 200, y: 310, w: 30, h: 30, vx: -0.5, alive: true, type: 'walker' },
+                    { x: 460, y: 310, w: 30, h: 30, vx: 0.5, alive: true, type: 'walker' },
+                    { x: 600, y: 150, w: 30, h: 30, vx: 0, alive: true, type: 'gunner', shootTimer: 40 },
+                    { x: 350, y: 180, w: 30, h: 30, vx: 0, alive: true, type: 'gunner', shootTimer: 70 }
+                ];
+                resetTransient();
+                game.flag.x = 740;
+                game.flag.y = 130;
+                game.flag.baseY = 340;
+                var m = game.mario;
+                m.x = 50; m.y = 300; m.vy = 0; m.vx = 0; m.onGround = false; m.facing = 1;
+                prepareStageStart();
+            }
+
+            function buildMagmaStage() {
+                currentStage = 'magma';
+                currentCommentPool = magmaComments;
+                stageDisplay.textContent = '🌋 ステージ5 (ボス)';
+                stageHint.textContent = '🔥 クッパを倒してピーチを救え！';
+                document.querySelector('.container').style.background = '#3a1a1a';
+
+                game.platforms = [ { x: 0, y: 370, w: 800, h: 30, lava: true } ];
+                game.platforms.push(
+                    { x: 30, y: 320, w: 90, h: 20, log: true },
+                    { x: 100, y: 290, w: 80, h: 16 },
+                    { x: 240, y: 240, w: 80, h: 16 },
+                    { x: 380, y: 290, w: 80, h: 16 },
+                    { x: 520, y: 230, w: 80, h: 16 },
+                    { x: 640, y: 280, w: 100, h: 16 }
+                );
+                game.coins = [
+                    { x: 120, y: 260, w: 16, h: 16, collected: false },
+                    { x: 260, y: 210, w: 16, h: 16, collected: false },
+                    { x: 400, y: 260, w: 16, h: 16, collected: false },
+                    { x: 540, y: 200, w: 16, h: 16, collected: false },
+                    { x: 660, y: 250, w: 16, h: 16, collected: false },
+                    { x: 710, y: 250, w: 16, h: 16, collected: false }
+                ];
+                game.enemies = [
+                    { x: 200, y: 330, w: 30, h: 30, vx: -0.6, alive: true, type: 'walker' },
+                    { x: 420, y: 330, w: 30, h: 30, vx: 0.5, alive: true, type: 'walker' },
+                    { x: 560, y: 330, w: 30, h: 30, vx: -0.5, alive: true, type: 'walker' }
+                ];
+                game.bowser = {
+                    x: 680, y: 130, w: 50, h: 60,
+                    alive: true,
+                    hp: 5,
+                    hitTimer: 0
+                };
+                resetTransient();
+                game.flag.x = 740;
+                game.flag.y = 140;
+                game.flag.baseY = 360;
+                var m = game.mario;
+                m.x = 60; m.y = 282; m.vy = 0; m.vx = 0; m.onGround = true; m.facing = 1;
+                prepareStageStart();
+            }
+
+            function resetTransient() {
+                game.poisonSplashes = [];
+                game.arrows = [];
+                game.bullets = [];
+                game.lavaColumns = [];
+                game.teslas = [];
+                game.rockets = [];
+                game.splashTimer = 0;
+                game.lavaTimer = 0;
+                game.bowserTimer = 0;
+            }
+
+            function prepareStageStart() {
+                game.gameClear = false;
+                game.gameOver = false;
+                gameoverMsg.style.display = 'none';
+                clearOverlay.classList.remove('active');
+                isClearOverlayActive = false;
+                stageTransition.classList.remove('active');
+                waitingForStageTransition = false;
+                retryOverlay.classList.remove('active');
+                isRetryOverlayActive = false;
+                endingOverlay.classList.remove('active');
+                isEndingActive = false;
+                endingTimer = 0;
+                endingPhase = 0;
+                endingImageShown = false;
+                updateUI();
+            }
+
+            // ---------- ステージ遷移 ----------
+            function showStageTransition(nextStage) {
+                waitingForStageTransition = true;
+                if (nextStage === 'water') {
+                    transitionIcon.textContent = '🌊';
+                    transitionTitle.textContent = 'ステージ2 水のステージ';
+                    transitionDesc.innerHTML = '毒水に落ちたら即ゲームオーバー！<br>毒水しぶきにも注意！';
+                } else if (nextStage === 'desert') {
+                    transitionIcon.textContent = '🏜️';
+                    transitionTitle.textContent = 'ステージ3 砂漠のステージ';
+                    transitionDesc.innerHTML = '弓クリボーが矢を放ってくる！<br>ジャンプで避けろ！';
+                } else if (nextStage === 'ice') {
+                    transitionIcon.textContent = '❄️';
+                    transitionTitle.textContent = 'ステージ4 氷のステージ';
+                    transitionDesc.innerHTML = '床が滑る！ デザートイーグル.50AEを持つ<br>銃クリボーに注意！';
+                } else if (nextStage === 'magma') {
+                    transitionIcon.textContent = '🌋';
+                    transitionTitle.textContent = 'ステージ5 マグマ (ボス)';
+                    transitionDesc.innerHTML = 'クッパがテスラとSpaceXを投げてくる！<br>溶岩とクリボーにも注意！<br>ここからは1000コインでリトライ可能';
+                }
+                stageTransition.classList.add('active');
+                stageTransition.dataset.nextStage = nextStage;
+            }
+
+            stageTransitionBtn.addEventListener('click', function() {
+                var nextStage = stageTransition.dataset.nextStage;
+                if (nextStage === 'water') {
+                    buildWaterStage();
+                    if (isStreaming && streamUnlocked) {
+                        twitchChat.innerHTML = '';
+                        addChatLine('🌊 水のステージ開始！');
+                    }
+                } else if (nextStage === 'desert') {
+                    buildDesertStage();
+                    if (isStreaming && streamUnlocked) {
+                        twitchChat.innerHTML = '';
+                        addChatLine('🏜️ 砂漠のステージ開始！');
+                    }
+                } else if (nextStage === 'ice') {
+                    buildIceStage();
+                    if (isStreaming && streamUnlocked) {
+                        twitchChat.innerHTML = '';
+                        addChatLine('❄️ 氷のステージ開始！');
+                    }
+                } else if (nextStage === 'magma') {
+                    buildMagmaStage();
+                    if (isStreaming && streamUnlocked) {
+                        twitchChat.innerHTML = '';
+                        addChatLine('🌋 マグマステージ！ クッパだ！');
+                    }
+                }
+            });
+
+            // ---------- UI更新 ----------
+            function updateUI() {
+                scoreSpan.textContent = '🟡 ' + game.score;
+                if (game.score >= 1000 && !streamUnlocked) {
+                    streamUnlocked = true;
+                    streamToggleBtn.className = 'stream-badge unlocked';
+                    streamToggleBtn.textContent = '📡 配信モード OFF';
+                    if (!isStreaming) {
+                        streamToggleBtn.textContent = '📡 配信モード OFF';
+                    }
+                }
+            }
+
+            // ---------- 毒水しぶき ----------
+            function spawnPoisonSplash() {
+                if (currentStage !== 'water') return;
+                var x = Math.random() * 780 + 10;
+                game.poisonSplashes.push({
+                    x: x, y: 370, vy: -2.5 - Math.random() * 2,
+                    width: 12, height: 16
+                });
+            }
+
+            // ---------- 弓矢 ----------
+            function spawnArrow(fromEnemy) {
+                var m = game.mario;
+                var dx = (m.x + m.w/2) - (fromEnemy.x + fromEnemy.w/2);
+                var dy = (m.y + m.h/2) - (fromEnemy.y + fromEnemy.h/2);
+                var dist = Math.sqrt(dx*dx + dy*dy) || 1;
+                var speed = 3.2;
+                game.arrows.push({
+                    x: fromEnemy.x + fromEnemy.w/2,
+                    y: fromEnemy.y + fromEnemy.h/2,
+                    vx: (dx / dist) * speed, vy: (dy / dist) * speed,
+                    w: 18, h: 4, life: 200
+                });
+            }
+
+            // ---------- 弾丸 ----------
+            function spawnBullet(fromEnemy) {
+                var m = game.mario;
+                var dx = (m.x + m.w/2) - (fromEnemy.x + fromEnemy.w/2);
+                var dy = (m.y + m.h/2) - (fromEnemy.y + fromEnemy.h/2);
+                var dist = Math.sqrt(dx*dx + dy*dy) || 1;
+                var speed = 5.5;
+                game.bullets.push({
+                    x: fromEnemy.x + fromEnemy.w/2,
+                    y: fromEnemy.y + fromEnemy.h/2,
+                    vx: (dx / dist) * speed, vy: (dy / dist) * speed,
+                    w: 10, h: 6, life: 150, trail: []
+                });
+            }
+
+            // ---------- 溶岩柱 ----------
+            function spawnLavaColumn() {
+                if (currentStage !== 'magma') return;
+                var x = 60 + Math.random() * 680;
+                game.lavaColumns.push({
+                    x: x, y: 370, w: 22, h: 0,
+                    maxH: 90 + Math.random() * 80,
+                    vy: -3.5, growth: 3.5, active: true,
+                    life: 120, phase: 'up'
+                });
+            }
+
+            // ---------- クッパの攻撃 ----------
+            function bowserAttack() {
+                if (currentStage !== 'magma' || !game.bowser || !game.bowser.alive) return;
+                var b = game.bowser;
+                var m = game.mario;
+                var dx = (m.x + m.w/2) - (b.x + b.w/2);
+                var dy = (m.y + m.h/2) - (b.y + b.h/2);
+                var dist = Math.sqrt(dx*dx + dy*dy) || 1;
+                
+                if (Math.random() < 0.5) {
+                    var tSpeed = 3.6;
+                    game.teslas.push({
+                        x: b.x, y: b.y + 20,
+                        vx: (dx/dist) * tSpeed, vy: (dy/dist) * tSpeed - 1.5,
+                        w: 60, h: 26, life: 200,
+                        rotation: 0
+                    });
+                    if (isStreaming) addChatLine("🚗 クッパがテスラを投げた！");
+                } else {
+                    var rSpeed = 4.2;
+                    game.rockets.push({
+                        x: b.x, y: b.y + 20,
+                        vx: (dx/dist) * rSpeed, vy: (dy/dist) * rSpeed - 1.0,
+                        w: 20, h: 50, life: 220,
+                        trail: []
+                    });
+                    if (isStreaming) addChatLine("🚀 クッパがSpaceXを投げた！");
+                }
+            }
+
+            // ---------- 物理更新 ----------
+            function updatePhysics() {
+                if (game.gameClear || game.gameOver) return;
+                var m = game.mario;
+                
+                var isIce = (currentStage === 'ice');
+                var fr = isIce ? 0.97 : game.friction;
+                var accel = isIce ? 3.2 : game.moveSpeed;
+                
+                if (game.leftPressed) { m.vx = -accel; }
+                else if (game.rightPressed) { m.vx = accel; }
+                else { m.vx *= fr; if (Math.abs(m.vx) < 0.1) m.vx = 0; }
+                if (isIce) {
+                    if (m.vx > 5.5) m.vx = 5.5;
+                    if (m.vx < -5.5) m.vx = -5.5;
+                }
+                
+                if (game.jumpPressed && m.onGround) {
+                    m.vy = game.jumpPower;
+                    m.onGround = false;
+                    game.jumpPressed = false;
+                }
+                
+                m.vy += game.gravity;
+                if (m.vy > 12) m.vy = 12;
+                
+                var newX = m.x + m.vx;
+                for (var i = 0; i < game.platforms.length; i++) {
+                    var p = game.platforms[i];
+                    if (p.lava) continue;
+                    if (newX < p.x + p.w && newX + m.w > p.x && m.y < p.y + p.h && m.y + m.h > p.y) {
+                        if (m.vx > 0) { newX = p.x - m.w; } else if (m.vx < 0) { newX = p.x + p.w; }
+                        m.vx = 0;
+                        break;
+                    }
+                }
+                m.x = newX;
+                
+                var newY = m.y + m.vy;
+                m.onGround = false;
+                for (var j = 0; j < game.platforms.length; j++) {
+                    var p2 = game.platforms[j];
+                    if (p2.lava) continue;
+                    if (m.x < p2.x + p2.w && m.x + m.w > p2.x && newY < p2.y + p2.h && newY + m.h > p2.y) {
+                        if (m.vy > 0) { 
+                            newY = p2.y - m.h; 
+                            m.vy = 0; 
+                            m.onGround = true; 
+                        } else if (m.vy < 0) { 
+                            newY = p2.y + p2.h; 
+                            m.vy = 0; 
+                        }
+                        break;
+                    }
+                }
+                m.y = newY;
+                
+                if (m.x < 0) m.x = 0;
+                if (m.x + m.w > 800) m.x = 800 - m.w;
+                
+                if (currentStage === 'water' && m.y + m.h > 380) { setGameOver(); return; }
+                if ((currentStage === 'land' || currentStage === 'desert' || currentStage === 'ice') && m.y > 400) { setGameOver(); return; }
+                if (currentStage === 'magma' && m.y + m.h > 370) { setGameOver(); return; }
+                
+                for (var k = 0; k < game.coins.length; k++) {
+                    var coin = game.coins[k];
+                    if (coin.collected) continue;
+                    if (m.x + m.w > coin.x && m.x < coin.x + coin.w && m.y + m.h > coin.y && m.y < coin.y + coin.h) {
+                        coin.collected = true;
+                        game.score += 100;
+                        updateUI();
+                        if (isStreaming) addChatLine("🪙 コインGET！ +100");
+                    }
+                }
+                
+                for (var e = 0; e < game.enemies.length; e++) {
+                    var enemy = game.enemies[e];
+                    if (!enemy.alive) continue;
+                    
+                    if (enemy.type === 'archer' || enemy.type === 'gunner') {
+                        enemy.shootTimer--;
+                        if (enemy.shootTimer <= 0) {
+                            if (enemy.type === 'archer') spawnArrow(enemy);
+                            else if (enemy.type === 'gunner') {
+                                spawnBullet(enemy);
+                                if (isStreaming) addChatLine("🔫 デザートイーグル発射！");
+                            }
+                            enemy.shootTimer = (enemy.type === 'gunner') ? 110 + Math.floor(Math.random() * 60) : 90 + Math.floor(Math.random() * 60);
+                        }
+                    } else {
+                        enemy.x += enemy.vx;
+                        if (enemy.x < 0) { enemy.x = 0; enemy.vx = Math.abs(enemy.vx); }
+                        if (enemy.x + enemy.w > 800) { enemy.x = 800 - enemy.w; enemy.vx = -Math.abs(enemy.vx); }
+                    }
+                    
+                    if (enemy.type === 'walker') {
+                        for (var pi = 0; pi < game.platforms.length; pi++) {
+                            var pl = game.platforms[pi];
+                            if (pl.lava) continue;
+                            if (enemy.x + enemy.w > pl.x && enemy.x < pl.x + pl.w &&
+                                enemy.y < pl.y + pl.h && enemy.y + enemy.h > pl.y) {
+                                if (enemy.vx > 0 && enemy.x + enemy.w >= pl.x && enemy.x < pl.x) {
+                                    enemy.vx = -Math.abs(enemy.vx);
+                                } else if (enemy.vx < 0 && enemy.x <= pl.x + pl.w && enemy.x + enemy.w > pl.x + pl.w) {
+                                    enemy.vx = Math.abs(enemy.vx);
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (m.x + m.w > enemy.x + 4 && m.x < enemy.x + enemy.w - 4 &&
+                        m.y + m.h > enemy.y + 4 && m.y < enemy.y + enemy.h - 4) {
+                        if (m.vy > 0 && m.y + m.h - enemy.y < 20) {
+                            enemy.alive = false;
+                            game.score += 200;
+                            updateUI();
+                            m.vy = -5;
+                            if (isStreaming) addChatLine("💥 クリボーを踏んだ！ +200");
+                        } else {
+                            setGameOver(); return;
+                        }
+                    }
+                }
+                
+                if (currentStage === 'water') {
+                    game.splashTimer++;
+                    if (game.splashTimer >= game.splashInterval) {
+                        game.splashTimer = 0;
+                        spawnPoisonSplash();
+                    }
+                    for (var s = game.poisonSplashes.length - 1; s >= 0; s--) {
+                        var splash = game.poisonSplashes[s];
+                        splash.y += splash.vy;
+                        splash.vy += 0.08;
+                        if (splash.y < 0 || splash.y > 400) {
+                            game.poisonSplashes.splice(s, 1);
+                            continue;
+                        }
+                        if (m.x + m.w > splash.x && m.x < splash.x + splash.width &&
+                            m.y + m.h > splash.y && m.y < splash.y + splash.height) {
+                            setGameOver(); return;
+                        }
+                    }
+                }
+                
+                if (currentStage === 'desert') {
+                    for (var a = game.arrows.length - 1; a >= 0; a--) {
+                        var arrow = game.arrows[a];
+                        arrow.x += arrow.vx;
+                        arrow.y += arrow.vy;
+                        arrow.vy += 0.05;
+                        arrow.life--;
+                        if (arrow.x < -30 || arrow.x > 830 || arrow.y < -30 || arrow.y > 430 || arrow.life <= 0) {
+                            game.arrows.splice(a, 1);
+                            continue;
+                        }
+                        if (m.x + m.w > arrow.x && m.x < arrow.x + arrow.w &&
+                            m.y + m.h > arrow.y && m.y < arrow.y + arrow.h) {
+                            setGameOver(); return;
+                        }
+                    }
+                }
+                
+                if (currentStage === 'ice') {
+                    for (var b = game.bullets.length - 1; b >= 0; b--) {
+                        var bullet = game.bullets[b];
+                        bullet.trail.push({ x: bullet.x, y: bullet.y });
+                        if (bullet.trail.length > 5) bullet.trail.shift();
+                        bullet.x += bullet.vx;
+                        bullet.y += bullet.vy;
+                        bullet.life--;
+                        if (bullet.x < -30 || bullet.x > 830 || bullet.y < -30 || bullet.y > 430 || bullet.life <= 0) {
+                            game.bullets.splice(b, 1);
+                            continue;
+                        }
+                        if (m.x + m.w > bullet.x && m.x < bullet.x + bullet.w &&
+                            m.y + m.h > bullet.y && m.y < bullet.y + bullet.h) {
+                            setGameOver(); return;
+                        }
+                    }
+                }
+                
+                if (currentStage === 'magma') {
+                    game.lavaTimer++;
+                    if (game.lavaTimer >= game.lavaInterval) {
+                        game.lavaTimer = 0;
+                        spawnLavaColumn();
+                    }
+                    for (var l = game.lavaColumns.length - 1; l >= 0; l--) {
+                        var lava = game.lavaColumns[l];
+                        lava.h += lava.growth;
+                        lava.y = 370 - lava.h;
+                        lava.life--;
+                        if (lava.life <= 0 || lava.h > lava.maxH) {
+                            lava.phase = 'down';
+                            lava.growth = -lava.growth;
+                            if (lava.h <= 0) {
+                                game.lavaColumns.splice(l, 1);
+                                continue;
+                            }
+                        }
+                        if (lava.phase === 'down' && lava.h <= 0) {
+                            game.lavaColumns.splice(l, 1);
+                            continue;
+                        }
+                        if (m.x + m.w > lava.x && m.x < lava.x + lava.w &&
+                            m.y + m.h > lava.y && m.y < lava.y + lava.h) {
+                            setGameOver(); return;
+                        }
+                    }
+                    
+                    if (game.bowser && game.bowser.alive) {
+                        game.bowserTimer++;
+                        if (game.bowserTimer >= game.bowserInterval) {
+                            game.bowserTimer = 0;
+                            bowserAttack();
+                        }
+                        if (game.bowser.hitTimer > 0) game.bowser.hitTimer--;
+                    }
+                    
+                    for (var t = game.teslas.length - 1; t >= 0; t--) {
+                        var tesla = game.teslas[t];
+                        tesla.x += tesla.vx;
+                        tesla.y += tesla.vy;
+                        tesla.vy += 0.10;
+                        tesla.rotation += 0.05;
+                        tesla.life--;
+                        if (tesla.x < -80 || tesla.x > 880 || tesla.y < -80 || tesla.y > 480 || tesla.life <= 0) {
+                            game.teslas.splice(t, 1);
+                            continue;
+                        }
+                        if (m.x + m.w > tesla.x + 6 && m.x < tesla.x + tesla.w - 6 &&
+                            m.y + m.h > tesla.y + 4 && m.y < tesla.y + tesla.h - 4) {
+                            setGameOver(); return;
+                        }
+                    }
+                    
+                    for (var r = game.rockets.length - 1; r >= 0; r--) {
+                        var rocket = game.rockets[r];
+                        rocket.trail.push({ x: rocket.x, y: rocket.y });
+                        if (rocket.trail.length > 12) rocket.trail.shift();
+                        rocket.x += rocket.vx;
+                        rocket.y += rocket.vy;
+                        rocket.vy += 0.06;
+                        rocket.life--;
+                        if (rocket.x < -60 || rocket.x > 860 || rocket.y < -60 || rocket.y > 460 || rocket.life <= 0) {
+                            game.rockets.splice(r, 1);
+                            continue;
+                        }
+                        if (m.x + m.w > rocket.x + 4 && m.x < rocket.x + rocket.w - 4 &&
+                            m.y + m.h > rocket.y + 4 && m.y < rocket.y + rocket.h - 4) {
+                            setGameOver(); return;
+                        }
+                    }
+                    
+                    if (game.bowser && game.bowser.alive) {
+                        var b2 = game.bowser;
+                        if (m.x + m.w > b2.x + 4 && m.x < b2.x + b2.w - 4 &&
+                            m.y + m.h > b2.y + 4 && m.y < b2.y + b2.h - 4) {
+                            if (m.vy > 0 && m.y + m.h - b2.y < 25 && b2.hitTimer <= 0) {
+                                b2.hp--;
+                                b2.hitTimer = 30;
+                                m.vy = -7;
+                                game.score += 500;
+                                updateUI();
+                                if (isStreaming) addChatLine("💥 クッパにヒット！ 残りHP " + b2.hp);
+                                if (b2.hp <= 0) {
+                                    b2.alive = false;
+                                    game.score += 1000;
+                                    updateUI();
+                                    if (isStreaming) addChatLine("🏆 クッパ撃破！");
+                                }
+                            } else if (b2.hitTimer <= 0) {
+                                setGameOver(); return;
+                            }
+                        }
+                    }
+                }
+                
+                var f = game.flag;
+                if (m.x + m.w > f.x + 4 && m.x < f.x + f.w - 4 && m.y + m.h > f.y + 8 && m.y < f.y + f.h - 8) {
+                    game.gameClear = true;
+                    if (currentStage === 'land') {
+                        if (isStreaming) addChatLine("🏁 ステージ1クリア！");
+                        showStageTransition('water');
+                    } else if (currentStage === 'water') {
+                        if (isStreaming) addChatLine("🏁 ステージ2クリア！");
+                        showStageTransition('desert');
+                    } else if (currentStage === 'desert') {
+                        if (isStreaming) addChatLine("🏁 ステージ3クリア！");
+                        showStageTransition('ice');
+                    } else if (currentStage === 'ice') {
+                        if (isStreaming) addChatLine("🏁 ステージ4クリア！ マグマへ");
+                        showStageTransition('magma');
+                    } else if (currentStage === 'magma') {
+                        if (isStreaming) addChatLine("🏆 マグマステージクリア！");
+                        startEnding();
+                    }
+                }
+                if (m.vx > 0.2) m.facing = 1;
+                else if (m.vx < -0.2) m.facing = -1;
+            }
+
+            function setGameOver() {
+                game.gameOver = true;
+                gameoverMsg.style.display = 'block';
+                if (isStreaming) addChatLine("💀 GAME OVER");
+                if (currentStage === 'magma') {
+                    showRetryOverlay();
+                }
+            }
+
+            function showRetryOverlay() {
+                isRetryOverlayActive = true;
+                retryFootnote.textContent = '所持スコア: ' + game.score + ' (1000必要)';
+                if (game.score >= 1000) {
+                    retryBtn.disabled = false;
+                    retryBtn.textContent = '🪙 1000コインでリトライ';
+                } else {
+                    retryBtn.disabled = true;
+                    retryBtn.textContent = '🪙 コイン不足 (' + game.score + '/1000)';
+                }
+                retryOverlay.classList.add('active');
+            }
+
+            retryBtn.addEventListener('click', function() {
+                if (game.score < 1000) return;
+                game.score -= 1000;
+                updateUI();
+                retryOverlay.classList.remove('active');
+                isRetryOverlayActive = false;
+                gameoverMsg.style.display = 'none';
+                buildMagmaStage();
+                if (isStreaming && streamUnlocked) {
+                    addChatLine('🪙 1000コインを支払ってマグマステージからリトライ！');
+                }
+            });
+
+            giveupBtn.addEventListener('click', function() {
+                retryOverlay.classList.remove('active');
+                isRetryOverlayActive = false;
+                resetGame();
+            });
+
+            // ---------- エンディング ----------
+            var IMAGE_SHOW_DELAY = 18000;
+            var REDIRECT_DELAY = 12000;
+            var endingImageTimeout = null;
+            var endingRedirectTimeout = null;
+
+            function updateEndingAnimation() {
+                if (!isEndingActive || endingImageShown) return;
+                endingTimer++;
+                var w = 800, h = 400;
+
+                var grad = ectx.createLinearGradient(0, 0, 0, h);
+                grad.addColorStop(0, '#0a0a2a');
+                grad.addColorStop(1, '#1a1a3a');
+                ectx.fillStyle = grad;
+                ectx.fillRect(0, 0, w, h);
+
+                for (var i = 0; i < 40; i++) {
+                    var sx = (i * 37 + 13) % w;
+                    var sy = (i * 53 + 7) % (h * 0.6);
+                    var twinkle = 0.5 + Math.sin(endingTimer * 0.1 + i) * 0.5;
+                    ectx.fillStyle = 'rgba(255,255,220,' + twinkle + ')';
+                    ectx.fillRect(sx, sy, 2, 2);
+                }
+
+                ectx.fillStyle = '#2a1a3a';
+                ectx.fillRect(0, h - 60, w, 60);
+                ectx.fillStyle = '#3a2a4a';
+                ectx.fillRect(0, h - 60, w, 4);
+
+                var cageX = 500, cageY = h - 180, cageW = 80, cageH = 120;
+                var cageBroken = endingPhase >= 2;
+
+                if (!cageBroken) {
+                    ectx.strokeStyle = '#888';
+                    ectx.lineWidth = 4;
+                    ectx.strokeRect(cageX, cageY, cageW, cageH);
+                    for (var bx = cageX + 12; bx < cageX + cageW; bx += 16) {
+                        ectx.beginPath();
+                        ectx.moveTo(bx, cageY);
+                        ectx.lineTo(bx, cageY + cageH);
+                        ectx.stroke();
+                    }
+                    ectx.beginPath();
+                    ectx.moveTo(cageX, cageY + cageH/2);
+                    ectx.lineTo(cageX + cageW, cageY + cageH/2);
+                    ectx.stroke();
+                }
+
+                var peachX = cageBroken ? 520 : 540;
+                var peachY = cageY + 30;
+
+                ectx.fillStyle = '#ff69b4';
+                ectx.beginPath();
+                ectx.moveTo(peachX, peachY + 100);
+                ectx.lineTo(peachX - 20, peachY + 100);
+                ectx.lineTo(peachX - 12, peachY + 60);
+                ectx.lineTo(peachX + 12, peachY + 60);
+                ectx.lineTo(peachX + 20, peachY + 100);
+                ectx.closePath();
+                ectx.fill();
+
+                ectx.fillStyle = '#f7d9b0';
+                ectx.beginPath();
+                ectx.arc(peachX, peachY + 50, 14, 0, Math.PI * 2);
+                ectx.fill();
+
+                ectx.fillStyle = '#ffd700';
+                ectx.beginPath();
+                ectx.arc(peachX, peachY + 42, 15, Math.PI, Math.PI * 2);
+                ectx.fill();
+                ectx.fillRect(peachX - 15, peachY + 42, 30, 10);
+
+                ectx.fillStyle = '#222';
+                ectx.beginPath();
+                ectx.arc(peachX - 4, peachY + 50, 1.5, 0, Math.PI * 2);
+                ectx.arc(peachX + 4, peachY + 50, 1.5, 0, Math.PI * 2);
+                ectx.fill();
+
+                ectx.fillStyle = '#ffd700';
+                ectx.beginPath();
+                ectx.moveTo(peachX - 10, peachY + 38);
+                ectx.lineTo(peachX - 8, peachY + 30);
+                ectx.lineTo(peachX - 3, peachY + 36);
+                ectx.lineTo(peachX, peachY + 28);
+                ectx.lineTo(peachX + 3, peachY + 36);
+                ectx.lineTo(peachX + 8, peachY + 30);
+                ectx.lineTo(peachX + 10, peachY + 38);
+                ectx.closePath();
+                ectx.fill();
+
+                var marioStartX = 100;
+                var marioEndX = 460;
+                var marioX = marioStartX;
+                if (endingPhase >= 1) {
+                    var p = Math.min(1, (endingTimer - 90) / 90);
+                    marioX = marioStartX + (marioEndX - marioStartX) * p;
+                }
+                var marioY = h - 160;
+
+                ectx.save();
+                ectx.translate(marioX + 15, marioY + 20);
+
+                ectx.fillStyle = '#e33b3b';
+                ectx.fillRect(-14, -22, 28, 12);
+                ectx.fillRect(-10, -28, 20, 8);
+
+                ectx.fillStyle = '#f7d9b0';
+                ectx.fillRect(-12, -10, 24, 16);
+
+                ectx.fillStyle = '#222';
+                ectx.fillRect(-6, -6, 4, 4);
+                ectx.fillRect(2, -6, 4, 4);
+                ectx.fillRect(-4, 2, 8, 2);
+
+                ectx.fillStyle = '#e33b3b';
+                ectx.fillRect(-12, 6, 24, 16);
+
+                ectx.fillStyle = '#f5c542';
+                ectx.fillRect(-6, 12, 3, 3);
+                ectx.fillRect(3, 12, 3, 3);
+
+                ectx.fillStyle = '#2d2d8a';
+                ectx.fillRect(-12, 22, 10, 6);
+                ectx.fillRect(2, 22, 10, 6);
+
+                ectx.restore();
+
+                if (endingPhase >= 3) {
+                    var heartPulse = 1 + Math.sin(endingTimer * 0.2) * 0.15;
+                    ectx.fillStyle = '#ff3366';
+                    ectx.save();
+                    ectx.translate(marioX + 40, marioY - 20);
+                    ectx.scale(heartPulse, heartPulse);
+                    ectx.beginPath();
+                    ectx.moveTo(0, 5);
+                    ectx.bezierCurveTo(-8, -5, -16, 5, 0, 15);
+                    ectx.bezierCurveTo(16, 5, 8, -5, 0, 5);
+                    ectx.fill();
+                    ectx.restore();
+                }
+
+                if (endingPhase >= 4) {
+                    ectx.fillStyle = '#ffd700';
+                    ectx.font = 'bold 36px "Segoe UI", sans-serif';
+                    ectx.textAlign = 'center';
+                    ectx.fillText('Thank you Mario!', w/2, 80);
+                    ectx.font = 'bold 24px "Segoe UI", sans-serif';
+                    ectx.fillStyle = '#fff';
+                    ectx.fillText('Your quest is over.', w/2, 120);
+                    ectx.textAlign = 'left';
+                }
+
+                var wasPhase4 = (endingPhase >= 4);
+                if (endingTimer > 90 && endingPhase < 1) endingPhase = 1;
+                if (endingTimer > 180 && endingPhase < 2) endingPhase = 2;
+                if (endingTimer > 270 && endingPhase < 3) endingPhase = 3;
+                if (endingTimer > 360 && endingPhase < 4) endingPhase = 4;
+
+                if (!wasPhase4 && endingPhase >= 4) {
+                    scheduleImageAndRedirect();
+                }
+            }
+
+            function scheduleImageAndRedirect() {
+                if (endingImageTimeout) clearTimeout(endingImageTimeout);
+                endingImageTimeout = setTimeout(function() {
+                    endingImageShown = true;
+                    endingCanvas.style.display = 'none';
+                    endingImage.style.display = 'block';
+                }, IMAGE_SHOW_DELAY);
+
+                if (endingRedirectTimeout) clearTimeout(endingRedirectTimeout);
+                endingRedirectTimeout = setTimeout(function() {
+                    endingOverlay.classList.remove('active');
+                    isEndingActive = false;
+                    isClearOverlayActive = true;
+                    clearOverlay.classList.add('active');
+                }, IMAGE_SHOW_DELAY + REDIRECT_DELAY);
+            }
+
+            function startEnding() {
+                isEndingActive = true;
+                endingTimer = 0;
+                endingPhase = 0;
+                endingImageShown = false;
+                endingOverlay.classList.add('active');
+                endingCanvas.style.display = 'block';
+                endingImage.style.display = 'none';
+            }
+
+            // ---------- 描画 ----------
+            function draw() {
+                if (isClearOverlayActive || waitingForStageTransition || isRetryOverlayActive || isEndingActive || isOpeningActive) {
+                    ctx.clearRect(0, 0, 800, 400);
+                    return;
+                }
+                ctx.clearRect(0, 0, 800, 400);
+                
+                if (currentStage === 'land') {
+                    var grad = ctx.createLinearGradient(0, 0, 0, 400);
+                    grad.addColorStop(0, '#6fc3ff');
+                    grad.addColorStop(0.7, '#b3e0ff');
+                    ctx.fillStyle = grad;
+                    ctx.fillRect(0, 0, 800, 400);
+                    ctx.fillStyle = 'rgba(255,255,240,0.7)';
+                    drawCloud(90, 40, 1); drawCloud(550, 60, 0.9); drawCloud(340, 20, 0.7);
+                } else if (currentStage === 'water') {
+                    var grad2 = ctx.createLinearGradient(0, 0, 0, 400);
+                    grad2.addColorStop(0, '#0a2a4a');
+                    grad2.addColorStop(0.6, '#1a4a6a');
+                    grad2.addColorStop(1, '#2a5a7a');
+                    ctx.fillStyle = grad2;
+                    ctx.fillRect(0, 0, 800, 400);
+                    for (var b = 0; b < 20; b++) {
+                        var bx = (b * 43 + 17) % 800;
+                        var by = (b * 31 + 53) % 400;
+                        ctx.fillStyle = 'rgba(100, 200, 255, 0.15)';
+                        ctx.beginPath();
+                        ctx.arc(bx, by, 3 + b % 5, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                } else if (currentStage === 'desert') {
+                    var grad3 = ctx.createLinearGradient(0, 0, 0, 400);
+                    grad3.addColorStop(0, '#f5c56b');
+                    grad3.addColorStop(0.5, '#e8a94a');
+                    grad3.addColorStop(1, '#d4943a');
+                    ctx.fillStyle = grad3;
+                    ctx.fillRect(0, 0, 800, 400);
+                    ctx.fillStyle = 'rgba(255, 240, 150, 0.9)';
+                    ctx.shadowColor = '#fff7a0';
+                    ctx.shadowBlur = 40;
+                    ctx.beginPath();
+                    ctx.arc(700, 60, 35, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                    ctx.fillStyle = 'rgba(200, 150, 80, 0.5)';
+                    ctx.beginPath();
+                    ctx.moveTo(0, 280);
+                    ctx.quadraticCurveTo(150, 240, 300, 280);
+                    ctx.quadraticCurveTo(450, 240, 600, 280);
+                    ctx.quadraticCurveTo(720, 250, 800, 280);
+                    ctx.lineTo(800, 400);
+                    ctx.lineTo(0, 400);
+                    ctx.fill();
+                    for (var d = 0; d < 30; d++) {
+                        var dx = (d * 29 + Date.now() * 0.05) % 800;
+                        var dy = (d * 47 + 100) % 300;
+                        ctx.fillStyle = 'rgba(255, 220, 150, 0.4)';
+                        ctx.fillRect(dx, dy, 3, 1);
+                    }
+                } else if (currentStage === 'ice') {
+                    var grad4 = ctx.createLinearGradient(0, 0, 0, 400);
+                    grad4.addColorStop(0, '#a8d8ee');
+                    grad4.addColorStop(0.5, '#c8e8f5');
+                    grad4.addColorStop(1, '#e0f0fa');
+                    ctx.fillStyle = grad4;
+                    ctx.fillRect(0, 0, 800, 400);
+                    ctx.fillStyle = 'rgba(180, 220, 255, 0.3)';
+                    ctx.beginPath();
+                    ctx.ellipse(200, 60, 300, 40, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = 'rgba(200, 180, 255, 0.25)';
+                    ctx.beginPath();
+                    ctx.ellipse(600, 90, 250, 35, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    for (var f2 = 0; f2 < 40; f2++) {
+                        var fx = (f2 * 37 + 23) % 800;
+                        var fy = (f2 * 29 + 11) % 400;
+                        ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                        ctx.beginPath();
+                        ctx.arc(fx, fy, 1.5, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                } else if (currentStage === 'magma') {
+                    var gradM = ctx.createLinearGradient(0, 0, 0, 400);
+                    gradM.addColorStop(0, '#1a0a0a');
+                    gradM.addColorStop(0.5, '#3a1a1a');
+                    gradM.addColorStop(1, '#6a2a1a');
+                    ctx.fillStyle = gradM;
+                    ctx.fillRect(0, 0, 800, 400);
+                    ctx.fillStyle = 'rgba(255, 120, 40, 0.3)';
+                    ctx.beginPath();
+                    ctx.ellipse(400, 420, 500, 100, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    for (var fp = 0; fp < 30; fp++) {
+                        var fpx = (fp * 41 + Date.now() * 0.08) % 800;
+                        var fpy = (fp * 31 + 50) % 350;
+                        ctx.fillStyle = 'rgba(255, 150, 50, 0.6)';
+                        ctx.beginPath();
+                        ctx.arc(fpx, fpy, 1.5, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+                
+                for (var i = 0; i < game.platforms.length; i++) {
+                    var p = game.platforms[i];
+                    if (p.lava) {
+                        var lavaGrad = ctx.createLinearGradient(0, p.y, 0, p.y + p.h);
+                        lavaGrad.addColorStop(0, '#ff4400');
+                        lavaGrad.addColorStop(0.4, '#ff6600');
+                        lavaGrad.addColorStop(1, '#8a1a00');
+                        ctx.fillStyle = lavaGrad;
+                        ctx.fillRect(p.x, p.y, p.w, p.h);
+                        ctx.fillStyle = 'rgba(255, 220, 100, 0.7)';
+                        for (var lx = 0; lx < p.w; lx += 8) {
+                            var lwave = Math.sin(lx * 0.15 + Date.now() * 0.005) * 2;
+                            ctx.fillRect(lx, p.y + lwave, 5, 3);
+                        }
+                        ctx.fillStyle = 'rgba(255, 200, 50, 0.4)';
+                        ctx.fillRect(0, p.y - 2, 800, 4);
+                    } else if (p.log) {
+                        ctx.fillStyle = '#6a4a2a';
+                        ctx.fillRect(p.x, p.y, p.w, p.h);
+                        ctx.fillStyle = '#4a3018';
+                        ctx.fillRect(p.x, p.y + 4, p.w, 2);
+                        ctx.fillRect(p.x, p.y + 10, p.w, 2);
+                        ctx.fillStyle = '#8a6a3a';
+                        ctx.beginPath();
+                        ctx.ellipse(p.x + 6, p.y + p.h/2, 5, p.h/2 - 2, 0, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.fillStyle = '#4a3018';
+                        ctx.beginPath();
+                        ctx.ellipse(p.x + 6, p.y + p.h/2, 3, p.h/2 - 4, 0, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.fillStyle = '#8a6a3a';
+                        ctx.beginPath();
+                        ctx.ellipse(p.x + p.w - 6, p.y + p.h/2, 5, p.h/2 - 2, 0, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.fillStyle = '#4a3018';
+                        ctx.beginPath();
+                        ctx.ellipse(p.x + p.w - 6, p.y + p.h/2, 3, p.h/2 - 4, 0, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.fillStyle = 'rgba(100, 255, 100, 0.3)';
+                        ctx.fillRect(p.x, p.y - 2, p.w, 3);
+                    } else if (currentStage === 'water' && p.y === 380 && p.w === 800) {
+                        ctx.fillStyle = '#1a5a3a';
+                        ctx.fillRect(p.x, p.y, p.w, p.h);
+                        ctx.fillStyle = 'rgba(0, 255, 100, 0.2)';
+                        for (var w = 0; w < 800; w += 12) {
+                            var wave = Math.sin(w * 0.1 + Date.now() * 0.002) * 3;
+                            ctx.fillRect(w, p.y + wave, 6, 4);
+                        }
+                        ctx.fillStyle = 'rgba(255, 50, 50, 0.3)';
+                        ctx.fillRect(0, p.y - 2, 800, 6);
+                    } else if (p.y === 330 && p.w === 800 && currentStage === 'land') {
+                        ctx.fillStyle = '#7d9e5d';
+                        ctx.fillRect(p.x, p.y, p.w, 16);
+                        ctx.fillStyle = '#8b6b4d';
+                        ctx.fillRect(p.x, p.y + 16, p.w, p.h - 16);
+                        ctx.fillStyle = '#5f7d42';
+                        for (var gx = 0; gx < 800; gx += 24) { ctx.fillRect(gx, p.y - 4, 6, 8); }
+                    } else if (p.y === 350 && p.w === 800 && currentStage === 'desert') {
+                        ctx.fillStyle = '#d4a55a';
+                        ctx.fillRect(p.x, p.y, p.w, p.h);
+                        ctx.fillStyle = '#c4944a';
+                        for (var sx = 0; sx < 800; sx += 16) {
+                            ctx.fillRect(sx, p.y + 4, 8, 3);
+                            ctx.fillRect(sx + 8, p.y + 12, 6, 3);
+                        }
+                        ctx.fillStyle = '#b8843a';
+                        ctx.fillRect(p.x, p.y, p.w, 4);
+                    } else if (p.y === 340 && p.w === 800 && currentStage === 'ice') {
+                        ctx.fillStyle = '#a8e0f5';
+                        ctx.fillRect(p.x, p.y, p.w, p.h);
+                        ctx.fillStyle = '#c8eefc';
+                        ctx.fillRect(p.x, p.y, p.w, 8);
+                        ctx.fillStyle = '#e8f8ff';
+                        ctx.fillRect(p.x, p.y, p.w, 3);
+                        ctx.strokeStyle = 'rgba(120, 180, 220, 0.6)';
+                        ctx.lineWidth = 1;
+                        for (var cx = 0; cx < 800; cx += 60) {
+                            ctx.beginPath();
+                            ctx.moveTo(cx + 10, p.y + 8);
+                            ctx.lineTo(cx + 25, p.y + 30);
+                            ctx.lineTo(cx + 15, p.y + 50);
+                            ctx.stroke();
+                        }
+                    } else {
+                        if (currentStage === 'magma') {
+                            ctx.fillStyle = '#5a3a2a';
+                            ctx.fillRect(p.x, p.y, p.w, p.h);
+                            ctx.fillStyle = '#3a2a1a';
+                            ctx.fillRect(p.x + 4, p.y + 4, p.w - 8, 4);
+                            ctx.fillRect(p.x + 4, p.y + p.h - 6, p.w - 8, 4);
+                            ctx.fillStyle = '#2a1a0a';
+                            ctx.fillRect(p.x + 2, p.y + 2, 6, 6);
+                            ctx.fillRect(p.x + p.w - 8, p.y + 2, 6, 6);
+                            ctx.fillStyle = 'rgba(255, 120, 30, 0.7)';
+                            ctx.fillRect(p.x + 15, p.y + p.h/2 - 1, p.w - 30, 2);
+                        } else if (currentStage === 'desert') {
+                            ctx.fillStyle = '#c4944a';
+                            ctx.fillRect(p.x, p.y, p.w, p.h);
+                            ctx.fillStyle = '#a87a3a';
+                            ctx.fillRect(p.x + 4, p.y + 4, p.w - 8, 4);
+                            ctx.fillStyle = '#8a6030';
+                            ctx.fillRect(p.x + 2, p.y + 2, 6, 6);
+                            ctx.fillRect(p.x + p.w - 8, p.y + 2, 6, 6);
+                        } else if (currentStage === 'ice') {
+                            ctx.fillStyle = '#c8e8f5';
+                            ctx.fillRect(p.x, p.y, p.w, p.h);
+                            ctx.fillStyle = '#a8d0e8';
+                            ctx.fillRect(p.x + 2, p.y + 2, p.w - 4, p.h - 4);
+                            ctx.fillStyle = '#e8f8ff';
+                            ctx.fillRect(p.x, p.y, p.w, 4);
+                        } else {
+                            ctx.fillStyle = '#c49a6c';
+                            ctx.fillRect(p.x, p.y, p.w, p.h);
+                            ctx.fillStyle = '#a87d54';
+                            ctx.fillRect(p.x + 4, p.y + 4, p.w - 8, 4);
+                            ctx.fillRect(p.x + 4, p.y + p.h - 6, p.w - 8, 4);
+                            ctx.fillStyle = '#8b6b4d';
+                            ctx.fillRect(p.x + 2, p.y + 2, 6, 6);
+                            ctx.fillRect(p.x + p.w - 8, p.y + 2, 6, 6);
+                        }
+                    }
+                }
+                
+                for (var c = 0; c < game.coins.length; c++) {
+                    var coin = game.coins[c];
+                    if (coin.collected) continue;
+                    ctx.fillStyle = '#f5c542';
+                    ctx.shadowColor = '#f5c542';
+                    ctx.shadowBlur = 12;
+                    ctx.beginPath();
+                    ctx.arc(coin.x + 8, coin.y + 8, 10, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#f0d050';
+                    ctx.shadowBlur = 4;
+                    ctx.beginPath();
+                    ctx.arc(coin.x + 8, coin.y + 8, 6, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                }
+                
+                for (var e = 0; e < game.enemies.length; e++) {
+                    var enemy = game.enemies[e];
+                    if (!enemy.alive) continue;
+                    ctx.fillStyle = '#8b5a3a';
+                    ctx.fillRect(enemy.x, enemy.y, enemy.w, enemy.h);
+                    ctx.fillStyle = '#6a3f2a';
+                    ctx.fillRect(enemy.x + 4, enemy.y + 4, enemy.w - 8, 6);
+                    ctx.fillRect(enemy.x + 4, enemy.y + enemy.h - 10, enemy.w - 8, 6);
+                    ctx.fillStyle = '#fff';
+                    ctx.fillRect(enemy.x + 5, enemy.y + 8, 8, 8);
+                    ctx.fillRect(enemy.x + 17, enemy.y + 8, 8, 8);
+                    ctx.fillStyle = '#222';
+                    ctx.fillRect(enemy.x + 8, enemy.y + 11, 4, 4);
+                    ctx.fillRect(enemy.x + 20, enemy.y + 11, 4, 4);
+                    if (enemy.type === 'archer') {
+                        ctx.strokeStyle = '#6a3f1a';
+                        ctx.lineWidth = 3;
+                        ctx.beginPath();
+                        ctx.arc(enemy.x + 30, enemy.y + 15, 12, -Math.PI/2, Math.PI/2);
+                        ctx.stroke();
+                        ctx.strokeStyle = '#eee';
+                        ctx.lineWidth = 1;
+                        ctx.beginPath();
+                        ctx.moveTo(enemy.x + 30, enemy.y + 3);
+                        ctx.lineTo(enemy.x + 30, enemy.y + 27);
+                        ctx.stroke();
+                        ctx.fillStyle = '#8a2020';
+                        ctx.font = 'bold 12px sans-serif';
+                        ctx.fillText('🏹', enemy.x + 8, enemy.y + 28);
+                    } else if (enemy.type === 'gunner') {
+                        ctx.fillStyle = '#c0c0c0';
+                        ctx.fillRect(enemy.x + 28, enemy.y + 12, 18, 6);
+                        ctx.fillStyle = '#e8e8e8';
+                        ctx.fillRect(enemy.x + 28, enemy.y + 12, 18, 2);
+                        ctx.fillStyle = '#1a1a1a';
+                        ctx.beginPath();
+                        ctx.moveTo(enemy.x + 28, enemy.y + 18);
+                        ctx.lineTo(enemy.x + 34, enemy.y + 18);
+                        ctx.lineTo(enemy.x + 32, enemy.y + 28);
+                        ctx.lineTo(enemy.x + 26, enemy.y + 28);
+                        ctx.closePath();
+                        ctx.fill();
+                        ctx.fillStyle = '#1a1a1a';
+                        ctx.fillRect(enemy.x + 42, enemy.y + 10, 3, 3);
+                        ctx.fillStyle = '#a0a0a0';
+                        ctx.fillRect(enemy.x + 30, enemy.y + 14, 14, 3);
+                        ctx.fillStyle = '#8a2020';
+                        ctx.font = 'bold 10px sans-serif';
+                        ctx.fillText('DE', enemy.x + 10, enemy.y + 28);
+                    } else {
+                        ctx.fillStyle = '#1a3d7a';
+                        ctx.font = 'bold 14px sans-serif';
+                        ctx.fillText('D', enemy.x + 10, enemy.y + 26);
+                    }
+                }
+                
+                if (currentStage === 'magma' && game.bowser && game.bowser.alive) {
+                    var b3 = game.bowser;
+                    ctx.fillStyle = '#2a6a2a';
+                    ctx.beginPath();
+                    ctx.ellipse(b3.x + 25, b3.y + 40, 26, 22, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#1a4a1a';
+                    ctx.beginPath();
+                    ctx.ellipse(b3.x + 25, b3.y + 40, 20, 16, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#fff';
+                    for (var sp = 0; sp < 5; sp++) {
+                        var ang = -Math.PI + (sp / 4) * Math.PI;
+                        var sxp = b3.x + 25 + Math.cos(ang) * 24;
+                        var syp = b3.y + 40 + Math.sin(ang) * 20;
+                        ctx.beginPath();
+                        ctx.moveTo(sxp, syp);
+                        ctx.lineTo(sxp - 3, syp - 6);
+                        ctx.lineTo(sxp + 3, syp - 6);
+                        ctx.closePath();
+                        ctx.fill();
+                    }
+                    ctx.fillStyle = '#3a8a3a';
+                    ctx.beginPath();
+                    ctx.arc(b3.x + 25, b3.y + 15, 18, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#fff';
+                    ctx.beginPath();
+                    ctx.moveTo(b3.x + 12, b3.y + 5);
+                    ctx.lineTo(b3.x + 8, b3.y - 8);
+                    ctx.lineTo(b3.x + 18, b3.y + 2);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.moveTo(b3.x + 38, b3.y + 5);
+                    ctx.lineTo(b3.x + 42, b3.y - 8);
+                    ctx.lineTo(b3.x + 32, b3.y + 2);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.fillStyle = '#fff';
+                    ctx.beginPath();
+                    ctx.arc(b3.x + 18, b3.y + 13, 5, 0, Math.PI * 2);
+                    ctx.arc(b3.x + 32, b3.y + 13, 5, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#c00';
+                    ctx.beginPath();
+                    ctx.arc(b3.x + 19, b3.y + 14, 2.5, 0, Math.PI * 2);
+                    ctx.arc(b3.x + 33, b3.y + 14, 2.5, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = '#1a3a1a';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(b3.x + 15, b3.y + 24);
+                    ctx.lineTo(b3.x + 35, b3.y + 24);
+                    ctx.stroke();
+                    ctx.fillStyle = '#fff';
+                    ctx.beginPath();
+                    ctx.moveTo(b3.x + 18, b3.y + 24);
+                    ctx.lineTo(b3.x + 20, b3.y + 28);
+                    ctx.lineTo(b3.x + 22, b3.y + 24);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.moveTo(b3.x + 28, b3.y + 24);
+                    ctx.lineTo(b3.x + 30, b3.y + 28);
+                    ctx.lineTo(b3.x + 32, b3.y + 24);
+                    ctx.closePath();
+                    ctx.fill();
+                    var hpW = 60;
+                    var hpX = b3.x - 5;
+                    var hpY = b3.y - 25;
+                    ctx.fillStyle = '#000';
+                    ctx.fillRect(hpX - 1, hpY - 1, hpW + 2, 8);
+                    ctx.fillStyle = '#c00';
+                    ctx.fillRect(hpX, hpY, hpW * (b3.hp / 5), 6);
+                    if (b3.hitTimer > 0 && Math.floor(b3.hitTimer / 4) % 2 === 0) {
+                        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+                        ctx.beginPath();
+                        ctx.arc(b3.x + 25, b3.y + 30, 35, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+                
+                if (currentStage === 'water') {
+                    for (var s = 0; s < game.poisonSplashes.length; s++) {
+                        var splash = game.poisonSplashes[s];
+                        ctx.fillStyle = 'rgba(0, 255, 100, 0.7)';
+                        ctx.shadowColor = '#00ff66';
+                        ctx.shadowBlur = 15;
+                        ctx.fillRect(splash.x, splash.y, splash.width, splash.height);
+                        ctx.shadowBlur = 0;
+                    }
+                }
+                
+                if (currentStage === 'desert') {
+                    for (var a = 0; a < game.arrows.length; a++) {
+                        var arrow = game.arrows[a];
+                        ctx.save();
+                        ctx.translate(arrow.x + arrow.w/2, arrow.y + arrow.h/2);
+                        var angle = Math.atan2(arrow.vy, arrow.vx);
+                        ctx.rotate(angle);
+                        ctx.fillStyle = '#6a4a1a';
+                        ctx.fillRect(-9, -1, 14, 2);
+                        ctx.fillStyle = '#aaa';
+                        ctx.beginPath();
+                        ctx.moveTo(5, -3);
+                        ctx.lineTo(9, 0);
+                        ctx.lineTo(5, 3);
+                        ctx.fill();
+                        ctx.fillStyle = '#d44';
+                        ctx.beginPath();
+                        ctx.moveTo(-9, -1);
+                        ctx.lineTo(-13, -4);
+                        ctx.lineTo(-9, 1);
+                        ctx.fill();
+                        ctx.restore();
+                    }
+                }
+                
+                if (currentStage === 'ice') {
+                    for (var bi = 0; bi < game.bullets.length; bi++) {
+                        var bullet = game.bullets[bi];
+                        for (var t = 0; t < bullet.trail.length; t++) {
+                            var tp = bullet.trail[t];
+                            var alpha = (t + 1) / bullet.trail.length * 0.6;
+                            ctx.fillStyle = 'rgba(255, 200, 50, ' + alpha + ')';
+                            ctx.beginPath();
+                            ctx.arc(tp.x + bullet.w/2, tp.y + bullet.h/2, 3, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+                        ctx.save();
+                        ctx.translate(bullet.x + bullet.w/2, bullet.y + bullet.h/2);
+                        var bAngle = Math.atan2(bullet.vy, bullet.vx);
+                        ctx.rotate(bAngle);
+                        ctx.fillStyle = '#e8b84a';
+                        ctx.fillRect(-6, -3, 10, 6);
+                        ctx.fillStyle = '#f5d878';
+                        ctx.beginPath();
+                        ctx.moveTo(4, -3);
+                        ctx.lineTo(8, 0);
+                        ctx.lineTo(4, 3);
+                        ctx.fill();
+                        ctx.restore();
+                    }
+                }
+                
+                if (currentStage === 'magma') {
+                    for (var lc = 0; lc < game.lavaColumns.length; lc++) {
+                        var lava = game.lavaColumns[lc];
+                        var lg = ctx.createLinearGradient(0, lava.y, 0, lava.y + lava.h);
+                        lg.addColorStop(0, '#ffcc00');
+                        lg.addColorStop(0.4, '#ff6600');
+                        lg.addColorStop(1, '#8a1a00');
+                        ctx.fillStyle = lg;
+                        ctx.fillRect(lava.x, lava.y, lava.w, lava.h);
+                        ctx.fillStyle = 'rgba(255, 240, 150, 0.9)';
+                        ctx.beginPath();
+                        ctx.arc(lava.x + lava.w/2, lava.y, 6, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                    for (var tt = 0; tt < game.teslas.length; tt++) {
+                        var tesla = game.teslas[tt];
+                        ctx.save();
+                        ctx.translate(tesla.x + tesla.w/2, tesla.y + tesla.h/2);
+                        ctx.rotate(tesla.rotation);
+                        ctx.fillStyle = '#c8c8d0';
+                        ctx.fillRect(-30, -12, 60, 24);
+                        ctx.fillStyle = '#a0a0a8';
+                        ctx.fillRect(-18, -18, 36, 8);
+                        ctx.fillStyle = '#3a5a8a';
+                        ctx.fillRect(-14, -16, 28, 6);
+                        ctx.fillStyle = '#1a1a1a';
+                        ctx.beginPath();
+                        ctx.arc(-18, 12, 5, 0, Math.PI * 2);
+                        ctx.arc(18, 12, 5, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.fillStyle = '#c00';
+                        ctx.font = 'bold 12px sans-serif';
+                        ctx.fillText('T', -4, 4);
+                        ctx.restore();
+                    }
+                    for (var rr = 0; rr < game.rockets.length; rr++) {
+                        var rocket = game.rockets[rr];
+                        for (var rt = 0; rt < rocket.trail.length; rt++) {
+                            var rtp = rocket.trail[rt];
+                            var rAlpha = (rt + 1) / rocket.trail.length * 0.8;
+                            ctx.fillStyle = 'rgba(255, ' + (100 + rt * 15) + ', 50, ' + rAlpha + ')';
+                            ctx.beginPath();
+                            ctx.arc(rtp.x + rocket.w/2, rtp.y + rocket.h/2, 4, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+                        ctx.save();
+                        ctx.translate(rocket.x + rocket.w/2, rocket.y + rocket.h/2);
+                        var rAngle = Math.atan2(rocket.vy, rocket.vx);
+                        ctx.rotate(rAngle);
+                        ctx.fillStyle = '#f0f0f0';
+                        ctx.fillRect(-10, -8, 20, 32);
+                        ctx.fillStyle = '#1a1a1a';
+                        ctx.beginPath();
+                        ctx.moveTo(-10, -8);
+                        ctx.lineTo(0, -20);
+                        ctx.lineTo(10, -8);
+                        ctx.closePath();
+                        ctx.fill();
+                        ctx.beginPath();
+                        ctx.moveTo(-10, 18);
+                        ctx.lineTo(-16, 26);
+                        ctx.lineTo(-10, 24);
+                        ctx.closePath();
+                        ctx.fill();
+                        ctx.beginPath();
+                        ctx.moveTo(10, 18);
+                        ctx.lineTo(16, 26);
+                        ctx.lineTo(10, 24);
+                        ctx.closePath();
+                        ctx.fill();
+                        ctx.fillStyle = '#1a1a1a';
+                        ctx.font = 'bold 8px sans-serif';
+                        ctx.fillText('X', -3, 4);
+                        ctx.fillStyle = 'rgba(255, 200, 50, 0.9)';
+                        ctx.beginPath();
+                        ctx.arc(0, 26, 8, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.fillStyle = 'rgba(255, 100, 20, 0.9)';
+                        ctx.beginPath();
+                        ctx.arc(0, 30, 5, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.restore();
+                    }
+                }
+                
+                var f = game.flag;
+                ctx.fillStyle = '#6a6a6a';
+                ctx.fillRect(f.x + 10, f.y, 6, f.baseY - f.y);
+                ctx.fillStyle = '#c92a2a';
+                ctx.beginPath();
+                ctx.moveTo(f.x + 16, f.y + 6);
+                ctx.lineTo(f.x + 46, f.y + 20);
+                ctx.lineTo(f.x + 16, f.y + 36);
+                ctx.fill();
+                ctx.fillStyle = '#f5e56b';
+                ctx.font = 'bold 18px sans-serif';
+                ctx.fillText('🏁', f.x - 2, f.y + 52);
+                
+                var m = game.mario;
+                ctx.save();
+                ctx.translate(m.x + m.w/2, m.y + m.h/2);
+                if (m.facing < 0) ctx.scale(-1, 1);
+                ctx.translate(-m.w/2, -m.h/2);
+                if (isStreaming && streamUnlocked) {
+                    ctx.strokeStyle = '#666';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.moveTo(20, -2);
+                    ctx.lineTo(38, -20);
+                    ctx.stroke();
+                    ctx.fillStyle = '#222';
+                    ctx.fillRect(34, -26, 16, 24);
+                    ctx.fillStyle = '#3a6b9a';
+                    ctx.fillRect(36, -24, 12, 16);
+                    ctx.fillStyle = '#fff';
+                    ctx.font = '8px sans-serif';
+                    ctx.fillText('📱', 38, -14);
+                    ctx.fillStyle = '#e33b3b';
+                    ctx.fillRect(2, -6, 24, 12);
+                    ctx.fillRect(6, -10, 16, 6);
+                } else {
+                    ctx.fillStyle = '#e33b3b';
+                    ctx.fillRect(2, -2, 24, 12);
+                    ctx.fillRect(6, -6, 16, 6);
+                }
+                ctx.fillStyle = '#f7d9b0';
+                ctx.fillRect(4, 10, 20, 14);
+                ctx.fillStyle = '#222';
+                ctx.fillRect(16, 12, 6, 6);
+                ctx.fillRect(6, 12, 6, 6);
+                ctx.fillRect(10, 20, 10, 4);
+                ctx.fillStyle = '#e33b3b';
+                ctx.fillRect(2, 24, 24, 12);
+                ctx.fillStyle = '#f5c542';
+                ctx.fillRect(8, 28, 4, 4);
+                ctx.fillRect(18, 28, 4, 4);
+                ctx.fillStyle = '#2d2d8a';
+                ctx.fillRect(0, 34, 10, 6);
+                ctx.fillRect(18, 34, 10, 6);
+                ctx.restore();
+                
+                ctx.fillStyle = '#1f2e1f';
+                ctx.font = 'bold 20px monospace';
+                ctx.fillText('SCORE: ' + game.score, 620, 36);
+                
+                if (isStreaming && streamUnlocked) {
+                    ctx.fillStyle = 'rgba(100,65,165,0.7)';
+                    ctx.fillRect(8, 8, 100, 24);
+                    ctx.fillStyle = '#fff';
+                    ctx.font = 'bold 14px sans-serif';
+                    ctx.fillText('🔴 LIVE', 16, 26);
+                }
+                
+                if (currentStage === 'water') {
+                    ctx.fillStyle = 'rgba(255, 50, 50, 0.5)';
+                    ctx.font = 'bold 14px sans-serif';
+                    ctx.fillText('⚠️ 毒水注意！', 10, 60);
+                } else if (currentStage === 'desert') {
+                    ctx.fillStyle = 'rgba(180, 60, 20, 0.7)';
+                    ctx.font = 'bold 14px sans-serif';
+                    ctx.fillText('🏹 弓クリボー注意！', 10, 60);
+                } else if (currentStage === 'ice') {
+                    ctx.fillStyle = 'rgba(60, 100, 180, 0.8)';
+                    ctx.font = 'bold 14px sans-serif';
+                    ctx.fillText('❄️ 滑る！ 🔫 デザートイーグル注意！', 10, 60);
+                } else if (currentStage === 'magma') {
+                    ctx.fillStyle = 'rgba(255, 100, 40, 0.9)';
+                    ctx.font = 'bold 14px sans-serif';
+                    ctx.fillText('🔥 クッパを倒してピーチを救え！', 10, 60);
+                }
+            }
+
+            function drawCloud(x, y, s) {
+                ctx.beginPath();
+                ctx.arc(x, y, 24*s, 0, Math.PI*2);
+                ctx.arc(x+30*s, y-12*s, 30*s, 0, Math.PI*2);
+                ctx.arc(x+60*s, y, 26*s, 0, Math.PI*2);
+                ctx.arc(x+28*s, y+8*s, 22*s, 0, Math.PI*2);
+                ctx.fill();
+            }
+
+            // ---------- ゲーム制御 ----------
+            function resetGame() {
+                clearOverlay.classList.remove('active');
+                isClearOverlayActive = false;
+                stageTransition.classList.remove('active');
+                waitingForStageTransition = false;
+                retryOverlay.classList.remove('active');
+                isRetryOverlayActive = false;
+                endingOverlay.classList.remove('active');
+                isEndingActive = false;
+                if (endingImageTimeout) { clearTimeout(endingImageTimeout); endingImageTimeout = null; }
+                if (endingRedirectTimeout) { clearTimeout(endingRedirectTimeout); endingRedirectTimeout = null; }
+                buildLandStage();
+                game.gameClear = false;
+                game.gameOver = false;
+                gameoverMsg.style.display = 'none';
+                game.leftPressed = false;
+                game.rightPressed = false;
+                game.jumpPressed = false;
+                updateUI();
+                if (isStreaming && streamUnlocked) {
+                    twitchChat.innerHTML = '';
+                    addChatLine('🔄 ゲームリセット！');
+                }
+            }
+
+            clearRedirectBtn.addEventListener('click', function() {
+                window.location.href = 'pass.html';
+            });
+
+            // ---------- オープニング ----------
+            startBtn.addEventListener('click', function() {
+                isOpeningActive = false;
+                openingOverlay.classList.add('hidden');
+                buildLandStage();
+                if (isStreaming && streamUnlocked) {
+                    addChatLine('🎮 ゲームスタート！');
+                }
+            });
+
+            // ---------- Twitchコメント ----------
+            function addChatLine(msg) {
+                if (!isStreaming || !streamUnlocked) return;
+                var username = 'viewer' + Math.floor(Math.random() * 1000);
+                var chunks = [];
+                for (var i = 0; i < msg.length; i += 4) {
+                    chunks.push(msg.substring(i, i + 4));
+                }
+                chunks.forEach(function(chunk, index) {
+                    var line = document.createElement('div');
+                    line.className = 'chat-line';
+                    if (index === 0) {
+                        line.innerHTML = '<span class="username">' + username + '</span><span class="message">' + chunk + '</span>';
+                    } else {
+                        line.innerHTML = '<span class="message" style="padding-left: 4px;">' + chunk + '</span>';
+                    }
+                    twitchChat.appendChild(line);
+                });
+                while (twitchChat.children.length > 30) {
+                    twitchChat.removeChild(twitchChat.firstChild);
+                }
+                twitchChat.scrollTop = twitchChat.scrollHeight;
+            }
+
+            function randomComment() {
+                if (!isStreaming || !streamUnlocked) return;
+                var idx = Math.floor(Math.random() * currentCommentPool.length);
+                addChatLine(currentCommentPool[idx]);
+            }
+
+            // ---------- 配信モード ----------
+            function toggleStream() {
+                if (!streamUnlocked) {
+                    streamToggleBtn.textContent = '🔒 スコア1000必要';
+                    setTimeout(function() {
+                        streamToggleBtn.textContent = '🔒 配信モード (スコア1000)';
+                    }, 1500);
+                    return;
+                }
+                isStreaming = !isStreaming;
+                streamToggleBtn.textContent = isStreaming ? '📡 配信モード ON' : '📡 配信モード OFF';
+                twitchChat.classList.toggle('active', isStreaming);
+                if (isStreaming) {
+                    twitchChat.innerHTML = '';
+                    addChatLine('🔴 配信開始！ コメントが流れます');
+                    if (chatInterval) clearInterval(chatInterval);
+                    chatInterval = setInterval(randomComment, 3000);
+                } else {
+                    if (chatInterval) {
+                        clearInterval(chatInterval);
+                        chatInterval = null;
+                    }
+                    twitchChat.innerHTML = '';
+                }
+            }
+
+            streamToggleBtn.addEventListener('click', toggleStream);
+
+            // ---------- イベント ----------
+            leftBtn.addEventListener('mousedown', function(e) { e.preventDefault(); game.leftPressed = true; });
+            leftBtn.addEventListener('mouseup', function(e) { e.preventDefault(); game.leftPressed = false; });
+            leftBtn.addEventListener('mouseleave', function(e) { game.leftPressed = false; });
+            rightBtn.addEventListener('mousedown', function(e) { e.preventDefault(); game.rightPressed = true; });
+            rightBtn.addEventListener('mouseup', function(e) { e.preventDefault(); game.rightPressed = false; });
+            rightBtn.addEventListener('mouseleave', function(e) { game.rightPressed = false; });
+            jumpBtn.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                if (!game.gameClear && !game.gameOver && !isClearOverlayActive && !waitingForStageTransition && !isRetryOverlayActive && !isEndingActive && !isOpeningActive) {
+                    game.jumpPressed = true;
+                }
+            });
+            resetBtn.addEventListener('click', resetGame);
+
+            // ---------- ゲームループ ----------
+            function gameLoop() {
+                if (isEndingActive) {
+                    if (!endingImageShown) {
+                        updateEndingAnimation();
+                    }
+                    requestAnimationFrame(gameLoop);
+                    return;
+                }
+                if (isOpeningActive) {
+                    requestAnimationFrame(gameLoop);
+                    return;
+                }
+                if (!game.gameClear && !game.gameOver && !waitingForStageTransition && !isRetryOverlayActive) {
+                    updatePhysics();
+                }
+                if (!isClearOverlayActive && !waitingForStageTransition && !isRetryOverlayActive) {
+                    draw();
+                } else {
+                    ctx.clearRect(0, 0, 800, 400);
+                }
+                requestAnimationFrame(gameLoop);
+            }
+
+            // ---------- 初期化 ----------
+            updateUI();
+            gameLoop();
+
+            twitchChat.classList.remove('active');
+            streamToggleBtn.className = 'stream-badge';
+            streamToggleBtn.textContent = '🔒 配信モード (スコア1000)';
+            if (chatInterval) clearInterval(chatInterval);
+            chatInterval = null;
+
+        })();
+    </script>
+</body>
+</html>
