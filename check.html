@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <title>长按持有 · 最小实验</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none; /* 防止长按选中文本 */
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #111;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: system-ui, sans-serif;
+    }
+    .game {
+      background: #222;
+      padding: 2rem 3rem;
+      border-radius: 3rem;
+      text-align: center;
+      box-shadow: 0 20px 30px rgba(0,0,0,0.6);
+    }
+    .hold-area {
+      width: 260px;
+      height: 260px;
+      border-radius: 50%;
+      background: #2e2e2e;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      margin: 0 auto 2rem;
+      cursor: pointer;
+      transition: background 0.08s, transform 0.1s;
+      box-shadow: inset 0 8px 0 #1a1a1a, 0 15px 20px #0a0a0a;
+      border: 2px solid #444;
+      touch-action: none; /* 禁止触摸滚动/长按菜单 */
+      -webkit-tap-highlight-color: transparent;
+    }
+    .hold-area.active {
+      background: #3b6e3b;
+      transform: scale(0.96);
+      box-shadow: inset 0 5px 0 #1e3a1e, 0 10px 15px #0a0a0a;
+      border-color: #7aae7a;
+    }
+    .hold-area span {
+      font-size: 5rem;
+      line-height: 1;
+      filter: drop-shadow(0 8px 4px #00000066);
+      pointer-events: none; /* 让文字不干扰点击 */
+      color: #ddd;
+      transition: color 0.1s;
+    }
+    .hold-area.active span {
+      color: #fff;
+    }
+    .status {
+      color: #ccc;
+      font-size: 1.8rem;
+      font-weight: bold;
+      letter-spacing: 2px;
+      background: #1a1a1a;
+      padding: 0.8rem 1.5rem;
+      border-radius: 4rem;
+      display: inline-block;
+      min-width: 180px;
+      box-shadow: inset 0 2px 5px #00000066;
+      border: 1px solid #333;
+      transition: all 0.1s;
+    }
+    .status.holding {
+      color: #a5ffa5;
+      background: #1e3a1e;
+      border-color: #4caf50;
+      box-shadow: 0 0 15px #4caf5077;
+    }
+    .note {
+      color: #666;
+      margin-top: 1rem;
+      font-size: 0.8rem;
+      border-top: 1px solid #333;
+      padding-top: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="game">
+    <div class="hold-area" id="holdBtn">
+      <span>🖐️</span>
+    </div>
+    <div class="status" id="statusText">放开</div>
+    <div class="note">按住鼠标/手指 → 持有时</div>
+  </div>
+  <script>
+    (function() {
+      const holdBtn = document.getElementById('holdBtn');
+      const statusText = document.getElementById('statusText');
+      
+      // 核心状态：是否处于长按持有中
+      let isHolding = false;
+
+      // ----- 更新界面 & 状态 -----
+      function setHolding(active) {
+        // 避免重复更新
+        if (isHolding === active) return;
+        isHolding = active;
+
+        if (active) {
+          holdBtn.classList.add('active');
+          statusText.textContent = '持有时';
+          statusText.classList.add('holding');
+        } else {
+          holdBtn.classList.remove('active');
+          statusText.textContent = '放开';
+          statusText.classList.remove('holding');
+        }
+      }
+
+      // ----- 各种输入事件 -----
+
+      // 1. 鼠标 / 笔 (pointerdown 统一处理, 但防止重复)
+      //    使用 pointerdown 是为了同时兼容鼠标和触控笔等
+      function onPointerDown(e) {
+        // 仅当主要按键 (左键) 或触摸/笔 按下时触发
+        // pointerdown 的 button = 0 表示主按键 (左键)
+        if (e.button !== 0 && e.pointerType === 'mouse') return; 
+        
+        // 阻止默认行为 (比如鼠标中键滚动/长按菜单等)
+        e.preventDefault();
+        
+        // 捕获指针 (确保后续事件被捕获，同时避免丢失)
+        holdBtn.setPointerCapture(e.pointerId);
+        
+        // 激活持有状态
+        setHolding(true);
+      }
+
+      function onPointerUp(e) {
+        // 如果指针被捕获，释放
+        if (holdBtn.hasPointerCapture(e.pointerId)) {
+          holdBtn.releasePointerCapture(e.pointerId);
+        }
+        // 只有当前是按住状态才释放 (避免其他指针干扰)
+        // 简单处理: 任意 pointerup 都释放按住状态 (对于单点够用)
+        setHolding(false);
+        e.preventDefault();
+      }
+
+      // 处理 pointercancel (比如系统手势中断)
+      function onPointerCancel(e) {
+        if (holdBtn.hasPointerCapture(e.pointerId)) {
+          holdBtn.releasePointerCapture(e.pointerId);
+        }
+        setHolding(false);
+      }
+
+      // 处理指针离开元素时: 如果按住时移出, 也应该释放 (但用户可能是滑出, 要保持按住? 
+      // 为了符合直觉, 一旦移出元素/离开区域, 就释放)
+      // 但注意: 如果使用了 setPointerCapture, 移出元素仍然会收到事件, 这时我们不应该因为移出而释放
+      // 所以不用 pointerleave/out 来释放, 而是用 pointerup / cancel
+
+      // 但为了避免鼠标移出后仍然认为按住(如果没有捕获指针), 我们可以加一个后备: 鼠标移出窗口?
+      // 其实可以不加, 但为了实验简单可靠, 我们利用 window 上的 mouseup 兜底 (防止鼠标在外部松开没触发)
+      
+      // 兜底: 全局 mouseup / touchend 确保释放 (但注意不要与 pointer 事件冲突)
+      // 但如果已经用 pointer 事件, 大部分浏览器会正确触发 pointerup, 所以可以省略。
+      // 不过为了极端情况, 加一个全局 mouseup 和 touchend 作为保险 (但用 passive 防止阻塞)
+      
+      // 防止触摸时页面滚动/缩放 (已在 CSS touch-action: none)
+      
+      // ----- 注册事件 (使用 pointer events) -----
+      // 为了彻底避免鼠标/触摸两套事件重复触发，只用 pointer 事件
+      // 并且禁用触摸默认行为 (通过 css touch-action: none 已经禁止滚动, 但长按菜单还需要 preventDefault)
+      
+      // pointerdown
+      holdBtn.addEventListener('pointerdown', onPointerDown, { passive: false });
+      // pointerup / pointercancel
+      holdBtn.addEventListener('pointerup', onPointerUp, { passive: false });
+      holdBtn.addEventListener('pointercancel', onPointerCancel, { passive: false });
+      
+      // 可选: 阻止 contextmenu (右键菜单), 因为长按可能会弹出菜单
+      holdBtn.addEventListener('contextmenu', (e) => e.preventDefault());
+
+      // 额外安全: 如果指针离开按钮且没有被捕获, 我们也释放 (但是因为我们用了捕获, 一般不会触发)
+      // 为了更加鲁棒, 可以监听 pointerleave, 但释放条件应该是 没有捕获 且 按住状态
+      // 但简单起见, 省略, 因为捕获后移出不会触发 pointerleave? 会触发 pointerleave! 但捕获状态下仍然会触发 pointerup
+      // 所以我们不在这里释放, 以免干扰。
+
+      // 不过如果用户按住后拖动到按钮外, 我们希望保持按住还是释放? 
+      // 根据 "长按持有" 的一般逻辑, 手指/鼠标移出按钮区域应该视为松开 (类似按键弹起)
+      // 但如果我们希望 "只要按住不放, 即使移出也算持有", 那就用 pointer capture 不释放.
+      // 这里选择更符合硬件实验: 一旦移出按钮区域, 就释放. 
+      // 但为了简单且符合 "长按持有" 直觉, 我们用 pointer capture 后, 即使移出也保持捕获, 
+      // 那么指针移出不会触发 pointerleave? 实际上会触发, 但我们可以忽略它, 因为我们用捕获.
+      // 问题是: 如果用户按住后移出按钮, 他可能会期望释放 (因为UI上按钮已经不再高亮? 
+      // 但是我们的按钮在捕获状态下仍会高亮, 所以视觉反馈还在, 也合理)
+      
+      // 所以我现在决定: 采用捕获, 移出按钮不清除状态, 只有 pointerup/cancel 才清除。
+      // 这就实现了 "按住并拖动到按钮外, 仍然算持有" —— 类似虚拟摇杆按住拖拽的感觉。
+      // 对硬件实验来说, 这样更宽容。
+      
+      // 但若没有捕获 (比如某些旧浏览器), 移出按钮可能会失去 pointerup, 所以加一个全局 mouseup / touchend 兜底。
+      // 全局兜底: 监听 window 的 mouseup 和 touchend, 如果按住状态则释放 (防止在按钮外松开)
+      
+      function globalRelease(e) {
+        // 如果当前是按住状态, 并且事件目标不是按钮本身 (但按钮内会触发pointerup, 所以我们避免重复释放)
+        // 其实不用判断目标, 直接释放即可 (setHolding内部有状态防重)
+        // 但注意: 如果 pointerup 在按钮上触发, 会先调用 onPointerUp 释放, 然后全局 mouseup 也触发,
+        // 但 setHolding(false) 不会重复改变状态。
+        // 问题: 触摸事件也会触发 mouseup, 可能导致问题? 
+        // 而且 pointerup 后还会触发 mouseup, 我们全局的 mouseup 会再执行一次 setHolding(false) 无害。
+        // 但是 touchend 和 mouseup 可能同时触发, 同样无害。
+        setHolding(false);
+        // 不需要 preventDefault
+      }
+      
+      // 但是全局 mouseup 可能会在按钮外释放鼠标时触发, 这正是我们需要的兜底。
+      // 注意: 如果已经通过 pointerup 释放, 再次调用 setHolding(false) 无影响。
+      window.addEventListener('mouseup', globalRelease);
+      window.addEventListener('touchend', globalRelease);
+      // 同时处理 touchcancel (全局)
+      window.addEventListener('touchcancel', globalRelease);
+      
+      // 针对触摸事件, 我们还需要防止页面滚动和长按菜单 (因为 pointer events 已经涵盖, 但为防万一)
+      // 但 pointer events 已经调用了 preventDefault, 所以可以。
+      
+      // 对于某些浏览器, 触摸时可能会触发 click 或长按菜单, 但已经用 contextmenu 阻止。
+      
+      // 另外, 如果按住后失去焦点 (比如切换窗口), 也应该释放
+      window.addEventListener('blur', () => {
+        setHolding(false);
+      });
+      
+      // 可选: 阻止触摸滚动 (已经在 CSS 中用 touch-action: none, 但 body 也要)
+      document.body.addEventListener('touchmove', (e) => {
+        if (e.target === holdBtn || holdBtn.contains(e.target)) {
+          e.preventDefault();
+        }
+      }, { passive: false });
+      
+      // 防止 iOS 上长按弹出选择/菜单
+      holdBtn.addEventListener('touchstart', (e) => {
+        // 不阻止默认会导致长按菜单, 但我们用了 pointerdown 并且 preventDefault 了? 
+        // pointerdown 的 preventDefault 可以阻止后续的鼠标事件和部分默认行为, 
+        // 但为了确保, 再阻止一下.
+        e.preventDefault();
+      }, { passive: false });
+      
+      // 注意: 如果 touchstart 阻止了默认, 那么 pointerdown 可能不会触发? 其实顺序: pointerdown 在 touchstart 之前?
+      // 实际上现代浏览器 pointerdown 先于 touchstart 触发? 不, 触摸事件顺序: pointerdown -> touchstart ... 
+      // 为了不干扰 pointer 事件, 我们不在 touchstart 里 preventDefault 了, 因为 pointerdown 已经处理了.
+      // 但为了避免长按选择, 可以用 css user-select 和 -webkit-touch-callout 解决.
+      
+      // 再加一个样式: -webkit-touch-callout: none; 在 .hold-area 上
+      // 通过动态添加样式来补充
+      const style = document.createElement('style');
+      style.textContent = `
+        .hold-area {
+          -webkit-touch-callout: none;
+          -webkit-user-select: none;
+          user-select: none;
+        }
+      `;
+      document.head.appendChild(style);
+      
+      // 初始状态确保正确
+      setHolding(false);
+    })();
+  </script>
+</body>
+</html>
