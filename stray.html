@@ -3,34 +3,31 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>トルネコのゲーム - 5階のダンジョン</title>
+  <title>拳銃 分解・組み立てゲーム</title>
   <style>
     * {
+      margin: 0;
+      padding: 0;
       box-sizing: border-box;
       user-select: none;
     }
-
     body {
-      margin: 0;
-      min-height: 100vh;
-      background: #1a0e0b;
+      background: #111;
       display: flex;
       justify-content: center;
       align-items: center;
-      font-family: 'Courier New', monospace;
+      min-height: 100vh;
+      font-family: 'Segoe UI', Roboto, system-ui, sans-serif;
     }
-
     #game-container {
       position: relative;
-      width: 800px;
-      max-width: 100vw;
-      background: #0b0705;
-      border: 6px solid #b87c4b;
-      border-radius: 24px;
-      box-shadow: 0 0 30px #000000aa, inset 0 0 10px #3a1f0e;
-      padding: 18px;
+      width: 900px;
+      height: 600px;
+      box-shadow: 0 0 30px rgba(255, 255, 255, 0.1);
+      border-radius: 18px;
+      overflow: hidden;
+      background: #1e1e1e;
     }
-
     /* オープニング画面 */
     #opening-screen {
       position: absolute;
@@ -38,691 +35,524 @@
       left: 0;
       width: 100%;
       height: 100%;
-      background: #000;
-      border-radius: 16px;
-      overflow: hidden;
+      background-image: url('img151white.jpg');
+      background-size: cover;
+      background-position: center;
+      background-color: #111;
       display: flex;
       flex-direction: column;
-      align-items: center;
       justify-content: center;
+      align-items: center;
       z-index: 100;
+      transition: opacity 0.5s ease;
     }
-
-    #opening-screen img {
+    #opening-screen h1 {
+      font-size: 3rem;
+      color: #fff;
+      text-shadow: 3px 3px 0 #000, 6px 6px 0 rgba(255, 50, 50, 0.5);
+      letter-spacing: 6px;
+      margin-bottom: 40px;
+      font-weight: 800;
+      background: rgba(0,0,0,0.3);
+      padding: 12px 36px;
+      border-radius: 60px;
+      backdrop-filter: blur(2px);
+    }
+    #start-btn {
+      padding: 18px 72px;
+      font-size: 2.2rem;
+      font-weight: bold;
+      background: #c0392b;
+      color: white;
+      border: none;
+      border-radius: 60px;
+      cursor: pointer;
+      box-shadow: 0 10px 0 #7a1f1a, 0 12px 25px black;
+      transition: 0.08s linear;
+      letter-spacing: 8px;
+      text-shadow: 2px 2px 0 black;
+      transform: translateY(-2px);
+    }
+    #start-btn:active {
+      box-shadow: 0 4px 0 #7a1f1a, 0 8px 20px black;
+      transform: translateY(6px);
+    }
+    #start-btn:hover {
+      background: #e74c3c;
+    }
+    /* メインゲーム画面 */
+    #game-screen {
       position: absolute;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
-      object-fit: cover;
-      pointer-events: none;
-    }
-
-    .opening-content {
-      position: relative;
-      z-index: 10;
-      text-align: center;
-    }
-
-    .btn-start {
-      background: #c98f3c;
-      border: 5px solid #fbe6a2;
-      color: #2d1b0a;
-      font-size: 2.4rem;
-      font-weight: bold;
-      padding: 16px 60px;
-      border-radius: 60px;
-      cursor: pointer;
-      box-shadow: 0 10px 0 #6b3e18, 0 0 30px #ffbc5e;
-      transition: 0.08s linear;
-      letter-spacing: 4px;
-      font-family: 'Courier New', monospace;
-    }
-
-    .btn-start:active {
-      transform: translateY(6px);
-      box-shadow: 0 4px 0 #6b3e18, 0 0 30px #ffbc5e;
-    }
-
-    /* ゲーム画面 */
-    #game-screen {
       display: none;
-      flex-direction: column;
-      gap: 12px;
+      background: #1a1a1a;
+      background-image: radial-gradient(circle at 30% 30%, #2a2a2a 0%, #0a0a0a 100%);
     }
-
-    .status-bar {
-      display: flex;
-      justify-content: space-between;
-      background: #2a1b12;
-      padding: 12px 18px;
-      border-radius: 60px;
-      border: 3px solid #a16e3e;
-      color: #ffe3a4;
-      font-weight: bold;
-      font-size: 1.25rem;
-      text-shadow: 2px 2px 0 #1f1209;
-      box-shadow: inset 0 0 15px #00000077;
-      letter-spacing: 1px;
-    }
-
-    .status-bar span {
-      display: flex;
-      gap: 6px;
-      align-items: center;
-    }
-
-    .dungeon-grid {
-      display: grid;
-      grid-template-columns: repeat(15, 1fr);
-      grid-template-rows: repeat(11, 1fr);
-      gap: 2px;
-      background: #1e130e;
-      border: 4px solid #7a4e28;
-      border-radius: 12px;
-      padding: 8px;
-      aspect-ratio: 15 / 11;
-      box-shadow: inset 0 0 30px #000000;
-    }
-
-    .cell {
-      background: #3d2c1f;
-      border-radius: 4px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: relative;
-      transition: 0.05s;
-    }
-
-    .cell.wall {
-      background: #5a3e2b;
-      box-shadow: inset 0 0 0 2px #2e1d12;
-    }
-
-    .cell.floor {
-      background: #2f241b;
-    }
-
-    /* ドット絵スプライト（box-shadowでピクセルを描画） */
-    .sprite {
-      width: 10px;
-      height: 10px;
-      position: relative;
-      transform: scale(0.9);
-      image-rendering: pixelated;
-    }
-
-    /* プレイヤー（トルネコ風：黄色い鎧と剣） */
-    .sprite-player {
-      box-shadow:
-        /* 1行目 */
-        0 0 0 #ffd966, 10px 0 0 #ffd966, 20px 0 0 #ffd966,
-        /* 2行目 */
-        0 10px 0 #ffd966, 10px 10px 0 #fff2c0, 20px 10px 0 #ffd966,
-        /* 3行目（剣） */
-        30px 0 0 #d9d9d9, 30px 10px 0 #d9d9d9, 30px 20px 0 #d9d9d9;
-    }
-
-    /* 通常敵（赤いスライム風） */
-    .sprite-enemy {
-      box-shadow:
-        0 0 0 #ff6b6b, 10px 0 0 #ff6b6b, 20px 0 0 #ff6b6b,
-        0 10px 0 #ff6b6b, 10px 10px 0 #ffaaaa, 20px 10px 0 #ff6b6b,
-        0 20px 0 #cc3333, 10px 20px 0 #cc3333, 20px 20px 0 #cc3333;
-    }
-
-    /* ボス（紫の大型） */
-    .sprite-boss {
-      transform: scale(1.3);
-      box-shadow:
-        0 0 0 #c44aff, 10px 0 0 #c44aff, 20px 0 0 #c44aff,
-        0 10px 0 #c44aff, 10px 10px 0 #f0c0ff, 20px 10px 0 #c44aff,
-        0 20px 0 #8a2be2, 10px 20px 0 #8a2be2, 20px 20px 0 #8a2be2,
-        0 30px 0 #5e1a9e, 10px 30px 0 #5e1a9e, 20px 30px 0 #5e1a9e;
-    }
-
-    /* 階段（白いドット階段） */
-    .sprite-stairs {
-      box-shadow:
-        0 0 0 #e0e0e0, 10px 0 0 #b0b0b0, 20px 0 0 #808080,
-        0 10px 0 #b0b0b0, 10px 10px 0 #808080, 20px 10px 0 #505050,
-        0 20px 0 #808080, 10px 20px 0 #505050, 20px 20px 0 #303030;
-    }
-
-    .controller-panel {
-      display: flex;
-      justify-content: center;
-      gap: 40px;
-      margin-top: 8px;
-    }
-
-    .dpad {
-      display: grid;
-      grid-template-columns: repeat(3, 70px);
-      grid-template-rows: repeat(3, 70px);
-      gap: 6px;
-    }
-
-    .dpad button {
-      background: #8b6239;
-      border: none;
-      border-radius: 20px;
-      color: #ffe5b4;
-      font-size: 2.2rem;
-      font-weight: bold;
-      cursor: pointer;
-      box-shadow: 0 7px 0 #4d2f19, 0 0 12px #d49b5b;
-      transition: 0.06s linear;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: 'Courier New', monospace;
-      text-shadow: 2px 2px 0 #2f1c0c;
-    }
-
-    .dpad button:active {
-      transform: translateY(5px);
-      box-shadow: 0 2px 0 #4d2f19, 0 0 12px #d49b5b;
-    }
-
-    .dpad .empty {
-      visibility: hidden;
-    }
-
-    .dpad .up { grid-area: 1 / 2; }
-    .dpad .left { grid-area: 2 / 1; }
-    .dpad .right { grid-area: 2 / 3; }
-    .dpad .down { grid-area: 3 / 2; }
-
-    .btn-reset {
-      background: #5e3f26;
-      border: 3px solid #b88a4e;
-      color: #ffe5b4;
-      padding: 12px 28px;
-      border-radius: 40px;
-      font-size: 1.3rem;
-      font-weight: bold;
-      cursor: pointer;
-      box-shadow: 0 6px 0 #2f1b0c;
-      transition: 0.06s;
-      align-self: center;
-      font-family: 'Courier New', monospace;
-    }
-
-    .btn-reset:active {
-      transform: translateY(4px);
-      box-shadow: 0 2px 0 #2f1b0c;
-    }
-
-    .message-log {
-      background: #1b110b;
-      border: 3px solid #976c3d;
-      border-radius: 40px;
-      padding: 12px 20px;
-      color: #ffdb9d;
-      font-weight: bold;
-      font-size: 1.15rem;
-      text-align: center;
-      min-height: 3.8rem;
-      box-shadow: inset 0 0 15px black;
-      letter-spacing: 1px;
-    }
-
-    /* 勝利画面 */
-    #victory-screen {
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
+    canvas {
+      display: block;
       width: 100%;
       height: 100%;
-      background: #0a0200;
-      z-index: 200;
-      justify-content: center;
-      align-items: center;
-      flex-direction: column;
-      text-align: center;
-      padding: 20px;
+      cursor: crosshair;
     }
-
-    #victory-screen h1 {
-      font-size: 5rem;
-      color: #ffd966;
-      text-shadow: 0 0 40px #ffaa00, 8px 8px 0 #4a2a0a;
-      margin-bottom: 30px;
-      font-family: 'Courier New', monospace;
-      animation: pulse 1.5s infinite;
+    /* ステータス */
+    #status {
+      position: absolute;
+      top: 16px;
+      left: 20px;
+      color: #ddd;
+      background: rgba(0, 0, 0, 0.65);
+      padding: 10px 22px;
+      border-radius: 40px;
+      font-size: 1.3rem;
+      font-weight: 600;
+      backdrop-filter: blur(4px);
+      border-left: 6px solid #e74c3c;
+      pointer-events: none;
+      z-index: 10;
+      letter-spacing: 1px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.7);
     }
-
-    @keyframes pulse {
-      0% { transform: scale(1); }
-      50% { transform: scale(1.05); }
-      100% { transform: scale(1); }
+    #status span {
+      color: #f1c40f;
+      font-weight: 800;
     }
-
-    .victory-text {
-      color: #ffeab5;
-      font-size: 2rem;
-      margin-bottom: 50px;
-      font-weight: bold;
-      text-shadow: 3px 3px 0 #2f1b0c;
+    /* ヒント */
+    #hint {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #aaa;
+      background: rgba(0, 0, 0, 0.6);
+      padding: 8px 26px;
+      border-radius: 40px;
+      font-size: 1rem;
+      letter-spacing: 1px;
+      backdrop-filter: blur(4px);
+      border: 1px solid #444;
+      pointer-events: none;
+      z-index: 10;
+      white-space: nowrap;
     }
-
-    .btn-study {
-      background: #3b6b2e;
-      border: 5px solid #b3ff8f;
-      color: #f3ffd6;
-      font-size: 2.6rem;
-      font-weight: bold;
-      padding: 18px 60px;
-      border-radius: 80px;
-      cursor: pointer;
-      box-shadow: 0 10px 0 #1d3a13, 0 0 40px #70ff4a;
-      transition: 0.08s;
-      text-decoration: none;
-      display: inline-block;
-      font-family: 'Courier New', monospace;
-      letter-spacing: 4px;
-    }
-
-    .btn-study:active {
-      transform: translateY(6px);
-      box-shadow: 0 4px 0 #1d3a13, 0 0 40px #70ff4a;
-    }
-
     .hidden {
-      display: none !important;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
     }
   </style>
 </head>
 <body>
-<div id="game-container">
-
-  <!-- オープニング画面：背景画像と「はじめる」ボタンのみ -->
-  <div id="opening-screen">
-    <img src="img151white.jpg" alt="背景" onerror="this.style.display='none'">
-    <div class="opening-content">
-      <button class="btn-start" id="start-button">はじめる</button>
-    </div>
-  </div>
-
-  <!-- ゲーム画面 -->
-  <div id="game-screen">
-    <div class="status-bar">
-      <span>HP <span id="hp-display">20</span></span>
-      <span>ATK <span id="atk-display">5</span></span>
-      <span><span id="floor-display">1</span>F</span>
-      <span>ENEMY <span id="enemy-count">0</span></span>
+  <div id="game-container">
+    <!-- オープニング画面 -->
+    <div id="opening-screen">
+      <h1>🔫 拳銃 分解・組み立て</h1>
+      <button id="start-btn">はじまる</button>
     </div>
 
-    <div class="dungeon-grid" id="dungeon-grid"></div>
-
-    <div class="message-log" id="message-log">トルネコは どうくつに やってきた！</div>
-
-    <div class="controller-panel">
-      <div class="dpad">
-        <button class="empty" disabled></button>
-        <button class="up" data-dir="up">▲</button>
-        <button class="empty" disabled></button>
-        <button class="left" data-dir="left">◀</button>
-        <button class="empty" disabled></button>
-        <button class="right" data-dir="right">▶</button>
-        <button class="empty" disabled></button>
-        <button class="down" data-dir="down">▼</button>
-        <button class="empty" disabled></button>
-      </div>
-      <button class="btn-reset" id="reset-button">最初から</button>
+    <!-- ゲーム画面 -->
+    <div id="game-screen">
+      <canvas id="gameCanvas" width="900" height="600"></canvas>
+      <div id="status">部品: <span id="partsLeft">6</span> / 6</div>
+      <div id="hint">←↑↓→ で移動　｜　クリックでパーツを取る / 組み立てる</div>
     </div>
   </div>
+  <script>
+    (function(){
+      // ----- キャンバスとコンテキスト -----
+      const canvas = document.getElementById('gameCanvas');
+      const ctx = canvas.getContext('2d');
+      const openingScreen = document.getElementById('opening-screen');
+      const gameScreen = document.getElementById('game-screen');
+      const startBtn = document.getElementById('start-btn');
+      const partsLeftSpan = document.getElementById('partsLeft');
 
-  <!-- 勝利画面（トルネコ非表示、study.html誘導） -->
-  <div id="victory-screen">
-    <h1>勝利！</h1>
-    <div class="victory-text">ボスを倒した！<br> study.html へ進もう</div>
-    <a href="study.html" class="btn-study" id="study-link">STUDY</a>
-  </div>
-</div>
+      // ----- ゲームの状態 -----
+      let gameActive = false;
+      let partsOnFloor = [];        // 床に落ちているパーツ
+      let assembledParts = 0;       // 組み立て済みパーツ数 (0〜6)
+      let player = { x: 450, y: 400, radius: 18, speed: 3.8 };
+      const keys = { ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
 
-<script>
-  (function() {
-    // ----- 定数 & 設定 -----
-    const WIDTH = 15;
-    const HEIGHT = 11;
-    const MAX_FLOOR = 5;
+      // ----- パーツ定義 (6パーツ) -----
+      const partNames = [
+        'スライド', 'バレル', 'フレーム', 'マガジン', 'トリガー', 'グリップ'
+      ];
+      // 分解時のパーツ初期位置（ばらばらに配置）
+      const initialPartPositions = [
+        { x: 180, y: 150 }, // スライド
+        { x: 620, y: 200 }, // バレル
+        { x: 300, y: 480 }, // フレーム
+        { x: 730, y: 420 }, // マガジン
+        { x: 120, y: 350 }, // トリガー
+        { x: 520, y: 100 }  // グリップ
+      ];
 
-    // ゲーム状態
-    let floor = 1;
-    let player = { x: 1, y: 1, hp: 20, maxHp: 20, atk: 5 };
-    let map = [];
-    let enemies = [];
-    let stairsPos = { x: 13, y: 9 };
-    let message = "トルネコは どうくつに やってきた！";
-    let gameActive = false;
-    let gameCleared = false;
+      // 各パーツの色とサイズ（見た目用）
+      const partColors = ['#7f8c8d', '#95a5a6', '#bdc3c7', '#e67e22', '#f1c40f', '#e74c3c'];
+      const partSizes = [
+        { w: 70, h: 20 }, // スライド
+        { w: 55, h: 16 }, // バレル
+        { w: 60, h: 24 }, // フレーム
+        { w: 40, h: 36 }, // マガジン
+        { w: 26, h: 22 }, // トリガー
+        { w: 36, h: 40 }  // グリップ
+      ];
 
-    // DOM要素
-    const openingScreen = document.getElementById('opening-screen');
-    const gameScreen = document.getElementById('game-screen');
-    const victoryScreen = document.getElementById('victory-screen');
-    const dungeonGrid = document.getElementById('dungeon-grid');
-    const hpDisplay = document.getElementById('hp-display');
-    const atkDisplay = document.getElementById('atk-display');
-    const floorDisplay = document.getElementById('floor-display');
-    const enemyCountSpan = document.getElementById('enemy-count');
-    const messageLog = document.getElementById('message-log');
-    const startButton = document.getElementById('start-button');
-    const resetButton = document.getElementById('reset-button');
-    const dpadButtons = document.querySelectorAll('.dpad button[data-dir]');
+      // 組み立て位置（中央付近に順番に並べる）
+      const assemblyPositions = [
+        { x: 410, y: 260 }, // スライド
+        { x: 410, y: 290 }, // バレル
+        { x: 410, y: 320 }, // フレーム
+        { x: 500, y: 330 }, // マガジン
+        { x: 370, y: 310 }, // トリガー
+        { x: 440, y: 370 }  // グリップ
+      ];
 
-    // ダンジョン生成（ランダム）
-    function generateDungeon(floorNum) {
-      const newMap = Array(HEIGHT).fill().map(() => Array(WIDTH).fill(1));
-      enemies = [];
-
-      // 1. 通路を掘る（ランダムウォーク）
-      let px = Math.floor(WIDTH / 2);
-      let py = Math.floor(HEIGHT / 2);
-      newMap[py][px] = 0;
-      const steps = 250 + floorNum * 40;
-      for (let i = 0; i < steps; i++) {
-        const dir = Math.floor(Math.random() * 4);
-        if (dir === 0 && px > 1) px--;
-        else if (dir === 1 && px < WIDTH - 2) px++;
-        else if (dir === 2 && py > 1) py--;
-        else if (dir === 3 && py < HEIGHT - 2) py++;
-        newMap[py][px] = 0;
-      }
-
-      // 追加で部屋風領域を掘る
-      for (let k = 0; k < 4; k++) {
-        const cx = Math.floor(Math.random() * (WIDTH - 6)) + 3;
-        const cy = Math.floor(Math.random() * (HEIGHT - 6)) + 3;
-        for (let y = cy - 2; y <= cy + 2; y++) {
-          for (let x = cx - 2; x <= cx + 2; x++) {
-            if (x > 0 && x < WIDTH - 1 && y > 0 && y < HEIGHT - 1) {
-              newMap[y][x] = 0;
-            }
-          }
-        }
-      }
-
-      newMap[1][1] = 0;
-
-      // 2. 階段の位置
-      let stairsX, stairsY;
-      do {
-        stairsX = Math.floor(Math.random() * (WIDTH - 4)) + 3;
-        stairsY = Math.floor(Math.random() * (HEIGHT - 4)) + 3;
-      } while (newMap[stairsY][stairsX] !== 0 || (stairsX === 1 && stairsY === 1));
-      newMap[stairsY][stairsX] = 2;
-      stairsPos = { x: stairsX, y: stairsY };
-
-      // 3. 敵の配置
-      if (floorNum < MAX_FLOOR) {
-        const enemyCount = 3 + Math.floor(Math.random() * 4);
-        let placed = 0;
-        let attempts = 0;
-        while (placed < enemyCount && attempts < 800) {
-          attempts++;
-          const ex = Math.floor(Math.random() * WIDTH);
-          const ey = Math.floor(Math.random() * HEIGHT);
-          if (newMap[ey][ex] !== 0) continue;
-          if (ex === 1 && ey === 1) continue;
-          if (ex === stairsX && ey === stairsY) continue;
-          if (enemies.some(e => e.x === ex && e.y === ey)) continue;
-
-          const hp = 6 + floorNum * 2 + Math.floor(Math.random() * 4);
-          enemies.push({
-            x: ex, y: ey,
-            hp: hp,
-            maxHp: hp,
-            atk: 2 + floorNum + Math.floor(Math.random() * 2),
-            type: 'normal'
+      // ----- パーツの初期化 (分解状態) -----
+      function initParts() {
+        partsOnFloor = [];
+        assembledParts = 0;
+        for (let i = 0; i < 6; i++) {
+          partsOnFloor.push({
+            id: i,
+            name: partNames[i],
+            x: initialPartPositions[i].x,
+            y: initialPartPositions[i].y,
+            w: partSizes[i].w,
+            h: partSizes[i].h,
+            color: partColors[i],
+            collected: false,      // 床にあるかどうか
           });
-          placed++;
         }
-      } else {
-        // 5F ボス戦
-        let bossX, bossY;
-        do {
-          bossX = Math.floor(Math.random() * (WIDTH - 4)) + 3;
-          bossY = Math.floor(Math.random() * (HEIGHT - 4)) + 3;
-        } while (newMap[bossY][bossX] !== 0 || (bossX === 1 && bossY === 1) || (bossX === stairsX && bossY === stairsY));
-        enemies.push({
-          x: bossX, y: bossY,
-          hp: 45,
-          maxHp: 45,
-          atk: 8,
-          type: 'boss'
-        });
-        // 取り巻き
-        for (let i = 0; i < 2; i++) {
-          let ex, ey;
-          let att = 0;
-          do {
-            ex = Math.floor(Math.random() * (WIDTH - 2)) + 1;
-            ey = Math.floor(Math.random() * (HEIGHT - 2)) + 1;
-            att++;
-          } while (att < 300 && (newMap[ey][ex] !== 0 || (ex === 1 && ey === 1) || enemies.some(e => e.x === ex && e.y === ey) || (ex === bossX && ey === bossY)));
-          if (att < 300) {
-            const hp = 12;
-            enemies.push({
-              x: ex, y: ey,
-              hp: hp,
-              maxHp: hp,
-              atk: 4,
-              type: 'normal'
-            });
-          }
+        updatePartsLeft();
+      }
+
+      // 残りパーツ数の表示更新
+      function updatePartsLeft() {
+        const remaining = partsOnFloor.filter(p => !p.collected).length;
+        partsLeftSpan.textContent = remaining;
+      }
+
+      // ----- プレイヤー操作 (キーボード) -----
+      window.addEventListener('keydown', (e) => {
+        if (!gameActive) return;
+        if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+          e.preventDefault();
+          keys[e.key] = true;
         }
-      }
-
-      if (floorNum > 1) {
-        player.hp = Math.min(player.maxHp, player.hp + 6);
-      }
-
-      player.x = 1;
-      player.y = 1;
-
-      return newMap;
-    }
-
-    function initFloor(floorNum) {
-      map = generateDungeon(floorNum);
-      if (map[player.y]?.[player.x] !== 0 && map[player.y]?.[player.x] !== 2) {
-        map[1][1] = 0;
-        player.x = 1;
-        player.y = 1;
-      }
-      updateUI();
-      renderDungeon();
-    }
-
-    function updateUI() {
-      hpDisplay.textContent = player.hp;
-      atkDisplay.textContent = player.atk;
-      floorDisplay.textContent = floor;
-      const aliveEnemies = enemies.filter(e => e.hp > 0).length;
-      enemyCountSpan.textContent = aliveEnemies;
-      messageLog.textContent = message;
-    }
-
-    // 描画：絵文字を使わず、すべてCSSドット絵スプライトで表現
-    function renderDungeon() {
-      dungeonGrid.innerHTML = '';
-
-      for (let y = 0; y < HEIGHT; y++) {
-        for (let x = 0; x < WIDTH; x++) {
-          const cell = document.createElement('div');
-          cell.className = 'cell';
-
-          const tile = map[y]?.[x] ?? 1;
-          if (tile === 1) {
-            cell.classList.add('wall');
-          } else {
-            cell.classList.add('floor');
-          }
-
-          // 階段（プレイヤーがいない場合のみ表示）
-          if (tile === 2 && !(player.x === x && player.y === y)) {
-            const stairs = document.createElement('div');
-            stairs.className = 'sprite sprite-stairs';
-            cell.appendChild(stairs);
-          }
-
-          // 敵表示
-          const enemyHere = enemies.find(e => e.hp > 0 && e.x === x && e.y === y);
-          if (enemyHere) {
-            const enemySprite = document.createElement('div');
-            enemySprite.className = 'sprite ' + (enemyHere.type === 'boss' ? 'sprite-boss' : 'sprite-enemy');
-            cell.appendChild(enemySprite);
-          }
-
-          // プレイヤー表示（最優先）
-          if (player.x === x && player.y === y) {
-            const playerSprite = document.createElement('div');
-            playerSprite.className = 'sprite sprite-player';
-            cell.appendChild(playerSprite);
-          }
-
-          dungeonGrid.appendChild(cell);
-        }
-      }
-
-      updateUI();
-    }
-
-    function movePlayer(dx, dy) {
-      if (!gameActive || gameCleared) return;
-
-      const newX = player.x + dx;
-      const newY = player.y + dy;
-
-      if (newX < 0 || newX >= WIDTH || newY < 0 || newY >= HEIGHT) return;
-      if (map[newY][newX] === 1) return;
-
-      const enemyIndex = enemies.findIndex(e => e.hp > 0 && e.x === newX && e.y === newY);
-
-      if (enemyIndex !== -1) {
-        const enemy = enemies[enemyIndex];
-        enemy.hp -= player.atk;
-        message = `トルネコの攻撃！ ${enemy.type === 'boss' ? 'ボス' : 'てき'}に ${player.atk} ダメージ！`;
-
-        if (enemy.hp <= 0) {
-          message = `${enemy.type === 'boss' ? 'ボス' : 'てき'}を たおした！`;
-          enemies = enemies.filter(e => e.hp > 0);
-
-          if (enemy.type === 'boss' && floor === MAX_FLOOR) {
-            gameCleared = true;
-            gameActive = false;
-            gameScreen.style.display = 'none';
-            victoryScreen.style.display = 'flex';
-            openingScreen.style.display = 'none';
-            return;
-          }
-        } else {
-          player.hp -= enemy.atk;
-          message += ` ${enemy.type === 'boss' ? 'ボス' : 'てき'}の反撃！ ${enemy.atk} ダメージ！`;
-
-          if (player.hp <= 0) {
-            message = 'トルネコは たおれてしまった... 「最初から」で再挑戦';
-            gameActive = false;
-            player.hp = 0;
-            renderDungeon();
-            updateUI();
-            return;
-          }
-        }
-
-        renderDungeon();
-        return;
-      }
-
-      player.x = newX;
-      player.y = newY;
-
-      if (map[player.y][player.x] === 2) {
-        if (floor < MAX_FLOOR) {
-          floor++;
-          message = `${floor}階に すすんだ！`;
-          enemies = [];
-          initFloor(floor);
-          renderDungeon();
-          updateUI();
-          return;
-        } else {
-          message = 'ボスを たおさないと 先に すすめない！';
-          renderDungeon();
-          updateUI();
-          return;
-        }
-      }
-
-      renderDungeon();
-    }
-
-    function startGame() {
-      openingScreen.style.display = 'none';
-      gameScreen.style.display = 'flex';
-      victoryScreen.style.display = 'none';
-      gameCleared = false;
-      gameActive = true;
-
-      floor = 1;
-      player = { x: 1, y: 1, hp: 20, maxHp: 20, atk: 5 };
-      enemies = [];
-      message = 'トルネコは どうくつに やってきた！';
-
-      initFloor(1);
-      renderDungeon();
-      updateUI();
-    }
-
-    function resetGame() {
-      if (gameCleared) return;
-      gameActive = true;
-      floor = 1;
-      player = { x: 1, y: 1, hp: 20, maxHp: 20, atk: 5 };
-      enemies = [];
-      message = 'トルネコは どうくつに やってきた！';
-      initFloor(1);
-      renderDungeon();
-      updateUI();
-      victoryScreen.style.display = 'none';
-      gameScreen.style.display = 'flex';
-    }
-
-    function handleKeydown(e) {
-      if (!gameActive || gameCleared) return;
-      const key = e.key;
-      if (key === 'ArrowUp') { e.preventDefault(); movePlayer(0, -1); }
-      else if (key === 'ArrowDown') { e.preventDefault(); movePlayer(0, 1); }
-      else if (key === 'ArrowLeft') { e.preventDefault(); movePlayer(-1, 0); }
-      else if (key === 'ArrowRight') { e.preventDefault(); movePlayer(1, 0); }
-    }
-
-    startButton.addEventListener('click', startGame);
-    resetButton.addEventListener('click', resetGame);
-
-    dpadButtons.forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        if (!gameActive || gameCleared) return;
-        const dir = btn.getAttribute('data-dir');
-        if (dir === 'up') movePlayer(0, -1);
-        else if (dir === 'down') movePlayer(0, 1);
-        else if (dir === 'left') movePlayer(-1, 0);
-        else if (dir === 'right') movePlayer(1, 0);
       });
-    });
+      window.addEventListener('keyup', (e) => {
+        if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+          e.preventDefault();
+          keys[e.key] = false;
+        }
+      });
 
-    window.addEventListener('keydown', handleKeydown);
+      // プレイヤー移動
+      function movePlayer() {
+        if (!gameActive) return;
+        let dx = 0, dy = 0;
+        if (keys.ArrowLeft) dx -= player.speed;
+        if (keys.ArrowRight) dx += player.speed;
+        if (keys.ArrowUp) dy -= player.speed;
+        if (keys.ArrowDown) dy += player.speed;
 
-    openingScreen.style.display = 'flex';
-    gameScreen.style.display = 'none';
-    victoryScreen.style.display = 'none';
-  })();
-</script>
+        // 正規化 (斜め移動も同じ速度に)
+        if (dx !== 0 && dy !== 0) {
+          dx *= 0.707;
+          dy *= 0.707;
+        }
+
+        player.x = Math.max(player.radius + 10, Math.min(900 - player.radius - 10, player.x + dx));
+        player.y = Math.max(player.radius + 10, Math.min(600 - player.radius - 10, player.y + dy));
+      }
+
+      // ----- マウスクリック処理 -----
+      canvas.addEventListener('click', (e) => {
+        if (!gameActive) return;
+
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const mouseX = (e.clientX - rect.left) * scaleX;
+        const mouseY = (e.clientY - rect.top) * scaleY;
+
+        // 1. プレイヤーと床のパーツとの距離をチェック (回収)
+        let collected = false;
+        for (let part of partsOnFloor) {
+          if (part.collected) continue;
+
+          // パーツの中心
+          const partCenterX = part.x;
+          const partCenterY = part.y;
+
+          // プレイヤーとパーツの距離
+          const distToPlayer = Math.hypot(player.x - partCenterX, player.y - partCenterY);
+          // パーツの半径（ざっくり）
+          const partRadius = Math.max(part.w, part.h) / 2 + 10;
+
+          if (distToPlayer < player.radius + partRadius) {
+            // 回収
+            part.collected = true;
+            collected = true;
+            // 組み立て位置に移動（ただしすぐには描画しない、assembledPartsで管理）
+            break;
+          }
+        }
+
+        if (collected) {
+          // 回収したパーツを「組み立て済みリスト」に移動
+          // 単純に assembledParts を増やし、床から削除
+          // 実際には partsOnFloor に collected=true として残し、描画時に分ける
+          // ただし、組み立て位置に表示するために、順番に assemblyPositions に置く
+          // ここで assembledParts の数に応じて位置を決める
+          // ただしパーツの種類に応じた位置じゃなくてもOK（見た目重視）
+          // 簡単のため、回収順に assemblyPositions に沿って配置する
+          // でも partsOnFloor 内の collected フラグで管理する
+          // よりシンプルに: assembledParts をインクリメントし、その番号の位置に描画
+          // ただしパーツの id で位置を決めたい場合は assemblyPositions[part.id] を使う
+          // ここでは id で場所を決める方が自然なので、そうする
+          // 上の collected = true にしたパーツの id を保存
+        }
+
+        // もっと正確に: クリックで回収したパーツを特定し、assembledParts を増やす
+        // ループを書き直す
+        // 以下に再実装
+      });
+
+      // 上のイベントを上書き（きれいに書き直し）
+      // 登録済みのイベントを削除できないので、新しい関数で置き換え
+      // 一度削除するために、別の方法を使う
+      // シンプルに: フラグで管理
+
+      // 実際のクリック処理（完全版）
+      function handleCanvasClick(e) {
+        if (!gameActive) return;
+
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const mouseX = (e.clientX - rect.left) * scaleX;
+        const mouseY = (e.clientY - rect.top) * scaleY;
+
+        // 床にあるパーツで、プレイヤーに近いものを探す
+        let targetPart = null;
+        let minDist = Infinity;
+        for (let part of partsOnFloor) {
+          if (part.collected) continue;
+          const partCenterX = part.x;
+          const partCenterY = part.y;
+          const dist = Math.hypot(player.x - partCenterX, player.y - partCenterY);
+          const partRadius = Math.max(part.w, part.h) / 2 + 12;
+          if (dist < player.radius + partRadius && dist < minDist) {
+            minDist = dist;
+            targetPart = part;
+          }
+        }
+
+        if (targetPart) {
+          // 回収
+          targetPart.collected = true;
+          assembledParts++;
+          updatePartsLeft();
+
+          // すべて組み立てたらゲームクリア表示（後で）
+          if (assembledParts === 6) {
+            // 少し余韻
+          }
+        }
+      }
+
+      // イベントリスナー再設定
+      canvas.removeEventListener('click', handleCanvasClick); // 念のため
+      canvas.addEventListener('click', handleCanvasClick);
+
+      // ----- 描画処理 -----
+      function draw() {
+        ctx.clearRect(0, 0, 900, 600);
+
+        // 床のパーツ (回収されていないもの)
+        for (let part of partsOnFloor) {
+          if (part.collected) continue;
+          // 影
+          ctx.shadowColor = 'rgba(0,0,0,0.8)';
+          ctx.shadowBlur = 12;
+          ctx.shadowOffsetX = 4;
+          ctx.shadowOffsetY = 4;
+          // 本体
+          ctx.fillStyle = part.color;
+          ctx.beginPath();
+          ctx.roundRect(part.x - part.w/2, part.y - part.h/2, part.w, part.h, 6);
+          ctx.fill();
+          // 縁取り
+          ctx.shadowBlur = 0;
+          ctx.shadowOffsetX = 0;
+          ctx.shadowOffsetY = 0;
+          ctx.strokeStyle = '#2c3e50';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+
+          // パーツ名
+          ctx.font = 'bold 11px "Segoe UI", sans-serif';
+          ctx.fillStyle = '#fff';
+          ctx.shadowColor = 'black';
+          ctx.shadowBlur = 4;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(part.name, part.x, part.y - 2);
+          ctx.shadowBlur = 0;
+        }
+
+        // 組み立て済みパーツ (assembledParts の数だけ assemblyPositions に表示)
+        // ただし、どのパーツが組み立てられたかは partsOnFloor の collected で判断し、
+        // それぞれのパーツの id に対応する assemblyPositions に描画する
+        for (let i = 0; i < 6; i++) {
+          const part = partsOnFloor[i];
+          if (!part.collected) continue; // 未回収ならスキップ
+
+          // このパーツの組み立て位置
+          const pos = assemblyPositions[i];
+          // 描画
+          ctx.shadowColor = 'rgba(0,0,0,0.9)';
+          ctx.shadowBlur = 16;
+          ctx.shadowOffsetX = 5;
+          ctx.shadowOffsetY = 5;
+
+          ctx.fillStyle = part.color;
+          ctx.beginPath();
+          ctx.roundRect(pos.x - part.w/2, pos.y - part.h/2, part.w, part.h, 8);
+          ctx.fill();
+          ctx.shadowBlur = 0;
+          ctx.shadowOffsetX = 0;
+          ctx.shadowOffsetY = 0;
+          ctx.strokeStyle = '#ecf0f1';
+          ctx.lineWidth = 2.5;
+          ctx.stroke();
+
+          // パーツ名 (組み立て済み)
+          ctx.font = 'bold 11px "Segoe UI", sans-serif';
+          ctx.fillStyle = '#fff';
+          ctx.shadowColor = '#000';
+          ctx.shadowBlur = 6;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(part.name, pos.x, pos.y - 2);
+          ctx.shadowBlur = 0;
+        }
+
+        // プレイヤー (照準マーク)
+        ctx.shadowColor = 'black';
+        ctx.shadowBlur = 20;
+        ctx.shadowOffsetX = 3;
+        ctx.shadowOffsetY = 3;
+
+        // 外側の円
+        ctx.beginPath();
+        ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(231, 76, 60, 0.9)';
+        ctx.fill();
+        ctx.strokeStyle = '#f1c40f';
+        ctx.lineWidth = 4;
+        ctx.stroke();
+
+        // 十字
+        ctx.beginPath();
+        ctx.moveTo(player.x - 14, player.y);
+        ctx.lineTo(player.x + 14, player.y);
+        ctx.moveTo(player.x, player.y - 14);
+        ctx.lineTo(player.x, player.y + 14);
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        // 中心点
+        ctx.beginPath();
+        ctx.arc(player.x, player.y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+
+        // 影リセット
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+
+        // ゲームクリア表示
+        if (assembledParts === 6 && gameActive) {
+          ctx.font = 'bold 48px "Segoe UI", sans-serif';
+          ctx.fillStyle = '#f1c40f';
+          ctx.shadowColor = 'black';
+          ctx.shadowBlur = 20;
+          ctx.shadowOffsetX = 6;
+          ctx.shadowOffsetY = 6;
+          ctx.textAlign = 'center';
+          ctx.fillText('COMPLETE!', 450, 140);
+          ctx.shadowBlur = 0;
+        }
+      }
+
+      // roundRect ヘルパー
+      CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
+        if (w < 2 * r) r = w / 2;
+        if (h < 2 * r) r = h / 2;
+        this.moveTo(x + r, y);
+        this.lineTo(x + w - r, y);
+        this.quadraticCurveTo(x + w, y, x + w, y + r);
+        this.lineTo(x + w, y + h - r);
+        this.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+        this.lineTo(x + r, y + h);
+        this.quadraticCurveTo(x, y + h, x, y + h - r);
+        this.lineTo(x, y + r);
+        this.quadraticCurveTo(x, y, x + r, y);
+        return this;
+      };
+
+      // ----- ゲームループ -----
+      function gameLoop() {
+        if (gameActive) {
+          movePlayer();
+          draw();
+        }
+        requestAnimationFrame(gameLoop);
+      }
+
+      // ----- ゲーム開始 -----
+      function startGame() {
+        // オープニングをフェードアウト
+        openingScreen.classList.add('hidden');
+        // ゲーム画面表示
+        gameScreen.style.display = 'block';
+        // 初期化
+        initParts();
+        player.x = 450;
+        player.y = 400;
+        // キー状態リセット
+        for (let k in keys) keys[k] = false;
+        gameActive = true;
+
+        // オープニングを完全に非表示 (アニメーション後)
+        setTimeout(() => {
+          openingScreen.style.display = 'none';
+        }, 500);
+      }
+
+      // スタートボタン
+      startBtn.addEventListener('click', startGame);
+
+      // ループ開始
+      gameLoop();
+
+      // 初期化（念のため）
+      initParts();
+
+      // ウィンドウリサイズ対応（canvasは固定だが一応）
+      // 特になし
+
+      // オープニング背景画像の読み込み確認（エラーでも無視）
+      // 画像がなくても背景色で表示される
+    })();
+  </script>
 </body>
 </html>
