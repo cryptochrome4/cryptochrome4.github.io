@@ -1,97 +1,905 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-  <title>長押しで持って移動 · 最小</title>
-  <style>
-    * { box-sizing: border-box; user-select: none; }
-    html, body {
-      margin: 0; height: 100%; overflow: hidden;
-      background: #111;
-      font-family: system-ui, sans-serif;
-      touch-action: none; /* 全体でスクロール禁止 */
-    }
-    #item {
-      position: fixed;
-      left: 0; top: 0;
-      width: 120px; height: 120px;
-      border-radius: 50%;
-      background: #2e2e2e;
-      border: 2px solid #444;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 3rem;
-      color: #ddd;
-      cursor: grab;
-      /* transform で位置を動かす（left/top より軽い） */
-      will-change: transform;
-      transition: background 0.08s, border-color 0.08s;
-      -webkit-tap-highlight-color: transparent;
-    }
-    #item.holding {
-      background: #3b6e3b;
-      border-color: #7aae7a;
-      color: #fff;
-      cursor: grabbing;
-    }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>エアホッケー</title>
+<style>
+  * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    font-family: system-ui, "Segoe UI", sans-serif;
+    background: #000; color: #fff;
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* ============ オープニング画面 ============ */
+  #opening {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
+    background-size: cover; background-position: center;
+    background-color: #111;
+    z-index: 100;
+  }
+  #opening::before {
+    content: ""; position: absolute; inset: 0;
+    background: rgba(0,0,0,0.45);
+  }
+  #opening .inner { position: relative; text-align: center; }
+  #opening h1 {
+    font-size: 3rem; margin: 0 0 2rem;
+    text-shadow: 0 4px 20px #000;
+    letter-spacing: 4px;
+  }
+  #opening button {
+    display: block; width: 260px; margin: 0.8rem auto;
+    padding: 1rem; font-size: 1.4rem; font-weight: bold;
+    border: none; border-radius: 999px;
+    background: #4caf50; color: #fff; cursor: pointer;
+    box-shadow: 0 6px 0 #2e7d32, 0 10px 20px #0008;
+    transition: transform 0.08s, box-shadow 0.08s;
+  }
+  #opening button:active { transform: translateY(4px); box-shadow: 0 2px 0 #2e7d32; }
+  #opening button.secondary { background: #607d8b; box-shadow: 0 6px 0 #37474f, 0 10px 20px #0008; }
+  #opening button.secondary:active { box-shadow: 0 2px 0 #37474f; }
+
+  /* ============ 設定モーダル ============ */
+  #settings {
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(0,0,0,0.85);
+    display: none; justify-content: center; align-items: center;
+    overflow-y: auto; padding: 2rem 1rem;
+  }
+  #settings.open { display: flex; }
+  .panel {
+    background: #1e1e1e; color: #eee;
+    width: 100%; max-width: 560px;
+    border-radius: 1rem; padding: 1.5rem 1.5rem 2rem;
+    border: 1px solid #333;
+    box-shadow: 0 30px 60px #000a;
+  }
+  .panel h2 { margin: 0 0 1rem; font-size: 1.4rem; text-align: center; }
+  .field { margin: 1rem 0; }
+  .field label { display: block; font-size: 0.9rem; color: #aaa; margin-bottom: 0.3rem; }
+  .field input[type="number"], .field input[type="text"] {
+    width: 100%; padding: 0.6rem 0.8rem; font-size: 1rem;
+    background: #111; color: #eee;
+    border: 1px solid #444; border-radius: 0.5rem;
+  }
+  .field input[type="range"] { width: 100%; }
+  .row { display: flex; gap: 0.6rem; align-items: center; }
+  .row input { flex: 1; }
+  .row button {
+    padding: 0.6rem 1rem; border: none; border-radius: 0.5rem;
+    background: #4caf50; color: #fff; font-weight: bold; cursor: pointer;
+    white-space: nowrap;
+  }
+  .row button:active { transform: translateY(2px); }
+
+  .colors { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.4rem; }
+  .colors .swatch {
+    width: 100%; aspect-ratio: 1; border-radius: 0.4rem;
+    border: 2px solid #333; cursor: pointer; position: relative;
+  }
+  .colors .swatch.active { border-color: #4caf50; box-shadow: 0 0 0 2px #4caf50aa; }
+
+  .modes { display: flex; gap: 0.6rem; }
+  .modes button {
+    flex: 1; padding: 0.8rem; border-radius: 0.6rem;
+    border: 2px solid #444; background: #111; color: #ccc;
+    cursor: pointer; font-weight: bold;
+  }
+  .modes button.active { border-color: #4caf50; color: #fff; background: #1e3a1e; }
+
+  .panel .actions { display: flex; gap: 0.6rem; margin-top: 1.5rem; }
+  .panel .actions button {
+    flex: 1; padding: 0.9rem; border: none; border-radius: 0.6rem;
+    font-size: 1rem; font-weight: bold; cursor: pointer;
+  }
+  .panel .actions .close { background: #607d8b; color: #fff; }
+  .panel .actions .save  { background: #4caf50; color: #fff; }
+
+  /* ============ ゲーム画面 ============ */
+  #game {
+    position: fixed; inset: 0;
+    display: none; flex-direction: column;
+  }
+  #game.active { display: flex; }
+
+  #hud {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0.6rem 1rem;
+    font-size: 1.2rem; font-weight: bold;
+    background: rgba(0,0,0,0.4);
+    z-index: 5;
+  }
+  #hud .score { font-size: 1.8rem; letter-spacing: 2px; }
+  #hud .timer { font-variant-numeric: tabular-nums; }
+  #hud .turn { font-size: 0.9rem; color: #ffd54f; }
+
+  #board {
+    position: relative; flex: 1; overflow: hidden;
+  }
+  #rink {
+    position: absolute; inset: 0;
+  }
+  #rink .line { position: absolute; background: rgba(255,255,255,0.35); }
+
+  .paddle {
+    position: absolute; width: 90px; height: 90px; border-radius: 50%;
+    border: 3px solid #fff;
+    will-change: transform;
+    pointer-events: none;
+  }
+  #playerPaddle { background: #2196f3; box-shadow: 0 0 25px #2196f3aa; }
+  #aiPaddle     { background: #f44336; box-shadow: 0 0 25px #f44336aa; }
+
+  #puck {
+    position: absolute; width: 46px; height: 46px; border-radius: 50%;
+    background: #fff;
+    border: 2px solid #999;
+    box-shadow: 0 0 15px #fff8, inset 0 -4px 8px #0004;
+    will-change: transform;
+  }
+
+  /* ============ 勝利画面 ============ */
+  #result {
+    position: fixed; inset: 0; z-index: 300;
+    display: none; flex-direction: column;
+    justify-content: center; align-items: center;
+    background: #0a0a0a; text-align: center; padding: 2rem;
+  }
+  #result.open { display: flex; }
+  #result h1 { font-size: 2.2rem; margin: 0 0 1rem; }
+  #result p { color: #bbb; max-width: 480px; line-height: 1.7; }
+  #result a {
+    display: inline-block; margin-top: 2rem;
+    padding: 1rem 2.5rem; font-size: 1.3rem; font-weight: bold;
+    background: #4caf50; color: #fff; text-decoration: none;
+    border-radius: 999px; box-shadow: 0 6px 0 #2e7d32;
+    transition: transform 0.08s, box-shadow 0.08s;
+  }
+  #result a:active { transform: translateY(4px); box-shadow: 0 2px 0 #2e7d32; }
+</style>
 </head>
 <body>
-  <div id="item">🖐️</div>
 
-  <script>
-    const item = document.getElementById('item');
+<!-- ================= オープニング ================= -->
+<div id="opening">
+  <div class="inner">
+    <h1>エアホッケー</h1>
+    <button id="btnStart">はじまる</button>
+    <button id="btnSettings" class="secondary">せってい</button>
+  </div>
+</div>
 
-    // アイテムの現在位置（左上基準）
-    let x = 100, y = 100;
-    // 掴んだ時の「指の位置」と「アイテムの位置」の差分
-    let offsetX = 0, offsetY = 0;
-    // 掴んでいる pointerId（マルチタッチ対策）
-    let activePointerId = null;
+<!-- ================= 設定 ================= -->
+<div id="settings">
+  <div class="panel">
+    <h2>せってい</h2>
 
-    // 初期配置
-    function render() {
-      item.style.transform = `translate(${x}px, ${y}px)`;
+    <!-- モード -->
+    <div class="field">
+      <label>ルール</label>
+      <div class="modes">
+        <button data-mode="time"    id="modeTime">時間制</button>
+        <button data-mode="firstto" id="modeFirst">先取制</button>
+      </div>
+    </div>
+
+    <!-- 時間制 -->
+    <div id="timeOpts">
+      <div class="field">
+        <label>制限時間（秒）デフォルト150秒 = 2分30秒</label>
+        <input type="number" id="timeLimit" min="10" max="3600" step="10" value="150">
+      </div>
+    </div>
+
+    <!-- 先取制 -->
+    <div id="firstOpts" style="display:none;">
+      <div class="field">
+        <label>先に何点取ったら勝ち</label>
+        <input type="number" id="firstTo" min="1" max="50" value="7">
+      </div>
+    </div>
+
+    <!-- 速さ -->
+    <div class="field">
+      <label>円盤を打ったときの速さ：<span id="puckSpeedVal">1.0</span> 倍</label>
+      <input type="range" id="puckSpeed" min="0.3" max="3" step="0.1" value="1">
+    </div>
+    <div class="field">
+      <label>パドル（持ったとき）の速さ：<span id="paddleSpeedVal">1.0</span> 倍</label>
+      <input type="range" id="paddleSpeed" min="0.3" max="3" step="0.1" value="1">
+    </div>
+
+    <!-- 盤上 / 盤外カラー -->
+    <div class="field">
+      <label>盤上の色</label>
+      <div class="colors" id="rinkColors"></div>
+    </div>
+    <div class="field">
+      <label>盤外の色</label>
+      <div class="colors" id="outColors"></div>
+    </div>
+
+    <!-- 画像URL -->
+    <div class="field">
+      <label>盤上の背景画像URL</label>
+      <div class="row">
+        <input type="text" id="rinkImgUrl" placeholder="https://...">
+        <button id="applyRinkImg">このURLを使います</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>盤外の背景画像URL</label>
+      <div class="row">
+        <input type="text" id="outImgUrl" placeholder="https://...">
+        <button id="applyOutImg">このURLを使います</button>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="close" id="btnCloseSettings">閉じる</button>
+      <button class="save"  id="btnSaveSettings">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= ゲーム画面 ================= -->
+<div id="game">
+  <div id="hud">
+    <div class="score" id="scoreDisplay">0 - 0</div>
+    <div class="turn" id="turnDisplay"></div>
+    <div class="timer" id="timerDisplay">--:--</div>
+  </div>
+  <div id="board">
+    <div id="rink">
+      <!-- 中央線と円はJSで生成 -->
+    </div>
+    <div class="paddle" id="playerPaddle"></div>
+    <div class="paddle" id="aiPaddle"></div>
+    <div id="puck"></div>
+  </div>
+</div>
+
+<!-- ================= 勝利画面 ================= -->
+<div id="result">
+  <h1>🎉 勝利！ 🎉</h1>
+  <p>
+    おめでとう！コンピューターに勝ちました。<br>
+    次のステップへ進みましょう。
+  </p>
+  <a href="study.html">study.html へ進む</a>
+</div>
+
+<script>
+/* =========================================================
+   設定（保存可能）
+========================================================= */
+const DEFAULT_CONFIG = {
+  mode: 'time',          // 'time' | 'firstto'
+  timeLimit: 150,        // 秒
+  firstTo: 7,            // 先取点
+  puckSpeed: 1.0,
+  paddleSpeed: 1.0,
+  rinkColor: '#0b6623',  // 盤上（緑）
+  outColor:  '#111111',  // 盤外（黒）
+  rinkImg: '',
+  outImg: ''
+};
+
+const PRESET_COLORS = [
+  '#e53935', // 赤
+  '#4fc3f7', // 水色
+  '#fdd835', // 黄色
+  '#f06292', // ピンク
+  '#1e88e5', // 青
+  '#8d6e63', // 茶色
+  '#ffffff', // 白
+  '#fb8c00', // 橙
+  '#8e24aa', // 紫
+  '#000000', // 黒
+  '#9e9e9e', // 灰色
+  '#43a047', // 緑
+  '#aeea00'  // 黄緑
+];
+
+let config = { ...DEFAULT_CONFIG };
+try {
+  const saved = localStorage.getItem('airhockey_config');
+  if (saved) config = { ...config, ...JSON.parse(saved) };
+} catch(e) {}
+
+function saveConfig() {
+  try { localStorage.setItem('airhockey_config', JSON.stringify(config)); } catch(e) {}
+}
+
+/* =========================================================
+   オープニング & 設定UI
+========================================================= */
+const opening    = document.getElementById('opening');
+const settingsEl = document.getElementById('settings');
+
+// img151white.jpg を背景に
+opening.style.backgroundImage = "url('img151white.jpg')";
+
+// 設定モーダル内の要素
+const elModeTime  = document.getElementById('modeTime');
+const elModeFirst = document.getElementById('modeFirst');
+const elTimeOpts  = document.getElementById('timeOpts');
+const elFirstOpts = document.getElementById('firstOpts');
+const elTimeLimit = document.getElementById('timeLimit');
+const elFirstTo   = document.getElementById('firstTo');
+const elPuckSpeed = document.getElementById('puckSpeed');
+const elPuckSpeedVal = document.getElementById('puckSpeedVal');
+const elPaddleSpeed = document.getElementById('paddleSpeed');
+const elPaddleSpeedVal = document.getElementById('paddleSpeedVal');
+const elRinkColors = document.getElementById('rinkColors');
+const elOutColors  = document.getElementById('outColors');
+const elRinkImgUrl = document.getElementById('rinkImgUrl');
+const elOutImgUrl  = document.getElementById('outImgUrl');
+
+// カラーパレット生成
+function buildSwatches(container, key) {
+  container.innerHTML = '';
+  PRESET_COLORS.forEach(color => {
+    const d = document.createElement('div');
+    d.className = 'swatch';
+    d.style.background = color;
+    d.dataset.color = color;
+    d.title = color;
+    if (config[key] && config[key].toLowerCase() === color.toLowerCase()) {
+      d.classList.add('active');
     }
-    render();
-
-    item.addEventListener('pointerdown', (e) => {
-      if (e.button !== 0 && e.pointerType === 'mouse') return;
-      e.preventDefault();
-
-      // この pointer を専有（指がアイテム外に出てもイベントを受け取る）
-      item.setPointerCapture(e.pointerId);
-      activePointerId = e.pointerId;
-
-      // 掴んだ瞬間の差分を記録 → 指の位置にアイテムが飛ばない
-      offsetX = e.clientX - x;
-      offsetY = e.clientY - y;
-
-      item.classList.add('holding');
+    d.addEventListener('click', () => {
+      container.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+      d.classList.add('active');
+      config[key] = color;
     });
+    container.appendChild(d);
+  });
+}
+buildSwatches(elRinkColors, 'rinkColor');
+buildSwatches(elOutColors,  'outColor');
 
-    item.addEventListener('pointermove', (e) => {
-      // 掴んでいる pointer 以外は無視
-      if (e.pointerId !== activePointerId) return;
+// モード切替
+function setMode(mode) {
+  config.mode = mode;
+  if (mode === 'time') {
+    elModeTime.classList.add('active');
+    elModeFirst.classList.remove('active');
+    elTimeOpts.style.display = '';
+    elFirstOpts.style.display = 'none';
+  } else {
+    elModeFirst.classList.add('active');
+    elModeTime.classList.remove('active');
+    elFirstOpts.style.display = '';
+    elTimeOpts.style.display = 'none';
+  }
+}
+elModeTime.addEventListener('click',  () => setMode('time'));
+elModeFirst.addEventListener('click', () => setMode('firstto'));
 
-      // 指の位置 - 差分 = アイテムの新しい左上座標
-      x = e.clientX - offsetX;
-      y = e.clientY - offsetY;
-      render();
-    });
+// スライダー
+elPuckSpeed.addEventListener('input', () => { elPuckSpeedVal.textContent = parseFloat(elPuckSpeed.value).toFixed(1); });
+elPaddleSpeed.addEventListener('input', () => { elPaddleSpeedVal.textContent = parseFloat(elPaddleSpeed.value).toFixed(1); });
 
-    function release(e) {
-      if (e.pointerId !== activePointerId) return;
-      if (item.hasPointerCapture(e.pointerId)) {
-        item.releasePointerCapture(e.pointerId);
+// 画像URL適用
+document.getElementById('applyRinkImg').addEventListener('click', () => {
+  const url = elRinkImgUrl.value.trim();
+  if (!url) return;
+  config.rinkImg = url;
+  alert('盤上の背景画像URLを設定しました（保存ボタンで確定）');
+});
+document.getElementById('applyOutImg').addEventListener('click', () => {
+  const url = elOutImgUrl.value.trim();
+  if (!url) return;
+  config.outImg = url;
+  alert('盤外の背景画像URLを設定しました（保存ボタンで確定）');
+});
+
+// 設定を開く（現在の config を反映）
+function openSettings() {
+  setMode(config.mode);
+  elTimeLimit.value = config.timeLimit;
+  elFirstTo.value   = config.firstTo;
+  elPuckSpeed.value = config.puckSpeed;
+  elPuckSpeedVal.textContent = parseFloat(config.puckSpeed).toFixed(1);
+  elPaddleSpeed.value = config.paddleSpeed;
+  elPaddleSpeedVal.textContent = parseFloat(config.paddleSpeed).toFixed(1);
+  elRinkImgUrl.value = config.rinkImg || '';
+  elOutImgUrl.value  = config.outImg  || '';
+  buildSwatches(elRinkColors, 'rinkColor');
+  buildSwatches(elOutColors,  'outColor');
+  settingsEl.classList.add('open');
+}
+
+document.getElementById('btnSettings').addEventListener('click', openSettings);
+document.getElementById('btnCloseSettings').addEventListener('click', () => settingsEl.classList.remove('open'));
+
+document.getElementById('btnSaveSettings').addEventListener('click', () => {
+  config.timeLimit   = Math.max(10, Math.min(3600, parseInt(elTimeLimit.value, 10) || 150));
+  config.firstTo     = Math.max(1,  Math.min(50,   parseInt(elFirstTo.value, 10) || 7));
+  config.puckSpeed   = parseFloat(elPuckSpeed.value);
+  config.paddleSpeed = parseFloat(elPaddleSpeed.value);
+  saveConfig();
+  settingsEl.classList.remove('open');
+});
+
+/* =========================================================
+   ゲーム本体
+========================================================= */
+const gameEl        = document.getElementById('game');
+const boardEl       = document.getElementById('board');
+const rinkEl        = document.getElementById('rink');
+const playerPaddle  = document.getElementById('playerPaddle');
+const aiPaddle      = document.getElementById('aiPaddle');
+const puckEl        = document.getElementById('puck');
+const scoreDisplay  = document.getElementById('scoreDisplay');
+const timerDisplay  = document.getElementById('timerDisplay');
+const turnDisplay   = document.getElementById('turnDisplay');
+const resultEl      = document.getElementById('result');
+
+const PUCK_SIZE     = 46;
+const PADDLE_SIZE   = 90;
+
+let W = 0, H = 0;
+let playerScore = 0, aiScore = 0;
+let puck  = { x: 0, y: 0, vx: 0, vy: 0, r: PUCK_SIZE/2 };
+let playerPaddlePos = { x: 0, y: 0 };
+let aiPaddlePos     = { x: 0, y: 0 };
+const aiPaddleTarget = { x: 0, y: 0 };
+
+// 先攻/後攻
+let playerIsFirst = true;   // true: プレイヤーが先攻(下側)
+let gameRunning = false;
+let gameEnded = false;
+let mode = 'time';
+let remainingTime = 0;
+let lastTimestamp = 0;
+let rafId = 0;
+
+// ターゲット位置(スムーズ移動用)
+let playerTargetX = 0, playerTargetY = 0;
+let activePointerId = null;
+let grabOffsetX = 0, grabOffsetY = 0;
+let isGrabbing = false;
+
+/* ---------- レイアウト再構築 ---------- */
+function layout() {
+  W = boardEl.clientWidth;
+  H = boardEl.clientHeight;
+
+  // 盤の背景
+  rinkEl.style.background = config.rinkColor;
+  if (config.rinkImg) {
+    rinkEl.style.backgroundImage = `url('${config.rinkImg}')`;
+    rinkEl.style.backgroundSize = 'cover';
+    rinkEl.style.backgroundPosition = 'center';
+  } else {
+    rinkEl.style.backgroundImage = '';
+  }
+  boardEl.style.background = config.outColor;
+  if (config.outImg) {
+    boardEl.style.backgroundImage = `url('${config.outImg}')`;
+    boardEl.style.backgroundSize = 'cover';
+    boardEl.style.backgroundPosition = 'center';
+  } else {
+    boardEl.style.backgroundImage = '';
+  }
+
+  // 中央線・サークル
+  rinkEl.innerHTML = '';
+  const midY = H / 2;
+  const centerLine = document.createElement('div');
+  centerLine.className = 'line';
+  centerLine.style.left = '0'; centerLine.style.right = '0';
+  centerLine.style.top = (midY - 1) + 'px';
+  centerLine.style.height = '2px';
+  rinkEl.appendChild(centerLine);
+
+  const circle = document.createElement('div');
+  circle.style.position = 'absolute';
+  circle.style.left = '50%'; circle.style.top = '50%';
+  circle.style.width = '160px'; circle.style.height = '160px';
+  circle.style.marginLeft = '-80px'; circle.style.marginTop = '-80px';
+  circle.style.borderRadius = '50%';
+  circle.style.border = '2px solid rgba(255,255,255,0.35)';
+  rinkEl.appendChild(circle);
+
+  // パドル位置リセット(中央基準)
+  const paddleR = PADDLE_SIZE / 2;
+  playerPaddlePos = { x: W/2, y: playerIsFirst ? H - paddleR - 20 : paddleR + 20 };
+  aiPaddlePos     = { x: W/2, y: playerIsFirst ? paddleR + 20 : H - paddleR - 20 };
+  playerTargetX = playerPaddlePos.x;
+  playerTargetY = playerPaddlePos.y;
+  aiPaddleTarget.x = aiPaddlePos.x;
+  aiPaddleTarget.y = aiPaddlePos.y;
+
+  renderPaddles();
+}
+
+function renderPaddles() {
+  playerPaddle.style.transform = `translate(${playerPaddlePos.x - PADDLE_SIZE/2}px, ${playerPaddlePos.y - PADDLE_SIZE/2}px)`;
+  aiPaddle.style.transform     = `translate(${aiPaddlePos.x - PADDLE_SIZE/2}px, ${aiPaddlePos.y - PADDLE_SIZE/2}px)`;
+}
+
+function renderPuck() {
+  puckEl.style.transform = `translate(${puck.x - puck.r}px, ${puck.y - puck.r}px)`;
+}
+
+/* ---------- ゲーム開始 ---------- */
+function startGame() {
+  // 設定読み込み
+  mode = config.mode;
+  remainingTime = config.timeLimit;
+  playerScore = 0;
+  aiScore = 0;
+  gameEnded = false;
+  updateScoreUI();
+
+  // 先攻/後攻ランダム
+  playerIsFirst = Math.random() < 0.5;
+  turnDisplay.textContent = playerIsFirst ? 'あなたが先攻（下）' : 'コンピュータが先攻（上）';
+
+  // 画面切替
+  opening.style.display = 'none';
+  resultEl.classList.remove('open');
+  gameEl.classList.add('active');
+
+  // レイアウト→配置
+  layout();
+  resetPuck();
+
+  // タイマー初期化（時間制のみ表示）
+  if (mode === 'time') {
+    timerDisplay.style.display = '';
+    updateTimerUI();
+  } else {
+    timerDisplay.style.display = 'none';
+  }
+
+  gameRunning = true;
+  lastTimestamp = performance.now();
+  cancelAnimationFrame(rafId);
+  rafId = requestAnimationFrame(loop);
+}
+
+function resetPuck() {
+  puck.x = W / 2;
+  puck.y = H / 2;
+  puck.vx = 0;
+  puck.vy = 0;
+  renderPuck();
+  // 先攻側の方向へゆっくり
+  const dir = playerIsFirst ? 1 : -1; // 下側(player)なら上方向へ（ai側へ）
+  puck.vx = (Math.random() * 2 - 1) * 120;
+  puck.vy = dir * 180;
+}
+
+function updateScoreUI() {
+  scoreDisplay.textContent = `${playerScore} - ${aiScore}`;
+}
+
+function updateTimerUI() {
+  const t = Math.max(0, Math.ceil(remainingTime));
+  const m = Math.floor(t / 60);
+  const s = t % 60;
+  timerDisplay.textContent = `${m}:${String(s).padStart(2,'0')}`;
+}
+
+/* ---------- メインループ ---------- */
+function loop(ts) {
+  if (!gameRunning) return;
+  const dt = Math.min(0.033, (ts - lastTimestamp) / 1000);
+  lastTimestamp = ts;
+
+  if (mode === 'time') {
+    remainingTime -= dt;
+    updateTimerUI();
+    if (remainingTime <= 0) {
+      remainingTime = 0;
+      endByTime();
+      return;
+    }
+  }
+
+  updatePlayerPaddle(dt);
+  updateAIPaddle(dt);
+  updatePuck(dt);
+  checkGoal();
+
+  rafId = requestAnimationFrame(loop);
+}
+
+/* ---------- プレイヤーパドル ---------- */
+function updatePlayerPaddle(dt) {
+  // 目標位置へスムーズに追従（paddleSpeed 倍率）
+  const lerp = Math.min(1, dt * 20 * config.paddleSpeed);
+  playerPaddlePos.x += (playerTargetX - playerPaddlePos.x) * lerp;
+  playerPaddlePos.y += (playerTargetY - playerPaddlePos.y) * lerp;
+
+  // 範囲制限
+  const r = PADDLE_SIZE / 2;
+  playerPaddlePos.x = Math.max(r, Math.min(W - r, playerPaddlePos.x));
+  // 自分の陣地のみ（先攻なら下、後攻なら上）
+  if (playerIsFirst) {
+    playerPaddlePos.y = Math.max(H/2 + r, Math.min(H - r, playerPaddlePos.y));
+  } else {
+    playerPaddlePos.y = Math.max(r, Math.min(H/2 - r, playerPaddlePos.y));
+  }
+  renderPaddles();
+}
+
+/* ---------- AIパドル ---------- */
+function updateAIPaddle(dt) {
+  const r = PADDLE_SIZE / 2;
+  const aiSideTop = playerIsFirst; // プレイヤーが下 → AIは上
+
+  // 基本的に puck.x を追従、puck.y が自陣側に来たら前に出る
+  aiPaddleTarget.x = puck.x;
+
+  if (aiSideTop) {
+    // AIは上側
+    if (puck.y < H/2) {
+      aiPaddleTarget.y = Math.min(H/2 - r, puck.y + 30);
+    } else {
+      aiPaddleTarget.y = r + 20;
+    }
+  } else {
+    // AIは下側
+    if (puck.y > H/2) {
+      aiPaddleTarget.y = Math.max(H/2 + r, puck.y - 30);
+    } else {
+      aiPaddleTarget.y = H - r - 20;
+    }
+  }
+
+  // 追従（AIはプレイヤーより少し遅め）
+  const lerp = Math.min(1, dt * 12 * config.paddleSpeed);
+  aiPaddlePos.x += (aiPaddleTarget.x - aiPaddlePos.x) * lerp;
+  aiPaddlePos.y += (aiPaddleTarget.y - aiPaddlePos.y) * lerp;
+
+  // 範囲制限
+  aiPaddlePos.x = Math.max(r, Math.min(W - r, aiPaddlePos.x));
+  if (aiSideTop) {
+    aiPaddlePos.y = Math.max(r, Math.min(H/2 - r, aiPaddlePos.y));
+  } else {
+    aiPaddlePos.y = Math.max(H/2 + r, Math.min(H - r, aiPaddlePos.y));
+  }
+  renderPaddles();
+}
+
+/* ---------- 円盤 ---------- */
+function updatePuck(dt) {
+  // 摩擦
+  const friction = 0.995;
+  puck.vx *= Math.pow(friction, dt * 60);
+  puck.vy *= Math.pow(friction, dt * 60);
+
+  puck.x += puck.vx * dt;
+  puck.y += puck.vy * dt;
+
+  // 壁反射（左右）
+  if (puck.x - puck.r < 0) {
+    puck.x = puck.r;
+    puck.vx = Math.abs(puck.vx);
+  } else if (puck.x + puck.r > W) {
+    puck.x = W - puck.r;
+    puck.vx = -Math.abs(puck.vx);
+  }
+  // 上下（ただしゴール判定は checkGoal 側で）
+  if (puck.y - puck.r < 0) {
+    puck.y = puck.r;
+    puck.vy = Math.abs(puck.vy);
+  } else if (puck.y + puck.r > H) {
+    puck.y = H - puck.r;
+    puck.vy = -Math.abs(puck.vy);
+  }
+
+  // パドル衝突（円同士）
+  handlePaddleCollision(playerPaddlePos, true);
+  handlePaddleCollision(aiPaddlePos, false);
+
+  renderPuck();
+}
+
+function handlePaddleCollision(paddlePos, isPlayer) {
+  const dx = puck.x - paddlePos.x;
+  const dy = puck.y - paddlePos.y;
+  const dist = Math.hypot(dx, dy);
+  const minDist = puck.r + PADDLE_SIZE/2;
+
+  if (dist < minDist && dist > 0.0001) {
+    // 押し出し
+    const nx = dx / dist;
+    const ny = dy / dist;
+    puck.x = paddlePos.x + nx * minDist;
+    puck.y = paddlePos.y + ny * minDist;
+
+    // パドルの移動速度を加味（簡易: プレイヤーの場合は目標との差分）
+    let paddleVX = 0, paddleVY = 0;
+    if (isPlayer) {
+      paddleVX = (playerTargetX - playerPaddlePos.x) * 6;
+      paddleVY = (playerTargetY - playerPaddlePos.y) * 6;
+    } else {
+      paddleVX = puck.vx * 0.3;
+      paddleVY = puck.vy * 0.3;
+    }
+
+    // 反射 + 押し出し速度 + パドル速度
+    const baseSpeed = 420 * config.puckSpeed;
+    let vx = nx * baseSpeed + paddleVX * 0.5;
+    let vy = ny * baseSpeed + paddleVY * 0.5;
+
+    puck.vx = vx;
+    puck.vy = vy;
+  }
+}
+
+/* ---------- ゴール判定 ---------- */
+function checkGoal() {
+  const GOAL_WIDTH = W * 0.35;
+  const goalLeft  = (W - GOAL_WIDTH) / 2;
+  const goalRight = goalLeft + GOAL_WIDTH;
+
+  // 上側ゴール
+  if (puck.y - puck.r <= 0) {
+    if (puck.x > goalLeft && puck.x < goalRight) {
+      // 上側 = AIのゴール or プレイヤーのゴール?
+      // 先攻が下(player) → 上はAIのゴール → プレイヤー得点
+      if (playerIsFirst) {
+        playerScore++;
+      } else {
+        aiScore++;
       }
-      activePointerId = null;
-      item.classList.remove('holding');
+      onGoal();
+      return;
     }
+  }
+  // 下側ゴール
+  if (puck.y + puck.r >= H) {
+    if (puck.x > goalLeft && puck.x < goalRight) {
+      if (playerIsFirst) {
+        aiScore++;
+      } else {
+        playerScore++;
+      }
+      onGoal();
+      return;
+    }
+  }
+}
 
-    item.addEventListener('pointerup', release);
-    item.addEventListener('pointercancel', release);
-    item.addEventListener('contextmenu', (e) => e.preventDefault());
-  </script>
+function onGoal() {
+  updateScoreUI();
+
+  // 先取制チェック
+  if (mode === 'firstto') {
+    if (playerScore >= config.firstTo) { endGame('player'); return; }
+    if (aiScore     >= config.firstTo) { endGame('ai');     return; }
+  }
+
+  // 得点した側が次のサーブ権（簡易: 得点された側から再開 → 逆にした）
+  // 得点した側が下(先攻)かどうかでサーブ方向を調整
+  resetPuck();
+}
+
+/* ---------- 終了処理 ---------- */
+function endByTime() {
+  if (playerScore > aiScore)      endGame('player');
+  else if (aiScore > playerScore) endGame('ai');
+  else {
+    // 引き分け → コイントス
+    const playerWins = Math.random() < 0.5;
+    endGame(playerWins ? 'player' : 'ai', true);
+  }
+}
+
+function endGame(winner, coinFlip = false) {
+  if (gameEnded) return;
+  gameEnded = true;
+  gameRunning = false;
+  cancelAnimationFrame(rafId);
+
+  if (winner === 'player') {
+    // 勝利画面
+    gameEl.classList.remove('active');
+    resultEl.classList.add('open');
+    if (coinFlip) {
+      const h1 = resultEl.querySelector('h1');
+      h1.textContent = '🎉 勝利（コイントス） 🎉';
+    }
+  } else {
+    // 敗北 → オープニングに戻す
+    gameEl.classList.remove('active');
+    opening.style.display = '';
+    // 念のためタイトルを戻す
+    alert(coinFlip ? 'コイントスの結果、コンピュータの勝ちです。' : 'コンピュータの勝ちです。もう一度挑戦してください！');
+  }
+}
+
+/* =========================================================
+   入力（長押しドラッグ）
+========================================================= */
+boardEl.addEventListener('pointerdown', (e) => {
+  if (!gameRunning) return;
+  if (e.button !== 0 && e.pointerType === 'mouse') return;
+  e.preventDefault();
+
+  // 自分の陣地内かチェック
+  const rect = boardEl.getBoundingClientRect();
+  const px = e.clientX - rect.left;
+  const py = e.clientY - rect.top;
+
+  const r = PADDLE_SIZE / 2;
+  const inMyHalf = playerIsFirst ? py > H/2 : py < H/2;
+  if (!inMyHalf) return;
+
+  // パドルを掴むかどうか（パドルに近いか）
+  const dx = px - playerPaddlePos.x;
+  const dy = py - playerPaddlePos.y;
+  const dist = Math.hypot(dx, dy);
+
+  boardEl.setPointerCapture(e.pointerId);
+  activePointerId = e.pointerId;
+  isGrabbing = true;
+
+  if (dist < PADDLE_SIZE) {
+    // 掴んだ位置の差分（指とパドル中心のズレ）
+    grabOffsetX = playerPaddlePos.x - px;
+    grabOffsetY = playerPaddlePos.y - py;
+  } else {
+    // 離れた位置をタップ → その位置へ移動（ズレ0扱い）
+    grabOffsetX = 0;
+    grabOffsetY = 0;
+    playerTargetX = px;
+    playerTargetY = py;
+  }
+});
+
+boardEl.addEventListener('pointermove', (e) => {
+  if (!gameRunning || !isGrabbing || e.pointerId !== activePointerId) return;
+  e.preventDefault();
+  const rect = boardEl.getBoundingClientRect();
+  const px = e.clientX - rect.left;
+  const py = e.clientY - rect.top;
+  playerTargetX = px + grabOffsetX;
+  playerTargetY = py + grabOffsetY;
+});
+
+function releasePointer(e) {
+  if (e.pointerId !== activePointerId) return;
+  if (boardEl.hasPointerCapture(e.pointerId)) boardEl.releasePointerCapture(e.pointerId);
+  activePointerId = null;
+  isGrabbing = false;
+}
+boardEl.addEventListener('pointerup', releasePointer);
+boardEl.addEventListener('pointercancel', releasePointer);
+boardEl.addEventListener('contextmenu', (e) => e.preventDefault());
+
+/* =========================================================
+   起動 & リサイズ
+========================================================= */
+document.getElementById('btnStart').addEventListener('click', () => {
+  // 保存済み config を再読込
+  try {
+    const saved = localStorage.getItem('airhockey_config');
+    if (saved) config = { ...DEFAULT_CONFIG, ...JSON.parse(saved) };
+  } catch(e) {}
+  startGame();
+});
+
+window.addEventListener('resize', () => {
+  if (!gameRunning) return;
+  layout();
+});
+
+// 初期表示: オープニング
+opening.style.display = 'flex';
+</script>
 </body>
 </html>
