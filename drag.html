@@ -14,7 +14,7 @@
     -webkit-tap-highlight-color: transparent;
   }
 
-  /* ============ オープニング画面 ============ */
+  /* ============ オープニング ============ */
   #opening {
     position: fixed; inset: 0;
     display: flex; flex-direction: column;
@@ -44,6 +44,8 @@
   #opening button:active { transform: translateY(4px); box-shadow: 0 2px 0 #2e7d32; }
   #opening button.secondary { background: #607d8b; box-shadow: 0 6px 0 #37474f, 0 10px 20px #0008; }
   #opening button.secondary:active { box-shadow: 0 2px 0 #37474f; }
+  #opening button.tertiary { background: #7e57c2; box-shadow: 0 6px 0 #4527a0, 0 10px 20px #0008; }
+  #opening button.tertiary:active { box-shadow: 0 2px 0 #4527a0; }
 
   /* ============ 設定モーダル ============ */
   #settings {
@@ -55,12 +57,29 @@
   #settings.open { display: flex; }
   .panel {
     background: #1e1e1e; color: #eee;
-    width: 100%; max-width: 560px;
+    width: 100%; max-width: 580px;
     border-radius: 1rem; padding: 1.5rem 1.5rem 2rem;
     border: 1px solid #333;
     box-shadow: 0 30px 60px #000a;
   }
-  .panel h2 { margin: 0 0 1rem; font-size: 1.4rem; text-align: center; }
+  .panel h2 { margin: 0 0 1.2rem; font-size: 1.4rem; text-align: center; }
+
+  /* 設定タブ */
+  .tabs { display: flex; gap: 0.4rem; margin-bottom: 1.2rem; }
+  .tabs button {
+    flex: 1; padding: 0.7rem 0.4rem;
+    background: #111; color: #aaa;
+    border: 2px solid #333; border-radius: 0.5rem;
+    font-weight: bold; cursor: pointer;
+    transition: all 0.1s;
+  }
+  .tabs button.active {
+    background: #1e3a1e; color: #fff;
+    border-color: #4caf50;
+  }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
   .field { margin: 1rem 0; }
   .field label { display: block; font-size: 0.9rem; color: #aaa; margin-bottom: 0.3rem; }
   .field input[type="number"], .field input[type="text"] {
@@ -69,6 +88,8 @@
     border: 1px solid #444; border-radius: 0.5rem;
   }
   .field input[type="range"] { width: 100%; }
+  .field .hint { font-size: 0.78rem; color: #666; margin-top: 0.25rem; }
+
   .row { display: flex; gap: 0.6rem; align-items: center; }
   .row input { flex: 1; }
   .row button {
@@ -92,6 +113,14 @@
     cursor: pointer; font-weight: bold;
   }
   .modes button.active { border-color: #4caf50; color: #fff; background: #1e3a1e; }
+
+  .levels { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.4rem; }
+  .levels button {
+    padding: 0.7rem 0.2rem; border-radius: 0.5rem;
+    border: 2px solid #444; background: #111; color: #ccc;
+    cursor: pointer; font-weight: bold; font-size: 0.85rem;
+  }
+  .levels button.active { border-color: #4caf50; color: #fff; background: #1e3a1e; }
 
   .panel .actions { display: flex; gap: 0.6rem; margin-top: 1.5rem; }
   .panel .actions button {
@@ -119,12 +148,8 @@
   #hud .timer { font-variant-numeric: tabular-nums; }
   #hud .turn { font-size: 0.9rem; color: #ffd54f; }
 
-  #board {
-    position: relative; flex: 1; overflow: hidden;
-  }
-  #rink {
-    position: absolute; inset: 0;
-  }
+  #board { position: relative; flex: 1; overflow: hidden; }
+  #rink  { position: absolute; inset: 0; }
   #rink .line { position: absolute; background: rgba(255,255,255,0.35); }
 
   .paddle {
@@ -171,73 +196,105 @@
   <div class="inner">
     <h1>エアホッケー</h1>
     <button id="btnStart">はじまる</button>
-    <button id="btnSettings" class="secondary">せってい</button>
+    <button id="btnSettings1" class="secondary">設定1（ルール・速さ）</button>
+    <button id="btnSettings2" class="tertiary">設定2（色・背景）</button>
+    <button id="btnSettings3" class="secondary">設定3（CPUの強さ）</button>
   </div>
 </div>
 
 <!-- ================= 設定 ================= -->
 <div id="settings">
   <div class="panel">
-    <h2>せってい</h2>
+    <h2 id="settingsTitle">せってい</h2>
 
-    <!-- モード -->
-    <div class="field">
-      <label>ルール</label>
-      <div class="modes">
-        <button data-mode="time"    id="modeTime">時間制</button>
-        <button data-mode="firstto" id="modeFirst">先取制</button>
-      </div>
+    <!-- タブ -->
+    <div class="tabs">
+      <button data-tab="1" id="tabBtn1">設定1</button>
+      <button data-tab="2" id="tabBtn2">設定2</button>
+      <button data-tab="3" id="tabBtn3">設定3</button>
     </div>
 
-    <!-- 時間制 -->
-    <div id="timeOpts">
+    <!-- ============ 設定1: ルール・速さ ============ -->
+    <div class="tab-content" id="tab1">
       <div class="field">
-        <label>制限時間（秒）デフォルト150秒 = 2分30秒</label>
-        <input type="number" id="timeLimit" min="10" max="3600" step="10" value="150">
+        <label>ルール</label>
+        <div class="modes">
+          <button data-mode="time"    id="modeTime">時間制</button>
+          <button data-mode="firstto" id="modeFirst">先取制</button>
+        </div>
       </div>
-    </div>
 
-    <!-- 先取制 -->
-    <div id="firstOpts" style="display:none;">
+      <div id="timeOpts">
+        <div class="field">
+          <label>制限時間（秒）デフォルト150秒 = 2分30秒</label>
+          <input type="number" id="timeLimit" min="10" max="3600" step="10" value="150">
+        </div>
+      </div>
+
+      <div id="firstOpts" style="display:none;">
+        <div class="field">
+          <label>先に何点取ったら勝ち</label>
+          <input type="number" id="firstTo" min="1" max="50" value="7">
+        </div>
+      </div>
+
       <div class="field">
-        <label>先に何点取ったら勝ち</label>
-        <input type="number" id="firstTo" min="1" max="50" value="7">
+        <label>円盤を打ったときの速さ：<span id="puckSpeedVal">3.0</span> 倍</label>
+        <input type="range" id="puckSpeed" min="0.3" max="9" step="0.1" value="3.0">
+        <div class="hint">0.3 〜 9.0 倍まで設定可能（デフォルト 3.0）</div>
+      </div>
+
+      <div class="field">
+        <label>パドル（持ったとき）の速さ：<span id="paddleSpeedVal">1.0</span> 倍</label>
+        <input type="range" id="paddleSpeed" min="0.3" max="3" step="0.1" value="1.0">
       </div>
     </div>
 
-    <!-- 速さ -->
-    <div class="field">
-      <label>円盤を打ったときの速さ：<span id="puckSpeedVal">1.0</span> 倍</label>
-      <input type="range" id="puckSpeed" min="0.3" max="3" step="0.1" value="1">
-    </div>
-    <div class="field">
-      <label>パドル（持ったとき）の速さ：<span id="paddleSpeedVal">1.0</span> 倍</label>
-      <input type="range" id="paddleSpeed" min="0.3" max="3" step="0.1" value="1">
-    </div>
+    <!-- ============ 設定2: 色・背景 ============ -->
+    <div class="tab-content" id="tab2">
+      <div class="field">
+        <label>盤上の色</label>
+        <div class="colors" id="rinkColors"></div>
+      </div>
+      <div class="field">
+        <label>盤外の色</label>
+        <div class="colors" id="outColors"></div>
+      </div>
 
-    <!-- 盤上 / 盤外カラー -->
-    <div class="field">
-      <label>盤上の色</label>
-      <div class="colors" id="rinkColors"></div>
-    </div>
-    <div class="field">
-      <label>盤外の色</label>
-      <div class="colors" id="outColors"></div>
-    </div>
+      <div class="field">
+        <label>盤上の背景画像URL</label>
+        <div class="row">
+          <input type="text" id="rinkImgUrl" placeholder="https://...">
+          <button id="applyRinkImg">このURLを使います</button>
+        </div>
+        <div class="hint">※ 画像URLが設定されている場合は色より優先されます</div>
+      </div>
+      <div class="field">
+        <label>盤外の背景画像URL</label>
+        <div class="row">
+          <input type="text" id="outImgUrl" placeholder="https://...">
+          <button id="applyOutImg">このURLを使います</button>
+        </div>
+      </div>
 
-    <!-- 画像URL -->
-    <div class="field">
-      <label>盤上の背景画像URL</label>
-      <div class="row">
-        <input type="text" id="rinkImgUrl" placeholder="https://...">
-        <button id="applyRinkImg">このURLを使います</button>
+      <div class="row" style="margin-top:0.5rem;">
+        <button id="clearRinkImg" style="background:#607d8b;">盤上画像をクリア</button>
+        <button id="clearOutImg"  style="background:#607d8b;">盤外画像をクリア</button>
       </div>
     </div>
-    <div class="field">
-      <label>盤外の背景画像URL</label>
-      <div class="row">
-        <input type="text" id="outImgUrl" placeholder="https://...">
-        <button id="applyOutImg">このURLを使います</button>
+
+    <!-- ============ 設定3: CPUの強さ ============ -->
+    <div class="tab-content" id="tab3">
+      <div class="field">
+        <label>コンピューターの強さ</label>
+        <div class="levels" id="cpuLevels">
+          <button data-level="0">超弱い</button>
+          <button data-level="1">弱い</button>
+          <button data-level="2">普通</button>
+          <button data-level="3">強い</button>
+          <button data-level="4">超強い</button>
+        </div>
+        <div class="hint" id="cpuLevelDesc">デフォルトは「普通」です</div>
       </div>
     </div>
 
@@ -256,9 +313,7 @@
     <div class="timer" id="timerDisplay">--:--</div>
   </div>
   <div id="board">
-    <div id="rink">
-      <!-- 中央線と円はJSで生成 -->
-    </div>
+    <div id="rink"></div>
     <div class="paddle" id="playerPaddle"></div>
     <div class="paddle" id="aiPaddle"></div>
     <div id="puck"></div>
@@ -280,31 +335,36 @@
    設定（保存可能）
 ========================================================= */
 const DEFAULT_CONFIG = {
-  mode: 'time',          // 'time' | 'firstto'
-  timeLimit: 150,        // 秒
-  firstTo: 7,            // 先取点
-  puckSpeed: 1.0,
+  mode: 'time',
+  timeLimit: 150,
+  firstTo: 7,
+  puckSpeed: 3.0,        // デフォルト 3.0
   paddleSpeed: 1.0,
-  rinkColor: '#0b6623',  // 盤上（緑）
-  outColor:  '#111111',  // 盤外（黒）
+  cpuLevel: 2,           // 0:超弱い 1:弱い 2:普通 3:強い 4:超強い
+  rinkColor: '#0b6623',
+  outColor:  '#111111',
   rinkImg: '',
   outImg: ''
 };
 
 const PRESET_COLORS = [
-  '#e53935', // 赤
-  '#4fc3f7', // 水色
-  '#fdd835', // 黄色
-  '#f06292', // ピンク
-  '#1e88e5', // 青
-  '#8d6e63', // 茶色
-  '#ffffff', // 白
-  '#fb8c00', // 橙
-  '#8e24aa', // 紫
-  '#000000', // 黒
-  '#9e9e9e', // 灰色
-  '#43a047', // 緑
-  '#aeea00'  // 黄緑
+  '#e53935', '#4fc3f7', '#fdd835', '#f06292', '#1e88e5', '#8d6e63', '#ffffff',
+  '#fb8c00', '#8e24aa', '#000000', '#9e9e9e', '#43a047', '#aeea00'
+];
+
+/* CPU レベル別パラメータ
+   - speed:      パドルの追従速度倍率
+   - reaction:   反応遅延（0に近いほど速く反応）
+   - prediction: 未来予測の強さ（puckの速度をどれだけ先読みするか）
+   - errorMax:   目標位置に加えるランダム誤差(px)。大きいほど弱い
+   - idleY:      待機時にどれだけ前へ出るか
+*/
+const CPU_LEVELS = [
+  { name:'超弱い', speed:0.35, reaction:0.15, prediction:0.00, errorMax:70, idleY:0 },
+  { name:'弱い',   speed:0.55, reaction:0.25, prediction:0.10, errorMax:45, idleY:8 },
+  { name:'普通',   speed:0.85, reaction:0.35, prediction:0.22, errorMax:22, idleY:18 },
+  { name:'強い',   speed:1.15, reaction:0.55, prediction:0.42, errorMax:10, idleY:28 },
+  { name:'超強い', speed:1.55, reaction:0.85, prediction:0.70, errorMax:2,  idleY:40 }
 ];
 
 let config = { ...DEFAULT_CONFIG };
@@ -312,6 +372,7 @@ try {
   const saved = localStorage.getItem('airhockey_config');
   if (saved) config = { ...config, ...JSON.parse(saved) };
 } catch(e) {}
+// 旧バージョンの puckSpeed=1.0 が保存されていた場合の互換はそのまま尊重（ユーザーが変更可）
 
 function saveConfig() {
   try { localStorage.setItem('airhockey_config', JSON.stringify(config)); } catch(e) {}
@@ -322,11 +383,32 @@ function saveConfig() {
 ========================================================= */
 const opening    = document.getElementById('opening');
 const settingsEl = document.getElementById('settings');
-
-// img151white.jpg を背景に
+const settingsTitle = document.getElementById('settingsTitle');
 opening.style.backgroundImage = "url('img151white.jpg')";
 
-// 設定モーダル内の要素
+// タブ
+const tabBtns = {
+  1: document.getElementById('tabBtn1'),
+  2: document.getElementById('tabBtn2'),
+  3: document.getElementById('tabBtn3')
+};
+const tabContents = {
+  1: document.getElementById('tab1'),
+  2: document.getElementById('tab2'),
+  3: document.getElementById('tab3')
+};
+function switchTab(n) {
+  Object.keys(tabBtns).forEach(k => {
+    tabBtns[k].classList.toggle('active', Number(k) === n);
+    tabContents[k].classList.toggle('active', Number(k) === n);
+  });
+  settingsTitle.textContent = `せってい ${n}`;
+}
+tabBtns[1].addEventListener('click', () => switchTab(1));
+tabBtns[2].addEventListener('click', () => switchTab(2));
+tabBtns[3].addEventListener('click', () => switchTab(3));
+
+// 設定モーダル内要素
 const elModeTime  = document.getElementById('modeTime');
 const elModeFirst = document.getElementById('modeFirst');
 const elTimeOpts  = document.getElementById('timeOpts');
@@ -341,8 +423,10 @@ const elRinkColors = document.getElementById('rinkColors');
 const elOutColors  = document.getElementById('outColors');
 const elRinkImgUrl = document.getElementById('rinkImgUrl');
 const elOutImgUrl  = document.getElementById('outImgUrl');
+const elCpuLevels  = document.getElementById('cpuLevels');
+const elCpuLevelDesc = document.getElementById('cpuLevelDesc');
 
-// カラーパレット生成
+// カラーパレット
 function buildSwatches(container, key) {
   container.innerHTML = '';
   PRESET_COLORS.forEach(color => {
@@ -362,10 +446,8 @@ function buildSwatches(container, key) {
     container.appendChild(d);
   });
 }
-buildSwatches(elRinkColors, 'rinkColor');
-buildSwatches(elOutColors,  'outColor');
 
-// モード切替
+// モード
 function setMode(mode) {
   config.mode = mode;
   if (mode === 'time') {
@@ -384,25 +466,53 @@ elModeTime.addEventListener('click',  () => setMode('time'));
 elModeFirst.addEventListener('click', () => setMode('firstto'));
 
 // スライダー
-elPuckSpeed.addEventListener('input', () => { elPuckSpeedVal.textContent = parseFloat(elPuckSpeed.value).toFixed(1); });
-elPaddleSpeed.addEventListener('input', () => { elPaddleSpeedVal.textContent = parseFloat(elPaddleSpeed.value).toFixed(1); });
+elPuckSpeed.addEventListener('input', () => {
+  elPuckSpeedVal.textContent = parseFloat(elPuckSpeed.value).toFixed(1);
+});
+elPaddleSpeed.addEventListener('input', () => {
+  elPaddleSpeedVal.textContent = parseFloat(elPaddleSpeed.value).toFixed(1);
+});
 
-// 画像URL適用
+// CPUレベル選択
+function setCpuLevel(level) {
+  config.cpuLevel = level;
+  Array.from(elCpuLevels.children).forEach(btn => {
+    btn.classList.toggle('active', Number(btn.dataset.level) === level);
+  });
+  elCpuLevelDesc.textContent = `現在: ${CPU_LEVELS[level].name}`;
+}
+elCpuLevels.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-level]');
+  if (!btn) return;
+  setCpuLevel(Number(btn.dataset.level));
+});
+
+// 画像URL
 document.getElementById('applyRinkImg').addEventListener('click', () => {
   const url = elRinkImgUrl.value.trim();
-  if (!url) return;
+  if (!url) { alert('URLを入力してください'); return; }
   config.rinkImg = url;
   alert('盤上の背景画像URLを設定しました（保存ボタンで確定）');
 });
 document.getElementById('applyOutImg').addEventListener('click', () => {
   const url = elOutImgUrl.value.trim();
-  if (!url) return;
+  if (!url) { alert('URLを入力してください'); return; }
   config.outImg = url;
   alert('盤外の背景画像URLを設定しました（保存ボタンで確定）');
 });
+document.getElementById('clearRinkImg').addEventListener('click', () => {
+  config.rinkImg = '';
+  elRinkImgUrl.value = '';
+  alert('盤上画像をクリアしました（保存ボタンで確定）');
+});
+document.getElementById('clearOutImg').addEventListener('click', () => {
+  config.outImg = '';
+  elOutImgUrl.value = '';
+  alert('盤外画像をクリアしました（保存ボタンで確定）');
+});
 
-// 設定を開く（現在の config を反映）
-function openSettings() {
+// 設定を開く
+function openSettings(tab) {
   setMode(config.mode);
   elTimeLimit.value = config.timeLimit;
   elFirstTo.value   = config.firstTo;
@@ -414,10 +524,14 @@ function openSettings() {
   elOutImgUrl.value  = config.outImg  || '';
   buildSwatches(elRinkColors, 'rinkColor');
   buildSwatches(elOutColors,  'outColor');
+  setCpuLevel(config.cpuLevel);
+  switchTab(tab || 1);
   settingsEl.classList.add('open');
 }
 
-document.getElementById('btnSettings').addEventListener('click', openSettings);
+document.getElementById('btnSettings1').addEventListener('click', () => openSettings(1));
+document.getElementById('btnSettings2').addEventListener('click', () => openSettings(2));
+document.getElementById('btnSettings3').addEventListener('click', () => openSettings(3));
 document.getElementById('btnCloseSettings').addEventListener('click', () => settingsEl.classList.remove('open'));
 
 document.getElementById('btnSaveSettings').addEventListener('click', () => {
@@ -453,8 +567,7 @@ let playerPaddlePos = { x: 0, y: 0 };
 let aiPaddlePos     = { x: 0, y: 0 };
 const aiPaddleTarget = { x: 0, y: 0 };
 
-// 先攻/後攻
-let playerIsFirst = true;   // true: プレイヤーが先攻(下側)
+let playerIsFirst = true;
 let gameRunning = false;
 let gameEnded = false;
 let mode = 'time';
@@ -462,18 +575,21 @@ let remainingTime = 0;
 let lastTimestamp = 0;
 let rafId = 0;
 
-// ターゲット位置(スムーズ移動用)
+// AI用: 反応タイマーと誤差
+let aiReactionTimer = 0;
+let aiErrorX = 0, aiErrorY = 0;
+
+// ドラッグ用
 let playerTargetX = 0, playerTargetY = 0;
 let activePointerId = null;
 let grabOffsetX = 0, grabOffsetY = 0;
 let isGrabbing = false;
 
-/* ---------- レイアウト再構築 ---------- */
+/* ---------- レイアウト ---------- */
 function layout() {
   W = boardEl.clientWidth;
   H = boardEl.clientHeight;
 
-  // 盤の背景
   rinkEl.style.background = config.rinkColor;
   if (config.rinkImg) {
     rinkEl.style.backgroundImage = `url('${config.rinkImg}')`;
@@ -491,7 +607,6 @@ function layout() {
     boardEl.style.backgroundImage = '';
   }
 
-  // 中央線・サークル
   rinkEl.innerHTML = '';
   const midY = H / 2;
   const centerLine = document.createElement('div');
@@ -510,7 +625,6 @@ function layout() {
   circle.style.border = '2px solid rgba(255,255,255,0.35)';
   rinkEl.appendChild(circle);
 
-  // パドル位置リセット(中央基準)
   const paddleR = PADDLE_SIZE / 2;
   playerPaddlePos = { x: W/2, y: playerIsFirst ? H - paddleR - 20 : paddleR + 20 };
   aiPaddlePos     = { x: W/2, y: playerIsFirst ? paddleR + 20 : H - paddleR - 20 };
@@ -518,7 +632,6 @@ function layout() {
   playerTargetY = playerPaddlePos.y;
   aiPaddleTarget.x = aiPaddlePos.x;
   aiPaddleTarget.y = aiPaddlePos.y;
-
   renderPaddles();
 }
 
@@ -526,14 +639,18 @@ function renderPaddles() {
   playerPaddle.style.transform = `translate(${playerPaddlePos.x - PADDLE_SIZE/2}px, ${playerPaddlePos.y - PADDLE_SIZE/2}px)`;
   aiPaddle.style.transform     = `translate(${aiPaddlePos.x - PADDLE_SIZE/2}px, ${aiPaddlePos.y - PADDLE_SIZE/2}px)`;
 }
-
 function renderPuck() {
   puckEl.style.transform = `translate(${puck.x - puck.r}px, ${puck.y - puck.r}px)`;
 }
 
-/* ---------- ゲーム開始 ---------- */
+/* ---------- 開始 ---------- */
 function startGame() {
-  // 設定読み込み
+  // 最新 config 読み込み
+  try {
+    const saved = localStorage.getItem('airhockey_config');
+    if (saved) config = { ...DEFAULT_CONFIG, ...JSON.parse(saved) };
+  } catch(e) {}
+
   mode = config.mode;
   remainingTime = config.timeLimit;
   playerScore = 0;
@@ -541,26 +658,28 @@ function startGame() {
   gameEnded = false;
   updateScoreUI();
 
-  // 先攻/後攻ランダム
   playerIsFirst = Math.random() < 0.5;
-  turnDisplay.textContent = playerIsFirst ? 'あなたが先攻（下）' : 'コンピュータが先攻（上）';
+  const cpuName = CPU_LEVELS[config.cpuLevel].name;
+  turnDisplay.textContent =
+    (playerIsFirst ? 'あなたが先攻（下）' : 'コンピュータが先攻（上）') + ` ／ CPU:${cpuName}`;
 
-  // 画面切替
   opening.style.display = 'none';
   resultEl.classList.remove('open');
   gameEl.classList.add('active');
 
-  // レイアウト→配置
   layout();
   resetPuck();
 
-  // タイマー初期化（時間制のみ表示）
   if (mode === 'time') {
     timerDisplay.style.display = '';
     updateTimerUI();
   } else {
     timerDisplay.style.display = 'none';
   }
+
+  // AI 初期化
+  aiReactionTimer = 0;
+  aiErrorX = 0; aiErrorY = 0;
 
   gameRunning = true;
   lastTimestamp = performance.now();
@@ -574,8 +693,7 @@ function resetPuck() {
   puck.vx = 0;
   puck.vy = 0;
   renderPuck();
-  // 先攻側の方向へゆっくり
-  const dir = playerIsFirst ? 1 : -1; // 下側(player)なら上方向へ（ai側へ）
+  const dir = playerIsFirst ? 1 : -1;
   puck.vx = (Math.random() * 2 - 1) * 120;
   puck.vy = dir * 180;
 }
@@ -583,7 +701,6 @@ function resetPuck() {
 function updateScoreUI() {
   scoreDisplay.textContent = `${playerScore} - ${aiScore}`;
 }
-
 function updateTimerUI() {
   const t = Math.max(0, Math.ceil(remainingTime));
   const m = Math.floor(t / 60);
@@ -591,7 +708,7 @@ function updateTimerUI() {
   timerDisplay.textContent = `${m}:${String(s).padStart(2,'0')}`;
 }
 
-/* ---------- メインループ ---------- */
+/* ---------- ループ ---------- */
 function loop(ts) {
   if (!gameRunning) return;
   const dt = Math.min(0.033, (ts - lastTimestamp) / 1000);
@@ -615,17 +732,14 @@ function loop(ts) {
   rafId = requestAnimationFrame(loop);
 }
 
-/* ---------- プレイヤーパドル ---------- */
+/* ---------- プレイヤー ---------- */
 function updatePlayerPaddle(dt) {
-  // 目標位置へスムーズに追従（paddleSpeed 倍率）
   const lerp = Math.min(1, dt * 20 * config.paddleSpeed);
   playerPaddlePos.x += (playerTargetX - playerPaddlePos.x) * lerp;
   playerPaddlePos.y += (playerTargetY - playerPaddlePos.y) * lerp;
 
-  // 範囲制限
   const r = PADDLE_SIZE / 2;
   playerPaddlePos.x = Math.max(r, Math.min(W - r, playerPaddlePos.x));
-  // 自分の陣地のみ（先攻なら下、後攻なら上）
   if (playerIsFirst) {
     playerPaddlePos.y = Math.max(H/2 + r, Math.min(H - r, playerPaddlePos.y));
   } else {
@@ -634,32 +748,53 @@ function updatePlayerPaddle(dt) {
   renderPaddles();
 }
 
-/* ---------- AIパドル ---------- */
+/* ---------- AI ---------- */
 function updateAIPaddle(dt) {
   const r = PADDLE_SIZE / 2;
-  const aiSideTop = playerIsFirst; // プレイヤーが下 → AIは上
+  const aiSideTop = playerIsFirst; // プレイヤーが下 → AI は上
+  const L = CPU_LEVELS[config.cpuLevel];
 
-  // 基本的に puck.x を追従、puck.y が自陣側に来たら前に出る
-  aiPaddleTarget.x = puck.x;
+  // 反応タイマー: 一定間隔で目標を更新（反応が遅いほど間隔大）
+  aiReactionTimer -= dt;
+  if (aiReactionTimer <= 0) {
+    // 次の更新までの間隔（レベルが高いほど短い）
+    aiReactionTimer = Math.max(0.02, 0.28 - L.reaction * 0.26);
 
-  if (aiSideTop) {
-    // AIは上側
-    if (puck.y < H/2) {
-      aiPaddleTarget.y = Math.min(H/2 - r, puck.y + 30);
+    // 未来予測
+    const predict = L.prediction;
+    const futureX = puck.x + puck.vx * predict * 0.25;
+    const futureY = puck.y + puck.vy * predict * 0.25;
+
+    // 誤差更新
+    aiErrorX = (Math.random() * 2 - 1) * L.errorMax;
+    aiErrorY = (Math.random() * 2 - 1) * L.errorMax * 0.4;
+
+    // 目標X
+    aiPaddleTarget.x = futureX + aiErrorX;
+
+    // 目標Y
+    if (aiSideTop) {
+      // AI は上側
+      if (futureY < H/2) {
+        // 自陣に来たら迎撃
+        const attackY = Math.min(H/2 - r, Math.max(r + L.idleY, futureY + aiErrorY));
+        aiPaddleTarget.y = attackY;
+      } else {
+        aiPaddleTarget.y = r + L.idleY;
+      }
     } else {
-      aiPaddleTarget.y = r + 20;
-    }
-  } else {
-    // AIは下側
-    if (puck.y > H/2) {
-      aiPaddleTarget.y = Math.max(H/2 + r, puck.y - 30);
-    } else {
-      aiPaddleTarget.y = H - r - 20;
+      // AI は下側
+      if (futureY > H/2) {
+        const attackY = Math.max(H/2 + r, Math.min(H - r - L.idleY, futureY + aiErrorY));
+        aiPaddleTarget.y = attackY;
+      } else {
+        aiPaddleTarget.y = H - r - L.idleY;
+      }
     }
   }
 
-  // 追従（AIはプレイヤーより少し遅め）
-  const lerp = Math.min(1, dt * 12 * config.paddleSpeed);
+  // 追従
+  const lerp = Math.min(1, dt * 14 * L.speed * config.paddleSpeed);
   aiPaddlePos.x += (aiPaddleTarget.x - aiPaddlePos.x) * lerp;
   aiPaddlePos.y += (aiPaddleTarget.y - aiPaddlePos.y) * lerp;
 
@@ -675,7 +810,6 @@ function updateAIPaddle(dt) {
 
 /* ---------- 円盤 ---------- */
 function updatePuck(dt) {
-  // 摩擦
   const friction = 0.995;
   puck.vx *= Math.pow(friction, dt * 60);
   puck.vy *= Math.pow(friction, dt * 60);
@@ -683,24 +817,12 @@ function updatePuck(dt) {
   puck.x += puck.vx * dt;
   puck.y += puck.vy * dt;
 
-  // 壁反射（左右）
-  if (puck.x - puck.r < 0) {
-    puck.x = puck.r;
-    puck.vx = Math.abs(puck.vx);
-  } else if (puck.x + puck.r > W) {
-    puck.x = W - puck.r;
-    puck.vx = -Math.abs(puck.vx);
-  }
-  // 上下（ただしゴール判定は checkGoal 側で）
-  if (puck.y - puck.r < 0) {
-    puck.y = puck.r;
-    puck.vy = Math.abs(puck.vy);
-  } else if (puck.y + puck.r > H) {
-    puck.y = H - puck.r;
-    puck.vy = -Math.abs(puck.vy);
-  }
+  if (puck.x - puck.r < 0) { puck.x = puck.r; puck.vx = Math.abs(puck.vx); }
+  else if (puck.x + puck.r > W) { puck.x = W - puck.r; puck.vx = -Math.abs(puck.vx); }
 
-  // パドル衝突（円同士）
+  if (puck.y - puck.r < 0) { puck.y = puck.r; puck.vy = Math.abs(puck.vy); }
+  else if (puck.y + puck.r > H) { puck.y = H - puck.r; puck.vy = -Math.abs(puck.vy); }
+
   handlePaddleCollision(playerPaddlePos, true);
   handlePaddleCollision(aiPaddlePos, false);
 
@@ -714,13 +836,11 @@ function handlePaddleCollision(paddlePos, isPlayer) {
   const minDist = puck.r + PADDLE_SIZE/2;
 
   if (dist < minDist && dist > 0.0001) {
-    // 押し出し
     const nx = dx / dist;
     const ny = dy / dist;
     puck.x = paddlePos.x + nx * minDist;
     puck.y = paddlePos.y + ny * minDist;
 
-    // パドルの移動速度を加味（簡易: プレイヤーの場合は目標との差分）
     let paddleVX = 0, paddleVY = 0;
     if (isPlayer) {
       paddleVX = (playerTargetX - playerPaddlePos.x) * 6;
@@ -730,73 +850,46 @@ function handlePaddleCollision(paddlePos, isPlayer) {
       paddleVY = puck.vy * 0.3;
     }
 
-    // 反射 + 押し出し速度 + パドル速度
     const baseSpeed = 420 * config.puckSpeed;
-    let vx = nx * baseSpeed + paddleVX * 0.5;
-    let vy = ny * baseSpeed + paddleVY * 0.5;
-
-    puck.vx = vx;
-    puck.vy = vy;
+    puck.vx = nx * baseSpeed + paddleVX * 0.5;
+    puck.vy = ny * baseSpeed + paddleVY * 0.5;
   }
 }
 
-/* ---------- ゴール判定 ---------- */
+/* ---------- ゴール ---------- */
 function checkGoal() {
   const GOAL_WIDTH = W * 0.35;
   const goalLeft  = (W - GOAL_WIDTH) / 2;
   const goalRight = goalLeft + GOAL_WIDTH;
 
-  // 上側ゴール
   if (puck.y - puck.r <= 0) {
     if (puck.x > goalLeft && puck.x < goalRight) {
-      // 上側 = AIのゴール or プレイヤーのゴール?
-      // 先攻が下(player) → 上はAIのゴール → プレイヤー得点
-      if (playerIsFirst) {
-        playerScore++;
-      } else {
-        aiScore++;
-      }
-      onGoal();
-      return;
+      if (playerIsFirst) playerScore++; else aiScore++;
+      onGoal(); return;
     }
   }
-  // 下側ゴール
   if (puck.y + puck.r >= H) {
     if (puck.x > goalLeft && puck.x < goalRight) {
-      if (playerIsFirst) {
-        aiScore++;
-      } else {
-        playerScore++;
-      }
-      onGoal();
-      return;
+      if (playerIsFirst) aiScore++; else playerScore++;
+      onGoal(); return;
     }
   }
 }
 
 function onGoal() {
   updateScoreUI();
-
-  // 先取制チェック
   if (mode === 'firstto') {
     if (playerScore >= config.firstTo) { endGame('player'); return; }
     if (aiScore     >= config.firstTo) { endGame('ai');     return; }
   }
-
-  // 得点した側が次のサーブ権（簡易: 得点された側から再開 → 逆にした）
-  // 得点した側が下(先攻)かどうかでサーブ方向を調整
   resetPuck();
 }
 
-/* ---------- 終了処理 ---------- */
+/* ---------- 終了 ---------- */
 function endByTime() {
   if (playerScore > aiScore)      endGame('player');
   else if (aiScore > playerScore) endGame('ai');
-  else {
-    // 引き分け → コイントス
-    const playerWins = Math.random() < 0.5;
-    endGame(playerWins ? 'player' : 'ai', true);
-  }
+  else endGame(Math.random() < 0.5 ? 'player' : 'ai', true);
 }
 
 function endGame(winner, coinFlip = false) {
@@ -806,18 +899,14 @@ function endGame(winner, coinFlip = false) {
   cancelAnimationFrame(rafId);
 
   if (winner === 'player') {
-    // 勝利画面
     gameEl.classList.remove('active');
     resultEl.classList.add('open');
     if (coinFlip) {
-      const h1 = resultEl.querySelector('h1');
-      h1.textContent = '🎉 勝利（コイントス） 🎉';
+      resultEl.querySelector('h1').textContent = '🎉 勝利（コイントス） 🎉';
     }
   } else {
-    // 敗北 → オープニングに戻す
     gameEl.classList.remove('active');
     opening.style.display = '';
-    // 念のためタイトルを戻す
     alert(coinFlip ? 'コイントスの結果、コンピュータの勝ちです。' : 'コンピュータの勝ちです。もう一度挑戦してください！');
   }
 }
@@ -830,16 +919,13 @@ boardEl.addEventListener('pointerdown', (e) => {
   if (e.button !== 0 && e.pointerType === 'mouse') return;
   e.preventDefault();
 
-  // 自分の陣地内かチェック
   const rect = boardEl.getBoundingClientRect();
   const px = e.clientX - rect.left;
   const py = e.clientY - rect.top;
 
-  const r = PADDLE_SIZE / 2;
   const inMyHalf = playerIsFirst ? py > H/2 : py < H/2;
   if (!inMyHalf) return;
 
-  // パドルを掴むかどうか（パドルに近いか）
   const dx = px - playerPaddlePos.x;
   const dy = py - playerPaddlePos.y;
   const dist = Math.hypot(dx, dy);
@@ -849,15 +935,11 @@ boardEl.addEventListener('pointerdown', (e) => {
   isGrabbing = true;
 
   if (dist < PADDLE_SIZE) {
-    // 掴んだ位置の差分（指とパドル中心のズレ）
     grabOffsetX = playerPaddlePos.x - px;
     grabOffsetY = playerPaddlePos.y - py;
   } else {
-    // 離れた位置をタップ → その位置へ移動（ズレ0扱い）
-    grabOffsetX = 0;
-    grabOffsetY = 0;
-    playerTargetX = px;
-    playerTargetY = py;
+    grabOffsetX = 0; grabOffsetY = 0;
+    playerTargetX = px; playerTargetY = py;
   }
 });
 
@@ -882,23 +964,15 @@ boardEl.addEventListener('pointercancel', releasePointer);
 boardEl.addEventListener('contextmenu', (e) => e.preventDefault());
 
 /* =========================================================
-   起動 & リサイズ
+   起動
 ========================================================= */
-document.getElementById('btnStart').addEventListener('click', () => {
-  // 保存済み config を再読込
-  try {
-    const saved = localStorage.getItem('airhockey_config');
-    if (saved) config = { ...DEFAULT_CONFIG, ...JSON.parse(saved) };
-  } catch(e) {}
-  startGame();
-});
+document.getElementById('btnStart').addEventListener('click', startGame);
 
 window.addEventListener('resize', () => {
   if (!gameRunning) return;
   layout();
 });
 
-// 初期表示: オープニング
 opening.style.display = 'flex';
 </script>
 </body>
