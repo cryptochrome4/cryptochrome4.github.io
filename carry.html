@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <title>長押しで持って移動 · 最小</title>
+  <style>
+    * { box-sizing: border-box; user-select: none; }
+    html, body {
+      margin: 0; height: 100%; overflow: hidden;
+      background: #111;
+      font-family: system-ui, sans-serif;
+      touch-action: none; /* 全体でスクロール禁止 */
+    }
+    #item {
+      position: fixed;
+      left: 0; top: 0;
+      width: 120px; height: 120px;
+      border-radius: 50%;
+      background: #2e2e2e;
+      border: 2px solid #444;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 3rem;
+      color: #ddd;
+      cursor: grab;
+      /* transform で位置を動かす（left/top より軽い） */
+      will-change: transform;
+      transition: background 0.08s, border-color 0.08s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #item.holding {
+      background: #3b6e3b;
+      border-color: #7aae7a;
+      color: #fff;
+      cursor: grabbing;
+    }
+  </style>
+</head>
+<body>
+  <div id="item">🖐️</div>
+
+  <script>
+    const item = document.getElementById('item');
+
+    // アイテムの現在位置（左上基準）
+    let x = 100, y = 100;
+    // 掴んだ時の「指の位置」と「アイテムの位置」の差分
+    let offsetX = 0, offsetY = 0;
+    // 掴んでいる pointerId（マルチタッチ対策）
+    let activePointerId = null;
+
+    // 初期配置
+    function render() {
+      item.style.transform = `translate(${x}px, ${y}px)`;
+    }
+    render();
+
+    item.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0 && e.pointerType === 'mouse') return;
+      e.preventDefault();
+
+      // この pointer を専有（指がアイテム外に出てもイベントを受け取る）
+      item.setPointerCapture(e.pointerId);
+      activePointerId = e.pointerId;
+
+      // 掴んだ瞬間の差分を記録 → 指の位置にアイテムが飛ばない
+      offsetX = e.clientX - x;
+      offsetY = e.clientY - y;
+
+      item.classList.add('holding');
+    });
+
+    item.addEventListener('pointermove', (e) => {
+      // 掴んでいる pointer 以外は無視
+      if (e.pointerId !== activePointerId) return;
+
+      // 指の位置 - 差分 = アイテムの新しい左上座標
+      x = e.clientX - offsetX;
+      y = e.clientY - offsetY;
+      render();
+    });
+
+    function release(e) {
+      if (e.pointerId !== activePointerId) return;
+      if (item.hasPointerCapture(e.pointerId)) {
+        item.releasePointerCapture(e.pointerId);
+      }
+      activePointerId = null;
+      item.classList.remove('holding');
+    }
+
+    item.addEventListener('pointerup', release);
+    item.addEventListener('pointercancel', release);
+    item.addEventListener('contextmenu', (e) => e.preventDefault());
+  </script>
+</body>
+</html>
