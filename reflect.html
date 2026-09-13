@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>エアホッケー</title>
+<style>
+  * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    font-family: system-ui, "Segoe UI", sans-serif;
+    background: #000; color: #fff;
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* ============ オープニング ============ */
+  #opening {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
+    background-size: cover; background-position: center;
+    background-color: #111;
+    z-index: 100;
+  }
+  #opening::before {
+    content: ""; position: absolute; inset: 0;
+    background: rgba(0,0,0,0.45);
+  }
+  #opening .inner { position: relative; text-align: center; }
+  #opening h1 {
+    font-size: 3rem; margin: 0 0 2rem;
+    text-shadow: 0 4px 20px #000;
+    letter-spacing: 4px;
+  }
+  #opening button {
+    display: block; width: 260px; margin: 0.8rem auto;
+    padding: 1rem; font-size: 1.4rem; font-weight: bold;
+    border: none; border-radius: 999px;
+    background: #4caf50; color: #fff; cursor: pointer;
+    box-shadow: 0 6px 0 #2e7d32, 0 10px 20px #0008;
+    transition: transform 0.08s, box-shadow 0.08s;
+  }
+  #opening button:active { transform: translateY(4px); box-shadow: 0 2px 0 #2e7d32; }
+  #opening button.secondary { background: #607d8b; box-shadow: 0 6px 0 #37474f, 0 10px 20px #0008; }
+  #opening button.secondary:active { box-shadow: 0 2px 0 #37474f; }
+  #opening button.tertiary { background: #7e57c2; box-shadow: 0 6px 0 #4527a0, 0 10px 20px #0008; }
+  #opening button.tertiary:active { box-shadow: 0 2px 0 #4527a0; }
+  #opening button.danger { background: #e53935; box-shadow: 0 6px 0 #b71c1c, 0 10px 20px #0008; }
+  #opening button.danger:active { box-shadow: 0 2px 0 #b71c1c; }
+
+  /* ============ 設定モーダル ============ */
+  #settings {
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(0,0,0,0.85);
+    display: none; justify-content: center; align-items: center;
+    overflow-y: auto; padding: 2rem 1rem;
+  }
+  #settings.open { display: flex; }
+  .panel {
+    background: #1e1e1e; color: #eee;
+    width: 100%; max-width: 580px;
+    border-radius: 1rem; padding: 1.5rem 1.5rem 2rem;
+    border: 1px solid #333;
+    box-shadow: 0 30px 60px #000a;
+  }
+  .panel h2 { margin: 0 0 1.2rem; font-size: 1.4rem; text-align: center; }
+
+  .tabs { display: flex; gap: 0.4rem; margin-bottom: 1.2rem; }
+  .tabs button {
+    flex: 1; padding: 0.7rem 0.4rem;
+    background: #111; color: #aaa;
+    border: 2px solid #333; border-radius: 0.5rem;
+    font-weight: bold; cursor: pointer;
+    transition: all 0.1s;
+  }
+  .tabs button.active {
+    background: #1e3a1e; color: #fff;
+    border-color: #4caf50;
+  }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  .field { margin: 1rem 0; }
+  .field label { display: block; font-size: 0.9rem; color: #aaa; margin-bottom: 0.3rem; }
+  .field input[type="number"], .field input[type="text"] {
+    width: 100%; padding: 0.6rem 0.8rem; font-size: 1rem;
+    background: #111; color: #eee;
+    border: 1px solid #444; border-radius: 0.5rem;
+  }
+  .field input[type="range"] { width: 100%; }
+  .field .hint { font-size: 0.78rem; color: #666; margin-top: 0.25rem; }
+
+  .row { display: flex; gap: 0.6rem; align-items: center; }
+  .row input { flex: 1; }
+  .row button {
+    padding: 0.6rem 1rem; border: none; border-radius: 0.5rem;
+    background: #4caf50; color: #fff; font-weight: bold; cursor: pointer;
+    white-space: nowrap;
+  }
+  .row button:active { transform: translateY(2px); }
+
+  .colors { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.4rem; }
+  .colors .swatch {
+    width: 100%; aspect-ratio: 1; border-radius: 0.4rem;
+    border: 2px solid #333; cursor: pointer; position: relative;
+  }
+  .colors .swatch.active { border-color: #4caf50; box-shadow: 0 0 0 2px #4caf50aa; }
+
+  .modes { display: flex; gap: 0.6rem; }
+  .modes button {
+    flex: 1; padding: 0.8rem; border-radius: 0.6rem;
+    border: 2px solid #444; background: #111; color: #ccc;
+    cursor: pointer; font-weight: bold;
+  }
+  .modes button.active { border-color: #4caf50; color: #fff; background: #1e3a1e; }
+
+  .levels { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.4rem; }
+  .levels button {
+    padding: 0.7rem 0.2rem; border-radius: 0.5rem;
+    border: 2px solid #444; background: #111; color: #ccc;
+    cursor: pointer; font-weight: bold; font-size: 0.85rem;
+  }
+  .levels button.active { border-color: #4caf50; color: #fff; background: #1e3a1e; }
+
+  .panel .actions { display: flex; gap: 0.6rem; margin-top: 1.5rem; }
+  .panel .actions button {
+    flex: 1; padding: 0.9rem; border: none; border-radius: 0.6rem;
+    font-size: 1rem; font-weight: bold; cursor: pointer;
+  }
+  .panel .actions .close { background: #607d8b; color: #fff; }
+  .panel .actions .save  { background: #4caf50; color: #fff; }
+
+  /* ============ ゲーム画面 ============ */
+  #game {
+    position: fixed; inset: 0;
+    display: none; flex-direction: column;
+  }
+  #game.active { display: flex; }
+
+  #hud {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0.6rem 1rem;
+    font-size: 1.2rem; font-weight: bold;
+    background: rgba(0,0,0,0.4);
+    z-index: 5;
+  }
+  #hud .score { font-size: 1.8rem; letter-spacing: 2px; }
+  #hud .timer { font-variant-numeric: tabular-nums; }
+  #hud .turn { font-size: 0.9rem; color: #ffd54f; }
+
+  #board { position: relative; flex: 1; overflow: hidden; }
+  #rink  { position: absolute; inset: 0; }
+  #rink .line { position: absolute; background: rgba(255,255,255,0.35); }
+
+  /* ★ 角のバンパー */
+  .bumper {
+    position: absolute;
+    width: 70px; height: 70px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #ffe082, #ffb300 60%, #7f5200);
+    border: 3px solid #fff8;
+    box-shadow:
+      0 0 15px #ffb30088,
+      inset 0 -6px 10px #00000066,
+      inset 0 4px 6px #ffffff55;
+    pointer-events: none;
+    will-change: transform;
+  }
+
+  .paddle {
+    position: absolute; width: 90px; height: 90px; border-radius: 50%;
+    border: 3px solid #fff;
+    will-change: transform;
+    pointer-events: none;
+  }
+  #playerPaddle { background: #2196f3; box-shadow: 0 0 25px #2196f3aa; }
+  #aiPaddle     { background: #f44336; box-shadow: 0 0 25px #f44336aa; }
+
+  #puck {
+    position: absolute; width: 46px; height: 46px; border-radius: 50%;
+    background: #fff;
+    border: 2px solid #999;
+    box-shadow: 0 0 15px #fff8, inset 0 -4px 8px #0004;
+    will-change: transform;
+  }
+
+  /* ============ 勝利画面 ============ */
+  #result {
+    position: fixed; inset: 0; z-index: 300;
+    display: none; flex-direction: column;
+    justify-content: center; align-items: center;
+    background: #0a0a0a; text-align: center; padding: 2rem;
+  }
+  #result.open { display: flex; }
+  #result h1 { font-size: 2.2rem; margin: 0 0 1rem; }
+  #result p { color: #bbb; max-width: 480px; line-height: 1.7; }
+  #result a {
+    display: inline-block; margin-top: 2rem;
+    padding: 1rem 2.5rem; font-size: 1.3rem; font-weight: bold;
+    background: #4caf50; color: #fff; text-decoration: none;
+    border-radius: 999px; box-shadow: 0 6px 0 #2e7d32;
+    transition: transform 0.08s, box-shadow 0.08s;
+  }
+  #result a:active { transform: translateY(4px); box-shadow: 0 2px 0 #2e7d32; }
+</style>
+</head>
+<body>
+
+<!-- ================= オープニング ================= -->
+<div id="opening">
+  <div class="inner">
+    <h1>エアホッケー</h1>
+    <button id="btnStart">はじまる</button>
+    <button id="btnSettings1" class="secondary">設定1（ルール・速さ）</button>
+    <button id="btnSettings2" class="tertiary">設定2（色・背景）</button>
+    <button id="btnSettings3" class="secondary">設定3（CPUの強さ）</button>
+    <button id="btnReset"    class="danger">リセット（全設定を初期化）</button>
+  </div>
+</div>
+
+<!-- ================= 設定 ================= -->
+<div id="settings">
+  <div class="panel">
+    <h2 id="settingsTitle">せってい</h2>
+
+    <div class="tabs">
+      <button data-tab="1" id="tabBtn1">設定1</button>
+      <button data-tab="2" id="tabBtn2">設定2</button>
+      <button data-tab="3" id="tabBtn3">設定3</button>
+    </div>
+
+    <!-- 設定1 -->
+    <div class="tab-content" id="tab1">
+      <div class="field">
+        <label>ルール</label>
+        <div class="modes">
+          <button data-mode="time"    id="modeTime">時間制</button>
+          <button data-mode="firstto" id="modeFirst">先取制</button>
+        </div>
+      </div>
+
+      <div id="timeOpts">
+        <div class="field">
+          <label>制限時間（秒）デフォルト150秒 = 2分30秒</label>
+          <input type="number" id="timeLimit" min="10" max="3600" step="10" value="150">
+        </div>
+      </div>
+
+      <div id="firstOpts" style="display:none;">
+        <div class="field">
+          <label>先に何点取ったら勝ち</label>
+          <input type="number" id="firstTo" min="1" max="50" value="7">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>円盤を打ったときの速さ：<span id="puckSpeedVal">3.0</span> 倍</label>
+        <input type="range" id="puckSpeed" min="0.3" max="9" step="0.1" value="3.0">
+        <div class="hint">0.3 〜 9.0 倍まで設定可能（デフォルト 3.0）</div>
+      </div>
+
+      <div class="field">
+        <label>パドル（持ったとき）の速さ：<span id="paddleSpeedVal">1.0</span> 倍</label>
+        <input type="range" id="paddleSpeed" min="0.3" max="3" step="0.1" value="1.0">
+      </div>
+    </div>
+
+    <!-- 設定2 -->
+    <div class="tab-content" id="tab2">
+      <div class="field">
+        <label>盤上の色</label>
+        <div class="colors" id="rinkColors"></div>
+      </div>
+      <div class="field">
+        <label>盤外の色</label>
+        <div class="colors" id="outColors"></div>
+      </div>
+
+      <div class="field">
+        <label>盤上の背景画像URL</label>
+        <div class="row">
+          <input type="text" id="rinkImgUrl" placeholder="https://... または img/foo.jpg">
+          <button id="applyRinkImg">このURLを使います</button>
+        </div>
+        <div class="hint">※ 画像URLが設定されている場合は色より優先されます。相対パスもOK（例: img181sports.jpg）</div>
+      </div>
+      <div class="field">
+        <label>盤外の背景画像URL</label>
+        <div class="row">
+          <input type="text" id="outImgUrl" placeholder="https://... または img/foo.jpg">
+          <button id="applyOutImg">このURLを使います</button>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:0.5rem;">
+        <button id="clearRinkImg" style="background:#607d8b;">盤上画像をクリア</button>
+        <button id="clearOutImg"  style="background:#607d8b;">盤外画像をクリア</button>
+      </div>
+    </div>
+
+    <!-- 設定3 -->
+    <div class="tab-content" id="tab3">
+      <div class="field">
+        <label>コンピューターの強さ</label>
+        <div class="levels" id="cpuLevels">
+          <button data-level="0">超弱い</button>
+          <button data-level="1">弱い</button>
+          <button data-level="2">普通</button>
+          <button data-level="3">強い</button>
+          <button data-level="4">超強い</button>
+        </div>
+        <div class="hint" id="cpuLevelDesc">デフォルトは「普通」です</div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="close" id="btnCloseSettings">閉じる</button>
+      <button class="save"  id="btnSaveSettings">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= ゲーム画面 ================= -->
+<div id="game">
+  <div id="hud">
+    <div class="score" id="scoreDisplay">0 - 0</div>
+    <div class="turn" id="turnDisplay"></div>
+    <div class="timer" id="timerDisplay">--:--</div>
+  </div>
+  <div id="board">
+    <div id="rink"></div>
+    <!-- ★ 4隅バンパー -->
+    <div class="bumper" id="bumperTL"></div>
+    <div class="bumper" id="bumperTR"></div>
+    <div class="bumper" id="bumperBL"></div>
+    <div class="bumper" id="bumperBR"></div>
+    <div class="paddle" id="playerPaddle"></div>
+    <div class="paddle" id="aiPaddle"></div>
+    <div id="puck"></div>
+  </div>
+</div>
+
+<!-- ================= 勝利画面 ================= -->
+<div id="result">
+  <h1>🎉 勝利！ 🎉</h1>
+  <p>
+    おめでとう！コンピューターに勝ちました。<br>
+    次のステップへ進みましょう。
+  </p>
+  <a href="estate.html">estate.html へ進む</a>
+</div>
+
+<script>
+/* =========================================================
+   設定
+========================================================= */
+const DEFAULT_CONFIG = {
+  mode: 'time',
+  timeLimit: 150,
+  firstTo: 7,
+  puckSpeed: 3.0,
+  paddleSpeed: 1.0,
+  cpuLevel: 2,
+  rinkColor: '#0b6623',
+  outColor:  '#111111',
+  rinkImg: '',
+  outImg: ''
+};
+
+const PRESET_COLORS = [
+  '#e53935', '#4fc3f7', '#fdd835', '#f06292', '#1e88e5', '#8d6e63', '#ffffff',
+  '#fb8c00', '#8e24aa', '#000000', '#9e9e9e', '#43a047', '#aeea00'
+];
+
+const CPU_LEVELS = [
+  { name:'超弱い', speed:0.35, reaction:0.15, prediction:0.00, errorMax:70, idleY:0 },
+  { name:'弱い',   speed:0.55, reaction:0.25, prediction:0.10, errorMax:45, idleY:8 },
+  { name:'普通',   speed:0.85, reaction:0.35, prediction:0.22, errorMax:22, idleY:18 },
+  { name:'強い',   speed:1.15, reaction:0.55, prediction:0.42, errorMax:10, idleY:28 },
+  { name:'超強い', speed:1.55, reaction:0.85, prediction:0.70, errorMax:2,  idleY:40 }
+];
+
+// バンパー（4隅の障害物）
+const BUMPER_SIZE  = 70;
+const BUMPER_R     = BUMPER_SIZE / 2;
+const BUMPER_MARGIN = 18; // 盤の端からの距離
+
+let config = { ...DEFAULT_CONFIG };
+try {
+  const saved = localStorage.getItem('airhockey_config');
+  if (saved) config = { ...config, ...JSON.parse(saved) };
+} catch(e) {}
+
+function saveConfig() {
+  try { localStorage.setItem('airhockey_config', JSON.stringify(config)); } catch(e) {}
+}
+
+/* =========================================================
+   オープニング & 設定UI
+========================================================= */
+const opening    = document.getElementById('opening');
+const settingsEl = document.getElementById('settings');
+const settingsTitle = document.getElementById('settingsTitle');
+opening.style.backgroundImage = "url('img181sports.jpg')";
+
+const tabBtns = {
+  1: document.getElementById('tabBtn1'),
+  2: document.getElementById('tabBtn2'),
+  3: document.getElementById('tabBtn3')
+};
+const tabContents = {
+  1: document.getElementById('tab1'),
+  2: document.getElementById('tab2'),
+  3: document.getElementById('tab3')
+};
+function switchTab(n) {
+  Object.keys(tabBtns).forEach(k => {
+    tabBtns[k].classList.toggle('active', Number(k) === n);
+    tabContents[k].classList.toggle('active', Number(k) === n);
+  });
+  settingsTitle.textContent = `せってい ${n}`;
+}
+tabBtns[1].addEventListener('click', () => switchTab(1));
+tabBtns[2].addEventListener('click', () => switchTab(2));
+tabBtns[3].addEventListener('click', () => switchTab(3));
+
+const elModeTime  = document.getElementById('modeTime');
+const elModeFirst = document.getElementById('modeFirst');
+const elTimeOpts  = document.getElementById('timeOpts');
+const elFirstOpts = document.getElementById('firstOpts');
+const elTimeLimit = document.getElementById('timeLimit');
+const elFirstTo   = document.getElementById('firstTo');
+const elPuckSpeed = document.getElementById('puckSpeed');
+const elPuckSpeedVal = document.getElementById('puckSpeedVal');
+const elPaddleSpeed = document.getElementById('paddleSpeed');
+const elPaddleSpeedVal = document.getElementById('paddleSpeedVal');
+const elRinkColors = document.getElementById('rinkColors');
+const elOutColors  = document.getElementById('outColors');
+const elRinkImgUrl = document.getElementById('rinkImgUrl');
+const elOutImgUrl  = document.getElementById('outImgUrl');
+const elCpuLevels  = document.getElementById('cpuLevels');
+const elCpuLevelDesc = document.getElementById('cpuLevelDesc');
+
+function buildSwatches(container, key) {
+  container.innerHTML = '';
+  PRESET_COLORS.forEach(color => {
+    const d = document.createElement('div');
+    d.className = 'swatch';
+    d.style.background = color;
+    d.dataset.color = color;
+    d.title = color;
+    if (config[key] && config[key].toLowerCase() === color.toLowerCase()) {
+      d.classList.add('active');
+    }
+    d.addEventListener('click', () => {
+      container.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+      d.classList.add('active');
+      config[key] = color;
+    });
+    container.appendChild(d);
+  });
+}
+
+function setMode(mode) {
+  config.mode = mode;
+  if (mode === 'time') {
+    elModeTime.classList.add('active');
+    elModeFirst.classList.remove('active');
+    elTimeOpts.style.display = '';
+    elFirstOpts.style.display = 'none';
+  } else {
+    elModeFirst.classList.add('active');
+    elModeTime.classList.remove('active');
+    elFirstOpts.style.display = '';
+    elTimeOpts.style.display = 'none';
+  }
+}
+elModeTime.addEventListener('click',  () => setMode('time'));
+elModeFirst.addEventListener('click', () => setMode('firstto'));
+
+elPuckSpeed.addEventListener('input', () => {
+  elPuckSpeedVal.textContent = parseFloat(elPuckSpeed.value).toFixed(1);
+});
+elPaddleSpeed.addEventListener('input', () => {
+  elPaddleSpeedVal.textContent = parseFloat(elPaddleSpeed.value).toFixed(1);
+});
+
+function setCpuLevel(level) {
+  config.cpuLevel = level;
+  Array.from(elCpuLevels.children).forEach(btn => {
+    btn.classList.toggle('active', Number(btn.dataset.level) === level);
+  });
+  elCpuLevelDesc.textContent = `現在: ${CPU_LEVELS[level].name}`;
+}
+elCpuLevels.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-level]');
+  if (!btn) return;
+  setCpuLevel(Number(btn.dataset.level));
+});
+
+document.getElementById('applyRinkImg').addEventListener('click', () => {
+  const url = elRinkImgUrl.value.trim();
+  if (!url) { alert('URLを入力してください'); return; }
+  config.rinkImg = url;
+  alert('盤上の背景画像URLを設定しました（保存ボタンで確定）');
+});
+document.getElementById('applyOutImg').addEventListener('click', () => {
+  const url = elOutImgUrl.value.trim();
+  if (!url) { alert('URLを入力してください'); return; }
+  config.outImg = url;
+  alert('盤外の背景画像URLを設定しました（保存ボタンで確定）');
+});
+document.getElementById('clearRinkImg').addEventListener('click', () => {
+  config.rinkImg = '';
+  elRinkImgUrl.value = '';
+  alert('盤上画像をクリアしました（保存ボタンで確定）');
+});
+document.getElementById('clearOutImg').addEventListener('click', () => {
+  config.outImg = '';
+  elOutImgUrl.value = '';
+  alert('盤外画像をクリアしました（保存ボタンで確定）');
+});
+
+function openSettings(tab) {
+  setMode(config.mode);
+  elTimeLimit.value = config.timeLimit;
+  elFirstTo.value   = config.firstTo;
+  elPuckSpeed.value = config.puckSpeed;
+  elPuckSpeedVal.textContent = parseFloat(config.puckSpeed).toFixed(1);
+  elPaddleSpeed.value = config.paddleSpeed;
+  elPaddleSpeedVal.textContent = parseFloat(config.paddleSpeed).toFixed(1);
+  elRinkImgUrl.value = config.rinkImg || '';
+  elOutImgUrl.value  = config.outImg  || '';
+  buildSwatches(elRinkColors, 'rinkColor');
+  buildSwatches(elOutColors,  'outColor');
+  setCpuLevel(config.cpuLevel);
+  switchTab(tab || 1);
+  settingsEl.classList.add('open');
+}
+
+document.getElementById('btnSettings1').addEventListener('click', () => openSettings(1));
+document.getElementById('btnSettings2').addEventListener('click', () => openSettings(2));
+document.getElementById('btnSettings3').addEventListener('click', () => openSettings(3));
+document.getElementById('btnCloseSettings').addEventListener('click', () => settingsEl.classList.remove('open'));
+
+document.getElementById('btnSaveSettings').addEventListener('click', () => {
+  config.timeLimit   = Math.max(10, Math.min(3600, parseInt(elTimeLimit.value, 10) || 150));
+  config.firstTo     = Math.max(1,  Math.min(50,   parseInt(elFirstTo.value, 10) || 7));
+  config.puckSpeed   = parseFloat(elPuckSpeed.value);
+  config.paddleSpeed = parseFloat(elPaddleSpeed.value);
+  saveConfig();
+  settingsEl.classList.remove('open');
+});
+
+/* =========================================================
+   ★ リセット（4回確認）
+========================================================= */
+document.getElementById('btnReset').addEventListener('click', () => {
+  if (!confirm('本当にリセットしますか？\n（1/4）設定1〜3がすべて初期値に戻ります。')) return;
+  if (!confirm('本当にリセットしますか？\n（2/4）この操作は取り消せません。')) return;
+  if (!confirm('本当にリセットしますか？\n（3/4）色・背景画像・CPUの強さも消えます。')) return;
+  if (!confirm('本当にリセットしますか？\n（4/4）最終確認です。よろしいですか？')) return;
+
+  // リセット実行
+  config = { ...DEFAULT_CONFIG };
+  saveConfig();
+  alert('すべての設定を初期値に戻しました。');
+});
+
+/* =========================================================
+   ゲーム本体
+========================================================= */
+const gameEl        = document.getElementById('game');
+const boardEl       = document.getElementById('board');
+const rinkEl        = document.getElementById('rink');
+const playerPaddle  = document.getElementById('playerPaddle');
+const aiPaddle      = document.getElementById('aiPaddle');
+const puckEl        = document.getElementById('puck');
+const scoreDisplay  = document.getElementById('scoreDisplay');
+const timerDisplay  = document.getElementById('timerDisplay');
+const turnDisplay   = document.getElementById('turnDisplay');
+const resultEl      = document.getElementById('result');
+
+// ★ バンパー要素
+const bumperEls = {
+  TL: document.getElementById('bumperTL'),
+  TR: document.getElementById('bumperTR'),
+  BL: document.getElementById('bumperBL'),
+  BR: document.getElementById('bumperBR')
+};
+// バンパー座標（layout時に更新）
+let bumpers = [
+  { x: 0, y: 0 }, // TL
+  { x: 0, y: 0 }, // TR
+  { x: 0, y: 0 }, // BL
+  { x: 0, y: 0 }  // BR
+];
+
+const PUCK_SIZE     = 46;
+const PADDLE_SIZE   = 90;
+
+let W = 0, H = 0;
+let playerScore = 0, aiScore = 0;
+let puck  = { x: 0, y: 0, vx: 0, vy: 0, r: PUCK_SIZE/2 };
+let playerPaddlePos = { x: 0, y: 0 };
+let aiPaddlePos     = { x: 0, y: 0 };
+const aiPaddleTarget = { x: 0, y: 0 };
+
+let playerIsFirst = true;
+let gameRunning = false;
+let gameEnded = false;
+let mode = 'time';
+let remainingTime = 0;
+let lastTimestamp = 0;
+let rafId = 0;
+
+let aiReactionTimer = 0;
+let aiErrorX = 0, aiErrorY = 0;
+
+let playerTargetX = 0, playerTargetY = 0;
+let activePointerId = null;
+let grabOffsetX = 0, grabOffsetY = 0;
+let isGrabbing = false;
+
+/* ---------- レイアウト ---------- */
+function layout() {
+  W = boardEl.clientWidth;
+  H = boardEl.clientHeight;
+
+  rinkEl.style.background = config.rinkColor;
+  if (config.rinkImg) {
+    rinkEl.style.backgroundImage = `url('${config.rinkImg}')`;
+    rinkEl.style.backgroundSize = 'cover';
+    rinkEl.style.backgroundPosition = 'center';
+  } else {
+    rinkEl.style.backgroundImage = '';
+  }
+  boardEl.style.background = config.outColor;
+  if (config.outImg) {
+    boardEl.style.backgroundImage = `url('${config.outImg}')`;
+    boardEl.style.backgroundSize = 'cover';
+    boardEl.style.backgroundPosition = 'center';
+  } else {
+    boardEl.style.backgroundImage = '';
+  }
+
+  // 中央線・サークル（rink内）
+  rinkEl.innerHTML = '';
+  const midY = H / 2;
+  const centerLine = document.createElement('div');
+  centerLine.className = 'line';
+  centerLine.style.left = '0'; centerLine.style.right = '0';
+  centerLine.style.top = (midY - 1) + 'px';
+  centerLine.style.height = '2px';
+  rinkEl.appendChild(centerLine);
+
+  const circle = document.createElement('div');
+  circle.style.position = 'absolute';
+  circle.style.left = '50%'; circle.style.top = '50%';
+  circle.style.width = '160px'; circle.style.height = '160px';
+  circle.style.marginLeft = '-80px'; circle.style.marginTop = '-80px';
+  circle.style.borderRadius = '50%';
+  circle.style.border = '2px solid rgba(255,255,255,0.35)';
+  rinkEl.appendChild(circle);
+
+  // ★ バンパー位置（4隅）
+  const m = BUMPER_MARGIN + BUMPER_R;
+  bumpers[0] = { x: m,     y: m     }; // TL
+  bumpers[1] = { x: W - m, y: m     }; // TR
+  bumpers[2] = { x: m,     y: H - m }; // BL
+  bumpers[3] = { x: W - m, y: H - m }; // BR
+
+  // バンパー要素の位置を更新
+  bumperEls.TL.style.left = (bumpers[0].x - BUMPER_R) + 'px';
+  bumperEls.TL.style.top  = (bumpers[0].y - BUMPER_R) + 'px';
+  bumperEls.TR.style.left = (bumpers[1].x - BUMPER_R) + 'px';
+  bumperEls.TR.style.top  = (bumpers[1].y - BUMPER_R) + 'px';
+  bumperEls.BL.style.left = (bumpers[2].x - BUMPER_R) + 'px';
+  bumperEls.BL.style.top  = (bumpers[2].y - BUMPER_R) + 'px';
+  bumperEls.BR.style.left = (bumpers[3].x - BUMPER_R) + 'px';
+  bumperEls.BR.style.top  = (bumpers[3].y - BUMPER_R) + 'px';
+
+  const paddleR = PADDLE_SIZE / 2;
+  playerPaddlePos = { x: W/2, y: playerIsFirst ? H - paddleR - 20 : paddleR + 20 };
+  aiPaddlePos     = { x: W/2, y: playerIsFirst ? paddleR + 20 : H - paddleR - 20 };
+  playerTargetX = playerPaddlePos.x;
+  playerTargetY = playerPaddlePos.y;
+  aiPaddleTarget.x = aiPaddlePos.x;
+  aiPaddleTarget.y = aiPaddlePos.y;
+  renderPaddles();
+}
+
+function renderPaddles() {
+  playerPaddle.style.transform = `translate(${playerPaddlePos.x - PADDLE_SIZE/2}px, ${playerPaddlePos.y - PADDLE_SIZE/2}px)`;
+  aiPaddle.style.transform     = `translate(${aiPaddlePos.x - PADDLE_SIZE/2}px, ${aiPaddlePos.y - PADDLE_SIZE/2}px)`;
+}
+function renderPuck() {
+  puckEl.style.transform = `translate(${puck.x - puck.r}px, ${puck.y - puck.r}px)`;
+}
+
+/* ---------- 開始 ---------- */
+function startGame() {
+  try {
+    const saved = localStorage.getItem('airhockey_config');
+    if (saved) config = { ...DEFAULT_CONFIG, ...JSON.parse(saved) };
+  } catch(e) {}
+
+  mode = config.mode;
+  remainingTime = config.timeLimit;
+  playerScore = 0;
+  aiScore = 0;
+  gameEnded = false;
+  updateScoreUI();
+
+  playerIsFirst = Math.random() < 0.5;
+  const cpuName = CPU_LEVELS[config.cpuLevel].name;
+  turnDisplay.textContent =
+    (playerIsFirst ? 'あなたが先攻（下）' : 'コンピュータが先攻（上）') + ` ／ CPU:${cpuName}`;
+
+  opening.style.display = 'none';
+  resultEl.classList.remove('open');
+  gameEl.classList.add('active');
+
+  layout();
+  resetPuck();
+
+  if (mode === 'time') {
+    timerDisplay.style.display = '';
+    updateTimerUI();
+  } else {
+    timerDisplay.style.display = 'none';
+  }
+
+  aiReactionTimer = 0;
+  aiErrorX = 0; aiErrorY = 0;
+
+  gameRunning = true;
+  lastTimestamp = performance.now();
+  cancelAnimationFrame(rafId);
+  rafId = requestAnimationFrame(loop);
+}
+
+function resetPuck() {
+  puck.x = W / 2;
+  puck.y = H / 2;
+  puck.vx = 0;
+  puck.vy = 0;
+  renderPuck();
+  const dir = playerIsFirst ? 1 : -1;
+  puck.vx = (Math.random() * 2 - 1) * 120;
+  puck.vy = dir * 180;
+}
+
+function updateScoreUI() {
+  scoreDisplay.textContent = `${playerScore} - ${aiScore}`;
+}
+function updateTimerUI() {
+  const t = Math.max(0, Math.ceil(remainingTime));
+  const m = Math.floor(t / 60);
+  const s = t % 60;
+  timerDisplay.textContent = `${m}:${String(s).padStart(2,'0')}`;
+}
+
+/* ---------- ループ ---------- */
+function loop(ts) {
+  if (!gameRunning) return;
+  const dt = Math.min(0.033, (ts - lastTimestamp) / 1000);
+  lastTimestamp = ts;
+
+  if (mode === 'time') {
+    remainingTime -= dt;
+    updateTimerUI();
+    if (remainingTime <= 0) {
+      remainingTime = 0;
+      endByTime();
+      return;
+    }
+  }
+
+  updatePlayerPaddle(dt);
+  updateAIPaddle(dt);
+  updatePuck(dt);
+  checkGoal();
+
+  rafId = requestAnimationFrame(loop);
+}
+
+/* ---------- プレイヤー ---------- */
+function updatePlayerPaddle(dt) {
+  const lerp = Math.min(1, dt * 20 * config.paddleSpeed);
+  playerPaddlePos.x += (playerTargetX - playerPaddlePos.x) * lerp;
+  playerPaddlePos.y += (playerTargetY - playerPaddlePos.y) * lerp;
+
+  const r = PADDLE_SIZE / 2;
+  playerPaddlePos.x = Math.max(r, Math.min(W - r, playerPaddlePos.x));
+  if (playerIsFirst) {
+    playerPaddlePos.y = Math.max(H/2 + r, Math.min(H - r, playerPaddlePos.y));
+  } else {
+    playerPaddlePos.y = Math.max(r, Math.min(H/2 - r, playerPaddlePos.y));
+  }
+  renderPaddles();
+}
+
+/* ---------- AI ---------- */
+function updateAIPaddle(dt) {
+  const r = PADDLE_SIZE / 2;
+  const aiSideTop = playerIsFirst;
+  const L = CPU_LEVELS[config.cpuLevel];
+
+  aiReactionTimer -= dt;
+  if (aiReactionTimer <= 0) {
+    aiReactionTimer = Math.max(0.02, 0.28 - L.reaction * 0.26);
+
+    const predict = L.prediction;
+    const futureX = puck.x + puck.vx * predict * 0.25;
+    const futureY = puck.y + puck.vy * predict * 0.25;
+
+    aiErrorX = (Math.random() * 2 - 1) * L.errorMax;
+    aiErrorY = (Math.random() * 2 - 1) * L.errorMax * 0.4;
+
+    aiPaddleTarget.x = futureX + aiErrorX;
+
+    if (aiSideTop) {
+      if (futureY < H/2) {
+        const attackY = Math.min(H/2 - r, Math.max(r + L.idleY, futureY + aiErrorY));
+        aiPaddleTarget.y = attackY;
+      } else {
+        aiPaddleTarget.y = r + L.idleY;
+      }
+    } else {
+      if (futureY > H/2) {
+        const attackY = Math.max(H/2 + r, Math.min(H - r - L.idleY, futureY + aiErrorY));
+        aiPaddleTarget.y = attackY;
+      } else {
+        aiPaddleTarget.y = H - r - L.idleY;
+      }
+    }
+  }
+
+  const lerp = Math.min(1, dt * 14 * L.speed * config.paddleSpeed);
+  aiPaddlePos.x += (aiPaddleTarget.x - aiPaddlePos.x) * lerp;
+  aiPaddlePos.y += (aiPaddleTarget.y - aiPaddlePos.y) * lerp;
+
+  aiPaddlePos.x = Math.max(r, Math.min(W - r, aiPaddlePos.x));
+  if (aiSideTop) {
+    aiPaddlePos.y = Math.max(r, Math.min(H/2 - r, aiPaddlePos.y));
+  } else {
+    aiPaddlePos.y = Math.max(H/2 + r, Math.min(H - r, aiPaddlePos.y));
+  }
+  renderPaddles();
+}
+
+/* ---------- 円盤 ---------- */
+function updatePuck(dt) {
+  const friction = 0.995;
+  puck.vx *= Math.pow(friction, dt * 60);
+  puck.vy *= Math.pow(friction, dt * 60);
+
+  puck.x += puck.vx * dt;
+  puck.y += puck.vy * dt;
+
+  // 壁反射
+  if (puck.x - puck.r < 0) { puck.x = puck.r; puck.vx = Math.abs(puck.vx); }
+  else if (puck.x + puck.r > W) { puck.x = W - puck.r; puck.vx = -Math.abs(puck.vx); }
+
+  if (puck.y - puck.r < 0) { puck.y = puck.r; puck.vy = Math.abs(puck.vy); }
+  else if (puck.y + puck.r > H) { puck.y = H - puck.r; puck.vy = -Math.abs(puck.vy); }
+
+  // ★ バンパー衝突（4隅）
+  for (let i = 0; i < bumpers.length; i++) {
+    handleBumperCollision(bumpers[i]);
+  }
+
+  handlePaddleCollision(playerPaddlePos, true);
+  handlePaddleCollision(aiPaddlePos, false);
+
+  renderPuck();
+}
+
+/* ---------- ★ バンパー衝突 ---------- */
+function handleBumperCollision(bumper) {
+  const dx = puck.x - bumper.x;
+  const dy = puck.y - bumper.y;
+  const dist = Math.hypot(dx, dy);
+  const minDist = puck.r + BUMPER_R;
+
+  if (dist < minDist && dist > 0.0001) {
+    const nx = dx / dist;
+    const ny = dy / dist;
+
+    // 押し出し
+    puck.x = bumper.x + nx * minDist;
+    puck.y = bumper.y + ny * minDist;
+
+    // 反射（バンパーは固定なので、法線方向のみ反転＋少し減衰）
+    const dot = puck.vx * nx + puck.vy * ny;
+    puck.vx -= 2 * dot * nx;
+    puck.vy -= 2 * dot * ny;
+
+    // エネルギーを少し加える（気持ちよく跳ねるように）
+    puck.vx *= 1.05;
+    puck.vy *= 1.05;
+  }
+}
+
+function handlePaddleCollision(paddlePos, isPlayer) {
+  const dx = puck.x - paddlePos.x;
+  const dy = puck.y - paddlePos.y;
+  const dist = Math.hypot(dx, dy);
+  const minDist = puck.r + PADDLE_SIZE/2;
+
+  if (dist < minDist && dist > 0.0001) {
+    const nx = dx / dist;
+    const ny = dy / dist;
+    puck.x = paddlePos.x + nx * minDist;
+    puck.y = paddlePos.y + ny * minDist;
+
+    let paddleVX = 0, paddleVY = 0;
+    if (isPlayer) {
+      paddleVX = (playerTargetX - playerPaddlePos.x) * 6;
+      paddleVY = (playerTargetY - playerPaddlePos.y) * 6;
+    } else {
+      paddleVX = puck.vx * 0.3;
+      paddleVY = puck.vy * 0.3;
+    }
+
+    const baseSpeed = 420 * config.puckSpeed;
+    puck.vx = nx * baseSpeed + paddleVX * 0.5;
+    puck.vy = ny * baseSpeed + paddleVY * 0.5;
+  }
+}
+
+/* ---------- ゴール ---------- */
+function checkGoal() {
+  const GOAL_WIDTH = W * 0.35;
+  const goalLeft  = (W - GOAL_WIDTH) / 2;
+  const goalRight = goalLeft + GOAL_WIDTH;
+
+  if (puck.y - puck.r <= 0) {
+    if (puck.x > goalLeft && puck.x < goalRight) {
+      if (playerIsFirst) playerScore++; else aiScore++;
+      onGoal(); return;
+    }
+  }
+  if (puck.y + puck.r >= H) {
+    if (puck.x > goalLeft && puck.x < goalRight) {
+      if (playerIsFirst) aiScore++; else playerScore++;
+      onGoal(); return;
+    }
+  }
+}
+
+function onGoal() {
+  updateScoreUI();
+  if (mode === 'firstto') {
+    if (playerScore >= config.firstTo) { endGame('player'); return; }
+    if (aiScore     >= config.firstTo) { endGame('ai');     return; }
+  }
+  resetPuck();
+}
+
+/* ---------- 終了 ---------- */
+function endByTime() {
+  if (playerScore > aiScore)      endGame('player');
+  else if (aiScore > playerScore) endGame('ai');
+  else endGame(Math.random() < 0.5 ? 'player' : 'ai', true);
+}
+
+function endGame(winner, coinFlip = false) {
+  if (gameEnded) return;
+  gameEnded = true;
+  gameRunning = false;
+  cancelAnimationFrame(rafId);
+
+  if (winner === 'player') {
+    gameEl.classList.remove('active');
+    resultEl.classList.add('open');
+    if (coinFlip) {
+      resultEl.querySelector('h1').textContent = '🎉 勝利（コイントス） 🎉';
+    }
+  } else {
+    gameEl.classList.remove('active');
+    opening.style.display = '';
+    alert(coinFlip ? 'コイントスの結果、コンピュータの勝ちです。' : 'コンピュータの勝ちです。もう一度挑戦してください！');
+  }
+}
+
+/* =========================================================
+   入力（長押しドラッグ）
+========================================================= */
+boardEl.addEventListener('pointerdown', (e) => {
+  if (!gameRunning) return;
+  if (e.button !== 0 && e.pointerType === 'mouse') return;
+  e.preventDefault();
+
+  const rect = boardEl.getBoundingClientRect();
+  const px = e.clientX - rect.left;
+  const py = e.clientY - rect.top;
+
+  const inMyHalf = playerIsFirst ? py > H/2 : py < H/2;
+  if (!inMyHalf) return;
+
+  const dx = px - playerPaddlePos.x;
+  const dy = py - playerPaddlePos.y;
+  const dist = Math.hypot(dx, dy);
+
+  boardEl.setPointerCapture(e.pointerId);
+  activePointerId = e.pointerId;
+  isGrabbing = true;
+
+  if (dist < PADDLE_SIZE) {
+    grabOffsetX = playerPaddlePos.x - px;
+    grabOffsetY = playerPaddlePos.y - py;
+  } else {
+    grabOffsetX = 0; grabOffsetY = 0;
+    playerTargetX = px; playerTargetY = py;
+  }
+});
+
+boardEl.addEventListener('pointermove', (e) => {
+  if (!gameRunning || !isGrabbing || e.pointerId !== activePointerId) return;
+  e.preventDefault();
+  const rect = boardEl.getBoundingClientRect();
+  const px = e.clientX - rect.left;
+  const py = e.clientY - rect.top;
+  playerTargetX = px + grabOffsetX;
+  playerTargetY = py + grabOffsetY;
+});
+
+function releasePointer(e) {
+  if (e.pointerId !== activePointerId) return;
+  if (boardEl.hasPointerCapture(e.pointerId)) boardEl.releasePointerCapture(e.pointerId);
+  activePointerId = null;
+  isGrabbing = false;
+}
+boardEl.addEventListener('pointerup', releasePointer);
+boardEl.addEventListener('pointercancel', releasePointer);
+boardEl.addEventListener('contextmenu', (e) => e.preventDefault());
+
+/* =========================================================
+   起動
+========================================================= */
+document.getElementById('btnStart').addEventListener('click', startGame);
+
+window.addEventListener('resize', () => {
+  if (!gameRunning) return;
+  layout();
+});
+
+opening.style.display = 'flex';
+</script>
+</body>
+</html>
