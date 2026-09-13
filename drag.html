@@ -46,6 +46,8 @@
   #opening button.secondary:active { box-shadow: 0 2px 0 #37474f; }
   #opening button.tertiary { background: #7e57c2; box-shadow: 0 6px 0 #4527a0, 0 10px 20px #0008; }
   #opening button.tertiary:active { box-shadow: 0 2px 0 #4527a0; }
+  #opening button.danger { background: #e53935; box-shadow: 0 6px 0 #b71c1c, 0 10px 20px #0008; }
+  #opening button.danger:active { box-shadow: 0 2px 0 #b71c1c; }
 
   /* ============ 設定モーダル ============ */
   #settings {
@@ -64,7 +66,6 @@
   }
   .panel h2 { margin: 0 0 1.2rem; font-size: 1.4rem; text-align: center; }
 
-  /* 設定タブ */
   .tabs { display: flex; gap: 0.4rem; margin-bottom: 1.2rem; }
   .tabs button {
     flex: 1; padding: 0.7rem 0.4rem;
@@ -152,6 +153,21 @@
   #rink  { position: absolute; inset: 0; }
   #rink .line { position: absolute; background: rgba(255,255,255,0.35); }
 
+  /* ★ 角のバンパー */
+  .bumper {
+    position: absolute;
+    width: 70px; height: 70px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #ffe082, #ffb300 60%, #7f5200);
+    border: 3px solid #fff8;
+    box-shadow:
+      0 0 15px #ffb30088,
+      inset 0 -6px 10px #00000066,
+      inset 0 4px 6px #ffffff55;
+    pointer-events: none;
+    will-change: transform;
+  }
+
   .paddle {
     position: absolute; width: 90px; height: 90px; border-radius: 50%;
     border: 3px solid #fff;
@@ -199,6 +215,7 @@
     <button id="btnSettings1" class="secondary">設定1（ルール・速さ）</button>
     <button id="btnSettings2" class="tertiary">設定2（色・背景）</button>
     <button id="btnSettings3" class="secondary">設定3（CPUの強さ）</button>
+    <button id="btnReset"    class="danger">リセット（全設定を初期化）</button>
   </div>
 </div>
 
@@ -207,14 +224,13 @@
   <div class="panel">
     <h2 id="settingsTitle">せってい</h2>
 
-    <!-- タブ -->
     <div class="tabs">
       <button data-tab="1" id="tabBtn1">設定1</button>
       <button data-tab="2" id="tabBtn2">設定2</button>
       <button data-tab="3" id="tabBtn3">設定3</button>
     </div>
 
-    <!-- ============ 設定1: ルール・速さ ============ -->
+    <!-- 設定1 -->
     <div class="tab-content" id="tab1">
       <div class="field">
         <label>ルール</label>
@@ -250,7 +266,7 @@
       </div>
     </div>
 
-    <!-- ============ 設定2: 色・背景 ============ -->
+    <!-- 設定2 -->
     <div class="tab-content" id="tab2">
       <div class="field">
         <label>盤上の色</label>
@@ -264,15 +280,15 @@
       <div class="field">
         <label>盤上の背景画像URL</label>
         <div class="row">
-          <input type="text" id="rinkImgUrl" placeholder="https://...">
+          <input type="text" id="rinkImgUrl" placeholder="https://... または img/foo.jpg">
           <button id="applyRinkImg">このURLを使います</button>
         </div>
-        <div class="hint">※ 画像URLが設定されている場合は色より優先されます</div>
+        <div class="hint">※ 画像URLが設定されている場合は色より優先されます。相対パスもOK（例: img181sports.jpg）</div>
       </div>
       <div class="field">
         <label>盤外の背景画像URL</label>
         <div class="row">
-          <input type="text" id="outImgUrl" placeholder="https://...">
+          <input type="text" id="outImgUrl" placeholder="https://... または img/foo.jpg">
           <button id="applyOutImg">このURLを使います</button>
         </div>
       </div>
@@ -283,7 +299,7 @@
       </div>
     </div>
 
-    <!-- ============ 設定3: CPUの強さ ============ -->
+    <!-- 設定3 -->
     <div class="tab-content" id="tab3">
       <div class="field">
         <label>コンピューターの強さ</label>
@@ -314,6 +330,11 @@
   </div>
   <div id="board">
     <div id="rink"></div>
+    <!-- ★ 4隅バンパー -->
+    <div class="bumper" id="bumperTL"></div>
+    <div class="bumper" id="bumperTR"></div>
+    <div class="bumper" id="bumperBL"></div>
+    <div class="bumper" id="bumperBR"></div>
     <div class="paddle" id="playerPaddle"></div>
     <div class="paddle" id="aiPaddle"></div>
     <div id="puck"></div>
@@ -332,15 +353,15 @@
 
 <script>
 /* =========================================================
-   設定（保存可能）
+   設定
 ========================================================= */
 const DEFAULT_CONFIG = {
   mode: 'time',
   timeLimit: 150,
   firstTo: 7,
-  puckSpeed: 3.0,        // デフォルト 3.0
+  puckSpeed: 3.0,
   paddleSpeed: 1.0,
-  cpuLevel: 2,           // 0:超弱い 1:弱い 2:普通 3:強い 4:超強い
+  cpuLevel: 2,
   rinkColor: '#0b6623',
   outColor:  '#111111',
   rinkImg: '',
@@ -352,13 +373,6 @@ const PRESET_COLORS = [
   '#fb8c00', '#8e24aa', '#000000', '#9e9e9e', '#43a047', '#aeea00'
 ];
 
-/* CPU レベル別パラメータ
-   - speed:      パドルの追従速度倍率
-   - reaction:   反応遅延（0に近いほど速く反応）
-   - prediction: 未来予測の強さ（puckの速度をどれだけ先読みするか）
-   - errorMax:   目標位置に加えるランダム誤差(px)。大きいほど弱い
-   - idleY:      待機時にどれだけ前へ出るか
-*/
 const CPU_LEVELS = [
   { name:'超弱い', speed:0.35, reaction:0.15, prediction:0.00, errorMax:70, idleY:0 },
   { name:'弱い',   speed:0.55, reaction:0.25, prediction:0.10, errorMax:45, idleY:8 },
@@ -367,12 +381,16 @@ const CPU_LEVELS = [
   { name:'超強い', speed:1.55, reaction:0.85, prediction:0.70, errorMax:2,  idleY:40 }
 ];
 
+// バンパー（4隅の障害物）
+const BUMPER_SIZE  = 70;
+const BUMPER_R     = BUMPER_SIZE / 2;
+const BUMPER_MARGIN = -6; // 盤の端からの距離
+
 let config = { ...DEFAULT_CONFIG };
 try {
   const saved = localStorage.getItem('airhockey_config');
   if (saved) config = { ...config, ...JSON.parse(saved) };
 } catch(e) {}
-// 旧バージョンの puckSpeed=1.0 が保存されていた場合の互換はそのまま尊重（ユーザーが変更可）
 
 function saveConfig() {
   try { localStorage.setItem('airhockey_config', JSON.stringify(config)); } catch(e) {}
@@ -386,7 +404,6 @@ const settingsEl = document.getElementById('settings');
 const settingsTitle = document.getElementById('settingsTitle');
 opening.style.backgroundImage = "url('img181sports.jpg')";
 
-// タブ
 const tabBtns = {
   1: document.getElementById('tabBtn1'),
   2: document.getElementById('tabBtn2'),
@@ -408,7 +425,6 @@ tabBtns[1].addEventListener('click', () => switchTab(1));
 tabBtns[2].addEventListener('click', () => switchTab(2));
 tabBtns[3].addEventListener('click', () => switchTab(3));
 
-// 設定モーダル内要素
 const elModeTime  = document.getElementById('modeTime');
 const elModeFirst = document.getElementById('modeFirst');
 const elTimeOpts  = document.getElementById('timeOpts');
@@ -426,7 +442,6 @@ const elOutImgUrl  = document.getElementById('outImgUrl');
 const elCpuLevels  = document.getElementById('cpuLevels');
 const elCpuLevelDesc = document.getElementById('cpuLevelDesc');
 
-// カラーパレット
 function buildSwatches(container, key) {
   container.innerHTML = '';
   PRESET_COLORS.forEach(color => {
@@ -447,7 +462,6 @@ function buildSwatches(container, key) {
   });
 }
 
-// モード
 function setMode(mode) {
   config.mode = mode;
   if (mode === 'time') {
@@ -465,7 +479,6 @@ function setMode(mode) {
 elModeTime.addEventListener('click',  () => setMode('time'));
 elModeFirst.addEventListener('click', () => setMode('firstto'));
 
-// スライダー
 elPuckSpeed.addEventListener('input', () => {
   elPuckSpeedVal.textContent = parseFloat(elPuckSpeed.value).toFixed(1);
 });
@@ -473,7 +486,6 @@ elPaddleSpeed.addEventListener('input', () => {
   elPaddleSpeedVal.textContent = parseFloat(elPaddleSpeed.value).toFixed(1);
 });
 
-// CPUレベル選択
 function setCpuLevel(level) {
   config.cpuLevel = level;
   Array.from(elCpuLevels.children).forEach(btn => {
@@ -487,7 +499,6 @@ elCpuLevels.addEventListener('click', (e) => {
   setCpuLevel(Number(btn.dataset.level));
 });
 
-// 画像URL
 document.getElementById('applyRinkImg').addEventListener('click', () => {
   const url = elRinkImgUrl.value.trim();
   if (!url) { alert('URLを入力してください'); return; }
@@ -511,7 +522,6 @@ document.getElementById('clearOutImg').addEventListener('click', () => {
   alert('盤外画像をクリアしました（保存ボタンで確定）');
 });
 
-// 設定を開く
 function openSettings(tab) {
   setMode(config.mode);
   elTimeLimit.value = config.timeLimit;
@@ -544,6 +554,21 @@ document.getElementById('btnSaveSettings').addEventListener('click', () => {
 });
 
 /* =========================================================
+   ★ リセット（4回確認）
+========================================================= */
+document.getElementById('btnReset').addEventListener('click', () => {
+  if (!confirm('本当にリセットしますか？\n（1/4）設定1〜3がすべて初期値に戻ります。')) return;
+  if (!confirm('本当にリセットしますか？\n（2/4）この操作は取り消せません。')) return;
+  if (!confirm('本当にリセットしますか？\n（3/4）色・背景画像・CPUの強さも消えます。')) return;
+  if (!confirm('本当にリセットしますか？\n（4/4）最終確認です。よろしいですか？')) return;
+
+  // リセット実行
+  config = { ...DEFAULT_CONFIG };
+  saveConfig();
+  alert('すべての設定を初期値に戻しました。');
+});
+
+/* =========================================================
    ゲーム本体
 ========================================================= */
 const gameEl        = document.getElementById('game');
@@ -556,6 +581,21 @@ const scoreDisplay  = document.getElementById('scoreDisplay');
 const timerDisplay  = document.getElementById('timerDisplay');
 const turnDisplay   = document.getElementById('turnDisplay');
 const resultEl      = document.getElementById('result');
+
+// ★ バンパー要素
+const bumperEls = {
+  TL: document.getElementById('bumperTL'),
+  TR: document.getElementById('bumperTR'),
+  BL: document.getElementById('bumperBL'),
+  BR: document.getElementById('bumperBR')
+};
+// バンパー座標（layout時に更新）
+let bumpers = [
+  { x: 0, y: 0 }, // TL
+  { x: 0, y: 0 }, // TR
+  { x: 0, y: 0 }, // BL
+  { x: 0, y: 0 }  // BR
+];
 
 const PUCK_SIZE     = 46;
 const PADDLE_SIZE   = 90;
@@ -575,11 +615,9 @@ let remainingTime = 0;
 let lastTimestamp = 0;
 let rafId = 0;
 
-// AI用: 反応タイマーと誤差
 let aiReactionTimer = 0;
 let aiErrorX = 0, aiErrorY = 0;
 
-// ドラッグ用
 let playerTargetX = 0, playerTargetY = 0;
 let activePointerId = null;
 let grabOffsetX = 0, grabOffsetY = 0;
@@ -607,6 +645,7 @@ function layout() {
     boardEl.style.backgroundImage = '';
   }
 
+  // 中央線・サークル（rink内）
   rinkEl.innerHTML = '';
   const midY = H / 2;
   const centerLine = document.createElement('div');
@@ -624,6 +663,23 @@ function layout() {
   circle.style.borderRadius = '50%';
   circle.style.border = '2px solid rgba(255,255,255,0.35)';
   rinkEl.appendChild(circle);
+
+  // ★ バンパー位置（4隅）
+  const m = BUMPER_MARGIN + BUMPER_R;
+  bumpers[0] = { x: m,     y: m     }; // TL
+  bumpers[1] = { x: W - m, y: m     }; // TR
+  bumpers[2] = { x: m,     y: H - m }; // BL
+  bumpers[3] = { x: W - m, y: H - m }; // BR
+
+  // バンパー要素の位置を更新
+  bumperEls.TL.style.left = (bumpers[0].x - BUMPER_R) + 'px';
+  bumperEls.TL.style.top  = (bumpers[0].y - BUMPER_R) + 'px';
+  bumperEls.TR.style.left = (bumpers[1].x - BUMPER_R) + 'px';
+  bumperEls.TR.style.top  = (bumpers[1].y - BUMPER_R) + 'px';
+  bumperEls.BL.style.left = (bumpers[2].x - BUMPER_R) + 'px';
+  bumperEls.BL.style.top  = (bumpers[2].y - BUMPER_R) + 'px';
+  bumperEls.BR.style.left = (bumpers[3].x - BUMPER_R) + 'px';
+  bumperEls.BR.style.top  = (bumpers[3].y - BUMPER_R) + 'px';
 
   const paddleR = PADDLE_SIZE / 2;
   playerPaddlePos = { x: W/2, y: playerIsFirst ? H - paddleR - 20 : paddleR + 20 };
@@ -645,7 +701,6 @@ function renderPuck() {
 
 /* ---------- 開始 ---------- */
 function startGame() {
-  // 最新 config 読み込み
   try {
     const saved = localStorage.getItem('airhockey_config');
     if (saved) config = { ...DEFAULT_CONFIG, ...JSON.parse(saved) };
@@ -677,7 +732,6 @@ function startGame() {
     timerDisplay.style.display = 'none';
   }
 
-  // AI 初期化
   aiReactionTimer = 0;
   aiErrorX = 0; aiErrorY = 0;
 
@@ -751,39 +805,30 @@ function updatePlayerPaddle(dt) {
 /* ---------- AI ---------- */
 function updateAIPaddle(dt) {
   const r = PADDLE_SIZE / 2;
-  const aiSideTop = playerIsFirst; // プレイヤーが下 → AI は上
+  const aiSideTop = playerIsFirst;
   const L = CPU_LEVELS[config.cpuLevel];
 
-  // 反応タイマー: 一定間隔で目標を更新（反応が遅いほど間隔大）
   aiReactionTimer -= dt;
   if (aiReactionTimer <= 0) {
-    // 次の更新までの間隔（レベルが高いほど短い）
     aiReactionTimer = Math.max(0.02, 0.28 - L.reaction * 0.26);
 
-    // 未来予測
     const predict = L.prediction;
     const futureX = puck.x + puck.vx * predict * 0.25;
     const futureY = puck.y + puck.vy * predict * 0.25;
 
-    // 誤差更新
     aiErrorX = (Math.random() * 2 - 1) * L.errorMax;
     aiErrorY = (Math.random() * 2 - 1) * L.errorMax * 0.4;
 
-    // 目標X
     aiPaddleTarget.x = futureX + aiErrorX;
 
-    // 目標Y
     if (aiSideTop) {
-      // AI は上側
       if (futureY < H/2) {
-        // 自陣に来たら迎撃
         const attackY = Math.min(H/2 - r, Math.max(r + L.idleY, futureY + aiErrorY));
         aiPaddleTarget.y = attackY;
       } else {
         aiPaddleTarget.y = r + L.idleY;
       }
     } else {
-      // AI は下側
       if (futureY > H/2) {
         const attackY = Math.max(H/2 + r, Math.min(H - r - L.idleY, futureY + aiErrorY));
         aiPaddleTarget.y = attackY;
@@ -793,12 +838,10 @@ function updateAIPaddle(dt) {
     }
   }
 
-  // 追従
   const lerp = Math.min(1, dt * 14 * L.speed * config.paddleSpeed);
   aiPaddlePos.x += (aiPaddleTarget.x - aiPaddlePos.x) * lerp;
   aiPaddlePos.y += (aiPaddleTarget.y - aiPaddlePos.y) * lerp;
 
-  // 範囲制限
   aiPaddlePos.x = Math.max(r, Math.min(W - r, aiPaddlePos.x));
   if (aiSideTop) {
     aiPaddlePos.y = Math.max(r, Math.min(H/2 - r, aiPaddlePos.y));
@@ -817,16 +860,48 @@ function updatePuck(dt) {
   puck.x += puck.vx * dt;
   puck.y += puck.vy * dt;
 
+  // 壁反射
   if (puck.x - puck.r < 0) { puck.x = puck.r; puck.vx = Math.abs(puck.vx); }
   else if (puck.x + puck.r > W) { puck.x = W - puck.r; puck.vx = -Math.abs(puck.vx); }
 
   if (puck.y - puck.r < 0) { puck.y = puck.r; puck.vy = Math.abs(puck.vy); }
   else if (puck.y + puck.r > H) { puck.y = H - puck.r; puck.vy = -Math.abs(puck.vy); }
 
+  // ★ バンパー衝突（4隅）
+  for (let i = 0; i < bumpers.length; i++) {
+    handleBumperCollision(bumpers[i]);
+  }
+
   handlePaddleCollision(playerPaddlePos, true);
   handlePaddleCollision(aiPaddlePos, false);
 
   renderPuck();
+}
+
+/* ---------- ★ バンパー衝突 ---------- */
+function handleBumperCollision(bumper) {
+  const dx = puck.x - bumper.x;
+  const dy = puck.y - bumper.y;
+  const dist = Math.hypot(dx, dy);
+  const minDist = puck.r + BUMPER_R;
+
+  if (dist < minDist && dist > 0.0001) {
+    const nx = dx / dist;
+    const ny = dy / dist;
+
+    // 押し出し
+    puck.x = bumper.x + nx * minDist;
+    puck.y = bumper.y + ny * minDist;
+
+    // 反射（バンパーは固定なので、法線方向のみ反転＋少し減衰）
+    const dot = puck.vx * nx + puck.vy * ny;
+    puck.vx -= 2 * dot * nx;
+    puck.vy -= 2 * dot * ny;
+
+    // エネルギーを少し加える（気持ちよく跳ねるように）
+    puck.vx *= 1.05;
+    puck.vy *= 1.05;
+  }
 }
 
 function handlePaddleCollision(paddlePos, isPlayer) {
