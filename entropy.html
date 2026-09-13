@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Physicist Quiz Millionaire</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', 'Arial', sans-serif;
+    }
+    body {
+      min-height: 100vh;
+      background-color: #0a0f1e;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: #fff;
+      overflow: hidden;
+    }
+    /* main container */
+    #app {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      transition: background-image 0.3s ease;
+    }
+    /* opening screen */
+    #opening-screen {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background-image: url('img151white.jpg');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      z-index: 100;
+    }
+    #start-btn {
+      padding: 24px 80px;
+      font-size: 3rem;
+      font-weight: bold;
+      background: rgba(0, 0, 0, 0.65);
+      color: #f5e56b;
+      border: 4px solid #f5e56b;
+      border-radius: 80px;
+      cursor: pointer;
+      letter-spacing: 6px;
+      text-transform: uppercase;
+      transition: 0.2s;
+      box-shadow: 0 0 40px rgba(245, 229, 107, 0.6);
+      backdrop-filter: blur(3px);
+      text-shadow: 0 0 20px black;
+    }
+    #start-btn:hover {
+      background: rgba(245, 229, 107, 0.9);
+      color: #0a0f1e;
+      box-shadow: 0 0 70px #f5e56b;
+      border-color: #0a0f1e;
+      transform: scale(1.05);
+    }
+    /* game screen */
+    #game-screen {
+      position: absolute;
+      inset: 0;
+      display: none;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 30px 40px;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(3px);
+      z-index: 50;
+    }
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 1.5rem;
+      font-weight: bold;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 12px 30px;
+      border-radius: 50px;
+      border: 2px solid #f5e56b;
+    }
+    .question-counter {
+      color: #f5e56b;
+      letter-spacing: 2px;
+    }
+    .fifty-fifty-btn {
+      background: #2a3f5e;
+      border: 2px solid #f5e56b;
+      color: #f5e56b;
+      font-weight: bold;
+      font-size: 1.4rem;
+      padding: 10px 28px;
+      border-radius: 50px;
+      cursor: pointer;
+      transition: 0.2s;
+      letter-spacing: 1px;
+    }
+    .fifty-fifty-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+      border-color: #666;
+      color: #aaa;
+    }
+    .fifty-fifty-btn:not(:disabled):hover {
+      background: #f5e56b;
+      color: #0a0f1e;
+    }
+    .question-box {
+      background: rgba(10, 20, 40, 0.9);
+      border: 3px solid #f5e56b;
+      border-radius: 40px;
+      padding: 40px 50px;
+      margin: 20px 0;
+      font-size: 2.2rem;
+      line-height: 1.4;
+      text-align: center;
+      box-shadow: 0 0 50px rgba(245, 229, 107, 0.3);
+      max-width: 1200px;
+      align-self: center;
+      width: 100%;
+    }
+    .answers-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      max-width: 1200px;
+      width: 100%;
+      align-self: center;
+      margin-bottom: 30px;
+    }
+    .answer-btn {
+      background: rgba(20, 40, 70, 0.95);
+      border: 3px solid #4a6fa5;
+      color: #fff;
+      font-size: 1.6rem;
+      padding: 22px 20px;
+      border-radius: 30px;
+      cursor: pointer;
+      transition: 0.2s;
+      text-align: left;
+      padding-left: 40px;
+      font-weight: 500;
+      letter-spacing: 0.5px;
+    }
+    .answer-btn:hover:not(:disabled) {
+      background: #2a4b7a;
+      border-color: #f5e56b;
+      transform: scale(1.01);
+    }
+    .answer-btn.correct {
+      background: #1f7a1f;
+      border-color: #7eff7e;
+      box-shadow: 0 0 40px #7eff7e;
+    }
+    .answer-btn.wrong {
+      background: #7a1f1f;
+      border-color: #ff7e7e;
+      box-shadow: 0 0 40px #ff7e7e;
+    }
+    .answer-btn:disabled {
+      cursor: not-allowed;
+      opacity: 0.8;
+    }
+    .answer-btn.hidden-option {
+      opacity: 0.2;
+      pointer-events: none;
+      border-color: #333;
+    }
+    /* gun video overlay */
+    #gun-overlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      justify-content: center;
+      align-items: center;
+      background: rgba(0, 0, 0, 0.85);
+      z-index: 1000;
+      pointer-events: none;
+    }
+    #gun-overlay video {
+      width: 80%;
+      max-width: 900px;
+      border-radius: 20px;
+      box-shadow: 0 0 80px #f5e56b;
+    }
+    /* ending screen */
+    #ending-screen {
+      position: absolute;
+      inset: 0;
+      display: none;
+      justify-content: center;
+      align-items: center;
+      background-image: url('img181sports.jpg');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      z-index: 200;
+      font-size: 4rem;
+      font-weight: bold;
+      color: #f5e56b;
+      text-shadow: 0 0 40px black, 0 0 80px black;
+      text-align: center;
+      flex-direction: column;
+    }
+    #ending-screen span {
+      background: rgba(0, 0, 0, 0.6);
+      padding: 30px 70px;
+      border-radius: 80px;
+      border: 4px solid #f5e56b;
+      backdrop-filter: blur(4px);
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+  <!-- OPENING -->
+  <div id="opening-screen">
+    <button id="start-btn">START</button>
+  </div>
+
+  <!-- GAME -->
+  <div id="game-screen">
+    <div class="top-bar">
+      <span class="question-counter" id="q-counter">Question 1 / 50</span>
+      <button class="fifty-fifty-btn" id="fifty-btn">50:50 (9 left)</button>
+    </div>
+    <div class="question-box" id="question-text">Loading...</div>
+    <div class="answers-grid" id="answers-container">
+      <button class="answer-btn" data-index="0">A</button>
+      <button class="answer-btn" data-index="1">B</button>
+      <button class="answer-btn" data-index="2">C</button>
+      <button class="answer-btn" data-index="3">D</button>
+    </div>
+  </div>
+
+  <!-- GUN OVERLAY -->
+  <div id="gun-overlay">
+    <video id="gun-video" src="img180gun.jpg" muted playsinline></video>
+  </div>
+
+  <!-- ENDING -->
+  <div id="ending-screen">
+    <span>🏆 YOU WIN! 🏆</span>
+  </div>
+</div>
+
+<script>
+  // ========================
+  //  QUESTION SETS (Q, Z, U)
+  // ========================
+  const Q_SET = [
+    { q: "Who formulated the laws of motion and universal gravitation?", a: ["Isaac Newton", "Albert Einstein", "Galileo Galilei", "Niels Bohr"], correct: 0 },
+    { q: "What is the SI unit of electric current?", a: ["Volt", "Ampere", "Ohm", "Watt"], correct: 1 },
+    { q: "Which particle has a negative charge?", a: ["Proton", "Neutron", "Electron", "Positron"], correct: 2 },
+    { q: "Who proposed the theory of relativity?", a: ["Niels Bohr", "Max Planck", "Albert Einstein", "Werner Heisenberg"], correct: 2 },
+    { q: "What is the speed of light in vacuum (approx)?", a: ["3×10⁸ m/s", "3×10⁶ m/s", "3×10¹⁰ m/s", "3×10⁵ m/s"], correct: 0 },
+    { q: "Which scientist is known for the uncertainty principle?", a: ["Erwin Schrödinger", "Werner Heisenberg", "Paul Dirac", "Max Born"], correct: 1 },
+    { q: "What is the SI unit of force?", a: ["Joule", "Newton", "Pascal", "Watt"], correct: 1 },
+    { q: "Which law states that energy cannot be created or destroyed?", a: ["First law of thermodynamics", "Second law of thermodynamics", "Third law of thermodynamics", "Zeroth law"], correct: 0 },
+    { q: "Who discovered the electron?", a: ["J.J. Thomson", "Ernest Rutherford", "James Chadwick", "Robert Millikan"], correct: 0 },
+    { q: "What is the charge of a proton?", a: ["Negative", "Neutral", "Positive", "Variable"], correct: 2 },
+    { q: "Which physicist wrote 'Principia Mathematica'?", a: ["Albert Einstein", "Isaac Newton", "Galileo Galilei", "Johannes Kepler"], correct: 1 },
+    { q: "What does the 'c' in E=mc² represent?", a: ["Speed of sound", "Speed of light", "Gravitational constant", "Planck's constant"], correct: 1 },
+    { q: "Which scientist discovered radioactivity?", a: ["Marie Curie", "Henri Becquerel", "Pierre Curie", "Ernest Rutherford"], correct: 1 },
+    { q: "What is the SI unit of power?", a: ["Joule", "Watt", "Newton", "Pascal"], correct: 1 },
+    { q: "Who proposed the planetary model of the atom?", a: ["Niels Bohr", "Ernest Rutherford", "J.J. Thomson", "John Dalton"], correct: 1 },
+    { q: "What is the gravitational constant (approx)?", a: ["6.67×10⁻¹¹ N·m²/kg²", "9.81 m/s²", "3×10⁸ m/s", "1.6×10⁻¹⁹ C"], correct: 0 },
+    { q: "Which particle is electrically neutral?", a: ["Proton", "Electron", "Neutron", "Ion"], correct: 2 },
+    { q: "Who developed the theory of electromagnetism?", a: ["Michael Faraday", "James Clerk Maxwell", "André-Marie Ampère", "Heinrich Hertz"], correct: 1 },
+    { q: "What is the unit of frequency?", a: ["Hertz", "Newton", "Joule", "Watt"], correct: 0 },
+    { q: "Which physicist proposed the exclusion principle?", a: ["Wolfgang Pauli", "Niels Bohr", "Werner Heisenberg", "Max Planck"], correct: 0 },
+    { q: "What is the momentum of a photon?", a: ["Zero", "E/c", "mc²", "h/λ"], correct: 1 },
+    { q: "Who discovered X-rays?", a: ["Wilhelm Röntgen", "Henri Becquerel", "Marie Curie", "Thomas Edison"], correct: 0 },
+    { q: "What is the SI unit of energy?", a: ["Watt", "Joule", "Newton", "Pascal"], correct: 1 },
+    { q: "Which law explains why a rocket works in space?", a: ["Newton's first law", "Newton's second law", "Newton's third law", "Law of gravitation"], correct: 2 },
+    { q: "What is the charge of an electron?", a: ["-1.6×10⁻¹⁹ C", "+1.6×10⁻¹⁹ C", "0 C", "-9.1×10⁻³¹ C"], correct: 0 },
+    { q: "Who proposed the wave equation for quantum mechanics?", a: ["Erwin Schrödinger", "Werner Heisenberg", "Paul Dirac", "Max Planck"], correct: 0 },
+    { q: "What is the unit of resistance?", a: ["Volt", "Ampere", "Ohm", "Farad"], correct: 2 },
+    { q: "Which scientist discovered the neutron?", a: ["James Chadwick", "Ernest Rutherford", "J.J. Thomson", "Niels Bohr"], correct: 0 },
+    { q: "What does the second law of thermodynamics state about entropy?", a: ["Entropy always decreases", "Entropy always increases or stays same", "Entropy is constant", "Entropy can be negative"], correct: 1 },
+    { q: "Who is known for the photoelectric effect explanation?", a: ["Albert Einstein", "Max Planck", "Niels Bohr", "Louis de Broglie"], correct: 0 },
+    { q: "What is the unit of capacitance?", a: ["Henry", "Farad", "Tesla", "Weber"], correct: 1 },
+    { q: "Which physicist proposed the de Broglie wavelength?", a: ["Louis de Broglie", "Erwin Schrödinger", "Werner Heisenberg", "Max Born"], correct: 0 },
+    { q: "What is the strong nuclear force responsible for?", a: ["Radioactive decay", "Binding quarks and nucleons", "Electromagnetic repulsion", "Gravity"], correct: 1 },
+    { q: "What is the unit of magnetic flux?", a: ["Tesla", "Weber", "Henry", "Gauss"], correct: 1 },
+    { q: "Who developed the first nuclear reactor?", a: ["Enrico Fermi", "Robert Oppenheimer", "Albert Einstein", "Niels Bohr"], correct: 0 },
+    { q: "What is the half-life of carbon-14?", a: ["5,730 years", "1,000 years", "10,000 years", "50,000 years"], correct: 0 },
+    { q: "Which particle mediates the electromagnetic force?", a: ["Gluon", "Photon", "W boson", "Graviton"], correct: 1 },
+    { q: "What is the Planck constant (approx)?", a: ["6.63×10⁻³⁴ J·s", "3×10⁸ m/s", "1.6×10⁻¹⁹ C", "9.11×10⁻³¹ kg"], correct: 0 },
+    { q: "Who discovered superconductivity?", a: ["Heike Kamerlingh Onnes", "Albert Einstein", "Niels Bohr", "John Bardeen"], correct: 0 },
+    { q: "What is the unit of pressure?", a: ["Newton", "Pascal", "Joule", "Watt"], correct: 1 },
+    { q: "Which physicist proposed the Copenhagen interpretation?", a: ["Niels Bohr", "Albert Einstein", "Erwin Schrödinger", "Max Planck"], correct: 0 },
+    { q: "What is the rest mass of an electron (approx)?", a: ["9.11×10⁻³¹ kg", "1.67×10⁻²⁷ kg", "6.63×10⁻³⁴ kg", "1.6×10⁻¹⁹ kg"], correct: 0 },
+    { q: "What does E=mc² calculate?", a: ["Kinetic energy", "Rest energy", "Potential energy", "Thermal energy"], correct: 1 },
+    { q: "Who discovered the positron?", a: ["Carl Anderson", "Paul Dirac", "Ernest Rutherford", "James Chadwick"], correct: 0 },
+    { q: "What is the unit of inductance?", a: ["Farad", "Henry", "Tesla", "Weber"], correct: 1 },
+    { q: "Which force is the weakest of the four fundamental forces?", a: ["Strong nuclear", "Electromagnetic", "Weak nuclear", "Gravity"], correct: 3 },
+    { q: "What is the Heisenberg uncertainty principle about?", a: ["Position and momentum", "Energy and time", "Both A and B", "Charge and mass"], correct: 2 },
+    { q: "Who won the Nobel Prize in Physics in 1921?", a: ["Albert Einstein", "Niels Bohr", "Max Planck", "Werner Heisenberg"], correct: 0 },
+    { q: "What is the Schwarzschild radius?", a: ["Radius of a black hole's event horizon", "Radius of a neutron star", "Radius of the universe", "Radius of an atom"], correct: 0 },
+    { q: "Which particle is its own antiparticle?", a: ["Electron", "Proton", "Photon", "Neutron"], correct: 2 }
+  ];
+
+  const Z_SET = [
+    { q: "Who discovered the law of falling bodies?", a: ["Aristotle", "Galileo Galilei", "Isaac Newton", "Albert Einstein"], correct: 1 },
+    { q: "What is the SI unit of voltage?", a: ["Ampere", "Volt", "Ohm", "Watt"], correct: 1 },
+    { q: "Which particle has a positive charge?", a: ["Electron", "Neutron", "Proton", "Photon"], correct: 2 },
+    { q: "Who proposed the quantum hypothesis?", a: ["Albert Einstein", "Max Planck", "Niels Bohr", "Erwin Schrödinger"], correct: 1 },
+    { q: "What is the acceleration due to gravity on Earth?", a: ["9.81 m/s²", "3×10⁸ m/s²", "6.67×10⁻¹¹ m/s²", "1.6×10⁻¹⁹ m/s²"], correct: 0 },
+    { q: "Which scientist is famous for the double-slit experiment?", a: ["Thomas Young", "Isaac Newton", "Albert Einstein", "Niels Bohr"], correct: 0 },
+    { q: "What is the SI unit of work?", a: ["Watt", "Joule", "Newton", "Pascal"], correct: 1 },
+    { q: "Which law states that for every action there is an equal and opposite reaction?", a: ["Newton's first law", "Newton's second law", "Newton's third law", "Law of gravitation"], correct: 2 },
+    { q: "Who discovered the atomic nucleus?", a: ["J.J. Thomson", "Ernest Rutherford", "James Chadwick", "Niels Bohr"], correct: 1 },
+    { q: "What is the charge of a neutron?", a: ["Positive", "Negative", "Neutral", "Variable"], correct: 2 },
+    { q: "Which physicist is known for the equation ∇·E = ρ/ε₀?", a: ["James Clerk Maxwell", "Carl Friedrich Gauss", "Michael Faraday", "André-Marie Ampère"], correct: 1 },
+    { q: "What does the 'm' in E=mc² represent?", a: ["Momentum", "Mass", "Meter", "Mole"], correct: 1 },
+    { q: "Who discovered polonium and radium?", a: ["Marie Curie", "Henri Becquerel", "Pierre Curie", "Ernest Rutherford"], correct: 0 },
+    { q: "What is the SI unit of charge?", a: ["Volt", "Ampere", "Coulomb", "Ohm"], correct: 2 },
+    { q: "Who proposed the liquid drop model of the nucleus?", a: ["Niels Bohr", "Carl Friedrich von Weizsäcker", "Enrico Fermi", "Werner Heisenberg"], correct: 1 },
+    { q: "What is the fine-structure constant (approx)?", a: ["1/137", "1/100", "1/1000", "1/10"], correct: 0 },
+    { q: "Which particle is responsible for the strong force?", a: ["Photon", "Gluon", "W boson", "Graviton"], correct: 1 },
+    { q: "Who formulated the laws of electrolysis?", a: ["Michael Faraday", "Alessandro Volta", "André-Marie Ampère", "Georg Ohm"], correct: 0 },
+    { q: "What is the unit of power?", a: ["Joule", "Watt", "Newton", "Pascal"], correct: 1 },
+    { q: "Which physicist proposed the neutrino?", a: ["Wolfgang Pauli", "Enrico Fermi", "Niels Bohr", "Albert Einstein"], correct: 0 },
+    { q: "What is the energy of a photon proportional to?", a: ["Wavelength", "Frequency", "Amplitude", "Speed"], correct: 1 },
+    { q: "Who discovered the photoelectric effect?", a: ["Heinrich Hertz", "Albert Einstein", "Max Planck", "Wilhelm Hallwachs"], correct: 0 },
+    { q: "What is the SI unit of magnetic field?", a: ["Weber", "Tesla", "Henry", "Gauss"], correct: 1 },
+    { q: "Which law states that the total electric flux through a closed surface is proportional to the enclosed charge?", a: ["Gauss's law", "Ampere's law", "Faraday's law", "Coulomb's law"], correct: 0 },
+    { q: "What is the charge of an up quark?", a: ["+2/3", "-1/3", "+1/3", "-2/3"], correct: 0 },
+    { q: "Who proposed the theory of beta decay?", a: ["Enrico Fermi", "Wolfgang Pauli", "Niels Bohr", "Werner Heisenberg"], correct: 0 },
+    { q: "What is the unit of frequency?", a: ["Hertz", "Newton", "Joule", "Watt"], correct: 0 },
+    { q: "Which physicist discovered the positron?", a: ["Carl Anderson", "Paul Dirac", "Ernest Rutherford", "James Chadwick"], correct: 0 },
+    { q: "What is the entropy of a perfect crystal at absolute zero?", a: ["Infinite", "Zero", "Negative", "Undefined"], correct: 1 },
+    { q: "Who proposed the special theory of relativity?", a: ["Albert Einstein", "Hendrik Lorentz", "Henri Poincaré", "Hermann Minkowski"], correct: 0 },
+    { q: "What is the unit of conductance?", a: ["Ohm", "Siemens", "Farad", "Henry"], correct: 1 },
+    { q: "Which physicist developed quantum electrodynamics?", a: ["Richard Feynman", "Niels Bohr", "Erwin Schrödinger", "Werner Heisenberg"], correct: 0 },
+    { q: "What is the strong force mediated by?", a: ["Photons", "Gluons", "W bosons", "Gravitons"], correct: 1 },
+    { q: "What is the unit of magnetic flux density?", a: ["Tesla", "Weber", "Henry", "Gauss"], correct: 0 },
+    { q: "Who discovered the law of conservation of energy?", a: ["Julius von Mayer", "James Prescott Joule", "Hermann von Helmholtz", "All of the above"], correct: 3 },
+    { q: "What is the radius of the first Bohr orbit?", a: ["0.529 Å", "1 Å", "0.1 Å", "5.29 Å"], correct: 0 },
+    { q: "Which particle has no electric charge?", a: ["Proton", "Electron", "Neutron", "Positron"], correct: 2 },
+    { q: "What is the unit of radioactivity?", a: ["Becquerel", "Curie", "Gray", "Sievert"], correct: 0 },
+    { q: "Who discovered the electron's charge?", a: ["Robert Millikan", "J.J. Thomson", "Ernest Rutherford", "James Chadwick"], correct: 0 },
+    { q: "What is the uncertainty principle mathematically expressed as?", a: ["ΔxΔp ≥ ħ/2", "ΔxΔp ≤ ħ/2", "ΔxΔp = ħ", "ΔxΔp = 0"], correct: 0 },
+    { q: "Which physicist proposed the many-worlds interpretation?", a: ["Hugh Everett", "Niels Bohr", "Albert Einstein", "Erwin Schrödinger"], correct: 0 },
+    { q: "What is the unit of absorbed dose?", a: ["Gray", "Sievert", "Becquerel", "Curie"], correct: 0 },
+    { q: "Who discovered the neutron?", a: ["James Chadwick", "Ernest Rutherford", "J.J. Thomson", "Niels Bohr"], correct: 0 },
+    { q: "What is the critical density of the universe (approx)?", a: ["10⁻²⁶ kg/m³", "10⁻²⁰ kg/m³", "10⁻³⁰ kg/m³", "10⁻¹⁵ kg/m³"], correct: 0 },
+    { q: "Which physicist is known for the equation iħ∂ψ/∂t = Ĥψ?", a: ["Erwin Schrödinger", "Werner Heisenberg", "Paul Dirac", "Max Planck"], correct: 0 },
+    { q: "What is the unit of illuminance?", a: ["Lux", "Lumen", "Candela", "Watt"], correct: 0 },
+    { q: "Who discovered the cosmic microwave background radiation?", a: ["Penzias and Wilson", "Hubble", "Einstein", "Hawking"], correct: 0 },
+    { q: "What is the lifetime of a muon (approx)?", a: ["2.2 μs", "1 ns", "1 ms", "1 s"], correct: 0 },
+    { q: "Which physicist proposed the anthropic principle?", a: ["Brandon Carter", "Stephen Hawking", "John Wheeler", "Fred Hoyle"], correct: 0 },
+    { q: "What is the unit of luminous intensity?", a: ["Candela", "Lumen", "Lux", "Watt"], correct: 0 }
+  ];
+
+  const U_SET = [
+    { q: "What is the first law of thermodynamics?", a: ["Energy is conserved", "Entropy increases", "Absolute zero is unattainable", "Heat flows from hot to cold"], correct: 0 },
+    { q: "Which scientist discovered the photoelectric effect?", a: ["Heinrich Hertz", "Albert Einstein", "Max Planck", "Wilhelm Hallwachs"], correct: 0 },
+    { q: "What is the SI unit of power?", a: ["Joule", "Watt", "Newton", "Pascal"], correct: 1 },
+    { q: "Who proposed the uncertainty principle?", a: ["Werner Heisenberg", "Niels Bohr", "Erwin Schrödinger", "Max Born"], correct: 0 },
+    { q: "What is the speed of light in a vacuum?", a: ["3×10⁸ m/s", "3×10⁶ m/s", "3×10¹⁰ m/s", "3×10⁵ m/s"], correct: 0 },
+    { q: "Which particle has a negative charge?", a: ["Proton", "Neutron", "Electron", "Positron"], correct: 2 },
+    { q: "Who formulated the law of universal gravitation?", a: ["Isaac Newton", "Albert Einstein", "Galileo Galilei", "Johannes Kepler"], correct: 0 },
+    { q: "What is the unit of force?", a: ["Joule", "Newton", "Pascal", "Watt"], correct: 1 },
+    { q: "Which law states that entropy always increases?", a: ["First law of thermodynamics", "Second law of thermodynamics", "Third law of thermodynamics", "Zeroth law"], correct: 1 },
+    { q: "Who discovered the electron?", a: ["J.J. Thomson", "Ernest Rutherford", "James Chadwick", "Robert Millikan"], correct: 0 },
+    { q: "What is the charge of a proton?", a: ["Negative", "Neutral", "Positive", "Variable"], correct: 2 },
+    { q: "What does the 'c' in E=mc² stand for?", a: ["Speed of sound", "Speed of light", "Gravitational constant", "Planck's constant"], correct: 1 },
+    { q: "Which scientist discovered radioactivity?", a: ["Marie Curie", "Henri Becquerel", "Pierre Curie", "Ernest Rutherford"], correct: 1 },
+    { q: "What is the unit of energy?", a: ["Watt", "Joule", "Newton", "Pascal"], correct: 1 },
+    { q: "Who proposed the planetary model of the atom?", a: ["Niels Bohr", "Ernest Rutherford", "J.J. Thomson", "John Dalton"], correct: 1 },
+    { q: "What is the gravitational constant?", a: ["6.67×10⁻¹¹ N·m²/kg²", "9.81 m/s²", "3×10⁸ m/s", "1.6×10⁻¹⁹ C"], correct: 0 },
+    { q: "Which particle is electrically neutral?", a: ["Proton", "Electron", "Neutron", "Ion"], correct: 2 },
+    { q: "Who developed the theory of electromagnetism?", a: ["Michael Faraday", "James Clerk Maxwell", "André-Marie Ampère", "Heinrich Hertz"], correct: 1 },
+    { q: "What is the unit of frequency?", a: ["Hertz", "Newton", "Joule", "Watt"], correct: 0 },
+    { q: "Which physicist proposed the exclusion principle?", a: ["Wolfgang Pauli", "Niels Bohr", "Werner Heisenberg", "Max Planck"], correct: 0 },
+    { q: "What is the momentum of a photon?", a: ["Zero", "E/c", "mc²", "h/λ"], correct: 1 },
+    { q: "Who discovered X-rays?", a: ["Wilhelm Röntgen", "Henri Becquerel", "Marie Curie", "Thomas Edison"], correct: 0 },
+    { q: "What is the unit of energy?", a: ["Watt", "Joule", "Newton", "Pascal"], correct: 1 },
+    { q: "Which law explains rocket propulsion?", a: ["Newton's first law", "Newton's second law", "Newton's third law", "Law of gravitation"], correct: 2 },
+    { q: "What is the charge of an electron?", a: ["-1.6×10⁻¹⁹ C", "+1.6×10⁻¹⁹ C", "0 C", "-9.1×10⁻³¹ C"], correct: 0 },
+    { q: "Who proposed the wave equation?", a: ["Erwin Schrödinger", "Werner Heisenberg", "Paul Dirac", "Max Planck"], correct: 0 },
+    { q: "What is the unit of resistance?", a: ["Volt", "Ampere", "Ohm", "Farad"], correct: 2 },
+    { q: "Who discovered the neutron?", a: ["James Chadwick", "Ernest Rutherford", "J.J. Thomson", "Niels Bohr"], correct: 0 },
+    { q: "What does the second law of thermodynamics state?", a: ["Entropy always decreases", "Entropy always increases or stays same", "Entropy is constant", "Entropy can be negative"], correct: 1 },
+    { q: "Who explained the photoelectric effect?", a: ["Albert Einstein", "Max Planck", "Niels Bohr", "Louis de Broglie"], correct: 0 },
+    { q: "What is the unit of capacitance?", a: ["Henry", "Farad", "Tesla", "Weber"], correct: 1 },
+    { q: "Who proposed the de Broglie wavelength?", a: ["Louis de Broglie", "Erwin Schrödinger", "Werner Heisenberg", "Max Born"], correct: 0 },
+    { q: "What is the strong nuclear force responsible for?", a: ["Radioactive decay", "Binding quarks and nucleons", "Electromagnetic repulsion", "Gravity"], correct: 1 },
+    { q: "What is the unit of magnetic flux?", a: ["Tesla", "Weber", "Henry", "Gauss"], correct: 1 },
+    { q: "Who developed the first nuclear reactor?", a: ["Enrico Fermi", "Robert Oppenheimer", "Albert Einstein", "Niels Bohr"], correct: 0 },
+    { q: "What is the half-life of carbon-14?", a: ["5,730 years", "1,000 years", "10,000 years", "50,000 years"], correct: 0 },
+    { q: "Which particle mediates the electromagnetic force?", a: ["Gluon", "Photon", "W boson", "Graviton"], correct: 1 },
+    { q: "What is the Planck constant?", a: ["6.63×10⁻³⁴ J·s", "3×10⁸ m/s", "1.6×10⁻¹⁹ C", "9.11×10⁻³¹ kg"], correct: 0 },
+    { q: "Who discovered superconductivity?", a: ["Heike Kamerlingh Onnes", "Albert Einstein", "Niels Bohr", "John Bardeen"], correct: 0 },
+    { q: "What is the unit of pressure?", a: ["Newton", "Pascal", "Joule", "Watt"], correct: 1 },
+    { q: "Who proposed the Copenhagen interpretation?", a: ["Niels Bohr", "Albert Einstein", "Erwin Schrödinger", "Max Planck"], correct: 0 },
+    { q: "What is the rest mass of an electron?", a: ["9.11×10⁻³¹ kg", "1.67×10⁻²⁷ kg", "6.63×10⁻³⁴ kg", "1.6×10⁻¹⁹ kg"], correct: 0 },
+    { q: "What does E=mc² calculate?", a: ["Kinetic energy", "Rest energy", "Potential energy", "Thermal energy"], correct: 1 },
+    { q: "Who discovered the positron?", a: ["Carl Anderson", "Paul Dirac", "Ernest Rutherford", "James Chadwick"], correct: 0 },
+    { q: "What is the unit of inductance?", a: ["Farad", "Henry", "Tesla", "Weber"], correct: 1 },
+    { q: "Which force is the weakest?", a: ["Strong nuclear", "Electromagnetic", "Weak nuclear", "Gravity"], correct: 3 },
+    { q: "What is the Heisenberg uncertainty principle about?", a: ["Position and momentum", "Energy and time", "Both A and B", "Charge and mass"], correct: 2 },
+    { q: "Who won the Nobel Prize in Physics in 1921?", a: ["Albert Einstein", "Niels Bohr", "Max Planck", "Werner Heisenberg"], correct: 0 },
+    { q: "What is the Schwarzschild radius?", a: ["Radius of a black hole's event horizon", "Radius of a neutron star", "Radius of the universe", "Radius of an atom"], correct: 0 },
+    { q: "Which particle is its own antiparticle?", a: ["Electron", "Proton", "Photon", "Neutron"], correct: 2 }
+  ];
+
+  // ========================
+  //  GAME STATE
+  // ========================
+  let currentSet = [];
+  let currentIndex = 0;           // 0-49
+  let fiftyUsed = 0;              // 0-9
+  let currentCorrectIndex = -1;
+  let answerLocked = false;
+  let gameActive = false;
+  let isTransitioning = false;
+
+  // DOM elements
+  const openingScreen = document.getElementById('opening-screen');
+  const gameScreen = document.getElementById('game-screen');
+  const endingScreen = document.getElementById('ending-screen');
+  const startBtn = document.getElementById('start-btn');
+  const qCounter = document.getElementById('q-counter');
+  const questionText = document.getElementById('question-text');
+  const answersContainer = document.getElementById('answers-container');
+  const fiftyBtn = document.getElementById('fifty-btn');
+  const gunOverlay = document.getElementById('gun-overlay');
+  const gunVideo = document.getElementById('gun-video');
+
+  // All answer buttons
+  const answerBtns = document.querySelectorAll('.answer-btn');
+
+  // ========================
+  //  UTILITY FUNCTIONS
+  // ========================
+  function shuffleArray(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  // Randomly pick one of Q, Z, U
+  function pickRandomSet() {
+    const r = Math.random();
+    if (r < 1/3) return [...Q_SET];
+    if (r < 2/3) return [...Z_SET];
+    return [...U_SET];
+  }
+
+  // Shuffle questions and answers inside each question
+  function prepareSet(set) {
+    // shuffle questions
+    const shuffled = shuffleArray([...set]);
+    // shuffle answers within each question while keeping track of correct
+    return shuffled.map(q => {
+      const correctText = q.a[q.correct];
+      const shuffledAnswers = shuffleArray([...q.a]);
+      const newCorrectIndex = shuffledAnswers.indexOf(correctText);
+      return {
+        q: q.q,
+        a: shuffledAnswers,
+        correct: newCorrectIndex
+      };
+    });
+  }
+
+  // ========================
+  //  GAME FLOW
+  // ========================
+  function startGame() {
+    // reset state
+    const rawSet = pickRandomSet();
+    currentSet = prepareSet(rawSet);
+    currentIndex = 0;
+    fiftyUsed = 0;
+    answerLocked = false;
+    gameActive = true;
+    isTransitioning = false;
+
+    // UI transitions
+    openingScreen.style.display = 'none';
+    gameScreen.style.display = 'flex';
+    endingScreen.style.display = 'none';
+    gunOverlay.style.display = 'none';
+
+    // reset 50:50 button
+    updateFiftyButton();
+
+    // load first question
+    loadQuestion();
+  }
+
+  function loadQuestion() {
+    if (!gameActive) return;
+    if (currentIndex >= 50) {
+      // should not happen here (win handled after 50th correct)
+      return;
+    }
+
+    answerLocked = false;
+    const qData = currentSet[currentIndex];
+    currentCorrectIndex = qData.correct;
+
+    // update counter
+    qCounter.textContent = `Question ${currentIndex + 1} / 50`;
+
+    // set question text
+    questionText.textContent = qData.q;
+
+    // set answers
+    answerBtns.forEach((btn, idx) => {
+      btn.textContent = qData.a[idx];
+      btn.classList.remove('correct', 'wrong', 'hidden-option');
+      btn.disabled = false;
+      btn.style.display = 'block';
+    });
+
+    // reset 50:50 state for this question
+    // (button disabled state is handled globally)
+    updateFiftyButton();
+
+    // ensure any previous timeouts or overlays are cleared
+    gunOverlay.style.display = 'none';
+    if (gunVideo) {
+      gunVideo.pause();
+      gunVideo.currentTime = 0;
+    }
+  }
+
+  function updateFiftyButton() {
+    const remaining = 9 - fiftyUsed;
+    fiftyBtn.textContent = `50:50 (${remaining} left)`;
+    if (remaining <= 0) {
+      fiftyBtn.disabled = true;
+    } else {
+      fiftyBtn.disabled = false;
+    }
+    // if answer is locked or transitioning, disable
+    if (answerLocked || isTransitioning || !gameActive) {
+      fiftyBtn.disabled = true;
+    }
+  }
+
+  // Handle 50:50
+  function useFiftyFifty() {
+    if (fiftyUsed >= 9 || answerLocked || !gameActive || isTransitioning) return;
+    if (currentIndex >= 50) return;
+
+    // increment used count
+    fiftyUsed++;
+    updateFiftyButton();
+
+    // determine wrong answers to hide (2 of them)
+    const wrongIndices = [];
+    for (let i = 0; i < 4; i++) {
+      if (i !== currentCorrectIndex) wrongIndices.push(i);
+    }
+    // shuffle wrong indices and pick 2
+    shuffleArray(wrongIndices);
+    const toHide = wrongIndices.slice(0, 2);
+
+    answerBtns.forEach((btn, idx) => {
+      if (toHide.includes(idx)) {
+        btn.classList.add('hidden-option');
+        btn.disabled = true; // cannot click hidden ones
+      }
+    });
+
+    // disable 50:50 for rest of question (but button already disabled by updateFiftyButton? no)
+    // We'll disable it manually now
+    fiftyBtn.disabled = true;
+  }
+
+  // Handle answer selection
+  function selectAnswer(index) {
+    if (answerLocked || !gameActive || isTransitioning) return;
+    if (currentIndex >= 50) return;
+
+    // prevent clicking hidden options (already disabled, but double-check)
+    if (answerBtns[index].classList.contains('hidden-option')) return;
+
+    answerLocked = true;
+    // disable all answer buttons to prevent multiple clicks
+    answerBtns.forEach(btn => btn.disabled = true);
+    // disable 50:50
+    fiftyBtn.disabled = true;
+
+    const isCorrect = (index === currentCorrectIndex);
+
+    // highlight correct and wrong
+    if (isCorrect) {
+      answerBtns[index].classList.add('correct');
+      // show gun video for 5 seconds
+      showGunVideo();
+    } else {
+      answerBtns[index].classList.add('wrong');
+      // also highlight correct answer for learning? optional, but nice.
+      answerBtns[currentCorrectIndex].classList.add('correct');
+    }
+
+    // after animation / delay, decide next step
+    setTimeout(() => {
+      if (isCorrect) {
+        // move to next question or win
+        if (currentIndex === 49) {
+          // WIN!
+          gameActive = false;
+          gameScreen.style.display = 'none';
+          endingScreen.style.display = 'flex';
+        } else {
+          currentIndex++;
+          // reset 50:50? No, fiftyUsed persists across questions
+          loadQuestion();
+          // re-enable buttons based on current state
+          answerBtns.forEach(btn => {
+            btn.disabled = false;
+            btn.classList.remove('correct', 'wrong', 'hidden-option');
+          });
+          updateFiftyButton();
+          answerLocked = false;
+          isTransitioning = false;
+        }
+      } else {
+        // WRONG: restart whole game
+        restartGame();
+      }
+    }, 1200); // short delay to show correct/wrong colors
+  }
+
+  function showGunVideo() {
+    isTransitioning = true;
+    gunOverlay.style.display = 'flex';
+    // img180gun.jpg is an image, but spec says "img180gun.jpgを5秒間流して"
+    // Since it's an image, we simulate a 5-second display.
+    // We'll show it for 5 seconds, then hide.
+    // We use the <video> element but it's actually an image? To be safe,
+    // we'll set the video source to the image? Better to use an <img> but
+    // the HTML already has <video>. We'll just show the overlay for 5 sec.
+    // Instead of video, we can create an img dynamically, but to keep simple,
+    // we'll use a background image on the overlay? The spec says img180gun.jpg,
+    // so we assume it's an image. We'll replace video with an img? 
+    // But the html has video. Let's modify: we'll use an <img> inside the overlay
+    // dynamically. But we already have video. Better to adjust: the overlay contains
+    // a video element. We'll change it to an image element at runtime? Simpler:
+    // Set the video's poster to the image? That won't show for 5 sec.
+    // Let's just create an img element inside the overlay if not exists.
+    // We'll hide the video and show an img.
+    if (!gunOverlay.querySelector('img.gun-img')) {
+      const img = document.createElement('img');
+      img.className = 'gun-img';
+      img.src = 'img180gun.jpg';
+      img.style.width = '80%';
+      img.style.maxWidth = '900px';
+      img.style.borderRadius = '20px';
+      img.style.boxShadow = '0 0 80px #f5e56b';
+      gunOverlay.appendChild(img);
+    }
+    // hide video
+    gunVideo.style.display = 'none';
+    const gunImg = gunOverlay.querySelector('img.gun-img');
+    if (gunImg) gunImg.style.display = 'block';
+
+    // after 5 seconds hide overlay
+    setTimeout(() => {
+      gunOverlay.style.display = 'none';
+      if (gunImg) gunImg.style.display = 'none';
+      gunVideo.style.display = 'block'; // reset
+      isTransitioning = false;
+      // if the game was won or lost during this time? Not possible because we're in correct answer flow.
+      // but if user restarts, it's ok.
+    }, 5000);
+  }
+
+  function restartGame() {
+    gameActive = false;
+    isTransitioning = false;
+    answerLocked = false;
+    // reset UI
+    gameScreen.style.display = 'none';
+    endingScreen.style.display = 'none';
+    openingScreen.style.display = 'flex';
+    gunOverlay.style.display = 'none';
+    if (gunVideo) {
+      gunVideo.pause();
+      gunVideo.currentTime = 0;
+    }
+    // reset any leftover answer classes
+    answerBtns.forEach(btn => {
+      btn.disabled = false;
+      btn.classList.remove('correct', 'wrong', 'hidden-option');
+    });
+    fiftyUsed = 0;
+    currentIndex = 0;
+    updateFiftyButton();
+  }
+
+  // ========================
+  //  EVENT LISTENERS
+  // ========================
+  startBtn.addEventListener('click', startGame);
+
+  fiftyBtn.addEventListener('click', useFiftyFifty);
+
+  answerBtns.forEach((btn, idx) => {
+    btn.addEventListener('click', () => selectAnswer(idx));
+  });
+
+  // initial state: opening screen visible
+  openingScreen.style.display = 'flex';
+  gameScreen.style.display = 'none';
+  endingScreen.style.display = 'none';
+  gunOverlay.style.display = 'none';
+
+  // ensure background of app is handled (opening screen has its own bg)
+  // The #app background remains default, but opening screen covers it.
+
+  // fix for video element: we use image instead, so hide video initially
+  gunVideo.style.display = 'none';
+
+  // add small css for gun image
+  const style = document.createElement('style');
+  style.textContent = `
+    .gun-img {
+      animation: pulse 0.5s infinite alternate;
+    }
+    @keyframes pulse {
+      from { filter: drop-shadow(0 0 20px #f5e56b); }
+      to { filter: drop-shadow(0 0 60px #ffaa00); }
+    }
+  `;
+  document.head.appendChild(style);
+
+</script>
+</body>
+</html>
