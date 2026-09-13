@@ -11,43 +11,39 @@
       box-sizing: border-box;
       font-family: 'Segoe UI', 'Arial', sans-serif;
     }
-    body {
-      min-height: 100vh;
-      background-color: #0a0f1e;
-      display: flex;
-      justify-content: center;
-      align-items: center;
+    html, body {
+      min-height: 100%;
+      background-color: #000;
       color: #fff;
-      overflow: hidden;
     }
     /* main container */
     #app {
-      width: 100vw;
-      height: 100vh;
+      width: 100%;
+      min-height: 100vh;
       position: relative;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      background-size: fill;
-      background-position: center;
-      background-repeat: no-repeat;
-      transition: background-image 0.3s ease;
     }
-    /* opening screen */
+
+    /* ===== OPENING SCREEN (scrollable, image full length) ===== */
     #opening-screen {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      justify-content: center;
+      position: relative;
+      width: 100%;
+      min-height: 100vh;
+      display: none; /* JSで制御 */
+      flex-direction: column;
       align-items: center;
-      background-image: url('img182quiz.jpg');
-      background-size: fill;
-      background-position: center;
-      background-repeat: no-repeat;
+      background-color: #000;
       z-index: 100;
     }
+    #opening-screen img.opening-img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
     #start-btn {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
       padding: 24px 80px;
       font-size: 3rem;
       font-weight: bold;
@@ -62,17 +58,19 @@
       box-shadow: 0 0 40px rgba(245, 229, 107, 0.6);
       backdrop-filter: blur(3px);
       text-shadow: 0 0 20px black;
+      z-index: 110;
     }
     #start-btn:hover {
       background: rgba(245, 229, 107, 0.9);
       color: #0a0f1e;
       box-shadow: 0 0 70px #f5e56b;
       border-color: #0a0f1e;
-      transform: scale(1.05);
+      transform: translate(-50%, -50%) scale(1.05);
     }
-    /* game screen */
+
+    /* ===== GAME SCREEN (fixed fullscreen) ===== */
     #game-screen {
-      position: absolute;
+      position: fixed;
       inset: 0;
       display: none;
       flex-direction: column;
@@ -180,7 +178,8 @@
       pointer-events: none;
       border-color: #333;
     }
-    /* gun video overlay */
+
+    /* ===== GUN OVERLAY ===== */
     #gun-overlay {
       position: fixed;
       inset: 0;
@@ -191,37 +190,55 @@
       z-index: 1000;
       pointer-events: none;
     }
-    #gun-overlay video {
-      width: 80%;
-      max-width: 900px;
+    #gun-overlay img.gun-img {
+      max-width: 90vw;
+      max-height: 90vh;
       border-radius: 20px;
       box-shadow: 0 0 80px #f5e56b;
+      object-fit: contain;
     }
-    /* ending screen */
+
+    /* ===== ENDING SCREEN (scrollable, image full length) ===== */
     #ending-screen {
-      position: absolute;
-      inset: 0;
+      position: relative;
+      width: 100%;
+      min-height: 100vh;
       display: none;
-      justify-content: center;
+      flex-direction: column;
       align-items: center;
-      background-image: url('img184quiz.jpg');
-      background-size: fill;
-      background-position: center;
-      background-repeat: no-repeat;
+      background-color: #000;
       z-index: 200;
+    }
+    #ending-screen img.ending-img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+    #ending-screen .win-text {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
       font-size: 4rem;
       font-weight: bold;
       color: #f5e56b;
       text-shadow: 0 0 40px black, 0 0 80px black;
       text-align: center;
-      flex-direction: column;
-    }
-    #ending-screen span {
       background: rgba(0, 0, 0, 0.6);
       padding: 30px 70px;
       border-radius: 80px;
       border: 4px solid #f5e56b;
       backdrop-filter: blur(4px);
+      z-index: 210;
+      pointer-events: none;
+    }
+
+    .gun-img-anim {
+      animation: pulse 0.5s infinite alternate;
+    }
+    @keyframes pulse {
+      from { filter: drop-shadow(0 0 20px #f5e56b); }
+      to { filter: drop-shadow(0 0 60px #ffaa00); }
     }
   </style>
 </head>
@@ -229,6 +246,7 @@
 <div id="app">
   <!-- OPENING -->
   <div id="opening-screen">
+    <img class="opening-img" src="img182quiz.jpg" alt="Opening">
     <button id="start-btn">START</button>
   </div>
 
@@ -247,14 +265,15 @@
     </div>
   </div>
 
-  <!-- GUN OVERLAY -->
+  <!-- GUN OVERLAY (image) -->
   <div id="gun-overlay">
-    <video id="gun-video" src="img183quiz.jpg" muted playsinline></video>
+    <img class="gun-img" id="gun-img" src="img183quiz.jpg" alt="correct">
   </div>
 
   <!-- ENDING -->
   <div id="ending-screen">
-    <span>🏆 YOU WIN! 🏆</span>
+    <img class="ending-img" src="img184quiz.jpg" alt="Ending">
+    <div class="win-text">🏆 YOU WIN! 🏆</div>
   </div>
 </div>
 
@@ -425,8 +444,8 @@
   //  GAME STATE
   // ========================
   let currentSet = [];
-  let currentIndex = 0;           // 0-49
-  let fiftyUsed = 0;              // 0-9
+  let currentIndex = 0;
+  let fiftyUsed = 0;
   let currentCorrectIndex = -1;
   let answerLocked = false;
   let gameActive = false;
@@ -442,13 +461,12 @@
   const answersContainer = document.getElementById('answers-container');
   const fiftyBtn = document.getElementById('fifty-btn');
   const gunOverlay = document.getElementById('gun-overlay');
-  const gunVideo = document.getElementById('gun-video');
+  const gunImg = document.getElementById('gun-img');
 
-  // All answer buttons
   const answerBtns = document.querySelectorAll('.answer-btn');
 
   // ========================
-  //  UTILITY FUNCTIONS
+  //  UTILITY
   // ========================
   function shuffleArray(arr) {
     for (let i = arr.length - 1; i > 0; i--) {
@@ -458,7 +476,6 @@
     return arr;
   }
 
-  // Randomly pick one of Q, Z, U
   function pickRandomSet() {
     const r = Math.random();
     if (r < 1/3) return [...Q_SET];
@@ -466,20 +483,13 @@
     return [...U_SET];
   }
 
-  // Shuffle questions and answers inside each question
   function prepareSet(set) {
-    // shuffle questions
     const shuffled = shuffleArray([...set]);
-    // shuffle answers within each question while keeping track of correct
     return shuffled.map(q => {
       const correctText = q.a[q.correct];
       const shuffledAnswers = shuffleArray([...q.a]);
       const newCorrectIndex = shuffledAnswers.indexOf(correctText);
-      return {
-        q: q.q,
-        a: shuffledAnswers,
-        correct: newCorrectIndex
-      };
+      return { q: q.q, a: shuffledAnswers, correct: newCorrectIndex };
     });
   }
 
@@ -487,7 +497,6 @@
   //  GAME FLOW
   // ========================
   function startGame() {
-    // reset state
     const rawSet = pickRandomSet();
     currentSet = prepareSet(rawSet);
     currentIndex = 0;
@@ -496,37 +505,29 @@
     gameActive = true;
     isTransitioning = false;
 
-    // UI transitions
+    // scroll to top when game starts
+    window.scrollTo(0, 0);
+
     openingScreen.style.display = 'none';
     gameScreen.style.display = 'flex';
     endingScreen.style.display = 'none';
     gunOverlay.style.display = 'none';
 
-    // reset 50:50 button
     updateFiftyButton();
-
-    // load first question
     loadQuestion();
   }
 
   function loadQuestion() {
     if (!gameActive) return;
-    if (currentIndex >= 50) {
-      // should not happen here (win handled after 50th correct)
-      return;
-    }
+    if (currentIndex >= 50) return;
 
     answerLocked = false;
     const qData = currentSet[currentIndex];
     currentCorrectIndex = qData.correct;
 
-    // update counter
     qCounter.textContent = `Question ${currentIndex + 1} / 50`;
-
-    // set question text
     questionText.textContent = qData.q;
 
-    // set answers
     answerBtns.forEach((btn, idx) => {
       btn.textContent = qData.a[idx];
       btn.classList.remove('correct', 'wrong', 'hidden-option');
@@ -534,16 +535,9 @@
       btn.style.display = 'block';
     });
 
-    // reset 50:50 state for this question
-    // (button disabled state is handled globally)
     updateFiftyButton();
-
-    // ensure any previous timeouts or overlays are cleared
     gunOverlay.style.display = 'none';
-    if (gunVideo) {
-      gunVideo.pause();
-      gunVideo.currentTime = 0;
-    }
+    if (gunImg) gunImg.classList.remove('gun-img-anim');
   }
 
   function updateFiftyButton() {
@@ -554,83 +548,65 @@
     } else {
       fiftyBtn.disabled = false;
     }
-    // if answer is locked or transitioning, disable
     if (answerLocked || isTransitioning || !gameActive) {
       fiftyBtn.disabled = true;
     }
   }
 
-  // Handle 50:50
   function useFiftyFifty() {
     if (fiftyUsed >= 9 || answerLocked || !gameActive || isTransitioning) return;
     if (currentIndex >= 50) return;
 
-    // increment used count
     fiftyUsed++;
     updateFiftyButton();
 
-    // determine wrong answers to hide (2 of them)
     const wrongIndices = [];
     for (let i = 0; i < 4; i++) {
       if (i !== currentCorrectIndex) wrongIndices.push(i);
     }
-    // shuffle wrong indices and pick 2
     shuffleArray(wrongIndices);
     const toHide = wrongIndices.slice(0, 2);
 
     answerBtns.forEach((btn, idx) => {
       if (toHide.includes(idx)) {
         btn.classList.add('hidden-option');
-        btn.disabled = true; // cannot click hidden ones
+        btn.disabled = true;
       }
     });
 
-    // disable 50:50 for rest of question (but button already disabled by updateFiftyButton? no)
-    // We'll disable it manually now
     fiftyBtn.disabled = true;
   }
 
-  // Handle answer selection
   function selectAnswer(index) {
     if (answerLocked || !gameActive || isTransitioning) return;
     if (currentIndex >= 50) return;
-
-    // prevent clicking hidden options (already disabled, but double-check)
     if (answerBtns[index].classList.contains('hidden-option')) return;
 
     answerLocked = true;
-    // disable all answer buttons to prevent multiple clicks
     answerBtns.forEach(btn => btn.disabled = true);
-    // disable 50:50
     fiftyBtn.disabled = true;
 
     const isCorrect = (index === currentCorrectIndex);
 
-    // highlight correct and wrong
     if (isCorrect) {
       answerBtns[index].classList.add('correct');
-      // show gun video for 5 seconds
-      showGunVideo();
+      showGunImage();
     } else {
       answerBtns[index].classList.add('wrong');
-      // also highlight correct answer for learning? optional, but nice.
       answerBtns[currentCorrectIndex].classList.add('correct');
     }
 
-    // after animation / delay, decide next step
     setTimeout(() => {
       if (isCorrect) {
-        // move to next question or win
         if (currentIndex === 49) {
-          // WIN!
+          // WIN
           gameActive = false;
           gameScreen.style.display = 'none';
           endingScreen.style.display = 'flex';
+          window.scrollTo(0, 0); // エンディング画像の先頭から表示
         } else {
           currentIndex++;
-          // reset 50:50? No, fiftyUsed persists across questions
           loadQuestion();
-          // re-enable buttons based on current state
           answerBtns.forEach(btn => {
             btn.disabled = false;
             btn.classList.remove('correct', 'wrong', 'hidden-option');
@@ -640,38 +616,21 @@
           isTransitioning = false;
         }
       } else {
-        // WRONG: restart whole game
         restartGame();
       }
-    }, 1200); // short delay to show correct/wrong colors
+    }, 1200);
   }
 
-  function showGunVideo() {
+  function showGunImage() {
     isTransitioning = true;
     gunOverlay.style.display = 'flex';
-    // img183quiz.jpg is an image, but spec says "img183quiz.jpgを5秒間流して"
-    // Since it's an image, we simulate a 5-second display.
-    // We'll show it for 5 seconds, then hide.
-    if (!gunOverlay.querySelector('img.gun-img')) {
-      const img = document.createElement('img');
-      img.className = 'gun-img';
-      img.src = 'img183quiz.jpg';
-      img.style.width = '80%';
-      img.style.maxWidth = '900px';
-      img.style.borderRadius = '20px';
-      img.style.boxShadow = '0 0 80px #f5e56b';
-      gunOverlay.appendChild(img);
+    if (gunImg) {
+      gunImg.classList.add('gun-img-anim');
     }
-    // hide video
-    gunVideo.style.display = 'none';
-    const gunImg = gunOverlay.querySelector('img.gun-img');
-    if (gunImg) gunImg.style.display = 'block';
 
-    // after 5 seconds hide overlay
     setTimeout(() => {
       gunOverlay.style.display = 'none';
-      if (gunImg) gunImg.style.display = 'none';
-      gunVideo.style.display = 'block'; // reset
+      if (gunImg) gunImg.classList.remove('gun-img-anim');
       isTransitioning = false;
     }, 5000);
   }
@@ -680,16 +639,13 @@
     gameActive = false;
     isTransitioning = false;
     answerLocked = false;
-    // reset UI
+
     gameScreen.style.display = 'none';
     endingScreen.style.display = 'none';
     openingScreen.style.display = 'flex';
     gunOverlay.style.display = 'none';
-    if (gunVideo) {
-      gunVideo.pause();
-      gunVideo.currentTime = 0;
-    }
-    // reset any leftover answer classes
+    if (gunImg) gunImg.classList.remove('gun-img-anim');
+
     answerBtns.forEach(btn => {
       btn.disabled = false;
       btn.classList.remove('correct', 'wrong', 'hidden-option');
@@ -697,44 +653,23 @@
     fiftyUsed = 0;
     currentIndex = 0;
     updateFiftyButton();
+    window.scrollTo(0, 0);
   }
 
   // ========================
-  //  EVENT LISTENERS
+  //  EVENTS
   // ========================
   startBtn.addEventListener('click', startGame);
-
   fiftyBtn.addEventListener('click', useFiftyFifty);
-
   answerBtns.forEach((btn, idx) => {
     btn.addEventListener('click', () => selectAnswer(idx));
   });
 
-  // initial state: opening screen visible
+  // initial state: opening visible, others hidden
   openingScreen.style.display = 'flex';
   gameScreen.style.display = 'none';
   endingScreen.style.display = 'none';
   gunOverlay.style.display = 'none';
-
-  // ensure background of app is handled (opening screen has its own bg)
-  // The #app background remains default, but opening screen covers it.
-
-  // fix for video element: we use image instead, so hide video initially
-  gunVideo.style.display = 'none';
-
-  // add small css for gun image
-  const style = document.createElement('style');
-  style.textContent = `
-    .gun-img {
-      animation: pulse 0.5s infinite alternate;
-    }
-    @keyframes pulse {
-      from { filter: drop-shadow(0 0 20px #f5e56b); }
-      to { filter: drop-shadow(0 0 60px #ffaa00); }
-    }
-  `;
-  document.head.appendChild(style);
-
 </script>
 </body>
 </html>
