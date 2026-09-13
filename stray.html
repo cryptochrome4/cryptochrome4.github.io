@@ -46,11 +46,12 @@
       align-items: center;
       justify-content: center;
       z-index: 100;
-      transition: opacity 0.5s;
     }
 
     #opening-screen img {
       position: absolute;
+      top: 0;
+      left: 0;
       width: 100%;
       height: 100%;
       object-fit: cover;
@@ -130,42 +131,63 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.6rem;
-      line-height: 1;
-      color: #ffd966;
+      position: relative;
       transition: 0.05s;
-      text-shadow: 2px 2px 0 #00000088;
     }
 
     .cell.wall {
       background: #5a3e2b;
       box-shadow: inset 0 0 0 2px #2e1d12;
-      color: #2a1b12;
     }
 
     .cell.floor {
       background: #2f241b;
     }
 
-    .cell.player {
-      color: #ffd966;
-      text-shadow: 0 0 10px #ffae00;
+    /* ドット絵スプライト（box-shadowでピクセルを描画） */
+    .sprite {
+      width: 10px;
+      height: 10px;
+      position: relative;
+      transform: scale(0.9);
+      image-rendering: pixelated;
     }
 
-    .cell.enemy {
-      color: #ff6b6b;
-      text-shadow: 0 0 12px #ff0000;
+    /* プレイヤー（トルネコ風：黄色い鎧と剣） */
+    .sprite-player {
+      box-shadow:
+        /* 1行目 */
+        0 0 0 #ffd966, 10px 0 0 #ffd966, 20px 0 0 #ffd966,
+        /* 2行目 */
+        0 10px 0 #ffd966, 10px 10px 0 #fff2c0, 20px 10px 0 #ffd966,
+        /* 3行目（剣） */
+        30px 0 0 #d9d9d9, 30px 10px 0 #d9d9d9, 30px 20px 0 #d9d9d9;
     }
 
-    .cell.boss {
-      color: #c44aff;
-      text-shadow: 0 0 16px #b700ff;
-      font-size: 2rem;
+    /* 通常敵（赤いスライム風） */
+    .sprite-enemy {
+      box-shadow:
+        0 0 0 #ff6b6b, 10px 0 0 #ff6b6b, 20px 0 0 #ff6b6b,
+        0 10px 0 #ff6b6b, 10px 10px 0 #ffaaaa, 20px 10px 0 #ff6b6b,
+        0 20px 0 #cc3333, 10px 20px 0 #cc3333, 20px 20px 0 #cc3333;
     }
 
-    .cell.stairs {
-      color: #7affb0;
-      text-shadow: 0 0 12px #00ff88;
+    /* ボス（紫の大型） */
+    .sprite-boss {
+      transform: scale(1.3);
+      box-shadow:
+        0 0 0 #c44aff, 10px 0 0 #c44aff, 20px 0 0 #c44aff,
+        0 10px 0 #c44aff, 10px 10px 0 #f0c0ff, 20px 10px 0 #c44aff,
+        0 20px 0 #8a2be2, 10px 20px 0 #8a2be2, 20px 20px 0 #8a2be2,
+        0 30px 0 #5e1a9e, 10px 30px 0 #5e1a9e, 20px 30px 0 #5e1a9e;
+    }
+
+    /* 階段（白いドット階段） */
+    .sprite-stairs {
+      box-shadow:
+        0 0 0 #e0e0e0, 10px 0 0 #b0b0b0, 20px 0 0 #808080,
+        0 10px 0 #b0b0b0, 10px 10px 0 #808080, 20px 10px 0 #505050,
+        0 20px 0 #808080, 10px 20px 0 #505050, 20px 20px 0 #303030;
     }
 
     .controller-panel {
@@ -328,10 +350,10 @@
   <!-- ゲーム画面 -->
   <div id="game-screen">
     <div class="status-bar">
-      <span>❤️ <span id="hp-display">20</span></span>
-      <span>⚔️ <span id="atk-display">5</span></span>
-      <span>🏰 <span id="floor-display">1</span>F</span>
-      <span>👾 <span id="enemy-count">0</span></span>
+      <span>HP <span id="hp-display">20</span></span>
+      <span>ATK <span id="atk-display">5</span></span>
+      <span><span id="floor-display">1</span>F</span>
+      <span>ENEMY <span id="enemy-count">0</span></span>
     </div>
 
     <div class="dungeon-grid" id="dungeon-grid"></div>
@@ -372,11 +394,11 @@
     // ゲーム状態
     let floor = 1;
     let player = { x: 1, y: 1, hp: 20, maxHp: 20, atk: 5 };
-    let map = [];           // 2D: 0=floor,1=wall,2=stairs
-    let enemies = [];       // {x, y, hp, maxHp, atk, type: 'normal' | 'boss'}
+    let map = [];
+    let enemies = [];
     let stairsPos = { x: 13, y: 9 };
     let message = "トルネコは どうくつに やってきた！";
-    let gameActive = false; // オープニング後 true
+    let gameActive = false;
     let gameCleared = false;
 
     // DOM要素
@@ -395,7 +417,6 @@
 
     // ダンジョン生成（ランダム）
     function generateDungeon(floorNum) {
-      // 壁で初期化
       const newMap = Array(HEIGHT).fill().map(() => Array(WIDTH).fill(1));
       enemies = [];
 
@@ -403,7 +424,7 @@
       let px = Math.floor(WIDTH / 2);
       let py = Math.floor(HEIGHT / 2);
       newMap[py][px] = 0;
-      const steps = 250 + floorNum * 40; // 階が深いほど広めに
+      const steps = 250 + floorNum * 40;
       for (let i = 0; i < steps; i++) {
         const dir = Math.floor(Math.random() * 4);
         if (dir === 0 && px > 1) px--;
@@ -413,7 +434,7 @@
         newMap[py][px] = 0;
       }
 
-      // 追加でいくつかの部屋風領域を掘る
+      // 追加で部屋風領域を掘る
       for (let k = 0; k < 4; k++) {
         const cx = Math.floor(Math.random() * (WIDTH - 6)) + 3;
         const cy = Math.floor(Math.random() * (HEIGHT - 6)) + 3;
@@ -426,32 +447,29 @@
         }
       }
 
-      // プレイヤー開始位置 (1,1) は必ず床に
       newMap[1][1] = 0;
-      // 壁で囲む(端は壁のまま)
 
-      // 2. 階段の位置を決定（右下方面）
+      // 2. 階段の位置
       let stairsX, stairsY;
       do {
         stairsX = Math.floor(Math.random() * (WIDTH - 4)) + 3;
         stairsY = Math.floor(Math.random() * (HEIGHT - 4)) + 3;
       } while (newMap[stairsY][stairsX] !== 0 || (stairsX === 1 && stairsY === 1));
-      newMap[stairsY][stairsX] = 2; // 階段
+      newMap[stairsY][stairsX] = 2;
       stairsPos = { x: stairsX, y: stairsY };
 
-      // 3. 敵の配置 (ボス階層以外は通常敵、5Fはボスのみ)
+      // 3. 敵の配置
       if (floorNum < MAX_FLOOR) {
-        const enemyCount = 3 + Math.floor(Math.random() * 4); // 3~6体
+        const enemyCount = 3 + Math.floor(Math.random() * 4);
         let placed = 0;
         let attempts = 0;
         while (placed < enemyCount && attempts < 800) {
           attempts++;
           const ex = Math.floor(Math.random() * WIDTH);
           const ey = Math.floor(Math.random() * HEIGHT);
-          if (newMap[ey][ex] !== 0) continue; // 床のみ
-          if (ex === 1 && ey === 1) continue; // プレイヤー初期位置
-          if (ex === stairsX && ey === stairsY) continue; // 階段
-          // 他の敵と重複しない
+          if (newMap[ey][ex] !== 0) continue;
+          if (ex === 1 && ey === 1) continue;
+          if (ex === stairsX && ey === stairsY) continue;
           if (enemies.some(e => e.x === ex && e.y === ey)) continue;
 
           const hp = 6 + floorNum * 2 + Math.floor(Math.random() * 4);
@@ -465,13 +483,12 @@
           placed++;
         }
       } else {
-        // 5F ボス戦: ボスを1体配置
+        // 5F ボス戦
         let bossX, bossY;
         do {
           bossX = Math.floor(Math.random() * (WIDTH - 4)) + 3;
           bossY = Math.floor(Math.random() * (HEIGHT - 4)) + 3;
         } while (newMap[bossY][bossX] !== 0 || (bossX === 1 && bossY === 1) || (bossX === stairsX && bossY === stairsY));
-        // ボスは強め
         enemies.push({
           x: bossX, y: bossY,
           hp: 45,
@@ -479,7 +496,7 @@
           atk: 8,
           type: 'boss'
         });
-        // 取り巻きを2体ほど
+        // 取り巻き
         for (let i = 0; i < 2; i++) {
           let ex, ey;
           let att = 0;
@@ -501,24 +518,19 @@
         }
       }
 
-      // プレイヤーのHPは階層移動時に少し回復する（ゲームバランス）
       if (floorNum > 1) {
         player.hp = Math.min(player.maxHp, player.hp + 6);
       }
 
-      // プレイヤー座標をリセット（1,1）
       player.x = 1;
       player.y = 1;
 
       return newMap;
     }
 
-    // マップ・敵データを更新
     function initFloor(floorNum) {
       map = generateDungeon(floorNum);
-      // プレイヤーが壁に埋まらないように
       if (map[player.y]?.[player.x] !== 0 && map[player.y]?.[player.x] !== 2) {
-        // 万が一(1,1)が壁なら床に
         map[1][1] = 0;
         player.x = 1;
         player.y = 1;
@@ -527,7 +539,6 @@
       renderDungeon();
     }
 
-    // UI更新（HP, 階層, 敵数, メッセージ）
     function updateUI() {
       hpDisplay.textContent = player.hp;
       atkDisplay.textContent = player.atk;
@@ -537,9 +548,8 @@
       messageLog.textContent = message;
     }
 
-    // 描画
+    // 描画：絵文字を使わず、すべてCSSドット絵スプライトで表現
     function renderDungeon() {
-      // グリッドをクリア
       dungeonGrid.innerHTML = '';
 
       for (let y = 0; y < HEIGHT; y++) {
@@ -547,7 +557,6 @@
           const cell = document.createElement('div');
           cell.className = 'cell';
 
-          // 地形
           const tile = map[y]?.[x] ?? 1;
           if (tile === 1) {
             cell.classList.add('wall');
@@ -555,92 +564,70 @@
             cell.classList.add('floor');
           }
 
-          // 階段
+          // 階段（プレイヤーがいない場合のみ表示）
           if (tile === 2 && !(player.x === x && player.y === y)) {
-            cell.classList.add('stairs');
-            cell.textContent = '🚪';
-          } else if (tile === 2 && player.x === x && player.y === y) {
-            // プレイヤーが階段上にいる場合はプレイヤー表示優先
+            const stairs = document.createElement('div');
+            stairs.className = 'sprite sprite-stairs';
+            cell.appendChild(stairs);
           }
 
           // 敵表示
           const enemyHere = enemies.find(e => e.hp > 0 && e.x === x && e.y === y);
           if (enemyHere) {
-            if (enemyHere.type === 'boss') {
-              cell.classList.add('boss');
-              cell.textContent = '👹';
-            } else {
-              cell.classList.add('enemy');
-              cell.textContent = '👾';
-            }
+            const enemySprite = document.createElement('div');
+            enemySprite.className = 'sprite ' + (enemyHere.type === 'boss' ? 'sprite-boss' : 'sprite-enemy');
+            cell.appendChild(enemySprite);
           }
 
           // プレイヤー表示（最優先）
           if (player.x === x && player.y === y) {
-            cell.classList.add('player');
-            cell.textContent = '⚔️';
+            const playerSprite = document.createElement('div');
+            playerSprite.className = 'sprite sprite-player';
+            cell.appendChild(playerSprite);
           }
 
           dungeonGrid.appendChild(cell);
         }
       }
 
-      // ステータスバー更新
       updateUI();
     }
 
-    // 移動処理
     function movePlayer(dx, dy) {
       if (!gameActive || gameCleared) return;
 
       const newX = player.x + dx;
       const newY = player.y + dy;
 
-      // 境界チェック
       if (newX < 0 || newX >= WIDTH || newY < 0 || newY >= HEIGHT) return;
-
-      // 壁チェック
       if (map[newY][newX] === 1) return;
 
-      // 敵がいるか？
       const enemyIndex = enemies.findIndex(e => e.hp > 0 && e.x === newX && e.y === newY);
 
       if (enemyIndex !== -1) {
-        // 戦闘（攻撃）
         const enemy = enemies[enemyIndex];
-        // プレイヤー攻撃
         enemy.hp -= player.atk;
         message = `トルネコの攻撃！ ${enemy.type === 'boss' ? 'ボス' : 'てき'}に ${player.atk} ダメージ！`;
 
         if (enemy.hp <= 0) {
-          // 敵を倒した
           message = `${enemy.type === 'boss' ? 'ボス' : 'てき'}を たおした！`;
-          // 敵を消す（hp0のままリストに残るが描画されない、後でフィルタ）
           enemies = enemies.filter(e => e.hp > 0);
 
-          // 勝利判定（ボスを倒したかつ5F）
           if (enemy.type === 'boss' && floor === MAX_FLOOR) {
-            // ゲームクリア！勝利画面表示
             gameCleared = true;
             gameActive = false;
-            // トルネコのゲーム非表示、勝利画面へ
             gameScreen.style.display = 'none';
             victoryScreen.style.display = 'flex';
-            // 念のためopeningも非表示
             openingScreen.style.display = 'none';
-            // リンクは同タブ（デフォルト）
             return;
           }
         } else {
-          // 敵の反撃
           player.hp -= enemy.atk;
           message += ` ${enemy.type === 'boss' ? 'ボス' : 'てき'}の反撃！ ${enemy.atk} ダメージ！`;
 
           if (player.hp <= 0) {
-            // ゲームオーバー
             message = 'トルネコは たおれてしまった... 「最初から」で再挑戦';
             gameActive = false;
-            // HP0で表示
             player.hp = 0;
             renderDungeon();
             updateUI();
@@ -648,30 +635,23 @@
           }
         }
 
-        // 敵が倒れた後の再描画
         renderDungeon();
         return;
       }
 
-      // 移動先に敵がいない場合、移動
       player.x = newX;
       player.y = newY;
 
-      // 階段チェック
       if (map[player.y][player.x] === 2) {
         if (floor < MAX_FLOOR) {
-          // 次の階へ
           floor++;
           message = `${floor}階に すすんだ！`;
-          // 階層移動前に敵リストをリセット
           enemies = [];
-          // プレイヤーHPは階層移動で回復（generate内で）
           initFloor(floor);
           renderDungeon();
           updateUI();
           return;
         } else {
-          // 5Fの階段は存在するが、ボスを倒さないとクリアにならない
           message = 'ボスを たおさないと 先に すすめない！';
           renderDungeon();
           updateUI();
@@ -679,37 +659,28 @@
         }
       }
 
-      // 通常移動後描画
       renderDungeon();
     }
 
-    // ゲーム開始
     function startGame() {
-      // オープニング非表示、ゲーム表示
       openingScreen.style.display = 'none';
       gameScreen.style.display = 'flex';
       victoryScreen.style.display = 'none';
       gameCleared = false;
       gameActive = true;
 
-      // 初期化
       floor = 1;
       player = { x: 1, y: 1, hp: 20, maxHp: 20, atk: 5 };
       enemies = [];
       message = 'トルネコは どうくつに やってきた！';
 
-      // 1F生成
       initFloor(1);
       renderDungeon();
       updateUI();
     }
 
-    // リセット（最初から）
     function resetGame() {
-      if (gameCleared) {
-        // クリア後はリセット不可（studyへ誘導）
-        return;
-      }
+      if (gameCleared) return;
       gameActive = true;
       floor = 1;
       player = { x: 1, y: 1, hp: 20, maxHp: 20, atk: 5 };
@@ -718,32 +689,19 @@
       initFloor(1);
       renderDungeon();
       updateUI();
-      // 勝利画面は非表示のまま
       victoryScreen.style.display = 'none';
       gameScreen.style.display = 'flex';
     }
 
-    // キーボード操作
     function handleKeydown(e) {
       if (!gameActive || gameCleared) return;
       const key = e.key;
-      // 矢印キーのみ有効
-      if (key === 'ArrowUp') {
-        e.preventDefault();
-        movePlayer(0, -1);
-      } else if (key === 'ArrowDown') {
-        e.preventDefault();
-        movePlayer(0, 1);
-      } else if (key === 'ArrowLeft') {
-        e.preventDefault();
-        movePlayer(-1, 0);
-      } else if (key === 'ArrowRight') {
-        e.preventDefault();
-        movePlayer(1, 0);
-      }
+      if (key === 'ArrowUp') { e.preventDefault(); movePlayer(0, -1); }
+      else if (key === 'ArrowDown') { e.preventDefault(); movePlayer(0, 1); }
+      else if (key === 'ArrowLeft') { e.preventDefault(); movePlayer(-1, 0); }
+      else if (key === 'ArrowRight') { e.preventDefault(); movePlayer(1, 0); }
     }
 
-    // イベント登録
     startButton.addEventListener('click', startGame);
     resetButton.addEventListener('click', resetGame);
 
@@ -761,7 +719,6 @@
 
     window.addEventListener('keydown', handleKeydown);
 
-    // 初期状態: オープニング画面表示、ゲーム画面非表示
     openingScreen.style.display = 'flex';
     gameScreen.style.display = 'none';
     victoryScreen.style.display = 'none';
