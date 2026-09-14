@@ -1,0 +1,2661 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LIKE 2026 — 仮想通貨と政党の好み分析</title>
+<style>
+  :root{
+    --forest-deep:#1b4332;
+    --forest:#2d6a4f;
+    --moss:#40916c;
+    --leaf:#52b788;
+    --leaf-light:#95d5b2;
+    --fern:#b7e4c7;
+    --bark:#5e503f;
+    --bark-dark:#3d3226;
+    --soil:#7f5539;
+    --soil-light:#a68a64;
+    --sun:#f4d35e;
+    --sun-deep:#ee9b00;
+    --mushroom:#e76f51;
+    --berry:#9d4edd;
+    --cream:#fefae0;
+    --ink:#1b2e1f;
+  }
+
+  *{box-sizing:border-box;}
+
+  body{
+    margin:0;
+    font-family:"Trebuchet MS","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+    background:
+      radial-gradient(circle at 15% 10%, rgba(244,211,94,.35), transparent 25%),
+      radial-gradient(circle at 85% 20%, rgba(82,183,136,.25), transparent 30%),
+      linear-gradient(180deg, #d8f3dc 0%, #b7e4c7 25%, #95d5b2 50%, #74c69d 75%, #52b788 100%);
+    color:var(--ink);
+    line-height:1.85;
+    overflow-x:hidden;
+  }
+
+  /* 木漏れ日 */
+  body::before{
+    content:"";
+    position:fixed;
+    inset:0;
+    pointer-events:none;
+    background:
+      radial-gradient(ellipse at 20% 15%, rgba(255,255,255,.35), transparent 22%),
+      radial-gradient(ellipse at 70% 30%, rgba(255,255,255,.25), transparent 18%),
+      radial-gradient(ellipse at 40% 70%, rgba(255,255,255,.2), transparent 20%),
+      radial-gradient(ellipse at 90% 80%, rgba(255,255,255,.22), transparent 16%);
+    z-index:1;
+  }
+
+  header{
+    position:relative;
+    padding:80px 20px 130px;
+    text-align:center;
+    background:
+      linear-gradient(180deg, rgba(27,67,50,.95), rgba(45,106,79,.9)),
+      repeating-linear-gradient(90deg, rgba(0,0,0,.06) 0 14px, transparent 14px 28px);
+    color:white;
+    overflow:hidden;
+  }
+
+  header::after{
+    content:"";
+    position:absolute;
+    left:0; right:0; bottom:-2px;
+    height:100px;
+    background:
+      radial-gradient(ellipse at 50% 0%, var(--leaf) 0 45%, transparent 46%),
+      radial-gradient(ellipse at 15% 25%, var(--moss) 0 40%, transparent 41%),
+      radial-gradient(ellipse at 85% 25%, var(--forest) 0 40%, transparent 41%);
+    background-size:240px 120px, 280px 100px, 280px 100px;
+    background-repeat:repeat-x;
+  }
+
+  /* 木の幹 */
+  .trunk{
+    position:absolute;
+    top:0;
+    width:60px;
+    height:100%;
+    background:
+      linear-gradient(90deg, #3d3226, #5e503f 40%, #7f5539 60%, #3d3226);
+    z-index:0;
+    opacity:.6;
+  }
+
+  .trunk.left{left:4%;}
+  .trunk.right{right:4%; transform:scaleX(-1);}
+
+  /* 葉 */
+  .leaf-deco{
+    position:absolute;
+    font-size:3rem;
+    opacity:.85;
+    animation:sway 6s ease-in-out infinite;
+    z-index:0;
+  }
+
+  .leaf-deco.l1{top:20px; left:10%; animation-delay:0s;}
+  .leaf-deco.l2{top:50px; right:14%; animation-delay:1s;}
+  .leaf-deco.l3{top:120px; left:20%; animation-delay:2s;}
+  .leaf-deco.l4{top:90px; right:24%; animation-delay:3s;}
+
+  @keyframes sway{
+    0%,100%{transform:rotate(-6deg) translateY(0);}
+    50%{transform:rotate(6deg) translateY(-8px);}
+  }
+
+  h1{
+    position:relative;
+    z-index:2;
+    font-size:clamp(2.1rem, 6vw, 4.6rem);
+    margin:0;
+    letter-spacing:.08em;
+    text-shadow:4px 4px 0 rgba(0,0,0,.25);
+    font-family:Impact,"Arial Black",sans-serif;
+  }
+
+  .subtitle{
+    position:relative;
+    z-index:2;
+    font-size:clamp(1rem, 2vw, 1.35rem);
+    margin-top:14px;
+    font-weight:bold;
+    letter-spacing:.12em;
+    color:var(--fern);
+  }
+
+  .wood-sign{
+    position:relative;
+    z-index:2;
+    display:inline-block;
+    margin-top:26px;
+    padding:14px 38px;
+    background:
+      linear-gradient(180deg, #7f5539, #5e503f);
+    color:var(--cream);
+    border:4px solid #3d3226;
+    border-radius:14px;
+    box-shadow:0 10px 0 rgba(0,0,0,.25), inset 0 -6px 0 rgba(0,0,0,.18);
+    font-weight:bold;
+    transform:rotate(-1.5deg);
+    letter-spacing:.06em;
+  }
+
+  main{
+    position:relative;
+    z-index:2;
+    max-width:1350px;
+    margin:0 auto;
+    padding:30px 18px 80px;
+  }
+
+  section{
+    margin:60px 0;
+    padding:30px 24px;
+    background:rgba(254,250,224,.92);
+    border:4px solid var(--leaf);
+    border-radius:22px;
+    box-shadow:
+      0 16px 40px rgba(27,67,50,.25),
+      inset 0 0 0 6px rgba(183,228,199,.5);
+    backdrop-filter:blur(3px);
+  }
+
+  h2{
+    font-size:clamp(1.5rem, 4vw, 2.3rem);
+    margin:0 0 22px;
+    padding:14px 22px;
+    color:var(--cream);
+    background:
+      linear-gradient(90deg, var(--forest-deep), var(--forest), var(--moss));
+    border-radius:14px;
+    box-shadow:5px 5px 0 rgba(0,0,0,.18);
+    font-family:Impact,"Arial Black",sans-serif;
+    letter-spacing:.06em;
+    position:relative;
+  }
+
+  h2::before{
+    content:"🌲";
+    margin-right:10px;
+  }
+
+  h3{
+    font-size:1.35rem;
+    margin:34px 0 14px;
+    padding-left:16px;
+    border-left:10px solid var(--mushroom);
+    color:var(--forest-deep);
+    position:relative;
+  }
+
+  h4{
+    font-size:1.1rem;
+    margin:24px 0 10px;
+    color:var(--forest-deep);
+    background:var(--fern);
+    display:inline-block;
+    padding:6px 16px;
+    border-radius:10px;
+    border:2px solid var(--moss);
+  }
+
+  p{margin:12px 0;}
+
+  .note{
+    background:#fff8d6;
+    border-left:8px solid var(--sun-deep);
+    padding:14px 18px;
+    border-radius:10px;
+    font-size:.95rem;
+    box-shadow:0 4px 10px rgba(0,0,0,.08);
+  }
+
+  .table-wrap{
+    overflow-x:auto;
+    margin:18px 0 34px;
+    border-radius:16px;
+    box-shadow:0 8px 22px rgba(27,67,50,.2);
+    border:3px solid var(--moss);
+  }
+
+  table{
+    width:100%;
+    border-collapse:collapse;
+    min-width:1150px;
+    background:var(--cream);
+  }
+
+  th{
+    background:linear-gradient(180deg, var(--forest), var(--forest-deep));
+    color:var(--cream);
+    padding:12px 10px;
+    text-align:left;
+    font-size:.84rem;
+    position:sticky;
+    top:0;
+    white-space:nowrap;
+    border-bottom:3px solid var(--bark);
+  }
+
+  td{
+    padding:9px 10px;
+    border-bottom:1px solid #d8f3dc;
+    font-size:.84rem;
+    vertical-align:middle;
+  }
+
+  tr:nth-child(even) td{background:#f1faee;}
+  tr:hover td{background:#d8f3dc;}
+
+  .rep th{background:linear-gradient(180deg, #9d0208, #6a040f);}
+  .dem th{background:linear-gradient(180deg, #1d3557, #0b2545);}
+
+  .senate th{
+    border-top:6px solid var(--sun);
+  }
+
+  .house th{
+    border-top:6px solid var(--mushroom);
+  }
+
+  .name-cell{
+    font-weight:bold;
+    color:var(--forest-deep);
+    white-space:nowrap;
+  }
+
+  .bar{
+    display:inline-block;
+    vertical-align:middle;
+    width:70px;
+    height:12px;
+    background:#e5e7eb;
+    border-radius:999px;
+    overflow:hidden;
+    margin-right:6px;
+    border:1px solid #cbd5e1;
+  }
+
+  .bar span{
+    display:block;
+    height:100%;
+    border-radius:999px;
+  }
+
+  .bar .g{background:linear-gradient(90deg,#95d5b2,#2d6a4f);}
+  .bar .y{background:linear-gradient(90deg,#f4d35e,#ee9b00);}
+  .bar .r{background:linear-gradient(90deg,#f4a261,#e76f51);}
+  .bar .b{background:linear-gradient(90deg,#90e0ef,#0077b6);}
+  .bar .p{background:linear-gradient(90deg,#c084fc,#7c3aed);}
+
+  .badge{
+    display:inline-block;
+    padding:2px 9px;
+    border-radius:999px;
+    font-size:.72rem;
+    font-weight:bold;
+    color:white;
+    white-space:nowrap;
+  }
+
+  .badge.rep{background:#9d0208;}
+  .badge.dem{background:#1d3557;}
+  .badge.cftc{background:var(--forest);}
+  .badge.sec{background:var(--berry);}
+  .badge.like{background:#2d6a4f;}
+  .badge.dislike{background:#9d0208;}
+  .badge.neutral{background:#6b7280;}
+
+  .legend{
+    display:flex;
+    flex-wrap:wrap;
+    gap:12px;
+    margin:14px 0 24px;
+    padding:14px 18px;
+    background:rgba(216,243,220,.8);
+    border-radius:14px;
+    font-size:.85rem;
+    border:2px dashed var(--moss);
+  }
+
+  .legend span{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+  }
+
+  .upset-box{
+    margin:20px 0;
+    padding:18px 20px;
+    border-radius:16px;
+    background:linear-gradient(90deg, #fff3cd, #ffe8a3);
+    border-left:10px solid var(--sun-deep);
+    box-shadow:0 6px 16px rgba(0,0,0,.1);
+  }
+
+  .upset-box h4{
+    background:var(--sun);
+    border-color:var(--sun-deep);
+    margin-top:0;
+  }
+
+  .upset-list{
+    margin:10px 0 0;
+    padding-left:0;
+    list-style:none;
+  }
+
+  .upset-list li{
+    padding:8px 12px;
+    margin:6px 0;
+    background:white;
+    border-radius:10px;
+    box-shadow:0 3px 8px rgba(0,0,0,.08);
+    font-size:.92rem;
+  }
+
+  .upset-list li b{color:#9d0208;}
+
+  .history-card{
+    margin:26px 0;
+    padding:24px 22px;
+    border-radius:22px;
+    background:linear-gradient(180deg, rgba(254,250,224,.98), rgba(216,243,220,.95));
+    border:4px dashed var(--moss);
+    position:relative;
+    box-shadow:0 10px 26px rgba(27,67,50,.15);
+  }
+
+  .history-card::before{
+    content:"📜";
+    position:absolute;
+    top:-24px;
+    left:22px;
+    font-size:2.3rem;
+    filter:drop-shadow(2px 3px 0 rgba(0,0,0,.2));
+  }
+
+  .history-card.red{border-color:#9d0208;}
+  .history-card.red::before{content:"🐘";}
+  .history-card.blue{border-color:#1d3557;}
+  .history-card.blue::before{content:"🫏";}
+
+  .timeline{
+    position:relative;
+    margin:20px 0 10px;
+    padding-left:30px;
+  }
+
+  .timeline::before{
+    content:"";
+    position:absolute;
+    left:8px;
+    top:0;
+    bottom:0;
+    width:6px;
+    background:linear-gradient(180deg, var(--sun), var(--mushroom), var(--forest));
+    border-radius:6px;
+  }
+
+  .timeline-item{
+    position:relative;
+    margin:16px 0;
+    padding:12px 16px;
+    background:var(--cream);
+    border-radius:14px;
+    box-shadow:0 6px 14px rgba(27,67,50,.12);
+    border-left:5px solid var(--leaf);
+  }
+
+  .timeline-item::before{
+    content:"";
+    position:absolute;
+    left:-28px;
+    top:18px;
+    width:14px;
+    height:14px;
+    border-radius:50%;
+    background:var(--sun);
+    border:3px solid var(--cream);
+    box-shadow:0 0 0 3px var(--mushroom);
+  }
+
+  .timeline-item b{color:var(--forest-deep);}
+
+  .party-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));
+    gap:18px;
+    margin:20px 0;
+  }
+
+  .party-card{
+    padding:18px;
+    border-radius:18px;
+    background:var(--cream);
+    box-shadow:0 8px 18px rgba(27,67,50,.15);
+    border-top:8px solid var(--moss);
+    border-left:3px solid var(--leaf-light);
+  }
+
+  .party-card h4{margin-top:0;}
+  .party-card.federalist{border-top-color:#6b7280;}
+  .party-card.demrep{border-top-color:#0077b6;}
+  .party-card.whig{border-top-color:#ee9b00;}
+  .party-card.know{border-top-color:#7f5539;}
+  .party-card.green{border-top-color:#2d6a4f;}
+  .party-card.libertarian{border-top-color:#eab308;}
+  .party-card.progressive{border-top-color:#52b788;}
+  .party-card.dixiecrat{border-top-color:#9d0208;}
+
+  .rank-compare{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:18px;
+    margin:20px 0;
+  }
+
+  .rank-compare > div{
+    padding:18px;
+    border-radius:18px;
+    background:var(--cream);
+    box-shadow:0 8px 18px rgba(27,67,50,.15);
+  }
+
+  .rank-compare .r{border-top:8px solid #9d0208;}
+  .rank-compare .d{border-top:8px solid #1d3557;}
+
+  footer{
+    background:linear-gradient(180deg, var(--forest-deep), #0b1f16);
+    color:var(--cream);
+    text-align:center;
+    padding:60px 20px 50px;
+    position:relative;
+    overflow:hidden;
+    z-index:2;
+  }
+
+  footer::before{
+    content:"";
+    position:absolute;
+    top:-50px; left:0; right:0;
+    height:90px;
+    background:
+      radial-gradient(ellipse at 50% 100%, var(--moss) 0 45%, transparent 46%),
+      radial-gradient(ellipse at 20% 80%, var(--forest) 0 40%, transparent 41%),
+      radial-gradient(ellipse at 80% 80%, var(--forest) 0 40%, transparent 41%);
+    background-size:220px 90px, 260px 80px, 260px 80px;
+    background-repeat:repeat-x;
+  }
+
+  footer a{
+    color:var(--sun);
+    font-weight:bold;
+    font-size:1.25rem;
+    text-decoration:none;
+    border-bottom:3px dashed var(--sun);
+    padding-bottom:4px;
+  }
+
+  footer a:hover{
+    color:white;
+    border-color:white;
+  }
+
+  .footer-leaves{
+    font-size:2rem;
+    letter-spacing:.4em;
+    margin-bottom:18px;
+    animation:sway 4s ease-in-out infinite;
+  }
+
+  @media(max-width:700px){
+    .rank-compare{grid-template-columns:1fr;}
+    section{padding:22px 14px;}
+    header{padding:60px 14px 110px;}
+    .trunk{display:none;}
+    .leaf-deco{font-size:2rem;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="trunk left"></div>
+  <div class="trunk right"></div>
+  <div class="leaf-deco l1">🍃</div>
+  <div class="leaf-deco l2">🌿</div>
+  <div class="leaf-deco l3">🍂</div>
+  <div class="leaf-deco l4">🌱</div>
+  <h1>LIKE 2026</h1>
+  <div class="subtitle">森のなかの仮想通貨・政党分析 — 上院と下院、それぞれの本音</div>
+  <div class="wood-sign">FOREST &amp; POLITICS — 木の下で語れ、チェーンでつながれ</div>
+</header>
+
+<main>
+
+  <section>
+    <h2>このページについて</h2>
+    <p>
+      このページは、前回の <strong>island.html</strong> に登場した共和党・民主党の議員たちを、
+      <strong>英語名だけ</strong>で、しかも <strong>上院と下院を完全に分離</strong>して一覧にしたものです。
+    </p>
+    <ul>
+      <li>仮想通貨の好き度（0〜100）</li>
+      <li>Clarity Act のルールブックを未完成だと思っている度（0〜100）</li>
+      <li>XRP と XLM をまだ商品だと思っていない度（0〜100）</li>
+      <li>どちらかと言えば CFTC 派か、SEC 派か</li>
+      <li>トランプ大統領が好きか嫌いか</li>
+      <li>共和党の中での偉い度（0〜100）</li>
+      <li>民主党の中での偉い度（0〜100）</li>
+    </ul>
+    <div class="note">
+      <strong>重要:</strong> ここに載っている数値・派閥・好悪はすべて<strong>創作的な想定値</strong>です。
+      実在の議員の実際の立場・発言・投票行動を保証するものではありません。
+      「こういうふうに分類したら、理念と下剋上の違いが見えるかもしれない」という思考実験として読んでください。
+    </div>
+
+    <div class="legend">
+      <span><span class="badge cftc">CFTC</span> 商品先物取引委員会寄り</span>
+      <span><span class="badge sec">SEC</span> 証券取引委員会寄り</span>
+      <span><span class="badge like">LIKE</span> トランプ大統領が好き</span>
+      <span><span class="badge dislike">DISLIKE</span> トランプ大統領が嫌い</span>
+      <span><span class="badge neutral">NEUTRAL</span> 中立・不明</span>
+      <span>🌲 上院 = 100人</span>
+      <span>🏛️ 下院 = 435人</span>
+    </div>
+  </section>
+
+  <section>
+    <h2>共和党 上院議員 — 仮想通貨・規制・派閥データ</h2>
+    <p>
+      共和党の上院議員の英語名と、仮想通貨に関する想定スタンスです。
+      上院は100人しかいないため、普通の上院議員でも「偉い度」は一定以上になります。
+    </p>
+
+    <div class="table-wrap">
+      <table class="rep senate">
+        <thead>
+          <tr>
+            <th>English Name</th>
+            <th>仮想通貨好き度</th>
+            <th>Clarity Act 未完成度</th>
+            <th>XRP/XLM 非商品度</th>
+            <th>CFTC / SEC</th>
+            <th>トランプ</th>
+            <th>共和党内偉い度</th>
+            <th>民主党内偉い度</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="name-cell">John Barrasso</td>
+            <td><span class="bar"><span class="g" style="width:55%"></span></span>55</td>
+            <td><span class="bar"><span class="y" style="width:60%"></span></span>60</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:82%"></span></span>82</td>
+            <td><span class="bar"><span class="b" style="width:10%"></span></span>10</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Marsha Blackburn</td>
+            <td><span class="bar"><span class="g" style="width:70%"></span></span>70</td>
+            <td><span class="bar"><span class="y" style="width:55%"></span></span>55</td>
+            <td><span class="bar"><span class="r" style="width:40%"></span></span>40</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:75%"></span></span>75</td>
+            <td><span class="bar"><span class="b" style="width:8%"></span></span>8</td>
+          </tr>
+          <tr>
+            <td class="name-cell">John Boozman</td>
+            <td><span class="bar"><span class="y" style="width:45%"></span></span>45</td>
+            <td><span class="bar"><span class="y" style="width:65%"></span></span>65</td>
+            <td><span class="bar"><span class="y" style="width:55%"></span></span>55</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:70%"></span></span>70</td>
+            <td><span class="bar"><span class="b" style="width:10%"></span></span>10</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Katie Britt</td>
+            <td><span class="bar"><span class="g" style="width:65%"></span></span>65</td>
+            <td><span class="bar"><span class="y" style="width:60%"></span></span>60</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:68%"></span></span>68</td>
+            <td><span class="bar"><span class="b" style="width:12%"></span></span>12</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Ted Budd</td>
+            <td><span class="bar"><span class="g" style="width:88%"></span></span>88</td>
+            <td><span class="bar"><span class="r" style="width:75%"></span></span>75</td>
+            <td><span class="bar"><span class="r" style="width:35%"></span></span>35</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:72%"></span></span>72</td>
+            <td><span class="bar"><span class="b" style="width:8%"></span></span>8</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Shelley Moore Capito</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="bar"><span class="y" style="width:60%"></span></span>60</td>
+            <td><span class="bar"><span class="y" style="width:55%"></span></span>55</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge neutral">NEUTRAL</span></td>
+            <td><span class="bar"><span class="r" style="width:66%"></span></span>66</td>
+            <td><span class="bar"><span class="b" style="width:15%"></span></span>15</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Bill Cassidy</td>
+            <td><span class="bar"><span class="y" style="width:48%"></span></span>48</td>
+            <td><span class="bar"><span class="y" style="width:70%"></span></span>70</td>
+            <td><span class="bar"><span class="y" style="width:60%"></span></span>60</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="b" style="width:18%"></span></span>18</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Susan Collins</td>
+            <td><span class="bar"><span class="y" style="width:42%"></span></span>42</td>
+            <td><span class="bar"><span class="y" style="width:68%"></span></span>68</td>
+            <td><span class="bar"><span class="y" style="width:58%"></span></span>58</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:70%"></span></span>70</td>
+            <td><span class="bar"><span class="b" style="width:20%"></span></span>20</td>
+          </tr>
+          <tr>
+            <td class="name-cell">John Cornyn</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:78%"></span></span>78</td>
+            <td><span class="bar"><span class="b" style="width:10%"></span></span>10</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Tom Cotton</td>
+            <td><span class="bar"><span class="g" style="width:60%"></span></span>60</td>
+            <td><span class="bar"><span class="y" style="width:65%"></span></span>65</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:80%"></span></span>80</td>
+            <td><span class="bar"><span class="b" style="width:8%"></span></span>8</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Kevin Cramer</td>
+            <td><span class="bar"><span class="g" style="width:75%"></span></span>75</td>
+            <td><span class="bar"><span class="y" style="width:58%"></span></span>58</td>
+            <td><span class="bar"><span class="r" style="width:42%"></span></span>42</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:71%"></span></span>71</td>
+            <td><span class="bar"><span class="b" style="width:10%"></span></span>10</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Mike Crapo</td>
+            <td><span class="bar"><span class="y" style="width:55%"></span></span>55</td>
+            <td><span class="bar"><span class="y" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:76%"></span></span>76</td>
+            <td><span class="bar"><span class="b" style="width:10%"></span></span>10</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Ted Cruz</td>
+            <td><span class="bar"><span class="g" style="width:92%"></span></span>92</td>
+            <td><span class="bar"><span class="r" style="width:80%"></span></span>80</td>
+            <td><span class="bar"><span class="r" style="width:30%"></span></span>30</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:88%"></span></span>88</td>
+            <td><span class="bar"><span class="b" style="width:6%"></span></span>6</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Steve Daines</td>
+            <td><span class="bar"><span class="g" style="width:78%"></span></span>78</td>
+            <td><span class="bar"><span class="y" style="width:56%"></span></span>56</td>
+            <td><span class="bar"><span class="r" style="width:38%"></span></span>38</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:74%"></span></span>74</td>
+            <td><span class="bar"><span class="b" style="width:8%"></span></span>8</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Joni Ernst</td>
+            <td><span class="bar"><span class="g" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:60%"></span></span>60</td>
+            <td><span class="bar"><span class="y" style="width:48%"></span></span>48</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:69%"></span></span>69</td>
+            <td><span class="bar"><span class="b" style="width:10%"></span></span>10</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Deb Fischer</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:67%"></span></span>67</td>
+            <td><span class="bar"><span class="b" style="width:10%"></span></span>10</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Lindsey Graham</td>
+            <td><span class="bar"><span class="y" style="width:58%"></span></span>58</td>
+            <td><span class="bar"><span class="y" style="width:60%"></span></span>60</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:79%"></span></span>79</td>
+            <td><span class="bar"><span class="b" style="width:12%"></span></span>12</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Chuck Grassley</td>
+            <td><span class="bar"><span class="y" style="width:40%"></span></span>40</td>
+            <td><span class="bar"><span class="y" style="width:70%"></span></span>70</td>
+            <td><span class="bar"><span class="y" style="width:60%"></span></span>60</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge neutral">NEUTRAL</span></td>
+            <td><span class="bar"><span class="r" style="width:85%"></span></span>85</td>
+            <td><span class="bar"><span class="b" style="width:10%"></span></span>10</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Bill Hagerty</td>
+            <td><span class="bar"><span class="g" style="width:80%"></span></span>80</td>
+            <td><span class="bar"><span class="y" style="width:55%"></span></span>55</td>
+            <td><span class="bar"><span class="r" style="width:36%"></span></span>36</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:73%"></span></span>73</td>
+            <td><span class="bar"><span class="b" style="width:8%"></span></span>8</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Josh Hawley</td>
+            <td><span class="bar"><span class="y" style="width:45%"></span></span>45</td>
+            <td><span class="bar"><span class="y" style="width:66%"></span></span>66</td>
+            <td><span class="bar"><span class="y" style="width:55%"></span></span>55</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:72%"></span></span>72</td>
+            <td><span class="bar"><span class="b" style="width:8%"></span></span>8</td>
+          </tr>
+          <tr>
+            <td class="name-cell">John Hoeven</td>
+            <td><span class="bar"><span class="y" style="width:48%"></span></span>48</td>
+            <td><span class="bar"><span class="y" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:68%"></span></span>68</td>
+            <td><span class="bar"><span class="b" style="width:10%"></span></span>10</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Cindy Hyde-Smith</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:66%"></span></span>66</td>
+            <td><span class="bar"><span class="b" style="width:10%"></span></span>10</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Ron Johnson</td>
+            <td><span class="bar"><span class="g" style="width:70%"></span></span>70</td>
+            <td><span class="bar"><span class="y" style="width:58%"></span></span>58</td>
+            <td><span class="bar"><span class="r" style="width:44%"></span></span>44</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:71%"></span></span>71</td>
+            <td><span class="bar"><span class="b" style="width:10%"></span></span>10</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Jim Justice</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="bar"><span class="y" style="width:60%"></span></span>60</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:65%"></span></span>65</td>
+            <td><span class="bar"><span class="b" style="width:12%"></span></span>12</td>
+          </tr>
+          <tr>
+            <td class="name-cell">John Kennedy</td>
+            <td><span class="bar"><span class="y" style="width:55%"></span></span>55</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:70%"></span></span>70</td>
+            <td><span class="bar"><span class="b" style="width:10%"></span></span>10</td>
+          </tr>
+          <tr>
+            <td class="name-cell">James Lankford</td>
+            <td><span class="bar"><span class="y" style="width:46%"></span></span>46</td>
+            <td><span class="bar"><span class="y" style="width:68%"></span></span>68</td>
+            <td><span class="bar"><span class="y" style="width:58%"></span></span>58</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge neutral">NEUTRAL</span></td>
+            <td><span class="bar"><span class="r" style="width:69%"></span></span>69</td>
+            <td><span class="bar"><span class="b" style="width:10%"></span></span>10</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Mike Lee</td>
+            <td><span class="bar"><span class="g" style="width:85%"></span></span>85</td>
+            <td><span class="bar"><span class="r" style="width:78%"></span></span>78</td>
+            <td><span class="bar"><span class="r" style="width:32%"></span></span>32</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:84%"></span></span>84</td>
+            <td><span class="bar"><span class="b" style="width:6%"></span></span>6</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Roger Marshall</td>
+            <td><span class="bar"><span class="g" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="y" style="width:60%"></span></span>60</td>
+            <td><span class="bar"><span class="y" style="width:48%"></span></span>48</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:67%"></span></span>67</td>
+            <td><span class="bar"><span class="b" style="width:10%"></span></span>10</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Mitch McConnell</td>
+            <td><span class="bar"><span class="y" style="width:44%"></span></span>44</td>
+            <td><span class="bar"><span class="y" style="width:66%"></span></span>66</td>
+            <td><span class="bar"><span class="y" style="width:56%"></span></span>56</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:95%"></span></span>95</td>
+            <td><span class="bar"><span class="b" style="width:8%"></span></span>8</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Markwayne Mullin</td>
+            <td><span class="bar"><span class="g" style="width:76%"></span></span>76</td>
+            <td><span class="bar"><span class="y" style="width:56%"></span></span>56</td>
+            <td><span class="bar"><span class="r" style="width:40%"></span></span>40</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:72%"></span></span>72</td>
+            <td><span class="bar"><span class="b" style="width:8%"></span></span>8</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Lisa Murkowski</td>
+            <td><span class="bar"><span class="y" style="width:46%"></span></span>46</td>
+            <td><span class="bar"><span class="y" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:74%"></span></span>74</td>
+            <td><span class="bar"><span class="b" style="width:16%"></span></span>16</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Rand Paul</td>
+            <td><span class="bar"><span class="g" style="width:90%"></span></span>90</td>
+            <td><span class="bar"><span class="r" style="width:82%"></span></span>82</td>
+            <td><span class="bar"><span class="r" style="width:28%"></span></span>28</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:83%"></span></span>83</td>
+            <td><span class="bar"><span class="b" style="width:6%"></span></span>6</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Pete Ricketts</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:68%"></span></span>68</td>
+            <td><span class="bar"><span class="b" style="width:10%"></span></span>10</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Jim Risch</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="bar"><span class="y" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:70%"></span></span>70</td>
+            <td><span class="bar"><span class="b" style="width:10%"></span></span>10</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Mitt Romney</td>
+            <td><span class="bar"><span class="y" style="width:48%"></span></span>48</td>
+            <td><span class="bar"><span class="y" style="width:68%"></span></span>68</td>
+            <td><span class="bar"><span class="y" style="width:58%"></span></span>58</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:77%"></span></span>77</td>
+            <td><span class="bar"><span class="b" style="width:18%"></span></span>18</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Mike Rounds</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:69%"></span></span>69</td>
+            <td><span class="bar"><span class="b" style="width:10%"></span></span>10</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Marco Rubio</td>
+            <td><span class="bar"><span class="g" style="width:66%"></span></span>66</td>
+            <td><span class="bar"><span class="y" style="width:60%"></span></span>60</td>
+            <td><span class="bar"><span class="y" style="width:48%"></span></span>48</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:81%"></span></span>81</td>
+            <td><span class="bar"><span class="b" style="width:10%"></span></span>10</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Eric Schmitt</td>
+            <td><span class="bar"><span class="g" style="width:82%"></span></span>82</td>
+            <td><span class="bar"><span class="r" style="width:76%"></span></span>76</td>
+            <td><span class="bar"><span class="r" style="width:34%"></span></span>34</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:73%"></span></span>73</td>
+            <td><span class="bar"><span class="b" style="width:8%"></span></span>8</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Rick Scott</td>
+            <td><span class="bar"><span class="g" style="width:72%"></span></span>72</td>
+            <td><span class="bar"><span class="y" style="width:58%"></span></span>58</td>
+            <td><span class="bar"><span class="r" style="width:44%"></span></span>44</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:75%"></span></span>75</td>
+            <td><span class="bar"><span class="b" style="width:8%"></span></span>8</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Tim Scott</td>
+            <td><span class="bar"><span class="g" style="width:68%"></span></span>68</td>
+            <td><span class="bar"><span class="y" style="width:60%"></span></span>60</td>
+            <td><span class="bar"><span class="y" style="width:46%"></span></span>46</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:78%"></span></span>78</td>
+            <td><span class="bar"><span class="b" style="width:10%"></span></span>10</td>
+          </tr>
+          <tr>
+            <td class="name-cell">John Thune</td>
+            <td><span class="bar"><span class="y" style="width:56%"></span></span>56</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:86%"></span></span>86</td>
+            <td><span class="bar"><span class="b" style="width:10%"></span></span>10</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Dan Sullivan</td>
+            <td><span class="bar"><span class="g" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="y" style="width:60%"></span></span>60</td>
+            <td><span class="bar"><span class="y" style="width:48%"></span></span>48</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:71%"></span></span>71</td>
+            <td><span class="bar"><span class="b" style="width:10%"></span></span>10</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Tommy Tuberville</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="bar"><span class="y" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:66%"></span></span>66</td>
+            <td><span class="bar"><span class="b" style="width:10%"></span></span>10</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Thom Tillis</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge neutral">NEUTRAL</span></td>
+            <td><span class="bar"><span class="r" style="width:68%"></span></span>68</td>
+            <td><span class="bar"><span class="b" style="width:10%"></span></span>10</td>
+          </tr>
+          <tr>
+            <td class="name-cell">J.D. Vance</td>
+            <td><span class="bar"><span class="g" style="width:74%"></span></span>74</td>
+            <td><span class="bar"><span class="y" style="width:58%"></span></span>58</td>
+            <td><span class="bar"><span class="r" style="width:42%"></span></span>42</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:87%"></span></span>87</td>
+            <td><span class="bar"><span class="b" style="width:6%"></span></span>6</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Roger Wicker</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:70%"></span></span>70</td>
+            <td><span class="bar"><span class="b" style="width:10%"></span></span>10</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Todd Young</td>
+            <td><span class="bar"><span class="g" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:60%"></span></span>60</td>
+            <td><span class="bar"><span class="y" style="width:48%"></span></span>48</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge neutral">NEUTRAL</span></td>
+            <td><span class="bar"><span class="r" style="width:69%"></span></span>69</td>
+            <td><span class="bar"><span class="b" style="width:10%"></span></span>10</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>共和党 下院議員 — 仮想通貨・規制・派閥データ</h2>
+    <p>
+      共和党の下院議員の英語名と、仮想通貨に関する想定スタンスです。
+      下院は435人いるため、普通の下院議員は上院議員より「偉い度」が低めになります。
+      しかし、下院議長・院内総務・委員会委員長・派閥リーダーは、普通の上院議員を上回ることがあります。
+    </p>
+
+    <div class="upset-box">
+      <h4>🏛️ 下剋上ポイント — 下院が上院に勝つ瞬間</h4>
+      <ul class="upset-list">
+        <li><b>Mike Johnson</b>（下院議長）は共和党内偉い度 93。普通の上院議員より明確に上。</li>
+        <li><b>Steve Scalise</b>（下院院内総務）は 89。多くの上院議員を上回る。</li>
+        <li><b>Jim Jordan</b>（下院司法委員長）は 86。保守派のリーダーとして上院議員より強い。</li>
+        <li><b>Elise Stefanik</b>（下院共和党会議議長）は 85。党内調整力が高い。</li>
+        <li><b>Tom Emmer</b>（下院共和党院内総務）は 84。下院指導部として上院中堅より上。</li>
+        <li><b>Marjorie Taylor Greene</b>は 81。メディア影響力で上院中堅を上回る。</li>
+        <li><b>Chip Roy</b>は 82。ハウス・フリーダム・コーカスの有力者。</li>
+        <li>一方、<b>Mitch McConnell</b>（95）、<b>Ted Cruz</b>（88）、<b>J.D. Vance</b>（87）、<b>John Thune</b>（86）は上院の大物として下院普通議員より上。</li>
+      </ul>
+    </div>
+
+    <div class="table-wrap">
+      <table class="rep house">
+        <thead>
+          <tr>
+            <th>English Name</th>
+            <th>仮想通貨好き度</th>
+            <th>Clarity Act 未完成度</th>
+            <th>XRP/XLM 非商品度</th>
+            <th>CFTC / SEC</th>
+            <th>トランプ</th>
+            <th>共和党内偉い度</th>
+            <th>民主党内偉い度</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="name-cell">Mike Johnson</td>
+            <td><span class="bar"><span class="y" style="width:58%"></span></span>58</td>
+            <td><span class="bar"><span class="y" style="width:60%"></span></span>60</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:93%"></span></span>93</td>
+            <td><span class="bar"><span class="b" style="width:8%"></span></span>8</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Steve Scalise</td>
+            <td><span class="bar"><span class="y" style="width:56%"></span></span>56</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:89%"></span></span>89</td>
+            <td><span class="bar"><span class="b" style="width:8%"></span></span>8</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Tom Emmer</td>
+            <td><span class="bar"><span class="g" style="width:86%"></span></span>86</td>
+            <td><span class="bar"><span class="r" style="width:74%"></span></span>74</td>
+            <td><span class="bar"><span class="r" style="width:34%"></span></span>34</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:84%"></span></span>84</td>
+            <td><span class="bar"><span class="b" style="width:8%"></span></span>8</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Elise Stefanik</td>
+            <td><span class="bar"><span class="g" style="width:70%"></span></span>70</td>
+            <td><span class="bar"><span class="y" style="width:58%"></span></span>58</td>
+            <td><span class="bar"><span class="r" style="width:44%"></span></span>44</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:85%"></span></span>85</td>
+            <td><span class="bar"><span class="b" style="width:8%"></span></span>8</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Jim Jordan</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="bar"><span class="y" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:86%"></span></span>86</td>
+            <td><span class="bar"><span class="b" style="width:6%"></span></span>6</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Marjorie Taylor Greene</td>
+            <td><span class="bar"><span class="g" style="width:66%"></span></span>66</td>
+            <td><span class="bar"><span class="y" style="width:60%"></span></span>60</td>
+            <td><span class="bar"><span class="y" style="width:48%"></span></span>48</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:81%"></span></span>81</td>
+            <td><span class="bar"><span class="b" style="width:6%"></span></span>6</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Byron Donalds</td>
+            <td><span class="bar"><span class="g" style="width:78%"></span></span>78</td>
+            <td><span class="bar"><span class="y" style="width:56%"></span></span>56</td>
+            <td><span class="bar"><span class="r" style="width:38%"></span></span>38</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:76%"></span></span>76</td>
+            <td><span class="bar"><span class="b" style="width:8%"></span></span>8</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Kevin McCarthy</td>
+            <td><span class="bar"><span class="g" style="width:60%"></span></span>60</td>
+            <td><span class="bar"><span class="y" style="width:60%"></span></span>60</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:83%"></span></span>83</td>
+            <td><span class="bar"><span class="b" style="width:10%"></span></span>10</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Ralph Norman</td>
+            <td><span class="bar"><span class="g" style="width:68%"></span></span>68</td>
+            <td><span class="bar"><span class="y" style="width:60%"></span></span>60</td>
+            <td><span class="bar"><span class="y" style="width:48%"></span></span>48</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:72%"></span></span>72</td>
+            <td><span class="bar"><span class="b" style="width:8%"></span></span>8</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Chip Roy</td>
+            <td><span class="bar"><span class="g" style="width:88%"></span></span>88</td>
+            <td><span class="bar"><span class="r" style="width:80%"></span></span>80</td>
+            <td><span class="bar"><span class="r" style="width:30%"></span></span>30</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:82%"></span></span>82</td>
+            <td><span class="bar"><span class="b" style="width:6%"></span></span>6</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Matt Gaetz</td>
+            <td><span class="bar"><span class="g" style="width:72%"></span></span>72</td>
+            <td><span class="bar"><span class="y" style="width:58%"></span></span>58</td>
+            <td><span class="bar"><span class="r" style="width:42%"></span></span>42</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:75%"></span></span>75</td>
+            <td><span class="bar"><span class="b" style="width:6%"></span></span>6</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Lauren Boebert</td>
+            <td><span class="bar"><span class="g" style="width:70%"></span></span>70</td>
+            <td><span class="bar"><span class="y" style="width:58%"></span></span>58</td>
+            <td><span class="bar"><span class="r" style="width:44%"></span></span>44</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:74%"></span></span>74</td>
+            <td><span class="bar"><span class="b" style="width:6%"></span></span>6</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Nancy Mace</td>
+            <td><span class="bar"><span class="g" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="y" style="width:60%"></span></span>60</td>
+            <td><span class="bar"><span class="y" style="width:48%"></span></span>48</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:70%"></span></span>70</td>
+            <td><span class="bar"><span class="b" style="width:8%"></span></span>8</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Anna Paulina Luna</td>
+            <td><span class="bar"><span class="g" style="width:76%"></span></span>76</td>
+            <td><span class="bar"><span class="y" style="width:56%"></span></span>56</td>
+            <td><span class="bar"><span class="r" style="width:40%"></span></span>40</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:73%"></span></span>73</td>
+            <td><span class="bar"><span class="b" style="width:6%"></span></span>6</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Cory Mills</td>
+            <td><span class="bar"><span class="g" style="width:74%"></span></span>74</td>
+            <td><span class="bar"><span class="y" style="width:58%"></span></span>58</td>
+            <td><span class="bar"><span class="r" style="width:42%"></span></span>42</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:71%"></span></span>71</td>
+            <td><span class="bar"><span class="b" style="width:8%"></span></span>8</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Mike Waltz</td>
+            <td><span class="bar"><span class="g" style="width:68%"></span></span>68</td>
+            <td><span class="bar"><span class="y" style="width:60%"></span></span>60</td>
+            <td><span class="bar"><span class="y" style="width:46%"></span></span>46</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:77%"></span></span>77</td>
+            <td><span class="bar"><span class="b" style="width:8%"></span></span>8</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Brian Mast</td>
+            <td><span class="bar"><span class="y" style="width:56%"></span></span>56</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:70%"></span></span>70</td>
+            <td><span class="bar"><span class="b" style="width:8%"></span></span>8</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Dan Crenshaw</td>
+            <td><span class="bar"><span class="g" style="width:80%"></span></span>80</td>
+            <td><span class="bar"><span class="r" style="width:72%"></span></span>72</td>
+            <td><span class="bar"><span class="r" style="width:36%"></span></span>36</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:79%"></span></span>79</td>
+            <td><span class="bar"><span class="b" style="width:8%"></span></span>8</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Wesley Hunt</td>
+            <td><span class="bar"><span class="g" style="width:70%"></span></span>70</td>
+            <td><span class="bar"><span class="y" style="width:58%"></span></span>58</td>
+            <td><span class="bar"><span class="r" style="width:44%"></span></span>44</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:72%"></span></span>72</td>
+            <td><span class="bar"><span class="b" style="width:8%"></span></span>8</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Troy Nehls</td>
+            <td><span class="bar"><span class="y" style="width:60%"></span></span>60</td>
+            <td><span class="bar"><span class="y" style="width:60%"></span></span>60</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:70%"></span></span>70</td>
+            <td><span class="bar"><span class="b" style="width:8%"></span></span>8</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Michael McCaul</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="bar"><span class="y" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge neutral">NEUTRAL</span></td>
+            <td><span class="bar"><span class="r" style="width:78%"></span></span>78</td>
+            <td><span class="bar"><span class="b" style="width:10%"></span></span>10</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Beth Van Duyne</td>
+            <td><span class="bar"><span class="g" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="y" style="width:60%"></span></span>60</td>
+            <td><span class="bar"><span class="y" style="width:48%"></span></span>48</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:70%"></span></span>70</td>
+            <td><span class="bar"><span class="b" style="width:8%"></span></span>8</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Roger Williams</td>
+            <td><span class="bar"><span class="y" style="width:58%"></span></span>58</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:71%"></span></span>71</td>
+            <td><span class="bar"><span class="b" style="width:8%"></span></span>8</td>
+          </tr>
+          <tr>
+            <td class="name-cell">August Pfluger</td>
+            <td><span class="bar"><span class="g" style="width:66%"></span></span>66</td>
+            <td><span class="bar"><span class="y" style="width:60%"></span></span>60</td>
+            <td><span class="bar"><span class="y" style="width:48%"></span></span>48</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:69%"></span></span>69</td>
+            <td><span class="bar"><span class="b" style="width:8%"></span></span>8</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Pat Fallon</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:68%"></span></span>68</td>
+            <td><span class="bar"><span class="b" style="width:8%"></span></span>8</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Jodey Arrington</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:73%"></span></span>73</td>
+            <td><span class="bar"><span class="b" style="width:8%"></span></span>8</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Ronny Jackson</td>
+            <td><span class="bar"><span class="y" style="width:56%"></span></span>56</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:71%"></span></span>71</td>
+            <td><span class="bar"><span class="b" style="width:8%"></span></span>8</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Tracey Mann</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="bar"><span class="y" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:67%"></span></span>67</td>
+            <td><span class="bar"><span class="b" style="width:8%"></span></span>8</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Rick Crawford</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:68%"></span></span>68</td>
+            <td><span class="bar"><span class="b" style="width:8%"></span></span>8</td>
+          </tr>
+          <tr>
+            <td class="name-cell">French Hill</td>
+            <td><span class="bar"><span class="g" style="width:72%"></span></span>72</td>
+            <td><span class="bar"><span class="y" style="width:58%"></span></span>58</td>
+            <td><span class="bar"><span class="r" style="width:42%"></span></span>42</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:74%"></span></span>74</td>
+            <td><span class="bar"><span class="b" style="width:8%"></span></span>8</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Bruce Westerman</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:69%"></span></span>69</td>
+            <td><span class="bar"><span class="b" style="width:8%"></span></span>8</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Steve Womack</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="bar"><span class="y" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:68%"></span></span>68</td>
+            <td><span class="bar"><span class="b" style="width:8%"></span></span>8</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Tom Cole</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:82%"></span></span>82</td>
+            <td><span class="bar"><span class="b" style="width:8%"></span></span>8</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Frank Lucas</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="bar"><span class="y" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:75%"></span></span>75</td>
+            <td><span class="bar"><span class="b" style="width:8%"></span></span>8</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Kevin Hern</td>
+            <td><span class="bar"><span class="g" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:60%"></span></span>60</td>
+            <td><span class="bar"><span class="y" style="width:48%"></span></span>48</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:73%"></span></span>73</td>
+            <td><span class="bar"><span class="b" style="width:8%"></span></span>8</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Josh Brecheen</td>
+            <td><span class="bar"><span class="g" style="width:66%"></span></span>66</td>
+            <td><span class="bar"><span class="y" style="width:60%"></span></span>60</td>
+            <td><span class="bar"><span class="y" style="width:48%"></span></span>48</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:68%"></span></span>68</td>
+            <td><span class="bar"><span class="b" style="width:8%"></span></span>8</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Stephanie Bice</td>
+            <td><span class="bar"><span class="g" style="width:60%"></span></span>60</td>
+            <td><span class="bar"><span class="y" style="width:60%"></span></span>60</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge like">LIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:69%"></span></span>69</td>
+            <td><span class="bar"><span class="b" style="width:8%"></span></span>8</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>民主党 上院議員 — 仮想通貨・規制・派閥データ</h2>
+    <p>
+      民主党の上院議員の英語名と、仮想通貨に関する想定スタンスです。
+      上院の民主党議員は、SEC 寄り・慎重派が多いですが、John Fetterman、Kyrsten Sinema、Joe Manchin のような中道・CFTC 寄りもいます。
+    </p>
+
+    <div class="table-wrap">
+      <table class="dem senate">
+        <thead>
+          <tr>
+            <th>English Name</th>
+            <th>仮想通貨好き度</th>
+            <th>Clarity Act 未完成度</th>
+            <th>XRP/XLM 非商品度</th>
+            <th>CFTC / SEC</th>
+            <th>トランプ</th>
+            <th>共和党内偉い度</th>
+            <th>民主党内偉い度</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="name-cell">Tammy Baldwin</td>
+            <td><span class="bar"><span class="y" style="width:42%"></span></span>42</td>
+            <td><span class="bar"><span class="y" style="width:66%"></span></span>66</td>
+            <td><span class="bar"><span class="y" style="width:56%"></span></span>56</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:8%"></span></span>8</td>
+            <td><span class="bar"><span class="b" style="width:68%"></span></span>68</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Michael Bennet</td>
+            <td><span class="bar"><span class="y" style="width:48%"></span></span>48</td>
+            <td><span class="bar"><span class="y" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:8%"></span></span>8</td>
+            <td><span class="bar"><span class="b" style="width:66%"></span></span>66</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Richard Blumenthal</td>
+            <td><span class="bar"><span class="y" style="width:38%"></span></span>38</td>
+            <td><span class="bar"><span class="y" style="width:70%"></span></span>70</td>
+            <td><span class="bar"><span class="y" style="width:60%"></span></span>60</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:62%"></span></span>62</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Cory Booker</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:8%"></span></span>8</td>
+            <td><span class="bar"><span class="b" style="width:72%"></span></span>72</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Sherrod Brown</td>
+            <td><span class="bar"><span class="y" style="width:40%"></span></span>40</td>
+            <td><span class="bar"><span class="y" style="width:68%"></span></span>68</td>
+            <td><span class="bar"><span class="y" style="width:58%"></span></span>58</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:70%"></span></span>70</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Maria Cantwell</td>
+            <td><span class="bar"><span class="y" style="width:46%"></span></span>46</td>
+            <td><span class="bar"><span class="y" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:64%"></span></span>64</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Ben Cardin</td>
+            <td><span class="bar"><span class="y" style="width:36%"></span></span>36</td>
+            <td><span class="bar"><span class="y" style="width:70%"></span></span>70</td>
+            <td><span class="bar"><span class="y" style="width:60%"></span></span>60</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:66%"></span></span>66</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Tom Carper</td>
+            <td><span class="bar"><span class="y" style="width:38%"></span></span>38</td>
+            <td><span class="bar"><span class="y" style="width:68%"></span></span>68</td>
+            <td><span class="bar"><span class="y" style="width:58%"></span></span>58</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:62%"></span></span>62</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Bob Casey</td>
+            <td><span class="bar"><span class="y" style="width:44%"></span></span>44</td>
+            <td><span class="bar"><span class="y" style="width:66%"></span></span>66</td>
+            <td><span class="bar"><span class="y" style="width:56%"></span></span>56</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:64%"></span></span>64</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Chris Coons</td>
+            <td><span class="bar"><span class="y" style="width:48%"></span></span>48</td>
+            <td><span class="bar"><span class="y" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:8%"></span></span>8</td>
+            <td><span class="bar"><span class="b" style="width:68%"></span></span>68</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Catherine Cortez Masto</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:8%"></span></span>8</td>
+            <td><span class="bar"><span class="b" style="width:70%"></span></span>70</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Tammy Duckworth</td>
+            <td><span class="bar"><span class="y" style="width:46%"></span></span>46</td>
+            <td><span class="bar"><span class="y" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:68%"></span></span>68</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Dick Durbin</td>
+            <td><span class="bar"><span class="y" style="width:40%"></span></span>40</td>
+            <td><span class="bar"><span class="y" style="width:68%"></span></span>68</td>
+            <td><span class="bar"><span class="y" style="width:58%"></span></span>58</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:78%"></span></span>78</td>
+          </tr>
+          <tr>
+            <td class="name-cell">John Fetterman</td>
+            <td><span class="bar"><span class="y" style="width:58%"></span></span>58</td>
+            <td><span class="bar"><span class="y" style="width:60%"></span></span>60</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge neutral">NEUTRAL</span></td>
+            <td><span class="bar"><span class="r" style="width:10%"></span></span>10</td>
+            <td><span class="bar"><span class="b" style="width:66%"></span></span>66</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Kirsten Gillibrand</td>
+            <td><span class="bar"><span class="y" style="width:44%"></span></span>44</td>
+            <td><span class="bar"><span class="y" style="width:66%"></span></span>66</td>
+            <td><span class="bar"><span class="y" style="width:56%"></span></span>56</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:70%"></span></span>70</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Martin Heinrich</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:66%"></span></span>66</td>
+          </tr>
+          <tr>
+            <td class="name-cell">John Hickenlooper</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:8%"></span></span>8</td>
+            <td><span class="bar"><span class="b" style="width:64%"></span></span>64</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Mazie Hirono</td>
+            <td><span class="bar"><span class="y" style="width:38%"></span></span>38</td>
+            <td><span class="bar"><span class="y" style="width:68%"></span></span>68</td>
+            <td><span class="bar"><span class="y" style="width:58%"></span></span>58</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:68%"></span></span>68</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Tim Kaine</td>
+            <td><span class="bar"><span class="y" style="width:46%"></span></span>46</td>
+            <td><span class="bar"><span class="y" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:8%"></span></span>8</td>
+            <td><span class="bar"><span class="b" style="width:68%"></span></span>68</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Mark Kelly</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="bar"><span class="y" style="width:60%"></span></span>60</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:8%"></span></span>8</td>
+            <td><span class="bar"><span class="b" style="width:72%"></span></span>72</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Angus King</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:8%"></span></span>8</td>
+            <td><span class="bar"><span class="b" style="width:64%"></span></span>64</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Amy Klobuchar</td>
+            <td><span class="bar"><span class="y" style="width:48%"></span></span>48</td>
+            <td><span class="bar"><span class="y" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:8%"></span></span>8</td>
+            <td><span class="bar"><span class="b" style="width:74%"></span></span>74</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Ben Ray Luján</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:66%"></span></span>66</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Joe Manchin</td>
+            <td><span class="bar"><span class="y" style="width:56%"></span></span>56</td>
+            <td><span class="bar"><span class="y" style="width:60%"></span></span>60</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge neutral">NEUTRAL</span></td>
+            <td><span class="bar"><span class="r" style="width:20%"></span></span>20</td>
+            <td><span class="bar"><span class="b" style="width:72%"></span></span>72</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Ed Markey</td>
+            <td><span class="bar"><span class="y" style="width:42%"></span></span>42</td>
+            <td><span class="bar"><span class="y" style="width:66%"></span></span>66</td>
+            <td><span class="bar"><span class="y" style="width:56%"></span></span>56</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:70%"></span></span>70</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Bob Menendez</td>
+            <td><span class="bar"><span class="y" style="width:40%"></span></span>40</td>
+            <td><span class="bar"><span class="y" style="width:68%"></span></span>68</td>
+            <td><span class="bar"><span class="y" style="width:58%"></span></span>58</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:60%"></span></span>60</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Jeff Merkley</td>
+            <td><span class="bar"><span class="y" style="width:44%"></span></span>44</td>
+            <td><span class="bar"><span class="y" style="width:66%"></span></span>66</td>
+            <td><span class="bar"><span class="y" style="width:56%"></span></span>56</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:66%"></span></span>66</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Chris Murphy</td>
+            <td><span class="bar"><span class="y" style="width:46%"></span></span>46</td>
+            <td><span class="bar"><span class="y" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:70%"></span></span>70</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Patty Murray</td>
+            <td><span class="bar"><span class="y" style="width:44%"></span></span>44</td>
+            <td><span class="bar"><span class="y" style="width:66%"></span></span>66</td>
+            <td><span class="bar"><span class="y" style="width:56%"></span></span>56</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:76%"></span></span>76</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Jon Ossoff</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:68%"></span></span>68</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Alex Padilla</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:66%"></span></span>66</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Gary Peters</td>
+            <td><span class="bar"><span class="y" style="width:48%"></span></span>48</td>
+            <td><span class="bar"><span class="y" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:8%"></span></span>8</td>
+            <td><span class="bar"><span class="b" style="width:70%"></span></span>70</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Jack Reed</td>
+            <td><span class="bar"><span class="y" style="width:40%"></span></span>40</td>
+            <td><span class="bar"><span class="y" style="width:68%"></span></span>68</td>
+            <td><span class="bar"><span class="y" style="width:58%"></span></span>58</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:64%"></span></span>64</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Bernie Sanders</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="bar"><span class="y" style="width:60%"></span></span>60</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:88%"></span></span>88</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Brian Schatz</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:68%"></span></span>68</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Chuck Schumer</td>
+            <td><span class="bar"><span class="y" style="width:48%"></span></span>48</td>
+            <td><span class="bar"><span class="y" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:8%"></span></span>8</td>
+            <td><span class="bar"><span class="b" style="width:92%"></span></span>92</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Jeanne Shaheen</td>
+            <td><span class="bar"><span class="y" style="width:44%"></span></span>44</td>
+            <td><span class="bar"><span class="y" style="width:66%"></span></span>66</td>
+            <td><span class="bar"><span class="y" style="width:56%"></span></span>56</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:66%"></span></span>66</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Kyrsten Sinema</td>
+            <td><span class="bar"><span class="y" style="width:58%"></span></span>58</td>
+            <td><span class="bar"><span class="y" style="width:60%"></span></span>60</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge neutral">NEUTRAL</span></td>
+            <td><span class="bar"><span class="r" style="width:16%"></span></span>16</td>
+            <td><span class="bar"><span class="b" style="width:70%"></span></span>70</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Tina Smith</td>
+            <td><span class="bar"><span class="y" style="width:48%"></span></span>48</td>
+            <td><span class="bar"><span class="y" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:66%"></span></span>66</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Debbie Stabenow</td>
+            <td><span class="bar"><span class="y" style="width:42%"></span></span>42</td>
+            <td><span class="bar"><span class="y" style="width:66%"></span></span>66</td>
+            <td><span class="bar"><span class="y" style="width:56%"></span></span>56</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:68%"></span></span>68</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Jon Tester</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="bar"><span class="y" style="width:60%"></span></span>60</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge neutral">NEUTRAL</span></td>
+            <td><span class="bar"><span class="r" style="width:10%"></span></span>10</td>
+            <td><span class="bar"><span class="b" style="width:68%"></span></span>68</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Chris Van Hollen</td>
+            <td><span class="bar"><span class="y" style="width:46%"></span></span>46</td>
+            <td><span class="bar"><span class="y" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:70%"></span></span>70</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Mark Warner</td>
+            <td><span class="bar"><span class="y" style="width:56%"></span></span>56</td>
+            <td><span class="bar"><span class="y" style="width:60%"></span></span>60</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:8%"></span></span>8</td>
+            <td><span class="bar"><span class="b" style="width:74%"></span></span>74</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Raphael Warnock</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:76%"></span></span>76</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Elizabeth Warren</td>
+            <td><span class="bar"><span class="y" style="width:40%"></span></span>40</td>
+            <td><span class="bar"><span class="y" style="width:72%"></span></span>72</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:90%"></span></span>90</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Peter Welch</td>
+            <td><span class="bar"><span class="y" style="width:48%"></span></span>48</td>
+            <td><span class="bar"><span class="y" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:66%"></span></span>66</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Sheldon Whitehouse</td>
+            <td><span class="bar"><span class="y" style="width:44%"></span></span>44</td>
+            <td><span class="bar"><span class="y" style="width:66%"></span></span>66</td>
+            <td><span class="bar"><span class="y" style="width:56%"></span></span>56</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:68%"></span></span>68</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Ron Wyden</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:78%"></span></span>78</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>民主党 下院議員 — 仮想通貨・規制・派閥データ</h2>
+    <p>
+      民主党の下院議員の英語名と、仮想通貨に関する想定スタンスです。
+      下院民主党では、Hakeem Jeffries、Nancy Pelosi、Alexandria Ocasio-Cortez などが、
+      普通の上院議員を上回る党内影響力を持つことがあります。ここが「下剋上」の見どころです。
+    </p>
+
+    <div class="upset-box">
+      <h4>🏛️ 下剋上ポイント — 下院民主党が上院民主党に勝つ瞬間</h4>
+      <ul class="upset-list">
+        <li><b>Hakeem Jeffries</b>（下院民主党院内総務）は民主党内偉い度 94。多くの上院議員を上回る。</li>
+        <li><b>Nancy Pelosi</b>（元下院議長）は 96。民主党全体でも最上位クラス。</li>
+        <li><b>Alexandria Ocasio-Cortez</b>は 84。進歩派の象徴として上院中堅より強い。</li>
+        <li><b>Jamie Raskin</b>は 80。下院司法委員会の有力者。</li>
+        <li><b>Adam Schiff</b>は 84。上院議員に転身したが、下院時代から強い影響力。</li>
+        <li><b>Maxine Waters</b>は 82。金融委員会の大物。</li>
+        <li><b>Katherine Clark</b>（下院民主党幹事）は 82。下院指導部。</li>
+        <li>一方、<b>Chuck Schumer</b>（92）、<b>Elizabeth Warren</b>（90）、<b>Bernie Sanders</b>（88）は上院の大物として下院普通議員より上。</li>
+      </ul>
+    </div>
+
+    <div class="table-wrap">
+      <table class="dem house">
+        <thead>
+          <tr>
+            <th>English Name</th>
+            <th>仮想通貨好き度</th>
+            <th>Clarity Act 未完成度</th>
+            <th>XRP/XLM 非商品度</th>
+            <th>CFTC / SEC</th>
+            <th>トランプ</th>
+            <th>共和党内偉い度</th>
+            <th>民主党内偉い度</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="name-cell">Hakeem Jeffries</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:8%"></span></span>8</td>
+            <td><span class="bar"><span class="b" style="width:94%"></span></span>94</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Katherine Clark</td>
+            <td><span class="bar"><span class="y" style="width:48%"></span></span>48</td>
+            <td><span class="bar"><span class="y" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:82%"></span></span>82</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Pete Aguilar</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:76%"></span></span>76</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Ted Lieu</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:72%"></span></span>72</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Nancy Pelosi</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="bar"><span class="y" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:8%"></span></span>8</td>
+            <td><span class="bar"><span class="b" style="width:96%"></span></span>96</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Alexandria Ocasio-Cortez</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:84%"></span></span>84</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Ilhan Omar</td>
+            <td><span class="bar"><span class="y" style="width:48%"></span></span>48</td>
+            <td><span class="bar"><span class="y" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:78%"></span></span>78</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Rashida Tlaib</td>
+            <td><span class="bar"><span class="y" style="width:46%"></span></span>46</td>
+            <td><span class="bar"><span class="y" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:76%"></span></span>76</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Ayanna Pressley</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:74%"></span></span>74</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Jamie Raskin</td>
+            <td><span class="bar"><span class="y" style="width:48%"></span></span>48</td>
+            <td><span class="bar"><span class="y" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:80%"></span></span>80</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Jerry Nadler</td>
+            <td><span class="bar"><span class="y" style="width:44%"></span></span>44</td>
+            <td><span class="bar"><span class="y" style="width:66%"></span></span>66</td>
+            <td><span class="bar"><span class="y" style="width:56%"></span></span>56</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:78%"></span></span>78</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Maxine Waters</td>
+            <td><span class="bar"><span class="y" style="width:42%"></span></span>42</td>
+            <td><span class="bar"><span class="y" style="width:68%"></span></span>68</td>
+            <td><span class="bar"><span class="y" style="width:58%"></span></span>58</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:82%"></span></span>82</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Adam Schiff</td>
+            <td><span class="bar"><span class="y" style="width:46%"></span></span>46</td>
+            <td><span class="bar"><span class="y" style="width:66%"></span></span>66</td>
+            <td><span class="bar"><span class="y" style="width:56%"></span></span>56</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:84%"></span></span>84</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Jim Himes</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:74%"></span></span>74</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Virginia Foxx</td>
+            <td><span class="bar"><span class="y" style="width:40%"></span></span>40</td>
+            <td><span class="bar"><span class="y" style="width:68%"></span></span>68</td>
+            <td><span class="bar"><span class="y" style="width:58%"></span></span>58</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:8%"></span></span>8</td>
+            <td><span class="bar"><span class="b" style="width:66%"></span></span>66</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Bobby Scott</td>
+            <td><span class="bar"><span class="y" style="width:44%"></span></span>44</td>
+            <td><span class="bar"><span class="y" style="width:66%"></span></span>66</td>
+            <td><span class="bar"><span class="y" style="width:56%"></span></span>56</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:72%"></span></span>72</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Glenn Ivey</td>
+            <td><span class="bar"><span class="y" style="width:48%"></span></span>48</td>
+            <td><span class="bar"><span class="y" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:70%"></span></span>70</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Robin Kelly</td>
+            <td><span class="bar"><span class="y" style="width:46%"></span></span>46</td>
+            <td><span class="bar"><span class="y" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:68%"></span></span>68</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Raja Krishnamoorthi</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:74%"></span></span>74</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Robert Garcia</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:72%"></span></span>72</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Joe Morelle</td>
+            <td><span class="bar"><span class="y" style="width:48%"></span></span>48</td>
+            <td><span class="bar"><span class="y" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:70%"></span></span>70</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Debbie Wasserman Schultz</td>
+            <td><span class="bar"><span class="y" style="width:46%"></span></span>46</td>
+            <td><span class="bar"><span class="y" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:76%"></span></span>76</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Matt Cartwright</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:68%"></span></span>68</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Jared Moskowitz</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="bar"><span class="y" style="width:60%"></span></span>60</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:70%"></span></span>70</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Dan Kildee</td>
+            <td><span class="bar"><span class="y" style="width:48%"></span></span>48</td>
+            <td><span class="bar"><span class="y" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:72%"></span></span>72</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Ann Kuster</td>
+            <td><span class="bar"><span class="y" style="width:46%"></span></span>46</td>
+            <td><span class="bar"><span class="y" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:68%"></span></span>68</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Sean Patrick Maloney</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:70%"></span></span>70</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Pat Ryan</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:72%"></span></span>72</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Chris Pappas</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:68%"></span></span>68</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Colin Allred</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="bar"><span class="y" style="width:60%"></span></span>60</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:74%"></span></span>74</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Veronica Escobar</td>
+            <td><span class="bar"><span class="y" style="width:48%"></span></span>48</td>
+            <td><span class="bar"><span class="y" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:72%"></span></span>72</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Joaquin Castro</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:74%"></span></span>74</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Henry Cuellar</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge cftc">CFTC</span></td>
+            <td><span class="badge neutral">NEUTRAL</span></td>
+            <td><span class="bar"><span class="r" style="width:10%"></span></span>10</td>
+            <td><span class="bar"><span class="b" style="width:66%"></span></span>66</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Sylvia Garcia</td>
+            <td><span class="bar"><span class="y" style="width:46%"></span></span>46</td>
+            <td><span class="bar"><span class="y" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:70%"></span></span>70</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Lizzie Fletcher</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:70%"></span></span>70</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Mark Takano</td>
+            <td><span class="bar"><span class="y" style="width:48%"></span></span>48</td>
+            <td><span class="bar"><span class="y" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:72%"></span></span>72</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Maxine Dexter</td>
+            <td><span class="bar"><span class="y" style="width:50%"></span></span>50</td>
+            <td><span class="bar"><span class="y" style="width:62%"></span></span>62</td>
+            <td><span class="bar"><span class="y" style="width:52%"></span></span>52</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:68%"></span></span>68</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Andrea Salinas</td>
+            <td><span class="bar"><span class="y" style="width:48%"></span></span>48</td>
+            <td><span class="bar"><span class="y" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:68%"></span></span>68</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Suzanne Bonamici</td>
+            <td><span class="bar"><span class="y" style="width:46%"></span></span>46</td>
+            <td><span class="bar"><span class="y" style="width:64%"></span></span>64</td>
+            <td><span class="bar"><span class="y" style="width:54%"></span></span>54</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:66%"></span></span>66</td>
+          </tr>
+          <tr>
+            <td class="name-cell">Earl Blumenauer</td>
+            <td><span class="bar"><span class="y" style="width:44%"></span></span>44</td>
+            <td><span class="bar"><span class="y" style="width:66%"></span></span>66</td>
+            <td><span class="bar"><span class="y" style="width:56%"></span></span>56</td>
+            <td><span class="badge sec">SEC</span></td>
+            <td><span class="badge dislike">DISLIKE</span></td>
+            <td><span class="bar"><span class="r" style="width:6%"></span></span>6</td>
+            <td><span class="bar"><span class="b" style="width:70%"></span></span>70</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>下剋上の比較 — 上院と下院、党内偉い度の逆転</h2>
+    <div class="rank-compare">
+      <div class="r">
+        <h4>共和党の下剋上</h4>
+        <p>
+          <strong>Mike Johnson</strong>（下院議長・93）は、多くの上院議員（John Barrasso 82、Marsha Blackburn 75、Lindsey Graham 79 など）を上回る。
+          <strong>Steve Scalise</strong>（89）、<strong>Jim Jordan</strong>（86）、<strong>Elise Stefanik</strong>（85）、<strong>Tom Emmer</strong>（84）も、上院中堅を超える。
+          一方、<strong>Mitch McConnell</strong>（95）、<strong>Ted Cruz</strong>（88）、<strong>J.D. Vance</strong>（87）、<strong>John Thune</strong>（86）は上院の大物として下院普通議員より上。
+        </p>
+      </div>
+      <div class="d">
+        <h4>民主党の下剋上</h4>
+        <p>
+          <strong>Nancy Pelosi</strong>（下院・96）、<strong>Hakeem Jeffries</strong>（下院・94）は、多くの上院議員（Patty Murray 76、Amy Klobuchar 74、Mark Warner 74 など）を上回る。
+          <strong>Adam Schiff</strong>（84）、<strong>Alexandria Ocasio-Cortez</strong>（84）、<strong>Maxine Waters</strong>（82）、<strong>Katherine Clark</strong>（82）も上院中堅を超える。
+          一方、<strong>Chuck Schumer</strong>（92）、<strong>Elizabeth Warren</strong>（90）、<strong>Bernie Sanders</strong>（88）は上院の大物として下院普通議員より上。
+        </p>
+      </div>
+    </div>
+    <p>
+      つまり、下院が上院に勝つのは、<strong>下院議長・院内総務・幹事・委員会委員長・派閥リーダー・メディア有力者</strong>の場合です。
+      普通の下院議員は、普通の上院議員より党内偉い度が低くなるように調整しています。
+      これによって、「下剋上」と「上院の格」の両方を見ることができます。
+    </p>
+  </section>
+
+  <section>
+    <h2>共和党の歴史 — いつから出来たのか</h2>
+
+    <div class="history-card red">
+      <h3>共和党の誕生</h3>
+      <div class="timeline">
+        <div class="timeline-item">
+          <b>1854年</b> — 共和党は、ウィスコンシン州リポンで開かれた会合を起源の一つとして生まれた。
+          当時の最大の争点は、奴隷制の拡大を許すかどうかだった。
+        </div>
+        <div class="timeline-item">
+          <b>1854年7月6日</b> — ミシガン州ジャクソンで、共和党という名前を正式に採用した会合が開かれた。
+          これが共和党の実質的な出発点とされる。
+        </div>
+        <div class="timeline-item">
+          <b>1856年</b> — 共和党は初めて大統領選挙に候補者を出した。ジョン・C・フレモントだった。
+        </div>
+        <div class="timeline-item">
+          <b>1860年</b> — エイブラハム・リンカーンが共和党から当選し、南北戦争と奴隷解放へ向かう。
+        </div>
+        <div class="timeline-item">
+          <b>20世紀</b> — 共和党は「小さな政府」「自由市場」「強い国防」を掲げる保守政党としての性格を強めた。
+        </div>
+        <div class="timeline-item">
+          <b>21世紀</b> — トランプ大統領の登場により、共和党は「アメリカ第一」「移民規制」「対中強硬」などの色彩を強めた。
+        </div>
+      </div>
+      <p>
+        共和党は、もともと「奴隷制に反対する北部の政治連合」として生まれた。
+        その後、産業界・農業界・保守派・リバタリアン・宗教右派など、さまざまな層を抱え込む大きな政党になった。
+        現在の共和党内でも、伝統的保守派、トランプ派、リバタリアン寄り、中道寄りなど、複数の潮流がある。
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>民主党の歴史 — いつから出来たのか</h2>
+
+    <div class="history-card blue">
+      <h3>民主党の誕生</h3>
+      <div class="timeline">
+        <div class="timeline-item">
+          <b>1828年</b> — 民主党は、アンドリュー・ジャクソンを支持する政治勢力として成立した。
+          これが現在の民主党の直接の起源とされる。
+        </div>
+        <div class="timeline-item">
+          <b>1830年代</b> — ジャクソン流民主主義が広がり、民主党は西部・南部・労働者層の支持を集めた。
+        </div>
+        <div class="timeline-item">
+          <b>1860年代</b> — 南北戦争をめぐって民主党は分裂し、南部と北部で異なる立場を取った。
+        </div>
+        <div class="timeline-item">
+          <b>20世紀前半</b> — ウッドロウ・ウィルソン、フランクリン・D・ルーズベルトのもとで、
+          民主党は進歩主義・社会保障・労働者保護の色彩を強めた。
+        </div>
+        <div class="timeline-item">
+          <b>1960年代</b> — 公民権運動をめぐって民主党は大きく変わり、
+          南部の白人保守層が共和党へ移る「南部の共和党化」が進んだ。
+        </div>
+        <div class="timeline-item">
+          <b>21世紀</b> — 民主党は「多様性」「社会保障」「気候変動」「女性の権利」などを掲げるリベラル政党としての性格を強めた。
+        </div>
+      </div>
+      <p>
+        民主党は、共和党よりも古い歴史を持つ。もともとは農業・労働者・移民・南部を基盤とする政党だったが、
+        20世紀を通じて都市部・労働組合・マイノリティ・進歩派を中心とする政党へと変化した。
+        現在の民主党内でも、進歩派、中道派、労働組合寄り、ビジネス寄りなど、複数の潮流がある。
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>他にも党はあったのか — かつて存在した主な政党</h2>
+    <p>
+      アメリカには、共和党と民主党以外にも、多くの政党が存在した。
+      現在も第三党はあるが、ここでは歴史的に重要なものを紹介する。
+    </p>
+
+    <div class="party-grid">
+      <div class="party-card federalist">
+        <h4>連邦党（Federalist Party）</h4>
+        <p>
+          1789年頃〜1820年代。アレクサンダー・ハミルトンを中心に、
+          強い連邦政府・金融・商業を支持した。ジェファーソンら民主共和党と対立した。
+        </p>
+      </div>
+      <div class="party-card demrep">
+        <h4>民主共和党（Democratic-Republican Party）</h4>
+        <p>
+          1792年頃〜1820年代。トーマス・ジェファーソンを中心に、
+          州の権利・農業・小さな政府を支持した。現在の民主党の源流の一つ。
+        </p>
+      </div>
+      <div class="party-card whig">
+        <h4>ホイッグ党（Whig Party）</h4>
+        <p>
+          1833年〜1856年。ヘンリー・クレイらが結成。
+          連邦政府の役割を認めつつ、ジャクソン大統領に反対した。
+          奴隷制問題で分裂し、共和党に取って代わられた。
+        </p>
+      </div>
+      <div class="party-card know">
+        <h4>ノウ・ナッシング党（Know Nothing / American Party）</h4>
+        <p>
+          1840年代〜1850年代。移民・カトリックに反対する秘密結社的な政党。
+          一時的に力を持ったが、奴隷制問題で分裂した。
+        </p>
+      </div>
+      <div class="party-card dixiecrat">
+        <h4>州権民主党（Dixiecrat / States' Rights Democratic Party）</h4>
+        <p>
+          1948年。人種分離を支持する南部民主党員が一時的に結成。
+          公民権運動への反発から生まれた。
+        </p>
+      </div>
+      <div class="party-card progressive">
+        <h4>進歩党（Progressive Party）</h4>
+        <p>
+          1912年、1924年、1948年などに結成された。
+          セオドア・ローズベルト、ロバート・ラ・フォレット、ヘンリー・ウォレスらが関わった。
+        </p>
+      </div>
+      <div class="party-card libertarian">
+        <h4>リバタリアン党（Libertarian Party）</h4>
+        <p>
+          1971年設立。現在も存在する第三党。
+          小さな政府・個人の自由・自由市場を強く支持する。
+        </p>
+      </div>
+      <div class="party-card green">
+        <h4>緑の党（Green Party）</h4>
+        <p>
+          1980年代〜1990年代に形成。現在も存在する。
+          環境保護・社会正義・非暴力・草の根民主主義を掲げる。
+        </p>
+      </div>
+    </div>
+
+    <div class="note">
+      このほかにも、禁酒党、社会党、共産党、改革党、アメリカ独立党など、
+      多くの政党が存在した。アメリカの政治は、常に二大政党だけだったわけではない。
+      しかし、選挙制度（小選挙区制）の影響で、第三党が全国的に力を持つのは難しい構造になっている。
+    </div>
+  </section>
+
+  <section>
+    <h2>まとめ — 仮想通貨と政党の未来</h2>
+    <p>
+      共和党は、仮想通貨に対して比較的友好的な議員が多い。
+      特に Ted Cruz、Rand Paul、Chip Roy、Tom Emmer などは、
+      「イノベーションを止めるな」「SEC は規制しすぎだ」という立場を取りやすい。
+      一方で、伝統的な金融規制を重視する議員もいる。
+    </p>
+    <p>
+      民主党は、仮想通貨に対して慎重な議員が多い。
+      Elizabeth Warren、Sherrod Brown、Richard Blumenthal などは、
+      「投資家保護」「マネーロンダリング防止」「SEC の役割」を重視する。
+      ただし、John Fetterman、Kyrsten Sinema、Joe Manchin のように、
+      比較的 CFTC 寄り・中道寄りの議員もいる。
+    </p>
+    <p>
+      Clarity Act のようなルールブックが未完成だと考える度合いは、
+      共和党内でも民主党でも幅がある。XRP と XLM をまだ商品だと思っていない度も、
+      議員によって大きく違う。これは、仮想通貨に対する理解度・関心度・選挙区の産業構造などが
+      影響していると考えられる。
+    </p>
+    <p>
+      トランプ大統領が好きか嫌いかは、共和党では「好き」が多く、民主党では「嫌い」が多い。
+      ただし、共和党内でも Mitt Romney、Susan Collins、Lisa Murkowski のような
+      中道派は、距離を置くことがある。民主党でも Joe Manchin、Kyrsten Sinema のような
+      中道派は、必ずしも強く反対しないことがある。
+    </p>
+    <p>
+      党内での「偉い度」は、上院・下院の指導部、委員会の議長・ランキングメンバー、
+      知名度、資金力、調整力などによって変わる。
+      共和党では Mitch McConnell、John Thune、Mike Johnson、Steve Scalise、Jim Jordan などが高い。
+      民主党では Chuck Schumer、Hakeem Jeffries、Nancy Pelosi、Elizabeth Warren、Bernie Sanders などが高い。
+    </p>
+    <p>
+      このページの数値はすべて創作的な想定値だが、
+      「仮想通貨」「規制」「派閥」「大統領への態度」「党内影響力」「下剋上」を並べることで、
+      共和党と民主党の理念の違いが、少しだけ見えやすくなるはずだ。
+    </p>
+  </section>
+
+</main>
+
+<footer>
+  <div class="footer-leaves">🍃 🌿 🍂 🌱 🍃</div>
+  <p>森風デザインの仮想通貨・政党分析ページ</p>
+  <p>
+    <a href="carry.html">carry.html へ — 持ち物と理念の続きを見る</a>
+  </p>
+  <p style="font-size:.85rem; opacity:.85;">
+    ※このページはフィクションです。実在の議員・政党を尊重しつつ、
+    仮想通貨と理念の違いを物語として理解するための創作です。
+  </p>
+</footer>
+
+</body>
+</html>
