@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>ノートパソコン 分解・組み立てゲーム</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+  html, body {
+    height: 100%; overflow: hidden; background: #111;
+    font-family: 'Segoe UI', Roboto, system-ui, sans-serif;
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #game-container {
+    position: relative;
+    width: 100vw; height: 100vh;
+    overflow: hidden;
+    background: #1e1e1e;
+  }
+  /* オープニング */
+  #opening-screen {
+    position: absolute; inset: 0;
+    background-image: url('img180gun.jpg');
+    background-size: cover;
+    background-position: center;
+    background-color: #111;
+    display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
+    z-index: 100;
+    transition: opacity 0.5s ease;
+  }
+  #opening-screen h1 {
+    font-size: clamp(1.6rem, 6.5vw, 3rem);
+    color: #fff;
+    text-shadow: 3px 3px 0 #000, 6px 6px 0 rgba(52,152,219,0.5);
+    letter-spacing: 5px; margin-bottom: 40px; font-weight: 800;
+    background: rgba(0,0,0,0.35); padding: 12px 36px;
+    border-radius: 60px; backdrop-filter: blur(2px);
+    text-align: center;
+  }
+  #start-btn {
+    padding: 18px 72px;
+    font-size: clamp(1.4rem, 5vw, 2.2rem);
+    font-weight: bold; background: #2980b9; color: white;
+    border: none; border-radius: 60px; cursor: pointer;
+    box-shadow: 0 10px 0 #1a5276, 0 12px 25px black;
+    transition: 0.08s linear; letter-spacing: 8px;
+    text-shadow: 2px 2px 0 black;
+  }
+  #start-btn:active {
+    box-shadow: 0 4px 0 #1a5276, 0 8px 20px black;
+    transform: translateY(6px);
+  }
+  #start-btn:hover { background: #3498db; }
+
+  /* ゲーム画面 */
+  #game-screen {
+    position: absolute; inset: 0;
+    display: none;
+    background: radial-gradient(circle at 30% 30%, #2a2a2a 0%, #0a0a0a 100%);
+  }
+  #gameCanvas {
+    display: block; width: 100%; height: 100%;
+    touch-action: none;
+  }
+  /* ステータス */
+  #status {
+    position: absolute; top: 16px; left: 20px;
+    color: #ddd; background: rgba(0,0,0,0.65);
+    padding: 10px 22px; border-radius: 40px;
+    font-size: clamp(0.9rem, 2.5vw, 1.3rem);
+    font-weight: 600; backdrop-filter: blur(4px);
+    border-left: 6px solid #3498db;
+    pointer-events: none; z-index: 10; letter-spacing: 1px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.7);
+  }
+  #status span { color: #f1c40f; font-weight: 800; }
+  /* ヒント */
+  #hint {
+    position: absolute; bottom: 20px; left: 50%;
+    transform: translateX(-50%);
+    color: #aaa; background: rgba(0,0,0,0.6);
+    padding: 8px 26px; border-radius: 40px;
+    font-size: clamp(0.7rem, 2vw, 1rem);
+    letter-spacing: 1px; backdrop-filter: blur(4px);
+    border: 1px solid #444; pointer-events: none; z-index: 10;
+    white-space: nowrap;
+  }
+  .hidden { opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+
+  /* 完了 → mayhem.html 誘導画面 */
+  #complete-screen {
+    position: absolute; inset: 0;
+    display: none;
+    flex-direction: column;
+    justify-content: center; align-items: center;
+    background: radial-gradient(circle at 50% 40%, #1a2a3a 0%, #0a0a0a 100%);
+    z-index: 200;
+    text-align: center;
+    padding: 20px;
+  }
+  #complete-screen h2 {
+    font-size: clamp(2rem, 8vw, 4rem);
+    color: #f1c40f;
+    text-shadow: 4px 4px 0 #000, 0 0 30px rgba(241,196,15,0.6);
+    letter-spacing: 6px;
+    margin-bottom: 16px;
+    font-weight: 900;
+  }
+  #complete-screen p {
+    font-size: clamp(1rem, 3vw, 1.5rem);
+    color: #ccc;
+    margin-bottom: 40px;
+    letter-spacing: 2px;
+  }
+  #go-mayhem-btn {
+    padding: 20px 80px;
+    font-size: clamp(1.4rem, 5vw, 2rem);
+    font-weight: bold;
+    background: #8e44ad;
+    color: white;
+    border: none;
+    border-radius: 60px;
+    cursor: pointer;
+    box-shadow: 0 10px 0 #5b2c6f, 0 12px 25px black;
+    transition: 0.08s linear;
+    letter-spacing: 4px;
+    text-shadow: 2px 2px 0 black;
+  }
+  #go-mayhem-btn:active {
+    box-shadow: 0 4px 0 #5b2c6f, 0 8px 20px black;
+    transform: translateY(6px);
+  }
+  #go-mayhem-btn:hover { background: #9b59b6; }
+</style>
+</head>
+<body>
+<div id="game-container">
+
+  <!-- オープニング -->
+  <div id="opening-screen">
+    <h1>💻 ノートパソコン 分解・組み立て</h1>
+    <button id="start-btn">はじまる</button>
+  </div>
+
+  <!-- ゲーム画面 -->
+  <div id="game-screen">
+    <canvas id="gameCanvas"></canvas>
+    <div id="status">組み立て: <span id="assembledCount">0</span> / 6</div>
+    <div id="hint">パーツを長押しでドラッグ → 中央の組み立て位置へ</div>
+  </div>
+
+  <!-- 完了 → mayhem.html 誘導 -->
+  <div id="complete-screen">
+    <h2>💻 組み立て完了！</h2>
+    <p>ノートPCの仕組みを理解したら、次は勉強だ。</p>
+    <button id="go-mayhem-btn">mayhem.html へ進む</button>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  // ===== DOM =====
+  const openingScreen = document.getElementById('opening-screen');
+  const gameScreen    = document.getElementById('game-screen');
+  const completeScreen= document.getElementById('complete-screen');
+  const startBtn      = document.getElementById('start-btn');
+  const goMayhemBtn   = document.getElementById('go-mayhem-btn');
+  const canvas        = document.getElementById('gameCanvas');
+  const ctx           = canvas.getContext('2d');
+  const assembledCountSpan = document.getElementById('assembledCount');
+
+  // ===== キャンバスサイズ（DPR対応）=====
+  function resizeCanvas() {
+    const dpr = window.devicePixelRatio || 1;
+    const w = gameScreen.clientWidth;
+    const h = gameScreen.clientHeight;
+    canvas.width  = w * dpr;
+    canvas.height = h * dpr;
+    canvas.style.width  = w + 'px';
+    canvas.style.height = h + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    draw();
+  }
+  window.addEventListener('resize', resizeCanvas);
+
+  // ===== ゲーム状態 =====
+  let gameActive = false;
+  let assembledParts = 0;
+  let parts = [];
+  let draggingPart = null;
+  let dragOffsetX = 0, dragOffsetY = 0;
+  let activePointerId = null;
+
+  // ===== パーツ定義（ノートPC）=====
+  const partNames  = ['Display','Keyboard','Motherboard','Battery','Touchpad','Bottom Cover'];
+  const partColors = ['#3498db','#95a5a6','#27ae60','#e67e22','#bdc3c7','#7f8c8d'];
+  const partSizes  = [
+    { w: 200, h: 130 }, // Display（大きめ）
+    { w: 190, h: 60  }, // Keyboard
+    { w: 150, h: 70  }, // Motherboard
+    { w: 160, h: 40  }, // Battery
+    { w: 90,  h: 50  }, // Touchpad
+    { w: 210, h: 140 }  // Bottom Cover（一番大きい）
+  ];
+  // 初期配置（床に散らばる）
+  const initialPositions = [
+    { x: 0.20, y: 0.25 }, // Display
+    { x: 0.72, y: 0.20 }, // Keyboard
+    { x: 0.25, y: 0.75 }, // Motherboard
+    { x: 0.80, y: 0.72 }, // Battery
+    { x: 0.12, y: 0.55 }, // Touchpad
+    { x: 0.60, y: 0.85 }  // Bottom Cover
+  ];
+  // 組み立て位置（ノートPCの形に配置）
+  //   上：Display
+  //   中央：Keyboard / Motherboard
+  //   下：Battery / Touchpad / Bottom Cover
+  const assemblyPositions = [
+    { x: 0.50, y: 0.30 }, // Display（ヒンジ上部）
+    { x: 0.50, y: 0.56 }, // Keyboard（中央やや上）
+    { x: 0.50, y: 0.68 }, // Motherboard（キーボードの下）
+    { x: 0.50, y: 0.78 }, // Battery（下部中央）
+    { x: 0.38, y: 0.70 }, // Touchpad（左手前）
+    { x: 0.50, y: 0.62 }  // Bottom Cover（土台・最背面）
+  ];
+
+  // ===== 初期化 =====
+  function initParts() {
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    parts = partNames.map((name, i) => ({
+      id: i,
+      name,
+      color: partColors[i],
+      w: partSizes[i].w,
+      h: partSizes[i].h,
+      x: initialPositions[i].x * w,
+      y: initialPositions[i].y * h,
+      assembled: false,
+      dragging: false
+    }));
+    assembledParts = 0;
+    updateStatus();
+  }
+
+  function updateStatus() {
+    assembledCountSpan.textContent = assembledParts;
+  }
+
+  // ===== キャンバス座標変換 =====
+  function getCanvasPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    };
+  }
+
+  // ===== 当たり判定（矩形）=====
+  function hitTest(px, py, part) {
+    return px >= part.x - part.w/2 && px <= part.x + part.w/2 &&
+           py >= part.y - part.h/2 && py <= part.y + part.h/2;
+  }
+
+  // ===== ドラッグ開始 =====
+  canvas.addEventListener('pointerdown', (e) => {
+    if (!gameActive) return;
+    if (e.button !== 0 && e.pointerType === 'mouse') return;
+    e.preventDefault();
+
+    const pos = getCanvasPos(e);
+
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const p = parts[i];
+      if (p.assembled) continue;
+      if (hitTest(pos.x, pos.y, p)) {
+        draggingPart = p;
+        p.dragging = true;
+        dragOffsetX = pos.x - p.x;
+        dragOffsetY = pos.y - p.y;
+        activePointerId = e.pointerId;
+        canvas.setPointerCapture(e.pointerId);
+        draw();
+        break;
+      }
+    }
+  });
+
+  // ===== ドラッグ中 =====
+  canvas.addEventListener('pointermove', (e) => {
+    if (!draggingPart || e.pointerId !== activePointerId) return;
+    e.preventDefault();
+    const pos = getCanvasPos(e);
+    draggingPart.x = pos.x - dragOffsetX;
+    draggingPart.y = pos.y - dragOffsetY;
+    draw();
+  });
+
+  // ===== ドロップ =====
+  function endDrag(e) {
+    if (!draggingPart || e.pointerId !== activePointerId) return;
+    e.preventDefault();
+
+    const p = draggingPart;
+    p.dragging = false;
+
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    const target = assemblyPositions[p.id];
+    const tx = target.x * w;
+    const ty = target.y * h;
+    const dist = Math.hypot(p.x - tx, p.y - ty);
+
+    // 大きいパーツはしきい値も大きめに
+    const threshold = Math.max(p.w, p.h) * 0.55;
+
+    if (dist < threshold) {
+      p.x = tx;
+      p.y = ty;
+      p.assembled = true;
+      assembledParts++;
+      updateStatus();
+
+      if (assembledParts === 6) {
+        setTimeout(showComplete, 300);
+      }
+    }
+
+    draggingPart = null;
+    activePointerId = null;
+    if (canvas.hasPointerCapture(e.pointerId)) {
+      canvas.releasePointerCapture(e.pointerId);
+    }
+    draw();
+  }
+
+  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('pointercancel', endDrag);
+  canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  // ===== キーボードで微調整 =====
+  window.addEventListener('keydown', (e) => {
+    if (!gameActive || !draggingPart) return;
+    const step = 4;
+    let moved = false;
+    if (e.key === 'ArrowUp')    { draggingPart.y -= step; moved = true; }
+    if (e.key === 'ArrowDown')  { draggingPart.y += step; moved = true; }
+    if (e.key === 'ArrowLeft')  { draggingPart.x -= step; moved = true; }
+    if (e.key === 'ArrowRight') { draggingPart.x += step; moved = true; }
+    if (moved) { e.preventDefault(); draw(); }
+  });
+
+  // ===== 描画 =====
+  function draw() {
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    ctx.clearRect(0, 0, w, h);
+
+    // 組み立て位置のガイド
+    ctx.save();
+    ctx.strokeStyle = 'rgba(52, 152, 219, 0.35)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 8]);
+    for (let i = 0; i < 6; i++) {
+      const pos = assemblyPositions[i];
+      const size = partSizes[i];
+      const px = pos.x * w, py = pos.y * h;
+      ctx.strokeRect(px - size.w/2, py - size.h/2, size.w, size.h);
+    }
+    ctx.setLineDash([]);
+    ctx.restore();
+
+    // パーツ描画（ドラッグ中を最前面、組み立て済みを背面に）
+    const sorted = [...parts].sort((a, b) => {
+      if (a.dragging) return 1;
+      if (b.dragging) return -1;
+      if (a.assembled && !b.assembled) return -1;
+      if (!a.assembled && b.assembled) return 1;
+      return 0;
+    });
+
+    for (const p of sorted) {
+      ctx.shadowColor = 'rgba(0,0,0,0.8)';
+      ctx.shadowBlur = p.dragging ? 24 : 12;
+      ctx.shadowOffsetX = 4;
+      ctx.shadowOffsetY = 4;
+
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      roundRect(ctx, p.x - p.w/2, p.y - p.h/2, p.w, p.h, 8);
+      ctx.fill();
+
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
+      ctx.strokeStyle = p.assembled ? '#f1c40f' : '#2c3e50';
+      ctx.lineWidth = p.assembled ? 3 : 2;
+      ctx.stroke();
+
+      // パーツ名
+      ctx.font = 'bold 13px "Segoe UI", sans-serif';
+      ctx.fillStyle = '#fff';
+      ctx.shadowColor = 'black';
+      ctx.shadowBlur = 4;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(p.name, p.x, p.y);
+      ctx.shadowBlur = 0;
+    }
+
+    // クリア表示
+    if (assembledParts === 6 && gameActive) {
+      ctx.font = 'bold 52px "Segoe UI", sans-serif';
+      ctx.fillStyle = '#f1c40f';
+      ctx.shadowColor = 'black';
+      ctx.shadowBlur = 24;
+      ctx.shadowOffsetX = 6;
+      ctx.shadowOffsetY = 6;
+      ctx.textAlign = 'center';
+      ctx.fillText('COMPLETE!', w/2, h*0.15);
+      ctx.shadowBlur = 0;
+    }
+  }
+
+  function roundRect(ctx, x, y, w, h, r) {
+    if (w < 2*r) r = w/2;
+    if (h < 2*r) r = h/2;
+    ctx.moveTo(x+r, y);
+    ctx.lineTo(x+w-r, y);
+    ctx.quadraticCurveTo(x+w, y, x+w, y+r);
+    ctx.lineTo(x+w, y+h-r);
+    ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+    ctx.lineTo(x+r, y+h);
+    ctx.quadraticCurveTo(x, y+h, x, y+h-r);
+    ctx.lineTo(x, y+r);
+    ctx.quadraticCurveTo(x, y, x+r, y);
+    ctx.closePath();
+  }
+
+  // ===== ゲーム開始 =====
+  function startGame() {
+    openingScreen.classList.add('hidden');
+    gameScreen.style.display = 'block';
+    requestAnimationFrame(() => {
+      resizeCanvas();
+      initParts();
+      draw();
+    });
+    gameActive = true;
+    setTimeout(() => { openingScreen.style.display = 'none'; }, 500);
+  }
+
+  // ===== 完了画面 → mayhem.html =====
+  function showComplete() {
+    gameActive = false;
+    gameScreen.style.display = 'none';
+    completeScreen.style.display = 'flex';
+  }
+
+  goMayhemBtn.addEventListener('click', () => {
+    window.location.href = 'mayhem.html';
+  });
+
+  startBtn.addEventListener('click', startGame);
+
+  // 初期描画
+  resizeCanvas();
+  initParts();
+  draw();
+})();
+</script>
+</body>
+</html>
