@@ -171,15 +171,16 @@
   }
   #speedGroup.active { display: flex; }
   #speedGroup button {
-    padding: 8px 14px;
+    padding: 8px 12px;
     font-size: clamp(12px, 2.6vw, 14px);
-    letter-spacing: 0.1em;
+    letter-spacing: 0.05em;
     background: rgba(255,255,255,0.08);
     color: #ccc;
     border: 1px solid #555;
     border-radius: 20px;
     cursor: pointer;
     box-shadow: none;
+    min-width: 44px;
   }
   #speedGroup button.on {
     background: linear-gradient(135deg, #f60, #fa0);
@@ -270,6 +271,7 @@
       <div id="battleControls">
         <button id="spinBtn">スタート</button>
         <div id="speedGroup">
+          <button data-speed="1" class="on">1x</button>
           <button data-speed="2">2x</button>
           <button data-speed="3">3x</button>
           <button data-speed="4">4x</button>
@@ -321,7 +323,6 @@
   ];
   const SHAPES = ["circle","triangle","square","star","hexagon","pentagon"];
 
-  // 他5項目（合計60固定・両者平等・3〜18）
   const CORE_KEYS = ["attack","defense","stamina","weight","spin"];
   const CORE_LABELS = {
     attack:"攻撃", defense:"防御", stamina:"持久",
@@ -330,7 +331,6 @@
   const TOTAL_POINTS = 60;
   const MIN_STAT = 3, MAX_STAT = 18;
 
-  // バウンドは別枠 0〜100 完全ランダム
   const BOUNCE_MIN = 0, BOUNCE_MAX = 100;
 
   const MAX_HP = 100;
@@ -339,16 +339,13 @@
   const WIN_STREAK = 5;
   const MAX_BATTLE_TIME = 30;
 
-  // 物理定数
   const CENTER_PULL = 22;
   const FRICTION = 0.55;
   const AIR_DRAG = 0.12;
   const PRECESS_DRIFT = 14;
-  const WALL_RESTITUTION_BASE = 0.35;   // バウンドで上乗せ
   const HP_DRAIN_BASE = 1.4;
   const HP_DRAIN_HIT = 1.0;
 
-  // 早送り：物理は固定ステップで分割
   const FIXED_STEP = 1/120;
 
   // ===================== 状態 =====================
@@ -381,7 +378,6 @@
   const pick = arr => arr[randInt(0,arr.length-1)];
   const clamp = (v,a,b) => Math.max(a, Math.min(b,v));
 
-  // 他5項目：合計60固定でランダム配分
   function randomCoreStats() {
     const stats = {};
     let remaining = TOTAL_POINTS;
@@ -399,7 +395,6 @@
     const color = pick(COLORS);
     const shape = pick(SHAPES);
     const core = base && base.core ? { ...base.core } : randomCoreStats();
-    // バウンドは別枠 0〜100 完全ランダム（base指定時は引き継ぎ）
     const bounce = base && typeof base.bounce === "number"
       ? base.bounce
       : randInt(BOUNCE_MIN, BOUNCE_MAX);
@@ -565,15 +560,11 @@
     p.radius = BASE_RADIUS * (Math.min(canvasW,canvasH)/420);
     e.radius = p.radius;
 
-    state.battle = {
-      elapsed: 0,
-      hitCooldown: 0,
-      acc: 0,
-    };
+    state.battle = { elapsed: 0, hitCooldown: 0 };
     state.phase = "battle";
     spinBtn.disabled = true;
     speedGroup.classList.add("active");
-    setSpeed(1);
+    resetSpeed();
     showCenter("READY...", 700, () => showCenter("GO!", 500));
     updatePanels();
   }
@@ -588,16 +579,29 @@
   }
 
   // ===================== 早送り =====================
+  function applySpeedUI() {
+    [...speedGroup.querySelectorAll("button")].forEach(b => {
+      b.classList.toggle("on", Number(b.dataset.speed) === state.speed);
+    });
+  }
   function setSpeed(s) {
     state.speed = s;
-    [...speedGroup.querySelectorAll("button")].forEach(b => {
-      b.classList.toggle("on", Number(b.dataset.speed) === s);
-    });
+    applySpeedUI();
+  }
+  function resetSpeed() {
+    state.speed = 1;
+    applySpeedUI();
   }
   speedGroup.addEventListener("click", ev => {
     const btn = ev.target.closest("button");
     if (!btn) return;
-    setSpeed(Number(btn.dataset.speed));
+    const s = Number(btn.dataset.speed);
+    // 同じ倍率を再クリック → 1xに戻る
+    if (s !== 1 && s === state.speed) {
+      setSpeed(1);
+    } else {
+      setSpeed(s);
+    }
   });
 
   // ===================== 物理 =====================
@@ -665,7 +669,6 @@
       k.y = arena.cy + ny*limit;
       const vn = k.vx*nx + k.vy*ny;
       if (vn > 0) {
-        // バウンド0〜100を反発係数に反映（0.30〜0.95）
         const rest = clamp(0.30 + k.bounce/100 * 0.65, 0.25, 0.97);
         k.vx -= (1 + rest) * vn * nx;
         k.vy -= (1 + rest) * vn * ny;
@@ -701,7 +704,6 @@
     const vn = rvx*nx + rvy*ny;
     if (vn > 0) return;
 
-    // バウンド0〜100で反発係数（平均を取り 0.25〜0.95）
     const avgBounce = (p.bounce + e.bounce) / 2;
     const rest = clamp(0.25 + avgBounce/100 * 0.70, 0.20, 0.97);
     const j = -(1 + rest) * vn / (1/p.mass + 1/e.mass);
@@ -732,15 +734,14 @@
     }
   }
 
-  // ===================== 戦闘更新（早送り対応） =====================
+  // ===================== 戦闘更新 =====================
   function updateBattle(dt) {
     const b = state.battle;
     if (!b) return;
 
-    // 倍率をかけて、固定ステップで分割実行
     let remaining = dt * state.speed;
     let guard = 0;
-    while (remaining > 0 && guard < 600) {
+    while (remaining > 0 && guard < 800) {
       guard++;
       const s = Math.min(FIXED_STEP, remaining);
       stepPhysics(s);
@@ -748,7 +749,6 @@
       if (state.phase !== "battle") break;
     }
 
-    // 時間切れ判定（stepPhysicsでelapsedが進む）
     const remain = Math.max(0, MAX_BATTLE_TIME - b.elapsed);
     timerBadge.textContent = remain.toFixed(1) + "s";
     if (b.elapsed >= MAX_BATTLE_TIME && state.phase === "battle") {
@@ -795,7 +795,7 @@
     state.phase = "ended";
     spinBtn.disabled = false;
     speedGroup.classList.remove("active");
-    setSpeed(1);
+    resetSpeed();
 
     if (result === "win") {
       state.streak++;
@@ -864,7 +864,7 @@
     spinBtn.disabled = false;
     spinBtn.textContent = "スタート";
     speedGroup.classList.remove("active");
-    setSpeed(1);
+    resetSpeed();
     timerBadge.textContent = MAX_BATTLE_TIME.toFixed(1) + "s";
     showCenter("NEXT BATTLE", 800);
   }
@@ -891,7 +891,7 @@
     state.player=null; state.enemy=null; state.streak=0;
     state.phase="idle";
     speedGroup.classList.remove("active");
-    setSpeed(1);
+    resetSpeed();
     gameEl.classList.remove("active");
     opening.style.display = "flex";
   }
@@ -910,7 +910,7 @@
     spinBtn.disabled = false;
     spinBtn.textContent = "スタート";
     speedGroup.classList.remove("active");
-    setSpeed(1);
+    resetSpeed();
     timerBadge.textContent = MAX_BATTLE_TIME.toFixed(1) + "s";
   }
 
