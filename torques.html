@@ -154,6 +154,7 @@
     z-index: 15;
     display: flex; gap: 8px; align-items: center;
     flex-wrap: wrap; justify-content: center;
+    max-width: 96vw;
   }
   #battleControls button {
     padding: 10px 22px;
@@ -186,6 +187,48 @@
     background: linear-gradient(135deg, #f60, #fa0);
     color: #fff; border-color: #fa0;
     box-shadow: 0 0 12px rgba(255,150,0,0.7);
+  }
+
+  /* 重力パネル */
+  #gravityPanel {
+    position: absolute;
+    top: 56px; left: 50%;
+    transform: translateX(-50%);
+    z-index: 15;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    background: rgba(0,0,0,0.6);
+    border: 1px solid #2a5a8a;
+    border-radius: 12px;
+    padding: 8px 12px;
+  }
+  #gravityPanel.active { display: flex; }
+  #gravityLabel {
+    font-size: clamp(11px, 2.6vw, 13px);
+    letter-spacing: 0.12em;
+    color: #8cf;
+  }
+  #gravityLabel b { color: #ffd94a; }
+  #gravityGroup {
+    display: flex; gap: 5px; flex-wrap: wrap; justify-content: center;
+  }
+  #gravityGroup button {
+    padding: 6px 10px;
+    font-size: clamp(11px, 2.4vw, 13px);
+    letter-spacing: 0.04em;
+    background: rgba(255,255,255,0.07);
+    color: #bbb;
+    border: 1px solid #456;
+    border-radius: 16px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  #gravityGroup button.on {
+    background: linear-gradient(135deg, #06c, #0af);
+    color: #fff; border-color: #0af;
+    box-shadow: 0 0 10px rgba(0,170,255,0.8);
   }
 
   /* ===== 選択画面 ===== */
@@ -267,6 +310,19 @@
       <canvas id="battleCanvas"></canvas>
       <div id="streakBadge">連勝 0 / 5</div>
       <div id="timerBadge">30.0s</div>
+
+      <div id="gravityPanel">
+        <div id="gravityLabel">重力 <b id="gravityValue">1.0x</b>（あなたのみ操作可）</div>
+        <div id="gravityGroup">
+          <button data-gravity="0.5">弱</button>
+          <button data-gravity="1" class="on">デフォ</button>
+          <button data-gravity="1.5">中</button>
+          <button data-gravity="2">強</button>
+          <button data-gravity="5">超強</button>
+          <button data-gravity="10">MAX</button>
+        </div>
+      </div>
+
       <div id="centerMsg"></div>
       <div id="battleControls">
         <button id="spinBtn">スタート</button>
@@ -339,21 +395,25 @@
   const WIN_STREAK = 5;
   const MAX_BATTLE_TIME = 30;
 
-  // 物理定数（中心引力を強化）
-  const CENTER_PULL = 90;      // 22 → 90
-  const FRICTION = 0.45;       // 0.55 → 0.45
+  // 物理定数
+  const CENTER_PULL = 90;      // 重力1xの基準
+  const FRICTION = 0.45;
   const AIR_DRAG = 0.12;
-  const PRECESS_DRIFT = 10;    // 14 → 10
+  const PRECESS_DRIFT = 10;
   const HP_DRAIN_BASE = 1.4;
   const HP_DRAIN_HIT = 1.0;
 
   const FIXED_STEP = 1/120;
+
+  // 重力プリセット（プレイヤーのみ）
+  const GRAVITY_PRESETS = [0.5, 1, 1.5, 2, 5, 10];
 
   // ===================== 状態 =====================
   const state = {
     player:null, enemy:null, streak:0,
     phase:"idle", rafId:null, lastTime:0,
     battle:null, speed:1,
+    gravity:1,       // 重力倍率
   };
 
   const $ = id => document.getElementById(id);
@@ -372,6 +432,9 @@
   const resultTitle = $("resultTitle");
   const resultMsg = $("resultMsg");
   const speedGroup = $("speedGroup");
+  const gravityPanel = $("gravityPanel");
+  const gravityGroup = $("gravityGroup");
+  const gravityValue = $("gravityValue");
 
   // ===================== ユーティリティ =====================
   const rand = (a,b) => a + Math.random()*(b-a);
@@ -433,15 +496,20 @@
 
   function drawArena() {
     ctx.save();
+    // 重力が強いと中心が赤く光る
+    const gIntensity = clamp((state.gravity - 1) / 9, 0, 1);
     const g = ctx.createRadialGradient(arena.cx, arena.cy, arena.r*0.05, arena.cx, arena.cy, arena.r);
-    g.addColorStop(0, "#3a3a5c");
+    g.addColorStop(0, gIntensity > 0.02
+      ? `rgba(${Math.round(58+180*gIntensity)}, ${Math.round(58-30*gIntensity)}, ${Math.round(92-60*gIntensity)}, 1)`
+      : "#3a3a5c");
     g.addColorStop(0.5, "#22223a");
     g.addColorStop(1, "#101020");
     ctx.beginPath();
     ctx.arc(arena.cx, arena.cy, arena.r, 0, Math.PI*2);
     ctx.fillStyle = g; ctx.fill();
-    ctx.lineWidth = 4; ctx.strokeStyle = "#4cc9f0";
-    ctx.shadowColor = "#4cc9f0"; ctx.shadowBlur = 18; ctx.stroke();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = gIntensity > 0.5 ? "#ff6a3d" : "#4cc9f0";
+    ctx.shadowColor = ctx.strokeStyle; ctx.shadowBlur = 18; ctx.stroke();
     ctx.shadowBlur = 0;
     ctx.beginPath();
     ctx.arc(arena.cx, arena.cy, arena.r*0.66, 0, Math.PI*2);
@@ -565,7 +633,9 @@
     state.phase = "battle";
     spinBtn.disabled = true;
     speedGroup.classList.add("active");
+    gravityPanel.classList.add("active");
     resetSpeed();
+    resetGravity();
     showCenter("READY...", 700, () => showCenter("GO!", 500));
     updatePanels();
   }
@@ -604,6 +674,27 @@
     }
   });
 
+  // ===================== 重力操作（プレイヤーのみ） =====================
+  function applyGravityUI() {
+    [...gravityGroup.querySelectorAll("button")].forEach(b => {
+      b.classList.toggle("on", Number(b.dataset.gravity) === state.gravity);
+    });
+    gravityValue.textContent = state.gravity.toFixed(1) + "x";
+  }
+  function setGravity(g) {
+    state.gravity = g;
+    applyGravityUI();
+  }
+  function resetGravity() {
+    state.gravity = 1;
+    applyGravityUI();
+  }
+  gravityGroup.addEventListener("click", ev => {
+    const btn = ev.target.closest("button");
+    if (!btn) return;
+    setGravity(Number(btn.dataset.gravity));
+  });
+
   // ===================== 物理 =====================
   function stepPhysics(dt) {
     const b = state.battle;
@@ -640,13 +731,13 @@
     const dist = Math.hypot(dx, dy) || 0.0001;
     const nx = dx/dist, ny = dy/dist;
 
-    // 中心引力：距離依存を非線形化（中心に近いほど強く引く）
-    const t = dist / arena.r;               // 0(中心) 〜 1(外周)
-    const pull = CENTER_PULL * t * (1 + (1 - t) * 0.8);
+    // 中心引力：距離依存を非線形化＋重力倍率（プレイヤー操作）
+    const t = dist / arena.r;
+    const pull = CENTER_PULL * state.gravity * t * (1 + (1 - t) * 0.8);
     k.vx += nx * pull * dt;
     k.vy += ny * pull * dt;
 
-    // 歳差ドリフト（回転が落ちるほど内側へ）
+    // 歳差ドリフト
     const hpRatio = clamp(k.hp/k.maxHp, 0, 1);
     const drift = PRECESS_DRIFT * (1 - hpRatio) * (1 + k.core.spin*0.02);
     k.vx += nx * drift * dt;
@@ -798,7 +889,9 @@
     state.phase = "ended";
     spinBtn.disabled = false;
     speedGroup.classList.remove("active");
+    gravityPanel.classList.remove("active");
     resetSpeed();
+    resetGravity();
 
     if (result === "win") {
       state.streak++;
@@ -867,7 +960,9 @@
     spinBtn.disabled = false;
     spinBtn.textContent = "スタート";
     speedGroup.classList.remove("active");
+    gravityPanel.classList.remove("active");
     resetSpeed();
+    resetGravity();
     timerBadge.textContent = MAX_BATTLE_TIME.toFixed(1) + "s";
     showCenter("NEXT BATTLE", 800);
   }
@@ -894,7 +989,9 @@
     state.player=null; state.enemy=null; state.streak=0;
     state.phase="idle";
     speedGroup.classList.remove("active");
+    gravityPanel.classList.remove("active");
     resetSpeed();
+    resetGravity();
     gameEl.classList.remove("active");
     opening.style.display = "flex";
   }
@@ -913,7 +1010,9 @@
     spinBtn.disabled = false;
     spinBtn.textContent = "スタート";
     speedGroup.classList.remove("active");
+    gravityPanel.classList.remove("active");
     resetSpeed();
+    resetGravity();
     timerBadge.textContent = MAX_BATTLE_TIME.toFixed(1) + "s";
   }
 
