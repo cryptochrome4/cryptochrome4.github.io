@@ -9,9 +9,7 @@
   html, body {
     width: 100%; height: 100%;
     font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif;
-    background: #111;
-    color: #eee;
-    overflow: hidden;
+    background: #111; color: #eee; overflow: hidden;
   }
   #app { width: 100%; height: 100%; position: relative; }
 
@@ -67,7 +65,6 @@
   }
   #battleCanvas { display: block; width: 100%; height: 100%; }
 
-  /* 情報パネル */
   #panels {
     display: flex; gap: 8px;
     padding: 8px;
@@ -139,6 +136,17 @@
     color: #8ef;
   }
 
+  #timerBadge {
+    position: absolute; top: 10px; right: 12px;
+    background: rgba(0,0,0,0.6);
+    border: 1px solid #666;
+    padding: 4px 12px; border-radius: 20px;
+    font-size: clamp(11px, 2.6vw, 14px);
+    letter-spacing: 0.1em;
+    z-index: 15;
+    color: #ccc;
+  }
+
   #battleControls {
     position: absolute;
     bottom: 12px; left: 50%;
@@ -164,7 +172,7 @@
     background: rgba(0,0,0,0.85);
     z-index: 50;
     align-items: center; justify-content: center;
-    flex-direction: column; gap: 16px;
+    flex-direction: column; gap: 14px;
     padding: 20px;
   }
   #choiceOverlay.active { display: flex; }
@@ -175,10 +183,10 @@
     text-shadow: 0 0 20px #ff8c00;
     margin-bottom: 8px;
   }
-  #choiceOverlay p { opacity: 0.8; font-size: clamp(12px,3vw,15px); margin-bottom: 10px; text-align:center;}
+  #choiceOverlay p { opacity: 0.8; font-size: clamp(12px,3vw,15px); margin-bottom: 6px; text-align:center;}
   .choiceBtn {
-    width: min(340px, 90vw);
-    padding: 16px;
+    width: min(360px, 90vw);
+    padding: 14px;
     font-size: clamp(14px, 3.5vw, 18px);
     letter-spacing: 0.1em;
     background: rgba(255,255,255,0.08);
@@ -193,7 +201,7 @@
   .choiceBtn:hover { background: rgba(0,170,255,0.25); transform: translateY(-2px); }
   .choiceBtn small { display:block; opacity:0.65; font-size: 0.8em; margin-top:4px;}
 
-  /* ===== ゲームオーバー / クリア ===== */
+  /* ===== 結果 ===== */
   #resultOverlay {
     display: none;
     position: absolute; inset: 0;
@@ -225,18 +233,17 @@
 <body>
 <div id="app">
 
-  <!-- オープニング -->
   <div id="opening">
     <h1>TORQUES</h1>
     <div class="sub">- コマ回し対決 -</div>
     <button id="startBtn">はじめる</button>
   </div>
 
-  <!-- ゲーム -->
   <div id="game">
     <div id="canvasWrap">
       <canvas id="battleCanvas"></canvas>
       <div id="streakBadge">連勝 0 / 5</div>
+      <div id="timerBadge">30.0s</div>
       <div id="centerMsg"></div>
       <div id="battleControls">
         <button id="spinBtn">スタート</button>
@@ -248,7 +255,6 @@
     </div>
   </div>
 
-  <!-- 勝利後選択 -->
   <div id="choiceOverlay">
     <h2>WIN!</h2>
     <p>次の敵にどう挑む？</p>
@@ -258,7 +264,6 @@
     <button class="choiceBtn" id="upBounceBtn"></button>
   </div>
 
-  <!-- 結果 -->
   <div id="resultOverlay">
     <h2 id="resultTitle"></h2>
     <p id="resultMsg"></p>
@@ -293,26 +298,30 @@
     attack:"攻撃", defense:"防御", stamina:"持久",
     weight:"重さ", spin:"回転", bounce:"バウンド"
   };
-  const TOTAL_POINTS = 60;      // 合計値（両者平等）
+  const TOTAL_POINTS = 60;
   const MIN_STAT = 3, MAX_STAT = 18;
-  const MAX_HP = 100;           // 回転量（止まったら負け）
-  const ARENA_MARGIN = 0.80;    // 描画領域に対する円の占有率
-  const BASE_RADIUS = 26;       // コマの基準半径(px, canvas座標基準)
+  const MAX_HP = 100;
+  const ARENA_MARGIN = 0.82;
+  const BASE_RADIUS = 24;
   const WIN_STREAK = 5;
+  const MAX_BATTLE_TIME = 30;
+
+  // 物理定数
+  const CENTER_PULL = 22;      // 中心引力
+  const FRICTION = 0.55;       // 台との摩擦（速度比例）
+  const AIR_DRAG = 0.12;       // 空気抵抗
+  const PRECESS_DRIFT = 14;    // 歳差による内側ドリフト
+  const WALL_RESTITUTION = 0.72;
+  const HP_DRAIN_BASE = 1.4;   // 毎秒の自然減
+  const HP_DRAIN_HIT = 1.0;    // 衝突衝撃の係数
 
   // ===================== 状態 =====================
   const state = {
-    player: null,
-    enemy: null,
-    streak: 0,
-    phase: "idle",       // idle | spinning | battle | ended
-    rafId: null,
-    lastTime: 0,
+    player: null, enemy: null, streak: 0,
+    phase: "idle", rafId: null, lastTime: 0,
     battle: null,
-    pendingKeep: false,
   };
 
-  // ===================== DOM =====================
   const $ = id => document.getElementById(id);
   const opening = $("opening");
   const gameEl = $("game");
@@ -323,103 +332,81 @@
   const spinBtn = $("spinBtn");
   const centerMsg = $("centerMsg");
   const streakBadge = $("streakBadge");
+  const timerBadge = $("timerBadge");
   const choiceOverlay = $("choiceOverlay");
   const resultOverlay = $("resultOverlay");
   const resultTitle = $("resultTitle");
   const resultMsg = $("resultMsg");
 
   // ===================== ユーティリティ =====================
-  const rand = (a, b) => a + Math.random() * (b - a);
-  const randInt = (a, b) => Math.floor(rand(a, b + 1));
-  const pick = arr => arr[randInt(0, arr.length - 1)];
-  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const rand = (a,b) => a + Math.random()*(b-a);
+  const randInt = (a,b) => Math.floor(rand(a,b+1));
+  const pick = arr => arr[randInt(0,arr.length-1)];
+  const clamp = (v,a,b) => Math.max(a, Math.min(b,v));
 
-  // 合計値固定でランダム配分（両者平等）
   function randomStats() {
     const stats = {};
     let remaining = TOTAL_POINTS;
-    // まず最小値配分
     for (const k of STAT_KEYS) { stats[k] = MIN_STAT; remaining -= MIN_STAT; }
-    // 残りをランダムに配分（上限考慮）
-    const keys = [...STAT_KEYS];
     let guard = 0;
     while (remaining > 0 && guard < 10000) {
       guard++;
-      const k = pick(keys);
+      const k = pick(STAT_KEYS);
       if (stats[k] < MAX_STAT) { stats[k]++; remaining--; }
     }
     return stats;
   }
 
-  function makeKom(a) {
+  function makeKom(base) {
     const color = pick(COLORS);
     const shape = pick(SHAPES);
-    const stats = a && a.stats ? { ...a.stats } : randomStats();
+    const stats = base && base.stats ? { ...base.stats } : randomStats();
+    const mass = 0.6 + stats.weight * 0.08;   // 質量
     return {
-      color: color.hex,
-      colorName: color.name,
-      shape,
-      stats,
-      hp: MAX_HP,
-      maxHp: MAX_HP,
-      x: 0, y: 0,
-      angle: 0,
-      vx: 0, vy: 0,
-      radius: 0,
+      color: color.hex, colorName: color.name, shape, stats,
+      hp: MAX_HP, maxHp: MAX_HP, mass,
+      x:0, y:0, vx:0, vy:0, angle:0, spinRate:0,
+      radius:0, wobble:0,
     };
   }
 
-  // ===================== 描画 =====================
-  let canvasW = 0, canvasH = 0, dpr = 1;
+  // ===================== Canvas =====================
+  let canvasW=0, canvasH=0, dpr=1;
   let arena = { cx:0, cy:0, r:0 };
 
   function resize() {
     const wrap = canvas.parentElement;
     const rect = wrap.getBoundingClientRect();
     dpr = window.devicePixelRatio || 1;
-    canvasW = rect.width;
-    canvasH = rect.height;
-    canvas.width = canvasW * dpr;
-    canvas.height = canvasH * dpr;
-    canvas.style.width = canvasW + "px";
-    canvas.style.height = canvasH + "px";
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-    arena.cx = canvasW / 2;
-    arena.cy = canvasH / 2;
+    canvasW = rect.width; canvasH = rect.height;
+    canvas.width = canvasW*dpr; canvas.height = canvasH*dpr;
+    canvas.style.width = canvasW+"px"; canvas.style.height = canvasH+"px";
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    arena.cx = canvasW/2; arena.cy = canvasH/2;
     arena.r = Math.min(canvasW, canvasH) * 0.5 * ARENA_MARGIN;
-
-    if (state.player) state.player.radius = BASE_RADIUS * (canvasW / 420);
-    if (state.enemy) state.enemy.radius = BASE_RADIUS * (canvasW / 420);
+    const rr = BASE_RADIUS * (Math.min(canvasW,canvasH)/420);
+    if (state.player) state.player.radius = rr;
+    if (state.enemy) state.enemy.radius = rr;
   }
 
   function drawArena() {
-    // 土俵
     ctx.save();
-    const g = ctx.createRadialGradient(arena.cx, arena.cy, arena.r*0.1, arena.cx, arena.cy, arena.r);
-    g.addColorStop(0, "#2a2a44");
-    g.addColorStop(1, "#12121f");
+    const g = ctx.createRadialGradient(arena.cx, arena.cy, arena.r*0.05, arena.cx, arena.cy, arena.r);
+    g.addColorStop(0, "#3a3a5c");
+    g.addColorStop(0.5, "#22223a");
+    g.addColorStop(1, "#101020");
     ctx.beginPath();
     ctx.arc(arena.cx, arena.cy, arena.r, 0, Math.PI*2);
-    ctx.fillStyle = g;
-    ctx.fill();
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = "#4cc9f0";
-    ctx.shadowColor = "#4cc9f0";
-    ctx.shadowBlur = 18;
-    ctx.stroke();
+    ctx.fillStyle = g; ctx.fill();
+    ctx.lineWidth = 4; ctx.strokeStyle = "#4cc9f0";
+    ctx.shadowColor = "#4cc9f0"; ctx.shadowBlur = 18; ctx.stroke();
     ctx.shadowBlur = 0;
-
-    // 内側の円
     ctx.beginPath();
-    ctx.arc(arena.cx, arena.cy, arena.r * 0.55, 0, Math.PI*2);
-    ctx.strokeStyle = "rgba(255,255,255,0.12)";
-    ctx.lineWidth = 1;
-    ctx.stroke();
+    ctx.arc(arena.cx, arena.cy, arena.r*0.66, 0, Math.PI*2);
+    ctx.strokeStyle = "rgba(255,255,255,0.10)"; ctx.lineWidth=1; ctx.stroke();
     ctx.beginPath();
-    ctx.arc(arena.cx, arena.cy, arena.r * 0.2, 0, Math.PI*2);
+    ctx.arc(arena.cx, arena.cy, arena.r*0.33, 0, Math.PI*2);
     ctx.stroke();
-
     ctx.restore();
   }
 
@@ -427,57 +414,49 @@
     if (!k) return;
     ctx.save();
     ctx.translate(k.x, k.y);
+
+    // 影（回転量が落ちると揺れる）
+    const hpRatio = clamp(k.hp/k.maxHp, 0, 1);
+    const wobble = (1 - hpRatio) * 0.5;
+    ctx.save();
+    ctx.translate(Math.sin(k.angle*0.7)*wobble*4, Math.cos(k.angle*0.9)*wobble*4);
     ctx.rotate(k.angle);
-
     const r = k.radius;
-    ctx.shadowColor = k.color;
-    ctx.shadowBlur = 14;
 
+    ctx.shadowColor = k.color; ctx.shadowBlur = 14 + hpRatio*8;
     ctx.beginPath();
     switch (k.shape) {
-      case "circle":
-        ctx.arc(0,0,r,0,Math.PI*2); break;
-      case "triangle":
-        poly(r, 3, -Math.PI/2); break;
-      case "square":
-        poly(r, 4, Math.PI/4); break;
-      case "pentagon":
-        poly(r, 5, -Math.PI/2); break;
-      case "hexagon":
-        poly(r, 6, 0); break;
-      case "star":
-        star(r, r*0.45, 5, -Math.PI/2); break;
+      case "circle":   ctx.arc(0,0,r,0,Math.PI*2); break;
+      case "triangle": poly(r,3,-Math.PI/2); break;
+      case "square":   poly(r,4,Math.PI/4); break;
+      case "pentagon": poly(r,5,-Math.PI/2); break;
+      case "hexagon":  poly(r,6,0); break;
+      case "star":     star(r,r*0.45,5,-Math.PI/2); break;
     }
     ctx.closePath();
-    ctx.fillStyle = k.color;
-    ctx.fill();
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = "rgba(255,255,255,0.85)";
-    ctx.stroke();
+    ctx.fillStyle = k.color; ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = "rgba(255,255,255,0.85)"; ctx.stroke();
 
-    // 回転が見えるマーカー
     ctx.shadowBlur = 0;
     ctx.beginPath();
-    ctx.moveTo(0,0);
-    ctx.lineTo(r*0.75, 0);
-    ctx.strokeStyle = "rgba(0,0,0,0.5)";
-    ctx.lineWidth = 2;
-    ctx.stroke();
+    ctx.moveTo(0,0); ctx.lineTo(r*0.75,0);
+    ctx.strokeStyle = "rgba(0,0,0,0.5)"; ctx.lineWidth=2; ctx.stroke();
+    ctx.restore();
 
     ctx.restore();
   }
 
-  function poly(r, n, offset) {
+  function poly(r,n,offset) {
     for (let i=0;i<n;i++) {
-      const a = offset + i * (Math.PI*2/n);
+      const a = offset + i*(Math.PI*2/n);
       const x = Math.cos(a)*r, y = Math.sin(a)*r;
       if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
     }
   }
-  function star(rOut, rIn, n, offset) {
+  function star(rOut,rIn,n,offset) {
     for (let i=0;i<n*2;i++) {
       const rr = (i%2===0)?rOut:rIn;
-      const a = offset + i * Math.PI/n;
+      const a = offset + i*Math.PI/n;
       const x = Math.cos(a)*rr, y = Math.sin(a)*rr;
       if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
     }
@@ -490,11 +469,11 @@
     if (state.player) drawKom(state.player);
   }
 
-  // ===================== 情報パネル =====================
-  function renderPanel(el, k, title) {
-    if (!k) { el.innerHTML = ""; return; }
+  // ===================== パネル =====================
+  function renderPanel(el,k,title) {
+    if (!k) { el.innerHTML=""; return; }
     const s = k.stats;
-    const hpPct = clamp(k.hp / k.maxHp * 100, 0, 100);
+    const hpPct = clamp(k.hp/k.maxHp*100,0,100);
     el.innerHTML = `
       <h3><span class="swatch" style="background:${k.color}"></span>${title}：${k.colorName} / ${shapeName(k.shape)}</h3>
       <div class="hp-bar"><div style="width:${hpPct}%"></div></div>
@@ -516,30 +495,36 @@
     streakBadge.textContent = `連勝 ${state.streak} / ${WIN_STREAK}`;
   }
 
-  // ===================== 戦闘 =====================
+  // ===================== 戦闘開始 =====================
   function startSpin() {
-    // プレイヤー・敵の初期配置（円の内側、左右）
     const p = state.player, e = state.enemy;
-    const rr = arena.r * 0.55;
-    p.x = arena.cx - rr; p.y = arena.cy;
-    e.x = arena.cx + rr; e.y = arena.cy;
-    p.angle = 0; e.angle = Math.PI;
+    const rr = arena.r * 0.6;
+    const angP = rand(0, Math.PI*2);
+    const angE = angP + Math.PI + rand(-0.6, 0.6);
+    p.x = arena.cx + Math.cos(angP)*rr;
+    p.y = arena.cy + Math.sin(angP)*rr;
+    e.x = arena.cx + Math.cos(angE)*rr;
+    e.y = arena.cy + Math.sin(angE)*rr;
+
+    // 初速：接線方向＋ランダム
+    const tangentP = angP + Math.PI/2;
+    const tangentE = angE + Math.PI/2;
+    const speedP = rand(140, 200);
+    const speedE = rand(140, 200);
+    p.vx = Math.cos(tangentP)*speedP + rand(-20,20);
+    p.vy = Math.sin(tangentP)*speedP + rand(-20,20);
+    e.vx = Math.cos(tangentE)*speedE + rand(-20,20);
+    e.vy = Math.sin(tangentE)*speedE + rand(-20,20);
+
     p.hp = p.maxHp; e.hp = e.maxHp;
-    p.radius = BASE_RADIUS * (canvasW/420);
-    e.radius = BASE_RADIUS * (canvasW/420);
+    p.angle = 0; e.angle = Math.PI;
+    p.radius = BASE_RADIUS * (Math.min(canvasW,canvasH)/420);
+    e.radius = p.radius;
 
     state.battle = {
-      orbitDirP: 1,     // 1=右回り(時計), -1=左
-      orbitDirE: -1,
-      orbitSpeedP: rand(0.9, 1.3),
-      orbitSpeedE: rand(0.9, 1.3),
-      contactTimer: rand(1.5, 3.5),
-      inContact: false,
-      contactDuration: 0,
       elapsed: 0,
-      pushAccumP: 0,
-      pushAccumE: 0,
       hitCooldown: 0,
+      lastCollision: 0,
     };
     state.phase = "battle";
     spinBtn.disabled = true;
@@ -556,125 +541,186 @@
     }, ms);
   }
 
+  // ===================== 物理更新 =====================
   function updateBattle(dt) {
     const b = state.battle;
     if (!b) return;
     const p = state.player, e = state.enemy;
 
     b.elapsed += dt;
+    b.hitCooldown -= dt;
 
-    // 回転量（HP）の自然減少：持久が高いほど減りにくい
-    const drainP = (1.6 - p.stats.stamina * 0.045) * dt;
-    const drainE = (1.6 - e.stats.stamina * 0.045) * dt;
+    // ---- 力の適用 ----
+    applyForces(p, dt);
+    applyForces(e, dt);
+
+    // ---- 位置積分 ----
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    e.x += e.vx * dt; e.y += e.vy * dt;
+
+    // ---- 壁 ----
+    wallCollide(p);
+    wallCollide(e);
+
+    // ---- コマ同士の衝突 ----
+    komCollide(p, e, b);
+
+    // ---- 回転アニメ ----
+    const hpRatioP = clamp(p.hp/p.maxHp, 0, 1);
+    const hpRatioE = clamp(e.hp/e.maxHp, 0, 1);
+    p.angle += dt * (6 + p.stats.spin*0.3) * hpRatioP;
+    e.angle -= dt * (6 + e.stats.spin*0.3) * hpRatioE;
+
+    // ---- 回転量（HP）減少 ----
+    const drainP = (HP_DRAIN_BASE - p.stats.stamina*0.04) * dt;
+    const drainE = (HP_DRAIN_BASE - e.stats.stamina*0.04) * dt;
     p.hp -= Math.max(0.15, drainP);
     e.hp -= Math.max(0.15, drainE);
 
-    // 回転アニメ
-    p.angle += dt * (6 + p.stats.spin * 0.25) * (p.hp>0?1:0);
-    e.angle -= dt * (6 + e.stats.spin * 0.25) * (e.hp>0?1:0);
-
-    if (!b.inContact) {
-      // 周回フェーズ：円の内側をゆっくり回る
-      const orbitR = arena.r * 0.55;
-      const angP = Math.atan2(p.y - arena.cy, p.x - arena.cx);
-      const angE = Math.atan2(e.y - arena.cy, e.x - arena.cx);
-      const newAngP = angP + b.orbitDirP * b.orbitSpeedP * dt;
-      const newAngE = angE + b.orbitDirE * b.orbitSpeedE * dt;
-      p.x = arena.cx + Math.cos(newAngP) * orbitR;
-      p.y = arena.cy + Math.sin(newAngP) * orbitR;
-      e.x = arena.cx + Math.cos(newAngE) * orbitR;
-      e.y = arena.cy + Math.sin(newAngE) * orbitR;
-
-      b.contactTimer -= dt;
-      if (b.contactTimer <= 0) {
-        b.inContact = true;
-        b.contactDuration = rand(0.8, 2.2);
-        b.pushAccumP = 0; b.pushAccumE = 0;
-        b.hitCooldown = 0;
-      }
-    } else {
-      // 接触フェーズ：押し合い
-      b.contactDuration -= dt;
-      b.hitCooldown -= dt;
-
-      const dx = e.x - p.x;
-      const dy = e.y - p.y;
-      const dist = Math.hypot(dx, dy) || 0.0001;
-      const nx = dx / dist, ny = dy / dist;
-
-      // 接触していなければ近づける
-      const touchDist = p.radius + e.radius;
-      if (dist > touchDist) {
-        const sp = 90 * dt;
-        p.x += nx * sp; p.y += ny * sp;
-        e.x -= nx * sp; e.y -= ny * sp;
-      } else {
-        // 押し合い計算
-        const pushP = p.stats.attack * 0.6 + p.stats.weight * 0.5 + p.stats.spin * 0.4;
-        const pushE = e.stats.attack * 0.6 + e.stats.weight * 0.5 + e.stats.spin * 0.4;
-        const resistP = p.stats.defense * 0.5 + p.stats.bounce * 0.6 + p.stats.weight * 0.4;
-        const resistE = e.stats.defense * 0.5 + e.stats.bounce * 0.6 + e.stats.weight * 0.4;
-
-        const netP = (pushP - resistE) * 0.06;
-        const netE = (pushE - resistP) * 0.06;
-
-        const k = 60 * dt;
-        p.x -= nx * Math.max(0, netE) * k * 0.1;
-        p.y -= ny * Math.max(0, netE) * k * 0.1;
-        e.x += nx * Math.max(0, netP) * k * 0.1;
-        e.y += ny * Math.max(0, netP) * k * 0.1;
-
-        // 接触ダメージ
-        if (b.hitCooldown <= 0) {
-          const dmgToE = Math.max(0.5, (p.stats.attack*0.5 + p.stats.spin*0.5 - e.stats.defense*0.6) * 0.35);
-          const dmgToP = Math.max(0.5, (e.stats.attack*0.5 + e.stats.spin*0.5 - p.stats.defense*0.6) * 0.35);
-          e.hp -= dmgToE;
-          p.hp -= dmgToP;
-          b.hitCooldown = 0.25;
-        }
-      }
-
-      // 場外判定（中心が円外）
-      checkOut(p, e);
-      checkOut(e, p);
-
-      if (b.contactDuration <= 0) {
-        b.inContact = false;
-        b.contactTimer = rand(1.2, 3.0);
-      }
+    // ---- 時間切れ ----
+    const remain = Math.max(0, MAX_BATTLE_TIME - b.elapsed);
+    timerBadge.textContent = remain.toFixed(1) + "s";
+    if (b.elapsed >= MAX_BATTLE_TIME) {
+      if (p.hp > e.hp) endBattle("win");
+      else if (e.hp > p.hp) endBattle("lose");
+      else endBattle("draw");
+      return;
     }
 
-    // 回転量0判定
+    // ---- 決着判定 ----
     if (p.hp <= 0 || e.hp <= 0) {
-      endBattle(p.hp <= 0 && e.hp <= 0 ? "double" : (p.hp <= 0 ? "lose" : "win"));
+      if (p.hp <= 0 && e.hp <= 0) endBattle("draw");
+      else if (p.hp <= 0) endBattle("lose");
+      else endBattle("win");
+      return;
     }
+
     updatePanels();
   }
 
-  function checkOut(k, other) {
+  function applyForces(k, dt) {
+    const dx = arena.cx - k.x;
+    const dy = arena.cy - k.y;
+    const dist = Math.hypot(dx, dy) || 0.0001;
+    const nx = dx/dist, ny = dy/dist;
+
+    // 中心引力（距離に比例）
+    const pull = CENTER_PULL * (dist / arena.r);
+    k.vx += nx * pull * dt;
+    k.vy += ny * pull * dt;
+
+    // 歳差ドリフト：回転が落ちるほど内側へ
+    const hpRatio = clamp(k.hp/k.maxHp, 0, 1);
+    const drift = PRECESS_DRIFT * (1 - hpRatio) * (1 + k.stats.spin*0.02);
+    k.vx += nx * drift * dt;
+    k.vy += ny * drift * dt;
+
+    // 摩擦＋空気抵抗
+    const damp = 1 - (FRICTION*0.3 + AIR_DRAG) * dt;
+    k.vx *= damp;
+    k.vy *= damp;
+
+    // 速度上限
+    const sp = Math.hypot(k.vx,k.vy);
+    const maxSp = 420;
+    if (sp > maxSp) { k.vx = k.vx/sp*maxSp; k.vy = k.vy/sp*maxSp; }
+  }
+
+  function wallCollide(k) {
     const dx = k.x - arena.cx;
     const dy = k.y - arena.cy;
-    const d = Math.hypot(dx, dy);
-    if (d + k.radius * 0.3 > arena.r) {
-      // 相手の勝ち
-      if (k === state.player) endBattle("lose");
-      else endBattle("win");
+    const dist = Math.hypot(dx, dy);
+    const limit = arena.r - k.radius;
+    if (dist > limit) {
+      const nx = dx/dist, ny = dy/dist;
+      // 位置補正
+      k.x = arena.cx + nx*limit;
+      k.y = arena.cy + ny*limit;
+      // 反射
+      const vn = k.vx*nx + k.vy*ny;
+      if (vn > 0) {
+        k.vx -= (1 + WALL_RESTITUTION) * vn * nx;
+        k.vy -= (1 + WALL_RESTITUTION) * vn * ny;
+      }
+      // 場外判定：縁が完全に外＝中心が円外
+      const centerDist = Math.hypot(k.x - arena.cx, k.y - arena.cy);
+      if (centerDist > arena.r) {
+        if (k === state.player) endBattle("lose");
+        else endBattle("win");
+      }
+    }
+  }
+
+  function komCollide(p, e, b) {
+    const dx = e.x - p.x;
+    const dy = e.y - p.y;
+    const dist = Math.hypot(dx, dy) || 0.0001;
+    const touch = p.radius + e.radius;
+    if (dist >= touch) return;
+
+    const nx = dx/dist, ny = dy/dist;
+    const overlap = touch - dist;
+
+    // 位置分離（質量比）
+    const totalM = p.mass + e.mass;
+    const pShare = e.mass / totalM;
+    const eShare = p.mass / totalM;
+    p.x -= nx * overlap * pShare;
+    p.y -= ny * overlap * pShare;
+    e.x += nx * overlap * eShare;
+    e.y += ny * overlap * eShare;
+
+    // 相対速度
+    const rvx = e.vx - p.vx;
+    const rvy = e.vy - p.vy;
+    const vn = rvx*nx + rvy*ny;
+    if (vn > 0) return; // 離れていく
+
+    // 反発係数：バウンド力
+    const rest = clamp(0.25 + (p.stats.bounce + e.stats.bounce)*0.02, 0.2, 0.95);
+    const j = -(1 + rest) * vn / (1/p.mass + 1/e.mass);
+
+    p.vx -= j * nx / p.mass;
+    p.vy -= j * ny / p.mass;
+    e.vx += j * nx / e.mass;
+    e.vy += j * ny / e.mass;
+
+    // 攻撃・防御・回転による追加衝撃
+    if (b.hitCooldown <= 0) {
+      const atkP = p.stats.attack*0.5 + p.stats.spin*0.5;
+      const atkE = e.stats.attack*0.5 + e.stats.spin*0.5;
+      const defP = p.stats.defense*0.6 + p.stats.weight*0.4;
+      const defE = e.stats.defense*0.6 + e.stats.weight*0.4;
+
+      const impactP = Math.max(0, atkE - defP) * 0.25 + Math.abs(vn)*0.02;
+      const impactE = Math.max(0, atkP - defE) * 0.25 + Math.abs(vn)*0.02;
+
+      e.hp -= impactP * HP_DRAIN_HIT;
+      p.hp -= impactE * HP_DRAIN_HIT;
+
+      // 押し出しブースト
+      const pushP = Math.max(0, atkP - defE) * 0.6;
+      const pushE = Math.max(0, atkE - defP) * 0.6;
+      e.vx += nx * pushP; e.vy += ny * pushP;
+      p.vx -= nx * pushE; p.vy -= ny * pushE;
+
+      b.hitCooldown = 0.18;
+      b.lastCollision = b.elapsed;
     }
   }
 
   // ===================== ループ =====================
   function loop(t) {
     if (!state.lastTime) state.lastTime = t;
-    let dt = (t - state.lastTime) / 1000;
+    let dt = (t - state.lastTime)/1000;
     state.lastTime = t;
-    dt = Math.min(dt, 0.05);
+    dt = Math.min(dt, 0.04);
 
     if (state.phase === "battle") {
       updateBattle(dt);
     } else {
-      // 待機中も回転アニメ
-      if (state.player) state.player.angle += dt * 3;
-      if (state.enemy) state.enemy.angle -= dt * 3;
+      if (state.player) state.player.angle += dt*3;
+      if (state.enemy) state.enemy.angle -= dt*3;
     }
     render();
     state.rafId = requestAnimationFrame(loop);
@@ -690,20 +736,14 @@
       state.streak++;
       updatePanels();
       if (state.streak >= WIN_STREAK) {
-        showCenter("5連勝!!", 1200, () => {
-          window.location.href = "study.html";
-        });
+        showCenter("5連勝!!", 1200, () => { window.location.href = "hardware.html"; });
         return;
       }
-      showCenter("WIN!", 900, () => {
-        setTimeout(() => openChoice(), 200);
-      });
+      showCenter("WIN!", 900, () => setTimeout(openChoice, 200));
     } else if (result === "lose") {
       state.streak = 0;
       updatePanels();
-      showCenter("LOSE...", 1000, () => {
-        showResult(false);
-      });
+      showCenter("LOSE...", 1000, () => showResult(false));
     } else {
       state.streak = 0;
       updatePanels();
@@ -711,66 +751,43 @@
     }
   }
 
-  // ===================== 選択画面 =====================
+  // ===================== 選択 =====================
   function openChoice() {
     const p = state.player;
-    $("keepBtn").innerHTML = `このコマのまま挑む<small>${p.colorName} / ${shapeName(p.shape)} ／ 回転+1 or バウンド+1 を選べる</small>`;
+    $("keepBtn").innerHTML = `このコマのまま挑む<small>${p.colorName} / ${shapeName(p.shape)}</small>`;
     $("rerollBtn").innerHTML = `ランダム生成で新しいコマにする<small>パラメータ再抽選（強化なし）</small>`;
-    $("upSpinBtn").innerHTML = `回転速度を 1up して続ける<small>現在 回転 ${p.stats.spin} → ${Math.min(MAX_STAT, p.stats.spin+1)}</small>`;
-    $("upBounceBtn").innerHTML = `バウンド力を 1up して続ける<small>現在 バウンド ${p.stats.bounce} → ${Math.min(MAX_STAT, p.stats.bounce+1)}</small>`;
+    $("upSpinBtn").innerHTML = `回転速度を 1up して続ける<small>現在 回転 ${p.stats.spin} → ${Math.min(MAX_STAT,p.stats.spin+1)}</small>`;
+    $("upBounceBtn").innerHTML = `バウンド力を 1up して続ける<small>現在 バウンド ${p.stats.bounce} → ${Math.min(MAX_STAT,p.stats.bounce+1)}</small>`;
 
-    $("upSpinBtn").style.display = "block";
-    $("upBounceBtn").style.display = "block";
-    $("keepBtn").style.display = "none";
-
+    $("keepBtn").style.display = "block";
+    $("rerollBtn").style.display = "block";
+    $("upSpinBtn").style.display = "none";
+    $("upBounceBtn").style.display = "none";
     choiceOverlay.classList.add("active");
   }
-
   function closeChoice() { choiceOverlay.classList.remove("active"); }
 
-  // 「このコマのまま」を押したら強化選択を出す…のではなく、
-  // 仕様に合わせ「このコマのまま」＝強化選択肢を表示、ランダム生成＝即再抽選。
-  // ここでは keepBtn を「このコマのまま（強化選択へ）」として扱う。
-
-  // 実際のUI：keepBtnクリック → 強化2択を表示
   $("keepBtn").addEventListener("click", () => {
     $("keepBtn").style.display = "none";
     $("rerollBtn").style.display = "none";
-    // 強化ボタンは既に表示済み
+    $("upSpinBtn").style.display = "block";
+    $("upBounceBtn").style.display = "block";
   });
-
   $("rerollBtn").addEventListener("click", () => {
     closeChoice();
     state.player = makeKom(null);
     nextEnemy();
   });
-
   $("upSpinBtn").addEventListener("click", () => {
     closeChoice();
     state.player.stats.spin = Math.min(MAX_STAT, state.player.stats.spin + 1);
+    state.player.mass = 0.6 + state.player.stats.weight*0.08;
     nextEnemy();
   });
   $("upBounceBtn").addEventListener("click", () => {
     closeChoice();
     state.player.stats.bounce = Math.min(MAX_STAT, state.player.stats.bounce + 1);
     nextEnemy();
-  });
-
-  // 初期表示の調整：選択画面を開いたとき、keepBtn と rerollBtn を出す
-  const _openChoice = openChoice;
-  openChoice = function() {
-    _openChoice();
-    $("keepBtn").style.display = "block";
-    $("rerollBtn").style.display = "block";
-    $("upSpinBtn").style.display = "none";
-    $("upBounceBtn").style.display = "none";
-  };
-  // keepBtn を押したら強化2択
-  $("keepBtn").addEventListener("click", () => {
-    $("keepBtn").style.display = "none";
-    $("rerollBtn").style.display = "none";
-    $("upSpinBtn").style.display = "block";
-    $("upBounceBtn").style.display = "block";
   });
 
   function nextEnemy() {
@@ -780,16 +797,17 @@
     state.phase = "idle";
     spinBtn.disabled = false;
     spinBtn.textContent = "スタート";
+    timerBadge.textContent = MAX_BATTLE_TIME.toFixed(1) + "s";
     showCenter("NEXT BATTLE", 800);
   }
 
   function resetPositions() {
-    const rr = arena.r * 0.55;
-    if (state.player) { state.player.x = arena.cx - rr; state.player.y = arena.cy; state.player.angle = 0; }
-    if (state.enemy)  { state.enemy.x  = arena.cx + rr; state.enemy.y  = arena.cy; state.enemy.angle  = Math.PI; }
+    const rr = arena.r*0.6;
+    if (state.player) { state.player.x = arena.cx - rr; state.player.y = arena.cy; state.player.angle=0; }
+    if (state.enemy)  { state.enemy.x  = arena.cx + rr; state.enemy.y  = arena.cy; state.enemy.angle=Math.PI; }
   }
 
-  // ===================== 結果画面 =====================
+  // ===================== 結果 =====================
   function showResult(isWin) {
     resultOverlay.classList.add("active");
     resultTitle.textContent = isWin ? "WIN" : "GAME OVER";
@@ -802,13 +820,13 @@
   });
 
   function backToOpening() {
-    state.player = null; state.enemy = null; state.streak = 0;
+    state.player=null; state.enemy=null; state.streak=0;
     state.phase = "idle";
     gameEl.classList.remove("active");
     opening.style.display = "flex";
   }
 
-  // ===================== ゲーム開始 =====================
+  // ===================== 開始 =====================
   function startGame() {
     opening.style.display = "none";
     gameEl.classList.add("active");
@@ -821,9 +839,9 @@
     state.phase = "idle";
     spinBtn.disabled = false;
     spinBtn.textContent = "スタート";
+    timerBadge.textContent = MAX_BATTLE_TIME.toFixed(1) + "s";
   }
 
-  // ===================== イベント =====================
   $("startBtn").addEventListener("click", startGame);
   spinBtn.addEventListener("click", () => {
     if (state.phase === "idle" || state.phase === "ended") {
@@ -833,9 +851,7 @@
   });
   window.addEventListener("resize", () => { if (gameEl.classList.contains("active")) resize(); });
 
-  // ループ開始
   requestAnimationFrame(loop);
-
 })();
 </script>
 </body>
