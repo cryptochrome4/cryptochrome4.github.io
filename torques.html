@@ -203,6 +203,7 @@
     border: 1px solid #2a5a8a;
     border-radius: 12px;
     padding: 8px 12px;
+    max-width: 96vw;
   }
   #gravityPanel.active { display: flex; }
   #gravityLabel {
@@ -238,8 +239,9 @@
     background: rgba(0,0,0,0.85);
     z-index: 50;
     align-items: center; justify-content: center;
-    flex-direction: column; gap: 14px;
+    flex-direction: column; gap: 12px;
     padding: 20px;
+    overflow-y: auto;
   }
   #choiceOverlay.active { display: flex; }
   #choiceOverlay h2 {
@@ -247,13 +249,47 @@
     letter-spacing: 0.2em;
     color: #ffd94a;
     text-shadow: 0 0 20px #ff8c00;
-    margin-bottom: 8px;
+    margin-bottom: 4px;
   }
-  #choiceOverlay p { opacity: 0.8; font-size: clamp(12px,3vw,15px); margin-bottom: 6px; text-align:center;}
+  #choiceOverlay p { opacity: 0.85; font-size: clamp(12px,3vw,15px); margin-bottom: 6px; text-align:center;}
+  #choiceSubTitle {
+    font-size: clamp(12px, 3vw, 14px);
+    opacity: 0.75;
+    letter-spacing: 0.1em;
+    margin-top: 4px;
+  }
+  #choiceGrid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    width: min(420px, 92vw);
+  }
+  .upBtn {
+    padding: 12px 10px;
+    font-size: clamp(13px, 3.2vw, 16px);
+    letter-spacing: 0.05em;
+    background: rgba(0,170,255,0.18);
+    color: #eee;
+    border: 1px solid #0af;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+    text-align: center;
+    line-height: 1.3;
+  }
+  .upBtn:hover:not(:disabled) { background: rgba(0,170,255,0.35); transform: translateY(-2px); }
+  .upBtn:disabled {
+    opacity: 0.35;
+    cursor: default;
+    border-color: #555;
+    background: rgba(255,255,255,0.05);
+  }
+  .upBtn small { display: block; opacity: 0.7; font-size: 0.78em; margin-top: 3px; }
+
   .choiceBtn {
-    width: min(380px, 90vw);
+    width: min(420px, 92vw);
     padding: 14px;
-    font-size: clamp(14px, 3.5vw, 18px);
+    font-size: clamp(14px, 3.5vw, 17px);
     letter-spacing: 0.1em;
     background: rgba(255,255,255,0.08);
     color: #eee;
@@ -261,8 +297,8 @@
     border-radius: 10px;
     cursor: pointer;
     transition: background 0.15s, transform 0.1s;
-    text-align: left;
-    line-height: 1.5;
+    text-align: center;
+    line-height: 1.4;
   }
   .choiceBtn:hover { background: rgba(0,170,255,0.25); transform: translateY(-2px); }
   .choiceBtn small { display:block; opacity:0.65; font-size: 0.8em; margin-top:4px;}
@@ -312,14 +348,14 @@
       <div id="timerBadge">30.0s</div>
 
       <div id="gravityPanel">
-        <div id="gravityLabel">重力 <b id="gravityValue">1.0x</b>（あなたのみ操作可）</div>
+        <div id="gravityLabel">重力 <b id="gravityValue">15x</b>（あなたのみ操作可）</div>
         <div id="gravityGroup">
           <button data-gravity="0.5">弱</button>
-          <button data-gravity="1" class="on">デフォ</button>
-          <button data-gravity="1.5">中</button>
-          <button data-gravity="2">強</button>
-          <button data-gravity="5">超強</button>
-          <button data-gravity="10">MAX</button>
+          <button data-gravity="15" class="on">デフォ</button>
+          <button data-gravity="20">中</button>
+          <button data-gravity="30">強</button>
+          <button data-gravity="50">超強</button>
+          <button data-gravity="100">MAX</button>
         </div>
       </div>
 
@@ -343,10 +379,17 @@
   <div id="choiceOverlay">
     <h2>WIN!</h2>
     <p>次の敵にどう挑む？</p>
-    <button class="choiceBtn" id="keepBtn"></button>
+    <div id="choiceSubTitle">強化する項目を選べ（各上限：他30 / バウンド100）</div>
+    <div id="choiceGrid">
+      <button class="upBtn" data-up="attack"></button>
+      <button class="upBtn" data-up="defense"></button>
+      <button class="upBtn" data-up="stamina"></button>
+      <button class="upBtn" data-up="weight"></button>
+      <button class="upBtn" data-up="spin"></button>
+      <button class="upBtn" data-up="bounce"></button>
+    </div>
+    <div id="choiceSubTitle">または</div>
     <button class="choiceBtn" id="rerollBtn"></button>
-    <button class="choiceBtn" id="upSpinBtn"></button>
-    <button class="choiceBtn" id="upBounceBtn"></button>
   </div>
 
   <div id="resultOverlay">
@@ -385,9 +428,12 @@
     weight:"重さ", spin:"回転"
   };
   const TOTAL_POINTS = 60;
-  const MIN_STAT = 3, MAX_STAT = 18;
-
+  const MIN_STAT = 3;
+  const CORE_MAX = 30;       // 他5項目の上限
   const BOUNCE_MIN = 0, BOUNCE_MAX = 100;
+
+  const CORE_UP = 3;         // 強化：+3
+  const BOUNCE_UP = 7;       // 強化：+7
 
   const MAX_HP = 100;
   const ARENA_MARGIN = 0.82;
@@ -396,7 +442,7 @@
   const MAX_BATTLE_TIME = 30;
 
   // 物理定数
-  const CENTER_PULL = 90;      // 重力1xの基準
+  const CENTER_PULL = 90;      // 基準（重力倍率を掛ける）
   const FRICTION = 0.45;
   const AIR_DRAG = 0.12;
   const PRECESS_DRIFT = 10;
@@ -405,15 +451,12 @@
 
   const FIXED_STEP = 1/120;
 
-  // 重力プリセット（プレイヤーのみ）
-  const GRAVITY_PRESETS = [0.5, 1, 1.5, 2, 5, 10];
-
   // ===================== 状態 =====================
   const state = {
     player:null, enemy:null, streak:0,
     phase:"idle", rafId:null, lastTime:0,
     battle:null, speed:1,
-    gravity:1,       // 重力倍率
+    gravity:15,      // デフォルト15x
   };
 
   const $ = id => document.getElementById(id);
@@ -442,6 +485,7 @@
   const pick = arr => arr[randInt(0,arr.length-1)];
   const clamp = (v,a,b) => Math.max(a, Math.min(b,v));
 
+  // 他5項目：合計60固定でランダム配分（各3〜30）
   function randomCoreStats() {
     const stats = {};
     let remaining = TOTAL_POINTS;
@@ -450,7 +494,7 @@
     while (remaining > 0 && guard < 10000) {
       guard++;
       const k = pick(CORE_KEYS);
-      if (stats[k] < MAX_STAT) { stats[k]++; remaining--; }
+      if (stats[k] < CORE_MAX) { stats[k]++; remaining--; }
     }
     return stats;
   }
@@ -496,8 +540,8 @@
 
   function drawArena() {
     ctx.save();
-    // 重力が強いと中心が赤く光る
-    const gIntensity = clamp((state.gravity - 1) / 9, 0, 1);
+    // 重力が強いと中心が赤く光る（15x〜100xを0〜1に正規化）
+    const gIntensity = clamp((state.gravity - 15) / 85, 0, 1);
     const g = ctx.createRadialGradient(arena.cx, arena.cy, arena.r*0.05, arena.cx, arena.cy, arena.r);
     g.addColorStop(0, gIntensity > 0.02
       ? `rgba(${Math.round(58+180*gIntensity)}, ${Math.round(58-30*gIntensity)}, ${Math.round(92-60*gIntensity)}, 1)`
@@ -583,15 +627,17 @@
     if (!k) { el.innerHTML=""; return; }
     const c = k.core;
     const hpPct = clamp(k.hp/k.maxHp*100,0,100);
+    const maxTag = v => v >= CORE_MAX ? ' <span style="color:#ffd94a">MAX</span>' : '';
+    const maxTagB = v => v >= BOUNCE_MAX ? ' <span style="color:#ffd94a">MAX</span>' : '';
     el.innerHTML = `
       <h3><span class="swatch" style="background:${k.color}"></span>${title}：${k.colorName} / ${shapeName(k.shape)}</h3>
       <div class="hp-bar"><div style="width:${hpPct}%"></div></div>
-      <div class="stat-row"><span class="label">${CORE_LABELS.attack}</span><span class="val">${c.attack}</span></div>
-      <div class="stat-row"><span class="label">${CORE_LABELS.defense}</span><span class="val">${c.defense}</span></div>
-      <div class="stat-row"><span class="label">${CORE_LABELS.stamina}</span><span class="val">${c.stamina}</span></div>
-      <div class="stat-row"><span class="label">${CORE_LABELS.weight}</span><span class="val">${c.weight}</span></div>
-      <div class="stat-row"><span class="label">${CORE_LABELS.spin}</span><span class="val">${c.spin}</span></div>
-      <div class="stat-row"><span class="label">バウンド</span><span class="val">${k.bounce}</span></div>
+      <div class="stat-row"><span class="label">${CORE_LABELS.attack}</span><span class="val">${c.attack}${maxTag(c.attack)}</span></div>
+      <div class="stat-row"><span class="label">${CORE_LABELS.defense}</span><span class="val">${c.defense}${maxTag(c.defense)}</span></div>
+      <div class="stat-row"><span class="label">${CORE_LABELS.stamina}</span><span class="val">${c.stamina}${maxTag(c.stamina)}</span></div>
+      <div class="stat-row"><span class="label">${CORE_LABELS.weight}</span><span class="val">${c.weight}${maxTag(c.weight)}</span></div>
+      <div class="stat-row"><span class="label">${CORE_LABELS.spin}</span><span class="val">${c.spin}${maxTag(c.spin)}</span></div>
+      <div class="stat-row"><span class="label">バウンド</span><span class="val">${k.bounce}${maxTagB(k.bounce)}</span></div>
     `;
   }
   function shapeName(s) {
@@ -679,14 +725,14 @@
     [...gravityGroup.querySelectorAll("button")].forEach(b => {
       b.classList.toggle("on", Number(b.dataset.gravity) === state.gravity);
     });
-    gravityValue.textContent = state.gravity.toFixed(1) + "x";
+    gravityValue.textContent = state.gravity + "x";
   }
   function setGravity(g) {
     state.gravity = g;
     applyGravityUI();
   }
   function resetGravity() {
-    state.gravity = 1;
+    state.gravity = 15;
     applyGravityUI();
   }
   gravityGroup.addEventListener("click", ev => {
@@ -748,7 +794,7 @@
     k.vy *= damp;
 
     const sp = Math.hypot(k.vx,k.vy);
-    const maxSp = 420;
+    const maxSp = 800;
     if (sp > maxSp) { k.vx = k.vx/sp*maxSp; k.vy = k.vy/sp*maxSp; }
   }
 
@@ -912,43 +958,50 @@
     }
   }
 
-  // ===================== 選択 =====================
+  // ===================== 選択（強化6ボタン＋ランダム生成） =====================
   function openChoice() {
     const p = state.player;
-    $("keepBtn").innerHTML = `このコマのまま挑む<small>${p.colorName} / ${shapeName(p.shape)}</small>`;
-    $("rerollBtn").innerHTML = `ランダム生成で新しいコマにする<small>パラメータ再抽選（強化なし）</small>`;
-    $("upSpinBtn").innerHTML = `回転速度を 1up して続ける<small>現在 回転 ${p.core.spin} → ${Math.min(MAX_STAT,p.core.spin+1)}</small>`;
-    $("upBounceBtn").innerHTML = `バウンド力を 1up して続ける<small>現在 バウンド ${p.bounce} → ${Math.min(BOUNCE_MAX,p.bounce+1)}</small>`;
+    // 各ボタンのラベル更新
+    updateUpButton("attack",  CORE_LABELS.attack,  p.core.attack,  CORE_UP, CORE_MAX);
+    updateUpButton("defense", CORE_LABELS.defense, p.core.defense, CORE_UP, CORE_MAX);
+    updateUpButton("stamina", CORE_LABELS.stamina, p.core.stamina, CORE_UP, CORE_MAX);
+    updateUpButton("weight",  CORE_LABELS.weight,  p.core.weight,  CORE_UP, CORE_MAX);
+    updateUpButton("spin",    CORE_LABELS.spin,    p.core.spin,    CORE_UP, CORE_MAX);
+    updateUpButton("bounce",  "バウンド",          p.bounce,       BOUNCE_UP, BOUNCE_MAX);
 
-    $("keepBtn").style.display = "block";
-    $("rerollBtn").style.display = "block";
-    $("upSpinBtn").style.display = "none";
-    $("upBounceBtn").style.display = "none";
+    $("rerollBtn").innerHTML = `ランダム生成で新しいコマにする<small>パラメータ再抽選（強化なし）</small>`;
+
     choiceOverlay.classList.add("active");
+  }
+  function updateUpButton(key, label, current, up, max) {
+    const btn = document.querySelector(`.upBtn[data-up="${key}"]`);
+    const next = Math.min(max, current + up);
+    const isMax = current >= max;
+    btn.disabled = isMax;
+    btn.innerHTML = `${label} +${up}<small>${current} → ${next}${isMax ? "（MAX）" : ""}</small>`;
   }
   function closeChoice() { choiceOverlay.classList.remove("active"); }
 
-  $("keepBtn").addEventListener("click", () => {
-    $("keepBtn").style.display = "none";
-    $("rerollBtn").style.display = "none";
-    $("upSpinBtn").style.display = "block";
-    $("upBounceBtn").style.display = "block";
+  // 各強化ボタンのクリック処理
+  document.querySelectorAll(".upBtn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const key = btn.dataset.up;
+      const p = state.player;
+      if (key === "bounce") {
+        p.bounce = Math.min(BOUNCE_MAX, p.bounce + BOUNCE_UP);
+        p.stats.bounce = p.bounce;
+      } else {
+        p.core[key] = Math.min(CORE_MAX, p.core[key] + CORE_UP);
+        p.stats[key] = p.core[key];
+      }
+      closeChoice();
+      nextEnemy();
+    });
   });
+
   $("rerollBtn").addEventListener("click", () => {
     closeChoice();
     state.player = makeKom(null);
-    nextEnemy();
-  });
-  $("upSpinBtn").addEventListener("click", () => {
-    closeChoice();
-    state.player.core.spin = Math.min(MAX_STAT, state.player.core.spin + 1);
-    state.player.stats.spin = state.player.core.spin;
-    nextEnemy();
-  });
-  $("upBounceBtn").addEventListener("click", () => {
-    closeChoice();
-    state.player.bounce = Math.min(BOUNCE_MAX, state.player.bounce + 1);
-    state.player.stats.bounce = state.player.bounce;
     nextEnemy();
   });
 
