@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TORQUES - コマ回し対決</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%; height: 100%;
+    font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif;
+    background: #111;
+    color: #eee;
+    overflow: hidden;
+  }
+  #app { width: 100%; height: 100%; position: relative; }
+
+  /* ===== オープニング ===== */
+  #opening {
+    position: absolute; inset: 0;
+    background: url('img188elon.jpg') center/cover no-repeat, #111;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 100;
+  }
+  #opening::before {
+    content: ""; position: absolute; inset: 0;
+    background: rgba(0,0,0,0.45);
+  }
+  #opening h1 {
+    position: relative;
+    font-size: clamp(28px, 8vw, 64px);
+    letter-spacing: 0.15em;
+    text-shadow: 0 0 20px #0ff, 0 0 40px #08f;
+    margin-bottom: 40px;
+  }
+  #opening .sub {
+    position: relative;
+    font-size: clamp(12px, 3vw, 18px);
+    opacity: 0.8; margin-bottom: 50px; letter-spacing: 0.2em;
+  }
+  #startBtn {
+    position: relative;
+    padding: 18px 60px;
+    font-size: clamp(18px, 4vw, 26px);
+    letter-spacing: 0.3em;
+    background: linear-gradient(135deg, #06c, #0af);
+    color: #fff; border: none; border-radius: 50px;
+    cursor: pointer;
+    box-shadow: 0 0 25px rgba(0,180,255,0.7);
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  #startBtn:hover { transform: scale(1.05); box-shadow: 0 0 40px rgba(0,200,255,1); }
+
+  /* ===== ゲーム画面 ===== */
+  #game {
+    display: none;
+    position: absolute; inset: 0;
+    flex-direction: column;
+  }
+  #game.active { display: flex; }
+
+  #canvasWrap {
+    flex: 1; position: relative;
+    background: radial-gradient(circle at center, #1a1a2e 0%, #0a0a12 80%);
+    overflow: hidden;
+  }
+  #battleCanvas { display: block; width: 100%; height: 100%; }
+
+  /* 情報パネル */
+  #panels {
+    display: flex; gap: 8px;
+    padding: 8px;
+    background: rgba(0,0,0,0.75);
+    border-top: 1px solid #333;
+    min-height: 140px;
+  }
+  .panel {
+    flex: 1;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: clamp(10px, 2.4vw, 13px);
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .panel h3 {
+    font-size: clamp(11px, 2.6vw, 14px);
+    letter-spacing: 0.1em;
+    border-bottom: 1px solid #444;
+    padding-bottom: 3px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .swatch {
+    width: 14px; height: 14px; border-radius: 50%;
+    border: 1px solid #fff3; display: inline-block;
+  }
+  .stat-row {
+    display: flex; justify-content: space-between;
+    font-size: clamp(9px, 2.2vw, 12px);
+  }
+  .stat-row .label { opacity: 0.7; }
+  .stat-row .val { font-weight: bold; }
+  .hp-bar {
+    height: 6px; background: #333; border-radius: 3px; overflow: hidden;
+    margin-top: 2px;
+  }
+  .hp-bar > div {
+    height: 100%; width: 100%;
+    background: linear-gradient(90deg, #0f0, #ff0);
+    transition: width 0.15s;
+  }
+
+  #centerMsg {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: clamp(20px, 6vw, 42px);
+    font-weight: bold;
+    text-shadow: 0 0 20px #000, 0 0 40px #000;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+    text-align: center;
+    letter-spacing: 0.2em;
+    z-index: 20;
+  }
+  #centerMsg.show { opacity: 1; }
+
+  #streakBadge {
+    position: absolute; top: 10px; left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.6);
+    border: 1px solid #0af;
+    padding: 4px 16px; border-radius: 20px;
+    font-size: clamp(12px, 3vw, 16px);
+    letter-spacing: 0.15em;
+    z-index: 15;
+    color: #8ef;
+  }
+
+  #battleControls {
+    position: absolute;
+    bottom: 12px; left: 50%;
+    transform: translateX(-50%);
+    z-index: 15;
+    display: flex; gap: 10px;
+  }
+  #battleControls button {
+    padding: 10px 28px;
+    font-size: clamp(13px, 3vw, 17px);
+    letter-spacing: 0.15em;
+    background: linear-gradient(135deg, #06c, #0af);
+    color: #fff; border: none; border-radius: 30px;
+    cursor: pointer;
+    box-shadow: 0 0 15px rgba(0,150,255,0.6);
+  }
+  #battleControls button:disabled { opacity: 0.4; cursor: default; box-shadow: none; }
+
+  /* ===== 選択画面 ===== */
+  #choiceOverlay {
+    display: none;
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,0.85);
+    z-index: 50;
+    align-items: center; justify-content: center;
+    flex-direction: column; gap: 16px;
+    padding: 20px;
+  }
+  #choiceOverlay.active { display: flex; }
+  #choiceOverlay h2 {
+    font-size: clamp(20px, 5vw, 32px);
+    letter-spacing: 0.2em;
+    color: #ffd94a;
+    text-shadow: 0 0 20px #ff8c00;
+    margin-bottom: 8px;
+  }
+  #choiceOverlay p { opacity: 0.8; font-size: clamp(12px,3vw,15px); margin-bottom: 10px; text-align:center;}
+  .choiceBtn {
+    width: min(340px, 90vw);
+    padding: 16px;
+    font-size: clamp(14px, 3.5vw, 18px);
+    letter-spacing: 0.1em;
+    background: rgba(255,255,255,0.08);
+    color: #eee;
+    border: 1px solid #0af;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+    text-align: left;
+    line-height: 1.5;
+  }
+  .choiceBtn:hover { background: rgba(0,170,255,0.25); transform: translateY(-2px); }
+  .choiceBtn small { display:block; opacity:0.65; font-size: 0.8em; margin-top:4px;}
+
+  /* ===== ゲームオーバー / クリア ===== */
+  #resultOverlay {
+    display: none;
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,0.92);
+    z-index: 80;
+    align-items: center; justify-content: center;
+    flex-direction: column; gap: 24px;
+    padding: 20px; text-align: center;
+  }
+  #resultOverlay.active { display: flex; }
+  #resultOverlay h2 {
+    font-size: clamp(28px, 8vw, 56px);
+    letter-spacing: 0.2em;
+  }
+  #resultOverlay .win { color: #ffd94a; text-shadow: 0 0 30px #ff8c00; }
+  #resultOverlay .lose { color: #ff4a6e; text-shadow: 0 0 30px #f00; }
+  #resultOverlay p { opacity: 0.8; font-size: clamp(13px,3.5vw,17px); }
+  #resultOverlay button {
+    padding: 14px 50px;
+    font-size: clamp(15px, 4vw, 20px);
+    letter-spacing: 0.2em;
+    background: linear-gradient(135deg, #06c, #0af);
+    color: #fff; border: none; border-radius: 40px;
+    cursor: pointer;
+    box-shadow: 0 0 20px rgba(0,180,255,0.7);
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- オープニング -->
+  <div id="opening">
+    <h1>TORQUES</h1>
+    <div class="sub">- コマ回し対決 -</div>
+    <button id="startBtn">はじめる</button>
+  </div>
+
+  <!-- ゲーム -->
+  <div id="game">
+    <div id="canvasWrap">
+      <canvas id="battleCanvas"></canvas>
+      <div id="streakBadge">連勝 0 / 5</div>
+      <div id="centerMsg"></div>
+      <div id="battleControls">
+        <button id="spinBtn">スタート</button>
+      </div>
+    </div>
+    <div id="panels">
+      <div class="panel" id="playerPanel"></div>
+      <div class="panel" id="enemyPanel"></div>
+    </div>
+  </div>
+
+  <!-- 勝利後選択 -->
+  <div id="choiceOverlay">
+    <h2>WIN!</h2>
+    <p>次の敵にどう挑む？</p>
+    <button class="choiceBtn" id="keepBtn"></button>
+    <button class="choiceBtn" id="rerollBtn"></button>
+    <button class="choiceBtn" id="upSpinBtn"></button>
+    <button class="choiceBtn" id="upBounceBtn"></button>
+  </div>
+
+  <!-- 結果 -->
+  <div id="resultOverlay">
+    <h2 id="resultTitle"></h2>
+    <p id="resultMsg"></p>
+    <button id="resultBtn">オープニングへ</button>
+  </div>
+
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ===================== 定数 =====================
+  const COLORS = [
+    { name:"赤",   hex:"#e63946" },
+    { name:"水色", hex:"#4cc9f0" },
+    { name:"黄色", hex:"#ffd60a" },
+    { name:"ピンク",hex:"#ff70a6" },
+    { name:"青",   hex:"#3a86ff" },
+    { name:"茶色", hex:"#8d6e63" },
+    { name:"白",   hex:"#f1faee" },
+    { name:"橙",   hex:"#fb8500" },
+    { name:"紫",   hex:"#9b5de5" },
+    { name:"黒",   hex:"#222222" },
+    { name:"灰色", hex:"#9e9e9e" },
+    { name:"緑",   hex:"#2a9d8f" },
+    { name:"黄緑", hex:"#a7c957" },
+  ];
+  const SHAPES = ["circle","triangle","square","star","hexagon","pentagon"];
+  const STAT_KEYS = ["attack","defense","stamina","weight","spin","bounce"];
+  const STAT_LABELS = {
+    attack:"攻撃", defense:"防御", stamina:"持久",
+    weight:"重さ", spin:"回転", bounce:"バウンド"
+  };
+  const TOTAL_POINTS = 60;      // 合計値（両者平等）
+  const MIN_STAT = 3, MAX_STAT = 18;
+  const MAX_HP = 100;           // 回転量（止まったら負け）
+  const ARENA_MARGIN = 0.80;    // 描画領域に対する円の占有率
+  const BASE_RADIUS = 26;       // コマの基準半径(px, canvas座標基準)
+  const WIN_STREAK = 5;
+
+  // ===================== 状態 =====================
+  const state = {
+    player: null,
+    enemy: null,
+    streak: 0,
+    phase: "idle",       // idle | spinning | battle | ended
+    rafId: null,
+    lastTime: 0,
+    battle: null,
+    pendingKeep: false,
+  };
+
+  // ===================== DOM =====================
+  const $ = id => document.getElementById(id);
+  const opening = $("opening");
+  const gameEl = $("game");
+  const canvas = $("battleCanvas");
+  const ctx = canvas.getContext("2d");
+  const playerPanel = $("playerPanel");
+  const enemyPanel = $("enemyPanel");
+  const spinBtn = $("spinBtn");
+  const centerMsg = $("centerMsg");
+  const streakBadge = $("streakBadge");
+  const choiceOverlay = $("choiceOverlay");
+  const resultOverlay = $("resultOverlay");
+  const resultTitle = $("resultTitle");
+  const resultMsg = $("resultMsg");
+
+  // ===================== ユーティリティ =====================
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const randInt = (a, b) => Math.floor(rand(a, b + 1));
+  const pick = arr => arr[randInt(0, arr.length - 1)];
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+  // 合計値固定でランダム配分（両者平等）
+  function randomStats() {
+    const stats = {};
+    let remaining = TOTAL_POINTS;
+    // まず最小値配分
+    for (const k of STAT_KEYS) { stats[k] = MIN_STAT; remaining -= MIN_STAT; }
+    // 残りをランダムに配分（上限考慮）
+    const keys = [...STAT_KEYS];
+    let guard = 0;
+    while (remaining > 0 && guard < 10000) {
+      guard++;
+      const k = pick(keys);
+      if (stats[k] < MAX_STAT) { stats[k]++; remaining--; }
+    }
+    return stats;
+  }
+
+  function makeKom(a) {
+    const color = pick(COLORS);
+    const shape = pick(SHAPES);
+    const stats = a && a.stats ? { ...a.stats } : randomStats();
+    return {
+      color: color.hex,
+      colorName: color.name,
+      shape,
+      stats,
+      hp: MAX_HP,
+      maxHp: MAX_HP,
+      x: 0, y: 0,
+      angle: 0,
+      vx: 0, vy: 0,
+      radius: 0,
+    };
+  }
+
+  // ===================== 描画 =====================
+  let canvasW = 0, canvasH = 0, dpr = 1;
+  let arena = { cx:0, cy:0, r:0 };
+
+  function resize() {
+    const wrap = canvas.parentElement;
+    const rect = wrap.getBoundingClientRect();
+    dpr = window.devicePixelRatio || 1;
+    canvasW = rect.width;
+    canvasH = rect.height;
+    canvas.width = canvasW * dpr;
+    canvas.height = canvasH * dpr;
+    canvas.style.width = canvasW + "px";
+    canvas.style.height = canvasH + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    arena.cx = canvasW / 2;
+    arena.cy = canvasH / 2;
+    arena.r = Math.min(canvasW, canvasH) * 0.5 * ARENA_MARGIN;
+
+    if (state.player) state.player.radius = BASE_RADIUS * (canvasW / 420);
+    if (state.enemy) state.enemy.radius = BASE_RADIUS * (canvasW / 420);
+  }
+
+  function drawArena() {
+    // 土俵
+    ctx.save();
+    const g = ctx.createRadialGradient(arena.cx, arena.cy, arena.r*0.1, arena.cx, arena.cy, arena.r);
+    g.addColorStop(0, "#2a2a44");
+    g.addColorStop(1, "#12121f");
+    ctx.beginPath();
+    ctx.arc(arena.cx, arena.cy, arena.r, 0, Math.PI*2);
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = "#4cc9f0";
+    ctx.shadowColor = "#4cc9f0";
+    ctx.shadowBlur = 18;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // 内側の円
+    ctx.beginPath();
+    ctx.arc(arena.cx, arena.cy, arena.r * 0.55, 0, Math.PI*2);
+    ctx.strokeStyle = "rgba(255,255,255,0.12)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(arena.cx, arena.cy, arena.r * 0.2, 0, Math.PI*2);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  function drawKom(k) {
+    if (!k) return;
+    ctx.save();
+    ctx.translate(k.x, k.y);
+    ctx.rotate(k.angle);
+
+    const r = k.radius;
+    ctx.shadowColor = k.color;
+    ctx.shadowBlur = 14;
+
+    ctx.beginPath();
+    switch (k.shape) {
+      case "circle":
+        ctx.arc(0,0,r,0,Math.PI*2); break;
+      case "triangle":
+        poly(r, 3, -Math.PI/2); break;
+      case "square":
+        poly(r, 4, Math.PI/4); break;
+      case "pentagon":
+        poly(r, 5, -Math.PI/2); break;
+      case "hexagon":
+        poly(r, 6, 0); break;
+      case "star":
+        star(r, r*0.45, 5, -Math.PI/2); break;
+    }
+    ctx.closePath();
+    ctx.fillStyle = k.color;
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "rgba(255,255,255,0.85)";
+    ctx.stroke();
+
+    // 回転が見えるマーカー
+    ctx.shadowBlur = 0;
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.lineTo(r*0.75, 0);
+    ctx.strokeStyle = "rgba(0,0,0,0.5)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  function poly(r, n, offset) {
+    for (let i=0;i<n;i++) {
+      const a = offset + i * (Math.PI*2/n);
+      const x = Math.cos(a)*r, y = Math.sin(a)*r;
+      if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+  }
+  function star(rOut, rIn, n, offset) {
+    for (let i=0;i<n*2;i++) {
+      const rr = (i%2===0)?rOut:rIn;
+      const a = offset + i * Math.PI/n;
+      const x = Math.cos(a)*rr, y = Math.sin(a)*rr;
+      if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+  }
+
+  function render() {
+    ctx.clearRect(0,0,canvasW,canvasH);
+    drawArena();
+    if (state.enemy) drawKom(state.enemy);
+    if (state.player) drawKom(state.player);
+  }
+
+  // ===================== 情報パネル =====================
+  function renderPanel(el, k, title) {
+    if (!k) { el.innerHTML = ""; return; }
+    const s = k.stats;
+    const hpPct = clamp(k.hp / k.maxHp * 100, 0, 100);
+    el.innerHTML = `
+      <h3><span class="swatch" style="background:${k.color}"></span>${title}：${k.colorName} / ${shapeName(k.shape)}</h3>
+      <div class="hp-bar"><div style="width:${hpPct}%"></div></div>
+      <div class="stat-row"><span class="label">${STAT_LABELS.attack}</span><span class="val">${s.attack}</span></div>
+      <div class="stat-row"><span class="label">${STAT_LABELS.defense}</span><span class="val">${s.defense}</span></div>
+      <div class="stat-row"><span class="label">${STAT_LABELS.stamina}</span><span class="val">${s.stamina}</span></div>
+      <div class="stat-row"><span class="label">${STAT_LABELS.weight}</span><span class="val">${s.weight}</span></div>
+      <div class="stat-row"><span class="label">${STAT_LABELS.spin}</span><span class="val">${s.spin}</span></div>
+      <div class="stat-row"><span class="label">${STAT_LABELS.bounce}</span><span class="val">${s.bounce}</span></div>
+    `;
+  }
+  function shapeName(s) {
+    return { circle:"円", triangle:"三角", square:"四角", star:"星",
+             hexagon:"六角", pentagon:"五角" }[s] || s;
+  }
+  function updatePanels() {
+    renderPanel(playerPanel, state.player, "YOU");
+    renderPanel(enemyPanel, state.enemy, "CPU");
+    streakBadge.textContent = `連勝 ${state.streak} / ${WIN_STREAK}`;
+  }
+
+  // ===================== 戦闘 =====================
+  function startSpin() {
+    // プレイヤー・敵の初期配置（円の内側、左右）
+    const p = state.player, e = state.enemy;
+    const rr = arena.r * 0.55;
+    p.x = arena.cx - rr; p.y = arena.cy;
+    e.x = arena.cx + rr; e.y = arena.cy;
+    p.angle = 0; e.angle = Math.PI;
+    p.hp = p.maxHp; e.hp = e.maxHp;
+    p.radius = BASE_RADIUS * (canvasW/420);
+    e.radius = BASE_RADIUS * (canvasW/420);
+
+    state.battle = {
+      orbitDirP: 1,     // 1=右回り(時計), -1=左
+      orbitDirE: -1,
+      orbitSpeedP: rand(0.9, 1.3),
+      orbitSpeedE: rand(0.9, 1.3),
+      contactTimer: rand(1.5, 3.5),
+      inContact: false,
+      contactDuration: 0,
+      elapsed: 0,
+      pushAccumP: 0,
+      pushAccumE: 0,
+      hitCooldown: 0,
+    };
+    state.phase = "battle";
+    spinBtn.disabled = true;
+    showCenter("READY...", 700, () => showCenter("GO!", 500));
+    updatePanels();
+  }
+
+  function showCenter(text, ms, cb) {
+    centerMsg.textContent = text;
+    centerMsg.classList.add("show");
+    setTimeout(() => {
+      centerMsg.classList.remove("show");
+      if (cb) cb();
+    }, ms);
+  }
+
+  function updateBattle(dt) {
+    const b = state.battle;
+    if (!b) return;
+    const p = state.player, e = state.enemy;
+
+    b.elapsed += dt;
+
+    // 回転量（HP）の自然減少：持久が高いほど減りにくい
+    const drainP = (1.6 - p.stats.stamina * 0.045) * dt;
+    const drainE = (1.6 - e.stats.stamina * 0.045) * dt;
+    p.hp -= Math.max(0.15, drainP);
+    e.hp -= Math.max(0.15, drainE);
+
+    // 回転アニメ
+    p.angle += dt * (6 + p.stats.spin * 0.25) * (p.hp>0?1:0);
+    e.angle -= dt * (6 + e.stats.spin * 0.25) * (e.hp>0?1:0);
+
+    if (!b.inContact) {
+      // 周回フェーズ：円の内側をゆっくり回る
+      const orbitR = arena.r * 0.55;
+      const angP = Math.atan2(p.y - arena.cy, p.x - arena.cx);
+      const angE = Math.atan2(e.y - arena.cy, e.x - arena.cx);
+      const newAngP = angP + b.orbitDirP * b.orbitSpeedP * dt;
+      const newAngE = angE + b.orbitDirE * b.orbitSpeedE * dt;
+      p.x = arena.cx + Math.cos(newAngP) * orbitR;
+      p.y = arena.cy + Math.sin(newAngP) * orbitR;
+      e.x = arena.cx + Math.cos(newAngE) * orbitR;
+      e.y = arena.cy + Math.sin(newAngE) * orbitR;
+
+      b.contactTimer -= dt;
+      if (b.contactTimer <= 0) {
+        b.inContact = true;
+        b.contactDuration = rand(0.8, 2.2);
+        b.pushAccumP = 0; b.pushAccumE = 0;
+        b.hitCooldown = 0;
+      }
+    } else {
+      // 接触フェーズ：押し合い
+      b.contactDuration -= dt;
+      b.hitCooldown -= dt;
+
+      const dx = e.x - p.x;
+      const dy = e.y - p.y;
+      const dist = Math.hypot(dx, dy) || 0.0001;
+      const nx = dx / dist, ny = dy / dist;
+
+      // 接触していなければ近づける
+      const touchDist = p.radius + e.radius;
+      if (dist > touchDist) {
+        const sp = 90 * dt;
+        p.x += nx * sp; p.y += ny * sp;
+        e.x -= nx * sp; e.y -= ny * sp;
+      } else {
+        // 押し合い計算
+        const pushP = p.stats.attack * 0.6 + p.stats.weight * 0.5 + p.stats.spin * 0.4;
+        const pushE = e.stats.attack * 0.6 + e.stats.weight * 0.5 + e.stats.spin * 0.4;
+        const resistP = p.stats.defense * 0.5 + p.stats.bounce * 0.6 + p.stats.weight * 0.4;
+        const resistE = e.stats.defense * 0.5 + e.stats.bounce * 0.6 + e.stats.weight * 0.4;
+
+        const netP = (pushP - resistE) * 0.06;
+        const netE = (pushE - resistP) * 0.06;
+
+        const k = 60 * dt;
+        p.x -= nx * Math.max(0, netE) * k * 0.1;
+        p.y -= ny * Math.max(0, netE) * k * 0.1;
+        e.x += nx * Math.max(0, netP) * k * 0.1;
+        e.y += ny * Math.max(0, netP) * k * 0.1;
+
+        // 接触ダメージ
+        if (b.hitCooldown <= 0) {
+          const dmgToE = Math.max(0.5, (p.stats.attack*0.5 + p.stats.spin*0.5 - e.stats.defense*0.6) * 0.35);
+          const dmgToP = Math.max(0.5, (e.stats.attack*0.5 + e.stats.spin*0.5 - p.stats.defense*0.6) * 0.35);
+          e.hp -= dmgToE;
+          p.hp -= dmgToP;
+          b.hitCooldown = 0.25;
+        }
+      }
+
+      // 場外判定（中心が円外）
+      checkOut(p, e);
+      checkOut(e, p);
+
+      if (b.contactDuration <= 0) {
+        b.inContact = false;
+        b.contactTimer = rand(1.2, 3.0);
+      }
+    }
+
+    // 回転量0判定
+    if (p.hp <= 0 || e.hp <= 0) {
+      endBattle(p.hp <= 0 && e.hp <= 0 ? "double" : (p.hp <= 0 ? "lose" : "win"));
+    }
+    updatePanels();
+  }
+
+  function checkOut(k, other) {
+    const dx = k.x - arena.cx;
+    const dy = k.y - arena.cy;
+    const d = Math.hypot(dx, dy);
+    if (d + k.radius * 0.3 > arena.r) {
+      // 相手の勝ち
+      if (k === state.player) endBattle("lose");
+      else endBattle("win");
+    }
+  }
+
+  // ===================== ループ =====================
+  function loop(t) {
+    if (!state.lastTime) state.lastTime = t;
+    let dt = (t - state.lastTime) / 1000;
+    state.lastTime = t;
+    dt = Math.min(dt, 0.05);
+
+    if (state.phase === "battle") {
+      updateBattle(dt);
+    } else {
+      // 待機中も回転アニメ
+      if (state.player) state.player.angle += dt * 3;
+      if (state.enemy) state.enemy.angle -= dt * 3;
+    }
+    render();
+    state.rafId = requestAnimationFrame(loop);
+  }
+
+  // ===================== 勝敗 =====================
+  function endBattle(result) {
+    if (state.phase === "ended") return;
+    state.phase = "ended";
+    spinBtn.disabled = false;
+
+    if (result === "win") {
+      state.streak++;
+      updatePanels();
+      if (state.streak >= WIN_STREAK) {
+        showCenter("5連勝!!", 1200, () => {
+          window.location.href = "study.html";
+        });
+        return;
+      }
+      showCenter("WIN!", 900, () => {
+        setTimeout(() => openChoice(), 200);
+      });
+    } else if (result === "lose") {
+      state.streak = 0;
+      updatePanels();
+      showCenter("LOSE...", 1000, () => {
+        showResult(false);
+      });
+    } else {
+      state.streak = 0;
+      updatePanels();
+      showCenter("DRAW", 1000, () => showResult(false));
+    }
+  }
+
+  // ===================== 選択画面 =====================
+  function openChoice() {
+    const p = state.player;
+    $("keepBtn").innerHTML = `このコマのまま挑む<small>${p.colorName} / ${shapeName(p.shape)} ／ 回転+1 or バウンド+1 を選べる</small>`;
+    $("rerollBtn").innerHTML = `ランダム生成で新しいコマにする<small>パラメータ再抽選（強化なし）</small>`;
+    $("upSpinBtn").innerHTML = `回転速度を 1up して続ける<small>現在 回転 ${p.stats.spin} → ${Math.min(MAX_STAT, p.stats.spin+1)}</small>`;
+    $("upBounceBtn").innerHTML = `バウンド力を 1up して続ける<small>現在 バウンド ${p.stats.bounce} → ${Math.min(MAX_STAT, p.stats.bounce+1)}</small>`;
+
+    $("upSpinBtn").style.display = "block";
+    $("upBounceBtn").style.display = "block";
+    $("keepBtn").style.display = "none";
+
+    choiceOverlay.classList.add("active");
+  }
+
+  function closeChoice() { choiceOverlay.classList.remove("active"); }
+
+  // 「このコマのまま」を押したら強化選択を出す…のではなく、
+  // 仕様に合わせ「このコマのまま」＝強化選択肢を表示、ランダム生成＝即再抽選。
+  // ここでは keepBtn を「このコマのまま（強化選択へ）」として扱う。
+
+  // 実際のUI：keepBtnクリック → 強化2択を表示
+  $("keepBtn").addEventListener("click", () => {
+    $("keepBtn").style.display = "none";
+    $("rerollBtn").style.display = "none";
+    // 強化ボタンは既に表示済み
+  });
+
+  $("rerollBtn").addEventListener("click", () => {
+    closeChoice();
+    state.player = makeKom(null);
+    nextEnemy();
+  });
+
+  $("upSpinBtn").addEventListener("click", () => {
+    closeChoice();
+    state.player.stats.spin = Math.min(MAX_STAT, state.player.stats.spin + 1);
+    nextEnemy();
+  });
+  $("upBounceBtn").addEventListener("click", () => {
+    closeChoice();
+    state.player.stats.bounce = Math.min(MAX_STAT, state.player.stats.bounce + 1);
+    nextEnemy();
+  });
+
+  // 初期表示の調整：選択画面を開いたとき、keepBtn と rerollBtn を出す
+  const _openChoice = openChoice;
+  openChoice = function() {
+    _openChoice();
+    $("keepBtn").style.display = "block";
+    $("rerollBtn").style.display = "block";
+    $("upSpinBtn").style.display = "none";
+    $("upBounceBtn").style.display = "none";
+  };
+  // keepBtn を押したら強化2択
+  $("keepBtn").addEventListener("click", () => {
+    $("keepBtn").style.display = "none";
+    $("rerollBtn").style.display = "none";
+    $("upSpinBtn").style.display = "block";
+    $("upBounceBtn").style.display = "block";
+  });
+
+  function nextEnemy() {
+    state.enemy = makeKom(null);
+    resetPositions();
+    updatePanels();
+    state.phase = "idle";
+    spinBtn.disabled = false;
+    spinBtn.textContent = "スタート";
+    showCenter("NEXT BATTLE", 800);
+  }
+
+  function resetPositions() {
+    const rr = arena.r * 0.55;
+    if (state.player) { state.player.x = arena.cx - rr; state.player.y = arena.cy; state.player.angle = 0; }
+    if (state.enemy)  { state.enemy.x  = arena.cx + rr; state.enemy.y  = arena.cy; state.enemy.angle  = Math.PI; }
+  }
+
+  // ===================== 結果画面 =====================
+  function showResult(isWin) {
+    resultOverlay.classList.add("active");
+    resultTitle.textContent = isWin ? "WIN" : "GAME OVER";
+    resultTitle.className = isWin ? "win" : "lose";
+    resultMsg.textContent = isWin ? "5連勝達成！" : "連勝は " + state.streak + " でストップ…";
+  }
+  $("resultBtn").addEventListener("click", () => {
+    resultOverlay.classList.remove("active");
+    backToOpening();
+  });
+
+  function backToOpening() {
+    state.player = null; state.enemy = null; state.streak = 0;
+    state.phase = "idle";
+    gameEl.classList.remove("active");
+    opening.style.display = "flex";
+  }
+
+  // ===================== ゲーム開始 =====================
+  function startGame() {
+    opening.style.display = "none";
+    gameEl.classList.add("active");
+    state.streak = 0;
+    state.player = makeKom(null);
+    state.enemy = makeKom(null);
+    resize();
+    resetPositions();
+    updatePanels();
+    state.phase = "idle";
+    spinBtn.disabled = false;
+    spinBtn.textContent = "スタート";
+  }
+
+  // ===================== イベント =====================
+  $("startBtn").addEventListener("click", startGame);
+  spinBtn.addEventListener("click", () => {
+    if (state.phase === "idle" || state.phase === "ended") {
+      state.phase = "idle";
+      startSpin();
+    }
+  });
+  window.addEventListener("resize", () => { if (gameEl.classList.contains("active")) resize(); });
+
+  // ループ開始
+  requestAnimationFrame(loop);
+
+})();
+</script>
+</body>
+</html>
