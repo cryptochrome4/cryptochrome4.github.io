@@ -189,7 +189,6 @@
     box-shadow: 0 0 12px rgba(255,150,0,0.7);
   }
 
-  /* 重力パネル */
   #gravityPanel {
     position: absolute;
     top: 56px; left: 50%;
@@ -442,7 +441,7 @@
   const MAX_BATTLE_TIME = 30;
 
   // 物理定数
-  const CENTER_PULL = 90;      // 基準（重力倍率を掛ける）
+  const CENTER_PULL = 90;
   const FRICTION = 0.45;
   const AIR_DRAG = 0.12;
   const PRECESS_DRIFT = 10;
@@ -451,7 +450,6 @@
 
   const FIXED_STEP = 1/120;
 
-  // 重力プリセット（デフォルト100x）
   const GRAVITY_DEFAULT = 100;
   const GRAVITY_MIN = 50;
   const GRAVITY_MAX = 1000;
@@ -462,6 +460,8 @@
     phase:"idle", rafId:null, lastTime:0,
     battle:null, speed:1,
     gravity: GRAVITY_DEFAULT,
+    sparks: [],       // 雷エフェクト
+    bolts: [],        // 稲妻ライン
   };
 
   const $ = id => document.getElementById(id);
@@ -523,6 +523,11 @@
     };
   }
 
+  // コマの総合値（同点時の比較用）
+  function totalScore(k) {
+    return k.core.attack + k.core.defense + k.core.stamina + k.core.weight + k.core.spin;
+  }
+
   // ===================== Canvas =====================
   let canvasW=0, canvasH=0, dpr=1;
   let arena = { cx:0, cy:0, r:0 };
@@ -544,7 +549,6 @@
 
   function drawArena() {
     ctx.save();
-    // 重力強度を0〜1に正規化（50x〜1000x）
     const gIntensity = clamp((state.gravity - GRAVITY_MIN) / (GRAVITY_MAX - GRAVITY_MIN), 0, 1);
     const g = ctx.createRadialGradient(arena.cx, arena.cy, arena.r*0.05, arena.cx, arena.cy, arena.r);
     g.addColorStop(0, gIntensity > 0.02
@@ -619,11 +623,102 @@
     }
   }
 
+  // ===================== 雷エフェクト =====================
+  function spawnSparks(x, y, intensity) {
+    // intensity: 0〜1程度
+    const count = Math.round(6 + intensity * 12);
+    for (let i=0;i<count;i++) {
+      const a = rand(0, Math.PI*2);
+      const sp = rand(60, 220) * (0.6 + intensity);
+      state.sparks.push({
+        x, y,
+        vx: Math.cos(a)*sp,
+        vy: Math.sin(a)*sp,
+        life: rand(0.15, 0.35),
+        maxLife: 0.35,
+        size: rand(1.5, 3.5),
+      });
+    }
+  }
+
+  function spawnBolt(x, y, angle, intensity) {
+    // ジグザグの稲妻ライン
+    const segments = Math.round(4 + intensity * 4);
+    const length = 30 + intensity * 60;
+    const points = [{x, y}];
+    let cx = x, cy = y;
+    const dirx = Math.cos(angle), diry = Math.sin(angle);
+    for (let i=1;i<=segments;i++) {
+      const t = i / segments;
+      const jitter = (1 - t) * 14 * (Math.random()*2-1);
+      const px = x + dirx * length * t + (-diry) * jitter;
+      const py = y + diry * length * t + (dirx) * jitter;
+      points.push({x:px, y:py});
+    }
+    state.bolts.push({
+      points,
+      life: 0.18,
+      maxLife: 0.18,
+      intensity,
+    });
+  }
+
+  function updateEffects(dt) {
+    // スパーク
+    for (let i = state.sparks.length - 1; i >= 0; i--) {
+      const s = state.sparks[i];
+      s.x += s.vx * dt;
+      s.y += s.vy * dt;
+      s.vx *= 0.92;
+      s.vy *= 0.92;
+      s.life -= dt;
+      if (s.life <= 0) state.sparks.splice(i, 1);
+    }
+    // 稲妻
+    for (let i = state.bolts.length - 1; i >= 0; i--) {
+      const b = state.bolts[i];
+      b.life -= dt;
+      if (b.life <= 0) state.bolts.splice(i, 1);
+    }
+  }
+
+  function drawEffects() {
+    // 稲妻
+    ctx.save();
+    ctx.lineCap = "round";
+    for (const b of state.bolts) {
+      const a = clamp(b.life / b.maxLife, 0, 1);
+      const strong = b.intensity > 0.7;
+      ctx.strokeStyle = strong ? `rgba(255,240,150,${a})` : `rgba(180,230,255,${a})`;
+      ctx.shadowColor = strong ? "#ffe066" : "#7fdfff";
+      ctx.shadowBlur = 12;
+      ctx.lineWidth = 2 + b.intensity * 2;
+      ctx.beginPath();
+      ctx.moveTo(b.points[0].x, b.points[0].y);
+      for (let i=1;i<b.points.length;i++) {
+        ctx.lineTo(b.points[i].x, b.points[i].y);
+      }
+      ctx.stroke();
+    }
+    // スパーク
+    for (const s of state.sparks) {
+      const a = clamp(s.life / s.maxLife, 0, 1);
+      ctx.fillStyle = `rgba(200,240,255,${a})`;
+      ctx.shadowColor = "#aef";
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.size, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
   function render() {
     ctx.clearRect(0,0,canvasW,canvasH);
     drawArena();
     if (state.enemy) drawKom(state.enemy);
     if (state.player) drawKom(state.player);
+    drawEffects();
   }
 
   // ===================== パネル =====================
@@ -679,6 +774,8 @@
     p.radius = BASE_RADIUS * (Math.min(canvasW,canvasH)/420);
     e.radius = p.radius;
 
+    state.sparks = [];
+    state.bolts = [];
     state.battle = { elapsed: 0, hitCooldown: 0 };
     state.phase = "battle";
     spinBtn.disabled = true;
@@ -717,14 +814,11 @@
     const btn = ev.target.closest("button");
     if (!btn) return;
     const s = Number(btn.dataset.speed);
-    if (s !== 1 && s === state.speed) {
-      setSpeed(1);
-    } else {
-      setSpeed(s);
-    }
+    if (s !== 1 && s === state.speed) setSpeed(1);
+    else setSpeed(s);
   });
 
-  // ===================== 重力操作（プレイヤーのみ） =====================
+  // ===================== 重力操作 =====================
   function applyGravityUI() {
     [...gravityGroup.querySelectorAll("button")].forEach(b => {
       b.classList.toggle("on", Number(b.dataset.gravity) === state.gravity);
@@ -769,8 +863,9 @@
     p.angle += dt * (6 + p.core.spin*0.3) * hpRatioP;
     e.angle -= dt * (6 + e.core.spin*0.3) * hpRatioE;
 
-    const drainP = (HP_DRAIN_BASE - p.core.stamina*0.04) * dt;
-    const drainE = (HP_DRAIN_BASE - e.core.stamina*0.04) * dt;
+    // 持久の効きを強化（*0.08）
+    const drainP = (HP_DRAIN_BASE - p.core.stamina*0.08) * dt;
+    const drainE = (HP_DRAIN_BASE - e.core.stamina*0.08) * dt;
     p.hp -= Math.max(0.15, drainP);
     e.hp -= Math.max(0.15, drainE);
   }
@@ -781,13 +876,11 @@
     const dist = Math.hypot(dx, dy) || 0.0001;
     const nx = dx/dist, ny = dy/dist;
 
-    // 中心引力：距離依存を非線形化＋重力倍率
     const t = dist / arena.r;
     const pull = CENTER_PULL * state.gravity * t * (1 + (1 - t) * 0.8);
     k.vx += nx * pull * dt;
     k.vy += ny * pull * dt;
 
-    // 歳差ドリフト
     const hpRatio = clamp(k.hp/k.maxHp, 0, 1);
     const drift = PRECESS_DRIFT * (1 - hpRatio) * (1 + k.core.spin*0.02);
     k.vx += nx * drift * dt;
@@ -857,17 +950,22 @@
     e.vx += j * nx / e.mass;
     e.vy += j * ny / e.mass;
 
+    // 接触点（コマの中間）
+    const contactX = (p.x + e.x) / 2;
+    const contactY = (p.y + e.y) / 2;
+
     if (b.hitCooldown <= 0) {
       const atkP = p.core.attack*0.5 + p.core.spin*0.5;
       const atkE = e.core.attack*0.5 + e.core.spin*0.5;
       const defP = p.core.defense*0.6 + p.core.weight*0.4;
       const defE = e.core.defense*0.6 + e.core.weight*0.4;
 
-      const impactP = Math.max(0, atkE - defP) * 0.25 + Math.abs(vn)*0.02;
-      const impactE = Math.max(0, atkP - defE) * 0.25 + Math.abs(vn)*0.02;
+      // |vn|項を弱め（0.02 → 0.005）、5項目の差を通す（負でも少し通す＋最低1.0）
+      const impactP = (atkE - defP) * 0.4 + 1.0 + Math.abs(vn)*0.005;
+      const impactE = (atkP - defE) * 0.4 + 1.0 + Math.abs(vn)*0.005;
 
-      e.hp -= impactP * HP_DRAIN_HIT;
-      p.hp -= impactE * HP_DRAIN_HIT;
+      e.hp -= Math.max(0.2, impactP) * HP_DRAIN_HIT;
+      p.hp -= Math.max(0.2, impactE) * HP_DRAIN_HIT;
 
       const pushP = Math.max(0, atkP - defE) * 0.6;
       const pushE = Math.max(0, atkE - defP) * 0.6;
@@ -875,6 +973,20 @@
       p.vx -= nx * pushE; p.vy -= ny * pushE;
 
       b.hitCooldown = 0.18;
+
+      // 雷エフェクト（衝突速度で強度）
+      const intensity = clamp(Math.abs(vn) / 400, 0.15, 1);
+      spawnSparks(contactX, contactY, intensity);
+      spawnBolt(contactX, contactY, Math.atan2(ny, nx) + rand(-0.5,0.5), intensity);
+      spawnBolt(contactX, contactY, Math.atan2(-ny, -nx) + rand(-0.5,0.5), intensity);
+      if (intensity > 0.5) {
+        spawnBolt(contactX, contactY, rand(0, Math.PI*2), intensity * 0.8);
+      }
+    } else {
+      // 接触継続中の弱いバチバチ
+      if (Math.random() < 0.4) {
+        spawnSparks(contactX, contactY, 0.25);
+      }
     }
   }
 
@@ -893,27 +1005,37 @@
       if (state.phase !== "battle") break;
     }
 
+    updateEffects(dt);
+
     const remain = Math.max(0, MAX_BATTLE_TIME - b.elapsed);
     timerBadge.textContent = remain.toFixed(1) + "s";
     if (b.elapsed >= MAX_BATTLE_TIME && state.phase === "battle") {
-      const p = state.player, e = state.enemy;
-      if (p.hp > e.hp) endBattle("win");
-      else if (e.hp > p.hp) endBattle("lose");
-      else endBattle("draw");
+      judgeByHP();
       return;
     }
 
     if (state.phase === "battle") {
       const p = state.player, e = state.enemy;
       if (p.hp <= 0 || e.hp <= 0) {
-        if (p.hp <= 0 && e.hp <= 0) endBattle("draw");
-        else if (p.hp <= 0) endBattle("lose");
-        else endBattle("win");
+        judgeByHP();
         return;
       }
     }
 
     updatePanels();
+  }
+
+  // 決着判定：HPの深さ → 同点なら5項目合計 → それも同値ならドロー
+  function judgeByHP() {
+    const p = state.player, e = state.enemy;
+    if (p.hp < e.hp) endBattle("lose");
+    else if (e.hp < p.hp) endBattle("win");
+    else {
+      const sp = totalScore(p), se = totalScore(e);
+      if (sp > se) endBattle("win");
+      else if (se > sp) endBattle("lose");
+      else endBattle("draw");
+    }
   }
 
   // ===================== ループ =====================
@@ -928,6 +1050,7 @@
     } else {
       if (state.player) state.player.angle += dt*3;
       if (state.enemy) state.enemy.angle -= dt*3;
+      updateEffects(dt);
     }
     render();
     state.rafId = requestAnimationFrame(loop);
@@ -962,7 +1085,7 @@
     }
   }
 
-  // ===================== 選択（強化6ボタン＋ランダム生成） =====================
+  // ===================== 選択 =====================
   function openChoice() {
     const p = state.player;
     updateUpButton("attack",  CORE_LABELS.attack,  p.core.attack,  CORE_UP, CORE_MAX);
@@ -973,7 +1096,6 @@
     updateUpButton("bounce",  "バウンド",          p.bounce,       BOUNCE_UP, BOUNCE_MAX);
 
     $("rerollBtn").innerHTML = `ランダム生成で新しいコマにする<small>パラメータ再抽選（強化なし）</small>`;
-
     choiceOverlay.classList.add("active");
   }
   function updateUpButton(key, label, current, up, max) {
@@ -1018,6 +1140,8 @@
     gravityPanel.classList.remove("active");
     resetSpeed();
     resetGravity();
+    state.sparks = [];
+    state.bolts = [];
     timerBadge.textContent = MAX_BATTLE_TIME.toFixed(1) + "s";
     showCenter("NEXT BATTLE", 800);
   }
@@ -1047,6 +1171,8 @@
     gravityPanel.classList.remove("active");
     resetSpeed();
     resetGravity();
+    state.sparks = [];
+    state.bolts = [];
     gameEl.classList.remove("active");
     opening.style.display = "flex";
   }
@@ -1068,6 +1194,8 @@
     gravityPanel.classList.remove("active");
     resetSpeed();
     resetGravity();
+    state.sparks = [];
+    state.bolts = [];
     timerBadge.textContent = MAX_BATTLE_TIME.toFixed(1) + "s";
   }
 
