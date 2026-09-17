@@ -339,10 +339,11 @@
   const WIN_STREAK = 5;
   const MAX_BATTLE_TIME = 30;
 
-  const CENTER_PULL = 22;
-  const FRICTION = 0.55;
+  // 物理定数（中心引力を強化）
+  const CENTER_PULL = 90;      // 22 → 90
+  const FRICTION = 0.45;       // 0.55 → 0.45
   const AIR_DRAG = 0.12;
-  const PRECESS_DRIFT = 14;
+  const PRECESS_DRIFT = 10;    // 14 → 10
   const HP_DRAIN_BASE = 1.4;
   const HP_DRAIN_HIT = 1.0;
 
@@ -596,7 +597,6 @@
     const btn = ev.target.closest("button");
     if (!btn) return;
     const s = Number(btn.dataset.speed);
-    // 同じ倍率を再クリック → 1xに戻る
     if (s !== 1 && s === state.speed) {
       setSpeed(1);
     } else {
@@ -640,10 +640,13 @@
     const dist = Math.hypot(dx, dy) || 0.0001;
     const nx = dx/dist, ny = dy/dist;
 
-    const pull = CENTER_PULL * (dist / arena.r);
+    // 中心引力：距離依存を非線形化（中心に近いほど強く引く）
+    const t = dist / arena.r;               // 0(中心) 〜 1(外周)
+    const pull = CENTER_PULL * t * (1 + (1 - t) * 0.8);
     k.vx += nx * pull * dt;
     k.vy += ny * pull * dt;
 
+    // 歳差ドリフト（回転が落ちるほど内側へ）
     const hpRatio = clamp(k.hp/k.maxHp, 0, 1);
     const drift = PRECESS_DRIFT * (1 - hpRatio) * (1 + k.core.spin*0.02);
     k.vx += nx * drift * dt;
