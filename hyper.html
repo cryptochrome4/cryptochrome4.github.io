@@ -378,6 +378,7 @@
           <button data-speed="2">2x</button>
           <button data-speed="3">3x</button>
           <button data-speed="4">4x</button>
+          <button data-speed="10">10x</button>
         </div>
       </div>
     </div>
@@ -462,7 +463,7 @@
   const HP_DRAIN_BASE = 2.8;
   const EDGE_DRAIN = 5.0;
 
-  // 壁（リム）反発の下限（バウンド0でも少し戻る）
+  // 壁（リム）反発の下限
   const WALL_REST_MIN = 0.08;
 
   const FIXED_STEP = 1/120;
@@ -538,7 +539,7 @@
       core, bounce, stats,
       hp: MAX_HP, maxHp: MAX_HP, mass,
       hyper: 0,
-      hyperLaunched: false,     // 必殺で弾かれた直後は壁無効
+      hyperLaunched: false,
       x:0, y:0, vx:0, vy:0, angle:0,
       radius:0,
     };
@@ -546,6 +547,17 @@
 
   function totalScore(k) {
     return k.core.attack + k.core.defense + k.core.stamina + k.core.weight + k.core.spin;
+  }
+
+  // 税金（累進課税・6段階）
+  function taxFor(diff, hyperUsed) {
+    if (hyperUsed) return 0;
+    if (diff <= 1) return 0;
+    if (diff <= 4) return 1;
+    if (diff <= 8) return 2;
+    if (diff <= 13) return 3;
+    if (diff <= 20) return 4;
+    return 5;
   }
 
   // ===================== Canvas =====================
@@ -623,7 +635,6 @@
     ctx.moveTo(0,0); ctx.lineTo(r*0.75,0);
     ctx.strokeStyle = "rgba(0,0,0,0.5)"; ctx.lineWidth=2; ctx.stroke();
 
-    // ハイパー満タン時にオーラ
     if (k.hyper >= HYPER_MAX) {
       ctx.shadowBlur = 0;
       ctx.beginPath();
@@ -949,13 +960,11 @@
     const dist = Math.hypot(dx, dy);
     const limit = arena.r - k.radius;
 
-    // 必殺で弾かれた直後は壁無効（リムを越える）
+    // 必殺で弾かれた直後は壁無効
     if (k.hyperLaunched) {
-      // 速度が落ちたらフラグ解除
       if (Math.hypot(k.vx, k.vy) < 120) {
         k.hyperLaunched = false;
       }
-      // 中心が円の外に出たら場外
       if (dist > arena.r) {
         if (k === state.player) endBattle("lose");
         else endBattle("win");
@@ -967,18 +976,15 @@
       const nx = dx/dist, ny = dy/dist;
       const vn = k.vx*nx + k.vy*ny;
       if (vn > 0) {
-        // リムの反発：バウンド依存（下限 WALL_REST_MIN）
         const rest = clamp(WALL_REST_MIN + k.bounce/100 * 0.65, WALL_REST_MIN, 0.97);
         k.vx -= (1 + rest) * vn * nx;
         k.vy -= (1 + rest) * vn * ny;
       }
-      // 円の外に出たら場外（リムを越えた場合）
       if (dist > arena.r) {
         if (k === state.player) endBattle("lose");
         else endBattle("win");
         return;
       }
-      // 位置補正（リムの内側に収める）
       if (dist > limit) {
         k.x = arena.cx + nx*limit;
         k.y = arena.cy + ny*limit;
@@ -1030,12 +1036,6 @@
       const defP = p.core.defense;
       const defE = e.core.defense;
 
-      // 税金（累進課税：diff^2 / 90）
-      function taxFor(diff, hyperUsed) {
-        if (hyperUsed) return 0;
-        return Math.floor(diff * diff / 90);
-      }
-
       const diffE = Math.max(0, atkP - defE);
       const diffP = Math.max(0, atkE - defP);
 
@@ -1050,7 +1050,6 @@
       for (let i=0;i<taxE;i++) if (Math.random() < 0.5) p.hyper = Math.min(HYPER_MAX, p.hyper + 1);
       for (let i=0;i<taxP;i++) if (Math.random() < 0.5) e.hyper = Math.min(HYPER_MAX, e.hyper + 1);
 
-      // 通常ノックバック
       const rawKnockToE = Math.max(0, p.bounce - e.bounce) * 0.6 + p.bounce * 0.15;
       const rawKnockToP = Math.max(0, e.bounce - p.bounce) * 0.6 + e.bounce * 0.15;
 
@@ -1066,9 +1065,6 @@
       let knockToP = rawKnockToP * resistP;
       let knockToE = rawKnockToE * resistE;
 
-      // ===== 必殺：6項目全部が関係する =====
-      // 攻め：バウンド主役 + 攻撃・回転・重さ
-      // 守り：防御・重さ・回転・バウンド
       function hyperPower(k) {
         return k.bounce * 1.0
              + k.core.attack * 0.3
@@ -1132,7 +1128,7 @@
 
     let remaining = dt * state.speed;
     let guard = 0;
-    while (remaining > 0 && guard < 800) {
+    while (remaining > 0 && guard < 2000) {
       guard++;
       const s = Math.min(FIXED_STEP, remaining);
       stepPhysics(s);
