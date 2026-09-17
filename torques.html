@@ -152,11 +152,12 @@
     bottom: 12px; left: 50%;
     transform: translateX(-50%);
     z-index: 15;
-    display: flex; gap: 10px;
+    display: flex; gap: 8px; align-items: center;
+    flex-wrap: wrap; justify-content: center;
   }
   #battleControls button {
-    padding: 10px 28px;
-    font-size: clamp(13px, 3vw, 17px);
+    padding: 10px 22px;
+    font-size: clamp(13px, 3vw, 16px);
     letter-spacing: 0.15em;
     background: linear-gradient(135deg, #06c, #0af);
     color: #fff; border: none; border-radius: 30px;
@@ -164,6 +165,27 @@
     box-shadow: 0 0 15px rgba(0,150,255,0.6);
   }
   #battleControls button:disabled { opacity: 0.4; cursor: default; box-shadow: none; }
+
+  #speedGroup {
+    display: none; gap: 6px; margin-left: 6px;
+  }
+  #speedGroup.active { display: flex; }
+  #speedGroup button {
+    padding: 8px 14px;
+    font-size: clamp(12px, 2.6vw, 14px);
+    letter-spacing: 0.1em;
+    background: rgba(255,255,255,0.08);
+    color: #ccc;
+    border: 1px solid #555;
+    border-radius: 20px;
+    cursor: pointer;
+    box-shadow: none;
+  }
+  #speedGroup button.on {
+    background: linear-gradient(135deg, #f60, #fa0);
+    color: #fff; border-color: #fa0;
+    box-shadow: 0 0 12px rgba(255,150,0,0.7);
+  }
 
   /* ===== 選択画面 ===== */
   #choiceOverlay {
@@ -185,7 +207,7 @@
   }
   #choiceOverlay p { opacity: 0.8; font-size: clamp(12px,3vw,15px); margin-bottom: 6px; text-align:center;}
   .choiceBtn {
-    width: min(360px, 90vw);
+    width: min(380px, 90vw);
     padding: 14px;
     font-size: clamp(14px, 3.5vw, 18px);
     letter-spacing: 0.1em;
@@ -247,6 +269,11 @@
       <div id="centerMsg"></div>
       <div id="battleControls">
         <button id="spinBtn">スタート</button>
+        <div id="speedGroup">
+          <button data-speed="2">2x</button>
+          <button data-speed="3">3x</button>
+          <button data-speed="4">4x</button>
+        </div>
       </div>
     </div>
     <div id="panels">
@@ -293,13 +320,19 @@
     { name:"黄緑", hex:"#a7c957" },
   ];
   const SHAPES = ["circle","triangle","square","star","hexagon","pentagon"];
-  const STAT_KEYS = ["attack","defense","stamina","weight","spin","bounce"];
-  const STAT_LABELS = {
+
+  // 他5項目（合計60固定・両者平等・3〜18）
+  const CORE_KEYS = ["attack","defense","stamina","weight","spin"];
+  const CORE_LABELS = {
     attack:"攻撃", defense:"防御", stamina:"持久",
-    weight:"重さ", spin:"回転", bounce:"バウンド"
+    weight:"重さ", spin:"回転"
   };
   const TOTAL_POINTS = 60;
   const MIN_STAT = 3, MAX_STAT = 18;
+
+  // バウンドは別枠 0〜100 完全ランダム
+  const BOUNCE_MIN = 0, BOUNCE_MAX = 100;
+
   const MAX_HP = 100;
   const ARENA_MARGIN = 0.82;
   const BASE_RADIUS = 24;
@@ -307,19 +340,22 @@
   const MAX_BATTLE_TIME = 30;
 
   // 物理定数
-  const CENTER_PULL = 22;      // 中心引力
-  const FRICTION = 0.55;       // 台との摩擦（速度比例）
-  const AIR_DRAG = 0.12;       // 空気抵抗
-  const PRECESS_DRIFT = 14;    // 歳差による内側ドリフト
-  const WALL_RESTITUTION = 0.72;
-  const HP_DRAIN_BASE = 1.4;   // 毎秒の自然減
-  const HP_DRAIN_HIT = 1.0;    // 衝突衝撃の係数
+  const CENTER_PULL = 22;
+  const FRICTION = 0.55;
+  const AIR_DRAG = 0.12;
+  const PRECESS_DRIFT = 14;
+  const WALL_RESTITUTION_BASE = 0.35;   // バウンドで上乗せ
+  const HP_DRAIN_BASE = 1.4;
+  const HP_DRAIN_HIT = 1.0;
+
+  // 早送り：物理は固定ステップで分割
+  const FIXED_STEP = 1/120;
 
   // ===================== 状態 =====================
   const state = {
-    player: null, enemy: null, streak: 0,
-    phase: "idle", rafId: null, lastTime: 0,
-    battle: null,
+    player:null, enemy:null, streak:0,
+    phase:"idle", rafId:null, lastTime:0,
+    battle:null, speed:1,
   };
 
   const $ = id => document.getElementById(id);
@@ -337,6 +373,7 @@
   const resultOverlay = $("resultOverlay");
   const resultTitle = $("resultTitle");
   const resultMsg = $("resultMsg");
+  const speedGroup = $("speedGroup");
 
   // ===================== ユーティリティ =====================
   const rand = (a,b) => a + Math.random()*(b-a);
@@ -344,14 +381,15 @@
   const pick = arr => arr[randInt(0,arr.length-1)];
   const clamp = (v,a,b) => Math.max(a, Math.min(b,v));
 
-  function randomStats() {
+  // 他5項目：合計60固定でランダム配分
+  function randomCoreStats() {
     const stats = {};
     let remaining = TOTAL_POINTS;
-    for (const k of STAT_KEYS) { stats[k] = MIN_STAT; remaining -= MIN_STAT; }
+    for (const k of CORE_KEYS) { stats[k] = MIN_STAT; remaining -= MIN_STAT; }
     let guard = 0;
     while (remaining > 0 && guard < 10000) {
       guard++;
-      const k = pick(STAT_KEYS);
+      const k = pick(CORE_KEYS);
       if (stats[k] < MAX_STAT) { stats[k]++; remaining--; }
     }
     return stats;
@@ -360,13 +398,21 @@
   function makeKom(base) {
     const color = pick(COLORS);
     const shape = pick(SHAPES);
-    const stats = base && base.stats ? { ...base.stats } : randomStats();
-    const mass = 0.6 + stats.weight * 0.08;   // 質量
+    const core = base && base.core ? { ...base.core } : randomCoreStats();
+    // バウンドは別枠 0〜100 完全ランダム（base指定時は引き継ぎ）
+    const bounce = base && typeof base.bounce === "number"
+      ? base.bounce
+      : randInt(BOUNCE_MIN, BOUNCE_MAX);
+
+    const stats = { ...core, bounce };
+    const mass = 0.6 + core.weight * 0.08;
+
     return {
-      color: color.hex, colorName: color.name, shape, stats,
+      color: color.hex, colorName: color.name, shape,
+      core, bounce, stats,
       hp: MAX_HP, maxHp: MAX_HP, mass,
-      x:0, y:0, vx:0, vy:0, angle:0, spinRate:0,
-      radius:0, wobble:0,
+      x:0, y:0, vx:0, vy:0, angle:0,
+      radius:0,
     };
   }
 
@@ -415,7 +461,6 @@
     ctx.save();
     ctx.translate(k.x, k.y);
 
-    // 影（回転量が落ちると揺れる）
     const hpRatio = clamp(k.hp/k.maxHp, 0, 1);
     const wobble = (1 - hpRatio) * 0.5;
     ctx.save();
@@ -472,17 +517,17 @@
   // ===================== パネル =====================
   function renderPanel(el,k,title) {
     if (!k) { el.innerHTML=""; return; }
-    const s = k.stats;
+    const c = k.core;
     const hpPct = clamp(k.hp/k.maxHp*100,0,100);
     el.innerHTML = `
       <h3><span class="swatch" style="background:${k.color}"></span>${title}：${k.colorName} / ${shapeName(k.shape)}</h3>
       <div class="hp-bar"><div style="width:${hpPct}%"></div></div>
-      <div class="stat-row"><span class="label">${STAT_LABELS.attack}</span><span class="val">${s.attack}</span></div>
-      <div class="stat-row"><span class="label">${STAT_LABELS.defense}</span><span class="val">${s.defense}</span></div>
-      <div class="stat-row"><span class="label">${STAT_LABELS.stamina}</span><span class="val">${s.stamina}</span></div>
-      <div class="stat-row"><span class="label">${STAT_LABELS.weight}</span><span class="val">${s.weight}</span></div>
-      <div class="stat-row"><span class="label">${STAT_LABELS.spin}</span><span class="val">${s.spin}</span></div>
-      <div class="stat-row"><span class="label">${STAT_LABELS.bounce}</span><span class="val">${s.bounce}</span></div>
+      <div class="stat-row"><span class="label">${CORE_LABELS.attack}</span><span class="val">${c.attack}</span></div>
+      <div class="stat-row"><span class="label">${CORE_LABELS.defense}</span><span class="val">${c.defense}</span></div>
+      <div class="stat-row"><span class="label">${CORE_LABELS.stamina}</span><span class="val">${c.stamina}</span></div>
+      <div class="stat-row"><span class="label">${CORE_LABELS.weight}</span><span class="val">${c.weight}</span></div>
+      <div class="stat-row"><span class="label">${CORE_LABELS.spin}</span><span class="val">${c.spin}</span></div>
+      <div class="stat-row"><span class="label">バウンド</span><span class="val">${k.bounce}</span></div>
     `;
   }
   function shapeName(s) {
@@ -506,7 +551,6 @@
     e.x = arena.cx + Math.cos(angE)*rr;
     e.y = arena.cy + Math.sin(angE)*rr;
 
-    // 初速：接線方向＋ランダム
     const tangentP = angP + Math.PI/2;
     const tangentE = angE + Math.PI/2;
     const speedP = rand(140, 200);
@@ -524,10 +568,12 @@
     state.battle = {
       elapsed: 0,
       hitCooldown: 0,
-      lastCollision: 0,
+      acc: 0,
     };
     state.phase = "battle";
     spinBtn.disabled = true;
+    speedGroup.classList.add("active");
+    setSpeed(1);
     showCenter("READY...", 700, () => showCenter("GO!", 500));
     updatePanels();
   }
@@ -541,8 +587,21 @@
     }, ms);
   }
 
-  // ===================== 物理更新 =====================
-  function updateBattle(dt) {
+  // ===================== 早送り =====================
+  function setSpeed(s) {
+    state.speed = s;
+    [...speedGroup.querySelectorAll("button")].forEach(b => {
+      b.classList.toggle("on", Number(b.dataset.speed) === s);
+    });
+  }
+  speedGroup.addEventListener("click", ev => {
+    const btn = ev.target.closest("button");
+    if (!btn) return;
+    setSpeed(Number(btn.dataset.speed));
+  });
+
+  // ===================== 物理 =====================
+  function stepPhysics(dt) {
     const b = state.battle;
     if (!b) return;
     const p = state.player, e = state.enemy;
@@ -550,52 +609,25 @@
     b.elapsed += dt;
     b.hitCooldown -= dt;
 
-    // ---- 力の適用 ----
     applyForces(p, dt);
     applyForces(e, dt);
 
-    // ---- 位置積分 ----
     p.x += p.vx * dt; p.y += p.vy * dt;
     e.x += e.vx * dt; e.y += e.vy * dt;
 
-    // ---- 壁 ----
     wallCollide(p);
     wallCollide(e);
-
-    // ---- コマ同士の衝突 ----
     komCollide(p, e, b);
 
-    // ---- 回転アニメ ----
     const hpRatioP = clamp(p.hp/p.maxHp, 0, 1);
     const hpRatioE = clamp(e.hp/e.maxHp, 0, 1);
-    p.angle += dt * (6 + p.stats.spin*0.3) * hpRatioP;
-    e.angle -= dt * (6 + e.stats.spin*0.3) * hpRatioE;
+    p.angle += dt * (6 + p.core.spin*0.3) * hpRatioP;
+    e.angle -= dt * (6 + e.core.spin*0.3) * hpRatioE;
 
-    // ---- 回転量（HP）減少 ----
-    const drainP = (HP_DRAIN_BASE - p.stats.stamina*0.04) * dt;
-    const drainE = (HP_DRAIN_BASE - e.stats.stamina*0.04) * dt;
+    const drainP = (HP_DRAIN_BASE - p.core.stamina*0.04) * dt;
+    const drainE = (HP_DRAIN_BASE - e.core.stamina*0.04) * dt;
     p.hp -= Math.max(0.15, drainP);
     e.hp -= Math.max(0.15, drainE);
-
-    // ---- 時間切れ ----
-    const remain = Math.max(0, MAX_BATTLE_TIME - b.elapsed);
-    timerBadge.textContent = remain.toFixed(1) + "s";
-    if (b.elapsed >= MAX_BATTLE_TIME) {
-      if (p.hp > e.hp) endBattle("win");
-      else if (e.hp > p.hp) endBattle("lose");
-      else endBattle("draw");
-      return;
-    }
-
-    // ---- 決着判定 ----
-    if (p.hp <= 0 || e.hp <= 0) {
-      if (p.hp <= 0 && e.hp <= 0) endBattle("draw");
-      else if (p.hp <= 0) endBattle("lose");
-      else endBattle("win");
-      return;
-    }
-
-    updatePanels();
   }
 
   function applyForces(k, dt) {
@@ -604,23 +636,19 @@
     const dist = Math.hypot(dx, dy) || 0.0001;
     const nx = dx/dist, ny = dy/dist;
 
-    // 中心引力（距離に比例）
     const pull = CENTER_PULL * (dist / arena.r);
     k.vx += nx * pull * dt;
     k.vy += ny * pull * dt;
 
-    // 歳差ドリフト：回転が落ちるほど内側へ
     const hpRatio = clamp(k.hp/k.maxHp, 0, 1);
-    const drift = PRECESS_DRIFT * (1 - hpRatio) * (1 + k.stats.spin*0.02);
+    const drift = PRECESS_DRIFT * (1 - hpRatio) * (1 + k.core.spin*0.02);
     k.vx += nx * drift * dt;
     k.vy += ny * drift * dt;
 
-    // 摩擦＋空気抵抗
     const damp = 1 - (FRICTION*0.3 + AIR_DRAG) * dt;
     k.vx *= damp;
     k.vy *= damp;
 
-    // 速度上限
     const sp = Math.hypot(k.vx,k.vy);
     const maxSp = 420;
     if (sp > maxSp) { k.vx = k.vx/sp*maxSp; k.vy = k.vy/sp*maxSp; }
@@ -633,16 +661,15 @@
     const limit = arena.r - k.radius;
     if (dist > limit) {
       const nx = dx/dist, ny = dy/dist;
-      // 位置補正
       k.x = arena.cx + nx*limit;
       k.y = arena.cy + ny*limit;
-      // 反射
       const vn = k.vx*nx + k.vy*ny;
       if (vn > 0) {
-        k.vx -= (1 + WALL_RESTITUTION) * vn * nx;
-        k.vy -= (1 + WALL_RESTITUTION) * vn * ny;
+        // バウンド0〜100を反発係数に反映（0.30〜0.95）
+        const rest = clamp(0.30 + k.bounce/100 * 0.65, 0.25, 0.97);
+        k.vx -= (1 + rest) * vn * nx;
+        k.vy -= (1 + rest) * vn * ny;
       }
-      // 場外判定：縁が完全に外＝中心が円外
       const centerDist = Math.hypot(k.x - arena.cx, k.y - arena.cy);
       if (centerDist > arena.r) {
         if (k === state.player) endBattle("lose");
@@ -661,7 +688,6 @@
     const nx = dx/dist, ny = dy/dist;
     const overlap = touch - dist;
 
-    // 位置分離（質量比）
     const totalM = p.mass + e.mass;
     const pShare = e.mass / totalM;
     const eShare = p.mass / totalM;
@@ -670,14 +696,14 @@
     e.x += nx * overlap * eShare;
     e.y += ny * overlap * eShare;
 
-    // 相対速度
     const rvx = e.vx - p.vx;
     const rvy = e.vy - p.vy;
     const vn = rvx*nx + rvy*ny;
-    if (vn > 0) return; // 離れていく
+    if (vn > 0) return;
 
-    // 反発係数：バウンド力
-    const rest = clamp(0.25 + (p.stats.bounce + e.stats.bounce)*0.02, 0.2, 0.95);
+    // バウンド0〜100で反発係数（平均を取り 0.25〜0.95）
+    const avgBounce = (p.bounce + e.bounce) / 2;
+    const rest = clamp(0.25 + avgBounce/100 * 0.70, 0.20, 0.97);
     const j = -(1 + rest) * vn / (1/p.mass + 1/e.mass);
 
     p.vx -= j * nx / p.mass;
@@ -685,12 +711,11 @@
     e.vx += j * nx / e.mass;
     e.vy += j * ny / e.mass;
 
-    // 攻撃・防御・回転による追加衝撃
     if (b.hitCooldown <= 0) {
-      const atkP = p.stats.attack*0.5 + p.stats.spin*0.5;
-      const atkE = e.stats.attack*0.5 + e.stats.spin*0.5;
-      const defP = p.stats.defense*0.6 + p.stats.weight*0.4;
-      const defE = e.stats.defense*0.6 + e.stats.weight*0.4;
+      const atkP = p.core.attack*0.5 + p.core.spin*0.5;
+      const atkE = e.core.attack*0.5 + e.core.spin*0.5;
+      const defP = p.core.defense*0.6 + p.core.weight*0.4;
+      const defE = e.core.defense*0.6 + e.core.weight*0.4;
 
       const impactP = Math.max(0, atkE - defP) * 0.25 + Math.abs(vn)*0.02;
       const impactE = Math.max(0, atkP - defE) * 0.25 + Math.abs(vn)*0.02;
@@ -698,15 +723,53 @@
       e.hp -= impactP * HP_DRAIN_HIT;
       p.hp -= impactE * HP_DRAIN_HIT;
 
-      // 押し出しブースト
       const pushP = Math.max(0, atkP - defE) * 0.6;
       const pushE = Math.max(0, atkE - defP) * 0.6;
       e.vx += nx * pushP; e.vy += ny * pushP;
       p.vx -= nx * pushE; p.vy -= ny * pushE;
 
       b.hitCooldown = 0.18;
-      b.lastCollision = b.elapsed;
     }
+  }
+
+  // ===================== 戦闘更新（早送り対応） =====================
+  function updateBattle(dt) {
+    const b = state.battle;
+    if (!b) return;
+
+    // 倍率をかけて、固定ステップで分割実行
+    let remaining = dt * state.speed;
+    let guard = 0;
+    while (remaining > 0 && guard < 600) {
+      guard++;
+      const s = Math.min(FIXED_STEP, remaining);
+      stepPhysics(s);
+      remaining -= s;
+      if (state.phase !== "battle") break;
+    }
+
+    // 時間切れ判定（stepPhysicsでelapsedが進む）
+    const remain = Math.max(0, MAX_BATTLE_TIME - b.elapsed);
+    timerBadge.textContent = remain.toFixed(1) + "s";
+    if (b.elapsed >= MAX_BATTLE_TIME && state.phase === "battle") {
+      const p = state.player, e = state.enemy;
+      if (p.hp > e.hp) endBattle("win");
+      else if (e.hp > p.hp) endBattle("lose");
+      else endBattle("draw");
+      return;
+    }
+
+    if (state.phase === "battle") {
+      const p = state.player, e = state.enemy;
+      if (p.hp <= 0 || e.hp <= 0) {
+        if (p.hp <= 0 && e.hp <= 0) endBattle("draw");
+        else if (p.hp <= 0) endBattle("lose");
+        else endBattle("win");
+        return;
+      }
+    }
+
+    updatePanels();
   }
 
   // ===================== ループ =====================
@@ -731,6 +794,8 @@
     if (state.phase === "ended") return;
     state.phase = "ended";
     spinBtn.disabled = false;
+    speedGroup.classList.remove("active");
+    setSpeed(1);
 
     if (result === "win") {
       state.streak++;
@@ -756,8 +821,8 @@
     const p = state.player;
     $("keepBtn").innerHTML = `このコマのまま挑む<small>${p.colorName} / ${shapeName(p.shape)}</small>`;
     $("rerollBtn").innerHTML = `ランダム生成で新しいコマにする<small>パラメータ再抽選（強化なし）</small>`;
-    $("upSpinBtn").innerHTML = `回転速度を 1up して続ける<small>現在 回転 ${p.stats.spin} → ${Math.min(MAX_STAT,p.stats.spin+1)}</small>`;
-    $("upBounceBtn").innerHTML = `バウンド力を 1up して続ける<small>現在 バウンド ${p.stats.bounce} → ${Math.min(MAX_STAT,p.stats.bounce+1)}</small>`;
+    $("upSpinBtn").innerHTML = `回転速度を 1up して続ける<small>現在 回転 ${p.core.spin} → ${Math.min(MAX_STAT,p.core.spin+1)}</small>`;
+    $("upBounceBtn").innerHTML = `バウンド力を 1up して続ける<small>現在 バウンド ${p.bounce} → ${Math.min(BOUNCE_MAX,p.bounce+1)}</small>`;
 
     $("keepBtn").style.display = "block";
     $("rerollBtn").style.display = "block";
@@ -780,13 +845,14 @@
   });
   $("upSpinBtn").addEventListener("click", () => {
     closeChoice();
-    state.player.stats.spin = Math.min(MAX_STAT, state.player.stats.spin + 1);
-    state.player.mass = 0.6 + state.player.stats.weight*0.08;
+    state.player.core.spin = Math.min(MAX_STAT, state.player.core.spin + 1);
+    state.player.stats.spin = state.player.core.spin;
     nextEnemy();
   });
   $("upBounceBtn").addEventListener("click", () => {
     closeChoice();
-    state.player.stats.bounce = Math.min(MAX_STAT, state.player.stats.bounce + 1);
+    state.player.bounce = Math.min(BOUNCE_MAX, state.player.bounce + 1);
+    state.player.stats.bounce = state.player.bounce;
     nextEnemy();
   });
 
@@ -797,6 +863,8 @@
     state.phase = "idle";
     spinBtn.disabled = false;
     spinBtn.textContent = "スタート";
+    speedGroup.classList.remove("active");
+    setSpeed(1);
     timerBadge.textContent = MAX_BATTLE_TIME.toFixed(1) + "s";
     showCenter("NEXT BATTLE", 800);
   }
@@ -821,7 +889,9 @@
 
   function backToOpening() {
     state.player=null; state.enemy=null; state.streak=0;
-    state.phase = "idle";
+    state.phase="idle";
+    speedGroup.classList.remove("active");
+    setSpeed(1);
     gameEl.classList.remove("active");
     opening.style.display = "flex";
   }
@@ -839,6 +909,8 @@
     state.phase = "idle";
     spinBtn.disabled = false;
     spinBtn.textContent = "スタート";
+    speedGroup.classList.remove("active");
+    setSpeed(1);
     timerBadge.textContent = MAX_BATTLE_TIME.toFixed(1) + "s";
   }
 
