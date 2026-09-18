@@ -13,7 +13,6 @@
   }
   #app { width: 100%; height: 100%; position: relative; }
 
-  /* ===== オープニング ===== */
   #opening {
     position: absolute; inset: 0;
     background: url('img190torques.jpg') center/cover no-repeat, #111;
@@ -50,7 +49,6 @@
   }
   #startBtn:hover { transform: scale(1.05); box-shadow: 0 0 40px rgba(0,200,255,1); }
 
-  /* ===== ゲーム画面 ===== */
   #game {
     display: none;
     position: absolute; inset: 0;
@@ -107,6 +105,22 @@
     background: linear-gradient(90deg, #0f0, #ff0);
     transition: width 0.15s;
   }
+  .hyper-row {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: clamp(9px, 2.2vw, 12px);
+    margin-top: 2px;
+    color: #f6a;
+  }
+  .hyper-bar {
+    height: 6px; background: #333; border-radius: 3px; overflow: hidden;
+    flex: 1; margin-left: 6px;
+  }
+  .hyper-bar > div {
+    height: 100%;
+    background: linear-gradient(90deg, #f0f, #f6a);
+    transition: width 0.2s;
+  }
+  .hyper-row.ready { color: #fff; text-shadow: 0 0 8px #f0f; }
 
   #centerMsg {
     position: absolute;
@@ -231,7 +245,6 @@
     box-shadow: 0 0 10px rgba(0,170,255,0.8);
   }
 
-  /* ===== 選択画面 ===== */
   #choiceOverlay {
     display: none;
     position: absolute; inset: 0;
@@ -302,7 +315,6 @@
   .choiceBtn:hover { background: rgba(0,170,255,0.25); transform: translateY(-2px); }
   .choiceBtn small { display:block; opacity:0.65; font-size: 0.8em; margin-top:4px;}
 
-  /* ===== 結果 ===== */
   #resultOverlay {
     display: none;
     position: absolute; inset: 0;
@@ -366,6 +378,7 @@
           <button data-speed="2">2x</button>
           <button data-speed="3">3x</button>
           <button data-speed="4">4x</button>
+          <button data-speed="10">10x</button>
         </div>
       </div>
     </div>
@@ -434,11 +447,11 @@
   const CORE_UP = 3;
   const BOUNCE_UP = 7;
 
-  const MAX_HP = 200;              // HP2倍
+  const MAX_HP = 190;
   const ARENA_MARGIN = 0.82;
   const BASE_RADIUS = 24;
   const WIN_STREAK = 5;
-  const MAX_BATTLE_TIME = 30;
+  const MAX_BATTLE_TIME = 25;
 
   // 物理定数
   const CENTER_PULL = 90;
@@ -446,15 +459,20 @@
   const AIR_DRAG = 0.12;
   const PRECESS_DRIFT = 10;
 
-  // HP減少系（200スケール）
-  const HP_DRAIN_BASE = 2.8;
-  const EDGE_DRAIN = 3.5;          // 外周で毎秒3.5
+  // HP減少系
+  const HP_DRAIN_BASE = 4;
+  const EDGE_DRAIN = 13;
+
+  // 壁（リム）反発の下限
+  const WALL_REST_MIN = 0.08;
 
   const FIXED_STEP = 1/120;
 
   const GRAVITY_DEFAULT = 100;
   const GRAVITY_MIN = 50;
   const GRAVITY_MAX = 1000;
+
+  const HYPER_MAX = 10;
 
   // ===================== 状態 =====================
   const state = {
@@ -520,6 +538,8 @@
       color: color.hex, colorName: color.name, shape,
       core, bounce, stats,
       hp: MAX_HP, maxHp: MAX_HP, mass,
+      hyper: 0,
+      hyperLaunched: false,
       x:0, y:0, vx:0, vy:0, angle:0,
       radius:0,
     };
@@ -527,6 +547,17 @@
 
   function totalScore(k) {
     return k.core.attack + k.core.defense + k.core.stamina + k.core.weight + k.core.spin;
+  }
+
+  // 税金（累進課税・6段階）
+  function taxFor(diff, hyperUsed) {
+    if (hyperUsed) return 0;
+    if (diff <= 1) return 0;
+    if (diff <= 4) return 1;
+    if (diff <= 8) return 2;
+    if (diff <= 13) return 3;
+    if (diff <= 20) return 4;
+    return 5;
   }
 
   // ===================== Canvas =====================
@@ -603,6 +634,17 @@
     ctx.beginPath();
     ctx.moveTo(0,0); ctx.lineTo(r*0.75,0);
     ctx.strokeStyle = "rgba(0,0,0,0.5)"; ctx.lineWidth=2; ctx.stroke();
+
+    if (k.hyper >= HYPER_MAX) {
+      ctx.shadowBlur = 0;
+      ctx.beginPath();
+      ctx.arc(0,0,r*1.5,0,Math.PI*2);
+      ctx.strokeStyle = "rgba(255,0,255,0.7)";
+      ctx.lineWidth = 2;
+      ctx.shadowColor = "#f0f";
+      ctx.shadowBlur = 16;
+      ctx.stroke();
+    }
     ctx.restore();
 
     ctx.restore();
@@ -641,7 +683,7 @@
     }
   }
 
-  function spawnBolt(x, y, angle, intensity) {
+  function spawnBolt(x, y, angle, intensity, colorMode) {
     const segments = Math.round(4 + intensity * 4);
     const length = 30 + intensity * 60;
     const points = [{x, y}];
@@ -653,7 +695,7 @@
       const py = y + diry * length * t + (dirx) * jitter;
       points.push({x:px, y:py});
     }
-    state.bolts.push({ points, life: 0.18, maxLife: 0.18, intensity });
+    state.bolts.push({ points, life: 0.18, maxLife: 0.18, intensity, colorMode: colorMode || "normal" });
   }
 
   function updateEffects(dt) {
@@ -678,11 +720,23 @@
     ctx.lineCap = "round";
     for (const b of state.bolts) {
       const a = clamp(b.life / b.maxLife, 0, 1);
+      const isHyper = b.colorMode === "hyper";
       const strong = b.intensity > 0.7;
-      ctx.strokeStyle = strong ? `rgba(255,240,150,${a})` : `rgba(180,230,255,${a})`;
-      ctx.shadowColor = strong ? "#ffe066" : "#7fdfff";
-      ctx.shadowBlur = 12;
-      ctx.lineWidth = 2 + b.intensity * 2;
+      let stroke, shadow;
+      if (isHyper) {
+        stroke = `rgba(255,100,255,${a})`;
+        shadow = "#f0f";
+      } else if (strong) {
+        stroke = `rgba(255,240,150,${a})`;
+        shadow = "#ffe066";
+      } else {
+        stroke = `rgba(180,230,255,${a})`;
+        shadow = "#7fdfff";
+      }
+      ctx.strokeStyle = stroke;
+      ctx.shadowColor = shadow;
+      ctx.shadowBlur = isHyper ? 20 : 12;
+      ctx.lineWidth = (2 + b.intensity * 2) * (isHyper ? 1.6 : 1);
       ctx.beginPath();
       ctx.moveTo(b.points[0].x, b.points[0].y);
       for (let i=1;i<b.points.length;i++) ctx.lineTo(b.points[i].x, b.points[i].y);
@@ -713,6 +767,8 @@
     if (!k) { el.innerHTML=""; return; }
     const c = k.core;
     const hpPct = clamp(k.hp/k.maxHp*100,0,100);
+    const hyperPct = clamp(k.hyper/HYPER_MAX*100,0,100);
+    const isReady = k.hyper >= HYPER_MAX;
     const maxTag = v => v >= CORE_MAX ? ' <span style="color:#ffd94a">MAX</span>' : '';
     const maxTagB = v => v >= BOUNCE_MAX ? ' <span style="color:#ffd94a">MAX</span>' : '';
     el.innerHTML = `
@@ -724,6 +780,10 @@
       <div class="stat-row"><span class="label">${CORE_LABELS.weight}</span><span class="val">${c.weight}${maxTag(c.weight)}</span></div>
       <div class="stat-row"><span class="label">${CORE_LABELS.spin}</span><span class="val">${c.spin}${maxTag(c.spin)}</span></div>
       <div class="stat-row"><span class="label">バウンド</span><span class="val">${k.bounce}${maxTagB(k.bounce)}</span></div>
+      <div class="hyper-row ${isReady ? "ready" : ""}">
+        <span>${isReady ? "必殺" : "ハイパー"} ${k.hyper}/${HYPER_MAX}</span>
+        <span class="hyper-bar"><div style="width:${hyperPct}%"></div></span>
+      </div>
     `;
   }
   function shapeName(s) {
@@ -747,7 +807,6 @@
     e.x = arena.cx + Math.cos(angE)*rr;
     e.y = arena.cy + Math.sin(angE)*rr;
 
-    // 初速：回転で移動速度ブースト
     const spinBoostP = 1 + p.core.spin / 30 * 0.6;
     const spinBoostE = 1 + e.core.spin / 30 * 0.6;
 
@@ -761,6 +820,8 @@
     e.vy = Math.sin(tangentE)*speedE + rand(-20,20);
 
     p.hp = p.maxHp; e.hp = e.maxHp;
+    p.hyper = 0; e.hyper = 0;
+    p.hyperLaunched = false; e.hyperLaunched = false;
     p.angle = 0; e.angle = Math.PI;
     p.radius = BASE_RADIUS * (Math.min(canvasW,canvasH)/420);
     e.radius = p.radius;
@@ -854,14 +915,11 @@
     p.angle += dt * (6 + p.core.spin*0.3) * hpRatioP;
     e.angle -= dt * (6 + e.core.spin*0.3) * hpRatioE;
 
-    // ===== HP減少 =====
-    // 自然減少（持久で軽減）
     const drainP = Math.max(0.3, HP_DRAIN_BASE - p.core.stamina*0.10) * dt;
     const drainE = Math.max(0.3, HP_DRAIN_BASE - e.core.stamina*0.10) * dt;
     p.hp -= drainP;
     e.hp -= drainE;
 
-    // 外側ペナルティ（距離の2乗に比例）
     const tP = Math.hypot(p.x - arena.cx, p.y - arena.cy) / arena.r;
     const tE = Math.hypot(e.x - arena.cx, e.y - arena.cy) / arena.r;
     const edgeResistP = 1 - clamp(p.core.spin / 60, 0, 0.4);
@@ -890,7 +948,6 @@
     k.vx *= damp;
     k.vy *= damp;
 
-    // 回転で移動速度上限をブースト
     const spinBoost = 1 + k.core.spin / 30 * 0.6;
     const maxSp = 3000 * spinBoost;
     const sp = Math.hypot(k.vx,k.vy);
@@ -902,20 +959,35 @@
     const dy = k.y - arena.cy;
     const dist = Math.hypot(dx, dy);
     const limit = arena.r - k.radius;
+
+    // 必殺で弾かれた直後は壁無効
+    if (k.hyperLaunched) {
+      if (Math.hypot(k.vx, k.vy) < 120) {
+        k.hyperLaunched = false;
+      }
+      if (dist > arena.r) {
+        if (k === state.player) endBattle("lose");
+        else endBattle("win");
+      }
+      return;
+    }
+
     if (dist > limit) {
       const nx = dx/dist, ny = dy/dist;
-      k.x = arena.cx + nx*limit;
-      k.y = arena.cy + ny*limit;
       const vn = k.vx*nx + k.vy*ny;
       if (vn > 0) {
-        const rest = clamp(0.30 + k.bounce/100 * 0.65, 0.25, 0.97);
+        const rest = clamp(WALL_REST_MIN + k.bounce/100 * 0.65, WALL_REST_MIN, 0.97);
         k.vx -= (1 + rest) * vn * nx;
         k.vy -= (1 + rest) * vn * ny;
       }
-      const centerDist = Math.hypot(k.x - arena.cx, k.y - arena.cy);
-      if (centerDist > arena.r) {
+      if (dist > arena.r) {
         if (k === state.player) endBattle("lose");
         else endBattle("win");
+        return;
+      }
+      if (dist > limit) {
+        k.x = arena.cx + nx*limit;
+        k.y = arena.cy + ny*limit;
       }
     }
   }
@@ -943,9 +1015,8 @@
     const vn = rvx*nx + rvy*ny;
     if (vn > 0) return;
 
-    // 反発（バウンド）
     const avgBounce = (p.bounce + e.bounce) / 2;
-    const rest = clamp(0.25 + avgBounce/100 * 0.70, 0.20, 0.97);
+    const rest = clamp(WALL_REST_MIN + avgBounce/100 * 0.70, WALL_REST_MIN, 0.97);
     const j = -(1 + rest) * vn / (1/p.mass + 1/e.mass);
 
     p.vx -= j * nx / p.mass;
@@ -957,38 +1028,87 @@
     const contactY = (p.y + e.y) / 2;
 
     if (b.hitCooldown <= 0) {
-      // ===== 攻撃 vs 防御 =====
-      // 防御 ≥ 攻撃 ならHPダメージ0、負ければ差だけ削られる
+      const pReady = p.hyper >= HYPER_MAX;
+      const eReady = e.hyper >= HYPER_MAX;
+
       const atkP = p.core.attack;
       const atkE = e.core.attack;
       const defP = p.core.defense;
       const defE = e.core.defense;
 
-      const dmgToE = Math.max(0, atkP - defE) * 0.8;
-      const dmgToP = Math.max(0, atkE - defP) * 0.8;
+      const diffE = Math.max(0, atkP - defE);
+      const diffP = Math.max(0, atkE - defP);
+
+      const taxE = taxFor(diffE, pReady);
+      const taxP = taxFor(diffP, eReady);
+
+      const dmgToE = Math.max(0, diffE - taxE) * 0.8;
+      const dmgToP = Math.max(0, diffP - taxP) * 0.8;
       e.hp -= dmgToE;
       p.hp -= dmgToP;
 
-      // ===== ノックバック（バウンド）=====
+      for (let i=0;i<taxE;i++) if (Math.random() < 0.5) p.hyper = Math.min(HYPER_MAX, p.hyper + 1);
+      for (let i=0;i<taxP;i++) if (Math.random() < 0.5) e.hyper = Math.min(HYPER_MAX, e.hyper + 1);
+
       const rawKnockToE = Math.max(0, p.bounce - e.bounce) * 0.6 + p.bounce * 0.15;
       const rawKnockToP = Math.max(0, e.bounce - p.bounce) * 0.6 + e.bounce * 0.15;
 
-      // ノックバック抑制：防御・重さ・回転
-      const resistP = 1 - clamp(defP / 50, 0, 0.5)
-                        - clamp(p.core.weight / 60, 0, 0.5)
-                        - clamp(p.core.spin / 60, 0, 0.5);
-      const resistE = 1 - clamp(defE / 50, 0, 0.5)
-                        - clamp(e.core.weight / 60, 0, 0.5)
-                        - clamp(e.core.spin / 60, 0, 0.5);
-      const knockToP = rawKnockToP * Math.max(0.1, resistP);
-      const knockToE = rawKnockToE * Math.max(0.1, resistE);
+      let resistP = 1 - clamp(defP / 50, 0, 0.5)
+                      - clamp(p.core.weight / 60, 0, 0.5)
+                      - clamp(p.core.spin / 60, 0, 0.5);
+      let resistE = 1 - clamp(defE / 50, 0, 0.5)
+                      - clamp(e.core.weight / 60, 0, 0.5)
+                      - clamp(e.core.spin / 60, 0, 0.5);
+      resistP = Math.max(0.1, resistP);
+      resistE = Math.max(0.1, resistE);
+
+      let knockToP = rawKnockToP * resistP;
+      let knockToE = rawKnockToE * resistE;
+
+      function hyperPower(k) {
+        return k.bounce * 1.0
+             + k.core.attack * 0.3
+             + k.core.spin * 0.3
+             + k.core.weight * 0.3;
+      }
+      function hyperGuard(k) {
+        return k.core.defense * 0.6
+             + k.core.weight * 0.4
+             + k.core.spin * 0.4
+             + k.bounce * 0.4;
+      }
+
+      if (pReady) {
+        const power = hyperPower(p);
+        const guard = hyperGuard(e);
+        const hyperKnock = Math.max(5, power * 2.0 * 9 - guard);
+        knockToE = Math.max(knockToE, hyperKnock);
+        e.hyperLaunched = true;
+        p.hyper = 0;
+
+        spawnBolt(contactX, contactY, Math.atan2(ny, nx), 1.2, "hyper");
+        spawnBolt(contactX, contactY, Math.atan2(-ny, -nx), 1.2, "hyper");
+        spawnBolt(contactX, contactY, rand(0, Math.PI*2), 1.0, "hyper");
+        showCenter("必殺!", 500);
+      }
+      if (eReady) {
+        const power = hyperPower(e);
+        const guard = hyperGuard(p);
+        const hyperKnock = Math.max(5, power * 2.0 * 9 - guard);
+        knockToP = Math.max(knockToP, hyperKnock);
+        p.hyperLaunched = true;
+        e.hyper = 0;
+
+        spawnBolt(contactX, contactY, Math.atan2(ny, nx), 1.2, "hyper");
+        spawnBolt(contactX, contactY, Math.atan2(-ny, -nx), 1.2, "hyper");
+        spawnBolt(contactX, contactY, rand(0, Math.PI*2), 1.0, "hyper");
+      }
 
       e.vx += nx * knockToE; e.vy += ny * knockToE;
       p.vx -= nx * knockToP; p.vy -= ny * knockToP;
 
       b.hitCooldown = 0.10;
 
-      // 雷エフェクト
       const intensity = clamp(Math.abs(vn) / 400, 0.15, 1);
       spawnSparks(contactX, contactY, intensity);
       spawnBolt(contactX, contactY, Math.atan2(ny, nx) + rand(-0.5,0.5), intensity);
@@ -1008,7 +1128,7 @@
 
     let remaining = dt * state.speed;
     let guard = 0;
-    while (remaining > 0 && guard < 800) {
+    while (remaining > 0 && guard < 2000) {
       guard++;
       const s = Math.min(FIXED_STEP, remaining);
       stepPhysics(s);
