@@ -1,0 +1,1306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>God Does Not Play Dice?</title>
+<style>
+  :root {
+    --paper: #f7f1df;
+    --paper-line: #d9cfb8;
+    --ink: #2a241c;
+    --board: #234b3a;
+    --board-edge: #6b4a2b;
+    --chalk-white: #f8f8f2;
+    --chalk-red: #ff6b6b;
+    --chalk-yellow: #ffe066;
+    --chalk-blue: #74c0fc;
+    --desk: #4a3423;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html, body {
+    height: 100%;
+    margin: 0;
+    font-family: "Comic Sans MS", "Chalkboard SE", "Segoe Print", cursive, sans-serif;
+    background: radial-gradient(circle at 50% 20%, #6b4a2b 0%, #2b1d12 70%);
+    color: var(--ink);
+    overflow: hidden;
+  }
+
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+  }
+
+  .scene {
+    width: min(1200px, 100%);
+    height: min(760px, 100%);
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    gap: 10px;
+  }
+
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: #f8f0dc;
+    font-size: 14px;
+    padding: 4px 10px;
+    text-shadow: 1px 1px 0 #00000066;
+  }
+
+  .title {
+    font-size: 18px;
+    letter-spacing: 0.5px;
+  }
+
+  .pageinfo {
+    font-size: 13px;
+    opacity: 0.9;
+  }
+
+  .stage {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    min-height: 0;
+  }
+
+  /* ===== Book ===== */
+  .book-wrap {
+    position: relative;
+    perspective: 1800px;
+    min-height: 0;
+  }
+
+  .book {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+  }
+
+  .page {
+    position: absolute;
+    inset: 0;
+    background: var(--paper);
+    border-radius: 10px 4px 4px 10px;
+    box-shadow:
+      0 10px 20px #00000055,
+      inset 0 0 0 1px #ffffff88;
+    padding: 22px 26px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transform-origin: left center;
+    backface-visibility: hidden;
+  }
+
+  .page::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 12px;
+    background: linear-gradient(90deg, #00000022, transparent);
+    pointer-events: none;
+  }
+
+  .page.cover {
+    background-size: cover;
+    background-position: center;
+    color: #fff;
+    text-shadow: 2px 2px 0 #00000099;
+  }
+
+  .page.cover .cover-label {
+    margin-top: auto;
+    background: #00000066;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 22px;
+    line-height: 1.3;
+  }
+
+  .page-num {
+    position: absolute;
+    bottom: 10px;
+    right: 16px;
+    font-size: 12px;
+    color: #00000066;
+  }
+
+  .page h1 {
+    font-size: 26px;
+    margin: 0 0 10px;
+    line-height: 1.2;
+  }
+
+  .page h2 {
+    font-size: 20px;
+    margin: 0 0 10px;
+    line-height: 1.2;
+  }
+
+  .page p {
+    font-size: 19px;
+    line-height: 1.55;
+    margin: 0 0 10px;
+  }
+
+  .page .big {
+    font-size: 22px;
+  }
+
+  .page .emoji {
+    font-size: 34px;
+    line-height: 1;
+    margin: 6px 0;
+  }
+
+  .page .draw {
+    margin-top: auto;
+    border-top: 2px dashed var(--paper-line);
+    padding-top: 8px;
+    font-size: 13px;
+    color: #00000077;
+  }
+
+  /* ===== Blackboard ===== */
+  .board-wrap {
+    position: relative;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .board-frame {
+    flex: 1;
+    background: var(--board-edge);
+    border-radius: 14px;
+    padding: 12px;
+    box-shadow: 0 14px 26px #00000066;
+    min-height: 0;
+  }
+
+  .board {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background:
+      radial-gradient(circle at 20% 20%, #2f5d49 0%, var(--board) 55%, #183528 100%);
+    border-radius: 8px;
+    padding: 18px 20px;
+    overflow: hidden;
+    box-shadow: inset 0 0 30px #00000077;
+  }
+
+  .board::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      repeating-linear-gradient(0deg, #ffffff05 0 1px, transparent 1px 3px);
+    pointer-events: none;
+    border-radius: 8px;
+  }
+
+  .chalk-line {
+    position: relative;
+    z-index: 2;
+    font-family: "Comic Sans MS", "Chalkboard SE", "Segoe Print", cursive;
+    font-size: 20px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+    min-height: 1.5em;
+    text-shadow: 1px 1px 0 #00000055;
+  }
+
+  .chalk-white { color: var(--chalk-white); }
+  .chalk-red { color: var(--chalk-red); }
+  .chalk-yellow { color: var(--chalk-yellow); }
+  .chalk-blue { color: var(--chalk-blue); }
+
+  .caret {
+    display: inline-block;
+    width: 10px;
+    height: 1.1em;
+    background: #ffffffcc;
+    vertical-align: -0.15em;
+    animation: blink 0.7s steps(1) infinite;
+    margin-left: 2px;
+  }
+
+  @keyframes blink {
+    50% { opacity: 0; }
+  }
+
+  .eraser {
+    position: absolute;
+    z-index: 5;
+    width: 96px;
+    height: 54px;
+    border-radius: 8px;
+    background: linear-gradient(180deg, #f2e6c9 0%, #d8c39a 60%, #b89a6a 100%);
+    border: 2px solid #8a6b42;
+    box-shadow: 0 8px 12px #00000066;
+    transform: translate(-120px, -20px) rotate(-8deg);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+
+  .eraser::after {
+    content: "";
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    top: 8px;
+    height: 12px;
+    border-radius: 4px;
+    background: #00000012;
+  }
+
+  .eraser.show {
+    opacity: 1;
+  }
+
+  .chalk-tray {
+    height: 18px;
+    background: linear-gradient(180deg, #7a5636, #4d3420);
+    border-radius: 0 0 10px 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 12px;
+    box-shadow: inset 0 2px 0 #ffffff22;
+  }
+
+  .chalk-stick {
+    width: 34px;
+    height: 8px;
+    border-radius: 4px;
+    box-shadow: 0 1px 2px #00000066;
+  }
+
+  .chalk-stick.white { background: var(--chalk-white); }
+  .chalk-stick.red { background: var(--chalk-red); }
+  .chalk-stick.yellow { background: var(--chalk-yellow); }
+  .chalk-stick.blue { background: var(--chalk-blue); }
+
+  .hint {
+    color: #f8f0dc;
+    font-size: 12px;
+    text-align: center;
+    opacity: 0.85;
+    text-shadow: 1px 1px 0 #00000066;
+  }
+
+  /* page turn */
+  .page.turn-next {
+    animation: turnNext 0.65s ease-in-out forwards;
+  }
+
+  .page.turn-prev {
+    animation: turnPrev 0.65s ease-in-out forwards;
+  }
+
+  @keyframes turnNext {
+    0% { transform: rotateY(0deg); }
+    100% { transform: rotateY(-168deg); }
+  }
+
+  @keyframes turnPrev {
+    0% { transform: rotateY(-168deg); }
+    100% { transform: rotateY(0deg); }
+  }
+
+  @media (max-width: 900px) {
+    .stage {
+      grid-template-columns: 1fr;
+      grid-template-rows: 1fr 1fr;
+    }
+    .page p { font-size: 17px; }
+    .chalk-line { font-size: 17px; }
+    .page h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+<div class="scene">
+  <div class="topbar">
+    <div class="title">God Does Not Play Dice?</div>
+    <div class="pageinfo" id="pageInfo">Page 1 / 40</div>
+  </div>
+
+  <div class="stage">
+    <div class="book-wrap">
+      <div class="book" id="book"></div>
+    </div>
+
+    <div class="board-wrap">
+      <div class="board-frame">
+        <div class="board" id="board">
+          <div class="chalk-line" id="chalkLine"></div>
+          <div class="eraser" id="eraser"></div>
+        </div>
+      </div>
+      <div class="chalk-tray">
+        <div class="chalk-stick white"></div>
+        <div class="chalk-stick red"></div>
+        <div class="chalk-stick yellow"></div>
+        <div class="chalk-stick blue"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="hint">← → ↑ ↓ keys · click · hold click to turn pages</div>
+</div>
+
+<script>
+/* ============================================================
+   PAGES
+   40 pages total.
+   Page 1 = cover  img40x.jpg
+   Page 40 = back cover img41x.jpg
+   ============================================================ */
+
+const pages = [
+  /* 1 */ {
+    type: "cover",
+    image: "img40x.jpg",
+    label: "God Does Not Play Dice?<br><small>A tiny story about Einstein, Bohr, and the tiny world</small>"
+  },
+
+  /* 2 */ {
+    title: "Hello, class!",
+    body: [
+      "My name is Marie Curie.",
+      "I am a scientist.",
+      "Today we meet two smart friends.",
+      "One is Einstein.",
+      "One is Bohr."
+    ],
+    board: [
+      ["white", "Today: two smart friends"],
+      ["yellow", "Einstein  +  Bohr"],
+      ["red", "They ask: What is tiny?"]
+    ]
+  },
+
+  /* 3 */ {
+    title: "A big meeting",
+    body: [
+      "Many smart people come to a big meeting.",
+      "The meeting is in a big room.",
+      "They talk about the tiny world.",
+      "The tiny world is very, very small.",
+      "You cannot see it with your eyes."
+    ],
+    board: [
+      ["white", "Big meeting = Solvay"],
+      ["blue", "Tiny world = very small"],
+      ["yellow", "Use your mind!"]
+    ]
+  },
+
+  /* 4 */ {
+    title: "The chairman",
+    body: [
+      "A man named Lorentz is the chairman.",
+      "He asks a big question.",
+      "What makes the tiny world act?",
+      "Can we know for sure?",
+      "Bohr stands up to talk."
+    ],
+    board: [
+      ["white", "Chairman: Lorentz"],
+      ["red", "Big question!"],
+      ["blue", "Bohr talks next"]
+    ]
+  },
+
+  /* 5 */ {
+    title: "Bohr says...",
+    body: [
+      "Bohr says the tiny world is strange.",
+      "It can be a wave.",
+      "It can be a particle.",
+      "It can be both.",
+      "That is okay for Bohr."
+    ],
+    board: [
+      ["white", "Bohr says:"],
+      ["yellow", "wave  +  particle"],
+      ["red", "Both are OK!"]
+    ]
+  },
+
+  /* 6 */ {
+    title: "Two ways to be",
+    body: [
+      "A wave is like water.",
+      "A particle is like a little ball.",
+      "The tiny world can be both.",
+      "Bohr calls this idea complementarity.",
+      "It is a big word. It means: both together."
+    ],
+    board: [
+      ["white", "complementarity"],
+      ["blue", "wave = water"],
+      ["red", "particle = ball"],
+      ["yellow", "both together"]
+    ]
+  },
+
+  /* 7 */ {
+    title: "Can we know both?",
+    body: [
+      "Can we know where it is?",
+      "Can we know how fast it goes?",
+      "Bohr says no.",
+      "If we know one, we lose the other.",
+      "This is the uncertainty principle."
+    ],
+    board: [
+      ["white", "uncertainty"],
+      ["red", "where?  OR  how fast?"],
+      ["blue", "not both at once"]
+    ]
+  },
+
+  /* 8 */ {
+    title: "Bohr's big idea",
+    body: [
+      "Bohr says the tiny world is not sure.",
+      "It is full of maybe.",
+      "Maybe here.",
+      "Maybe there.",
+      "We only see it when we look."
+    ],
+    board: [
+      ["white", "maybe, maybe"],
+      ["yellow", "look = see"],
+      ["red", "no look = no see?"]
+    ]
+  },
+
+  /* 9 */ {
+    title: "Look!",
+    body: [
+      "When we look, we see a thing.",
+      "When we do not look, we do not know.",
+      "Bohr says: no look, no thing.",
+      "This sounds very strange.",
+      "But Bohr says it is true."
+    ],
+    board: [
+      ["white", "look -> thing"],
+      ["blue", "no look -> no thing"],
+      ["red", "Bohr says: true!"]
+    ]
+  },
+
+  /* 10 */ {
+    title: "Einstein listens",
+    body: [
+      "Einstein sits and listens.",
+      "He does not agree.",
+      "He thinks the world is real.",
+      "It is there even when we do not look.",
+      "He wants to show Bohr."
+    ],
+    board: [
+      ["white", "Einstein listens"],
+      ["yellow", "world is real"],
+      ["red", "even when we do not look"]
+    ]
+  },
+
+  /* 11 */ {
+    title: "Einstein's board",
+    body: [
+      "Einstein goes to the blackboard.",
+      "He draws a board with a slit.",
+      "He draws a big screen behind it.",
+      "He says: Let us think about this.",
+      "This is a thought experiment."
+    ],
+    board: [
+      ["white", "thought experiment"],
+      ["blue", "board + slit"],
+      ["yellow", "screen behind"],
+      ["red", "think!"]
+    ]
+  },
+
+  /* 12 */ {
+    title: "One slit",
+    body: [
+      "The board has one small slit.",
+      "Electrons go to the board.",
+      "Some go through the slit.",
+      "They hit the screen.",
+      "They leave a mark."
+    ],
+    board: [
+      ["white", "one slit"],
+      ["blue", "electron -> slit -> screen"],
+      ["red", "mark!"]
+    ]
+  },
+
+  /* 13 */ {
+    title: "Like a wave",
+    body: [
+      "The electrons act like a wave.",
+      "They spread out.",
+      "They go many ways.",
+      "The wave is wide.",
+      "The wave is soft."
+    ],
+    board: [
+      ["white", "electron = wave?"],
+      ["blue", "spread out"],
+      ["yellow", "wide + soft"]
+    ]
+  },
+
+  /* 14 */ {
+    title: "Many electrons",
+    body: [
+      "Send many electrons.",
+      "They make a pretty pattern.",
+      "The pattern is like a wave.",
+      "We can count the marks.",
+      "We can say: about 100 here."
+    ],
+    board: [
+      ["white", "many electrons"],
+      ["blue", "pretty pattern"],
+      ["red", "about 100 here"]
+    ]
+  },
+
+  /* 15 */ {
+    title: "One electron",
+    body: [
+      "Now send one electron.",
+      "Where will it go?",
+      "We do not know.",
+      "Maybe here.",
+      "Maybe there."
+    ],
+    board: [
+      ["white", "one electron"],
+      ["red", "where?"],
+      ["yellow", "maybe here"],
+      ["blue", "maybe there"]
+    ]
+  },
+
+  /* 16 */ {
+    title: "A maybe map",
+    body: [
+      "The wave tells us maybe.",
+      "It does not tell us where.",
+      "It is a map of maybe.",
+      "It is very good at maybe.",
+      "But it is not a map of sure."
+    ],
+    board: [
+      ["white", "wave = map of maybe"],
+      ["yellow", "good at maybe"],
+      ["red", "not sure"]
+    ]
+  },
+
+  /* 17 */ {
+    title: "The mark",
+    body: [
+      "Then we see a mark.",
+      "The electron hits here.",
+      "Now we know where it is.",
+      "But before, we did not know.",
+      "That is the strange part."
+    ],
+    board: [
+      ["white", "mark = here"],
+      ["blue", "before: maybe"],
+      ["red", "after: here!"]
+    ]
+  },
+
+  /* 18 */ {
+    title: "Where did the wave go?",
+    body: [
+      "The wave was everywhere.",
+      "Then the electron hits one spot.",
+      "What happens to the wave?",
+      "It must go away.",
+      "It must go away very fast."
+    ],
+    board: [
+      ["white", "wave everywhere"],
+      ["blue", "then one spot"],
+      ["red", "wave goes away fast!"]
+    ]
+  },
+
+  /* 19 */ {
+    title: "Very fast",
+    body: [
+      "The wave goes away at once.",
+      "Even far away.",
+      "Even very far away.",
+      "This is very, very fast.",
+      "Einstein does not like this."
+    ],
+    board: [
+      ["white", "at once"],
+      ["yellow", "even far away"],
+      ["red", "Einstein: no!"]
+    ]
+  },
+
+  /* 20 */ {
+    title: "Light speed rule",
+    body: [
+      "Einstein has a rule.",
+      "Nothing goes faster than light.",
+      "Light is the fastest thing.",
+      "But the wave seems too fast.",
+      "This is a big problem."
+    ],
+    board: [
+      ["white", "light is fastest"],
+      ["blue", "nothing faster"],
+      ["red", "wave too fast?"]
+    ]
+  },
+
+  /* 21 */ {
+    title: "Spooky",
+    body: [
+      "Einstein calls it spooky.",
+      "Spooky means strange and scary.",
+      "How can far things talk?",
+      "How can they talk so fast?",
+      "He says: This cannot be right."
+    ],
+    board: [
+      ["white", "spooky = strange"],
+      ["yellow", "far things talk?"],
+      ["red", "too fast!"]
+    ]
+  },
+
+  /* 22 */ {
+    title: "God does not play dice",
+    body: [
+      "Einstein says a famous thing.",
+      "God does not play dice.",
+      "Dice are for games.",
+      "Dice are for maybe.",
+      "Einstein thinks the world is not a game."
+    ],
+    board: [
+      ["white", "God does not"],
+      ["red", "play dice"],
+      ["yellow", "dice = maybe game"],
+      ["blue", "world is not a game"]
+    ]
+  },
+
+  /* 23 */ {
+    title: "Bohr answers",
+    body: [
+      "Bohr hears this.",
+      "He does not agree.",
+      "He says: Do not tell God what to do.",
+      "The tiny world is maybe.",
+      "That is just how it is."
+    ],
+    board: [
+      ["white", "Bohr:"],
+      ["yellow", "Do not tell God"],
+      ["red", "tiny world = maybe"]
+    ]
+  },
+
+  /* 24 */ {
+    title: "Here and far",
+    body: [
+      "Einstein cares about here.",
+      "Einstein cares about far.",
+      "A thing here should not change a thing far.",
+      "Not at once.",
+      "Not faster than light."
+    ],
+    board: [
+      ["white", "here + far"],
+      ["blue", "here cannot change far"],
+      ["red", "not at once"]
+    ]
+  },
+
+  /* 25 */ {
+    title: "Locality",
+    body: [
+      "This idea has a name.",
+      "It is called locality.",
+      "Local means close.",
+      "Far means not close.",
+      "Close things touch. Far things do not."
+    ],
+    board: [
+      ["white", "locality"],
+      ["blue", "local = close"],
+      ["yellow", "far = not close"],
+      ["red", "close can touch"]
+    ]
+  },
+
+  /* 26 */ {
+    title: "Real",
+    body: [
+      "Einstein also cares about real.",
+      "Real means it is there.",
+      "It is there even when we do not look.",
+      "The moon is real.",
+      "The moon is there."
+    ],
+    board: [
+      ["white", "real = it is there"],
+      ["blue", "even when we do not look"],
+      ["yellow", "moon is real"]
+    ]
+  },
+
+  /* 27 */ {
+    title: "Local realism",
+    body: [
+      "Put the two ideas together.",
+      "Local and real.",
+      "Local realism.",
+      "It means: things are there, and close things touch.",
+      "Einstein likes this idea."
+    ],
+    board: [
+      ["white", "local + real"],
+      ["blue", "local realism"],
+      ["yellow", "things are there"],
+      ["red", "close things touch"]
+    ]
+  },
+
+  /* 28 */ {
+    title: "Bohr's tools",
+    body: [
+      "Bohr says: The wave is a tool.",
+      "It helps us count.",
+      "It helps us guess.",
+      "It is not a real thing.",
+      "It is just math."
+    ],
+    board: [
+      ["white", "wave = tool"],
+      ["blue", "helps us count"],
+      ["yellow", "just math"],
+      ["red", "not a real thing"]
+    ]
+  },
+
+  /* 29 */ {
+    title: "Math is good",
+    body: [
+      "Math is very good.",
+      "Math can say: maybe 100 here.",
+      "Math can say: maybe 50 there.",
+      "But math does not say: this one here.",
+      "Bohr says that is fine."
+    ],
+    board: [
+      ["white", "math is good"],
+      ["blue", "maybe 100 here"],
+      ["yellow", "maybe 50 there"],
+      ["red", "not: this one here"]
+    ]
+  },
+
+  /* 30 */ {
+    title: "Einstein wants more",
+    body: [
+      "Einstein wants more.",
+      "He wants to know: what is real?",
+      "He wants to know: what is sure?",
+      "He does not want only maybe.",
+      "He wants the whole truth."
+    ],
+    board: [
+      ["white", "Einstein wants more"],
+      ["yellow", "what is real?"],
+      ["blue", "what is sure?"],
+      ["red", "not only maybe"]
+    ]
+  },
+
+  /* 31 */ {
+    title: "Bohr wants less",
+    body: [
+      "Bohr wants less.",
+      "He says: Do not ask what we cannot see.",
+      "Do not ask what we cannot test.",
+      "Only talk about what we can see.",
+      "That is enough for Bohr."
+    ],
+    board: [
+      ["white", "Bohr wants less"],
+      ["blue", "only what we can see"],
+      ["yellow", "only what we can test"],
+      ["red", "that is enough"]
+    ]
+  },
+
+  /* 32 */ {
+    title: "Two smart friends",
+    body: [
+      "Einstein and Bohr are both smart.",
+      "They are both good.",
+      "They just think in different ways.",
+      "Einstein looks for what is real.",
+      "Bohr looks for what we can see."
+    ],
+    board: [
+      ["white", "two smart friends"],
+      ["yellow", "Einstein: real"],
+      ["blue", "Bohr: see"],
+      ["red", "both good!"]
+    ]
+  },
+
+  /* 33 */ {
+    title: "The slit again",
+    body: [
+      "Bohr thinks about the slit.",
+      "When the electron goes through, we bump it.",
+      "We bump it a little.",
+      "That bump changes things.",
+      "So we cannot know everything."
+    ],
+    board: [
+      ["white", "slit + bump"],
+      ["blue", "bump = change"],
+      ["yellow", "cannot know all"],
+      ["red", "uncertainty!"]
+    ]
+  },
+
+  /* 34 */ {
+    title: "Big and small",
+    body: [
+      "Einstein says: Wait!",
+      "The board and screen are big.",
+      "The electron is small.",
+      "Why use small rules for big things?",
+      "That does not fit."
+    ],
+    board: [
+      ["white", "big board"],
+      ["blue", "small electron"],
+      ["red", "small rules for big things?"],
+      ["yellow", "does not fit!"]
+    ]
+  },
+
+  /* 35 */ {
+    title: "A crack",
+    body: [
+      "Einstein finds a crack.",
+      "He says: Your rule is for small things.",
+      "You use it for big things.",
+      "That is not fair.",
+      "Bohr has to think."
+    ],
+    board: [
+      ["white", "Einstein finds a crack"],
+      ["blue", "rule for small"],
+      ["red", "used for big"],
+      ["yellow", "not fair!"]
+    ]
+  },
+
+  /* 36 */ {
+    title: "No answer",
+    body: [
+      "Bohr does not fully answer.",
+      "Einstein does not fully answer.",
+      "They talk and talk.",
+      "They do not agree.",
+      "But they keep thinking."
+    ],
+    board: [
+      ["white", "talk and talk"],
+      ["blue", "no full answer"],
+      ["yellow", "do not agree"],
+      ["red", "keep thinking!"]
+    ]
+  },
+
+  /* 37 */ {
+    title: "What did we learn?",
+    body: [
+      "The tiny world is strange.",
+      "It is full of maybe.",
+      "We can count many.",
+      "We cannot know one for sure.",
+      "That is the big surprise."
+    ],
+    board: [
+      ["white", "tiny world = strange"],
+      ["blue", "full of maybe"],
+      ["yellow", "count many"],
+      ["red", "not one for sure"]
+    ]
+  },
+
+  /* 38 */ {
+    title: "Two big ideas",
+    body: [
+      "Einstein says: It is real.",
+      "Bohr says: It is maybe.",
+      "Both ideas are big.",
+      "Both ideas are useful.",
+      "Scientists still talk about them."
+    ],
+    board: [
+      ["white", "Einstein: real"],
+      ["blue", "Bohr: maybe"],
+      ["yellow", "both big"],
+      ["red", "still talk today"]
+    ]
+  },
+
+  /* 39 */ {
+    title: "You can think too",
+    body: [
+      "You are smart.",
+      "You can think about tiny things.",
+      "You can ask big questions.",
+      "You can say: maybe.",
+      "You can say: let us find out."
+    ],
+    board: [
+      ["white", "You are smart!"],
+      ["yellow", "ask big questions"],
+      ["blue", "say: maybe"],
+      ["red", "let us find out!"]
+    ]
+  },
+
+  /* 40 */ {
+    type: "cover",
+    image: "img41x.jpg",
+    label: "The End<br><small>Keep asking questions.</small>"
+  }
+];
+
+/* ============================================================
+   STATE
+   ============================================================ */
+
+let current = 0;
+let turning = false;
+let typing = false;
+let typeTimer = null;
+let holdTimer = null;
+let holdInterval = null;
+let eraserTimer = null;
+
+const bookEl = document.getElementById("book");
+const boardEl = document.getElementById("board");
+const chalkLineEl = document.getElementById("chalkLine");
+const eraserEl = document.getElementById("eraser");
+const pageInfoEl = document.getElementById("pageInfo");
+
+/* ============================================================
+   BUILD PAGE
+   ============================================================ */
+
+function makePageEl(page, index) {
+  const el = document.createElement("div");
+  el.className = "page";
+
+  if (page.type === "cover") {
+    el.classList.add("cover");
+    el.style.backgroundImage = `url('${page.image}')`;
+    el.innerHTML = `
+      <div class="cover-label">${page.label}</div>
+      <div class="page-num">${index + 1}</div>
+    `;
+    return el;
+  }
+
+  const bodyHtml = page.body.map(line => `<p>${line}</p>`).join("");
+  el.innerHTML = `
+    <h1>${page.title}</h1>
+    ${bodyHtml}
+    <div class="draw">Page ${index + 1}</div>
+  `;
+  return el;
+}
+
+function renderBook() {
+  bookEl.innerHTML = "";
+  const pageEl = makePageEl(pages[current], current);
+  pageEl.id = "currentPage";
+  bookEl.appendChild(pageEl);
+}
+
+/* ============================================================
+   BLACKBOARD
+   ============================================================ */
+
+function clearBoardInstant() {
+  chalkLineEl.innerHTML = "";
+}
+
+function showEraser() {
+  eraserEl.classList.add("show");
+}
+
+function hideEraser() {
+  eraserEl.classList.remove("show");
+}
+
+function eraseBoard(callback) {
+  const page = pages[current];
+  if (!page.board) {
+    clearBoardInstant();
+    callback();
+    return;
+  }
+
+  showEraser();
+
+  // move eraser across the board
+  const boardRect = boardEl.getBoundingClientRect();
+  const w = boardRect.width;
+  const h = boardRect.height;
+
+  let x = -100;
+  let y = 10;
+  let step = 0;
+
+  const totalSteps = 18;
+  eraserEl.style.transform = `translate(${x}px, ${y}px) rotate(-8deg)`;
+
+  const move = () => {
+    step++;
+    x = -100 + (w + 200) * (step / totalSteps);
+    y = 10 + Math.sin(step / 2) * 12;
+    eraserEl.style.transform = `translate(${x}px, ${y}px) rotate(-8deg)`;
+
+    // wipe text gradually
+    const text = chalkLineEl.textContent || "";
+    const keep = Math.max(0, text.length - Math.ceil(text.length / totalSteps));
+    chalkLineEl.textContent = text.slice(0, keep);
+
+    if (step < totalSteps) {
+      eraserTimer = setTimeout(move, 28);
+    } else {
+      clearBoardInstant();
+      setTimeout(() => {
+        hideEraser();
+        callback();
+      }, 120);
+    }
+  };
+
+  move();
+}
+
+function typeBoard(callback) {
+  const page = pages[current];
+  if (!page.board) {
+    if (callback) callback();
+    return;
+  }
+
+  typing = true;
+  clearBoardInstant();
+
+  const lines = page.board;
+  let lineIndex = 0;
+  let charIndex = 0;
+  let span = null;
+
+  function nextChar() {
+    if (lineIndex >= lines.length) {
+      typing = false;
+      if (callback) callback();
+      return;
+    }
+
+    const [color, text] = lines[lineIndex];
+
+    if (charIndex === 0) {
+      span = document.createElement("span");
+      span.className = `chalk-${color}`;
+      chalkLineEl.appendChild(span);
+
+      if (lineIndex > 0) {
+        chalkLineEl.appendChild(document.createTextNode("\n"));
+      }
+    }
+
+    span.textContent += text[charIndex];
+    charIndex++;
+
+    if (charIndex >= text.length) {
+      lineIndex++;
+      charIndex = 0;
+    }
+
+    typeTimer = setTimeout(nextChar, 100);
+  }
+
+  nextChar();
+}
+
+function updateBoard() {
+  if (typeTimer) clearTimeout(typeTimer);
+  if (eraserTimer) clearTimeout(eraserTimer);
+
+  eraseBoard(() => {
+    typeBoard();
+  });
+}
+
+/* ============================================================
+   PAGE TURN
+   ============================================================ */
+
+function turnTo(nextIndex) {
+  if (turning) return;
+  if (nextIndex < 0 || nextIndex >= pages.length) return;
+  if (nextIndex === current) return;
+
+  turning = true;
+
+  const oldPage = document.getElementById("currentPage");
+  const direction = nextIndex > current ? "turn-next" : "turn-prev";
+
+  if (oldPage) {
+    oldPage.classList.add(direction);
+  }
+
+  setTimeout(() => {
+    current = nextIndex;
+    renderBook();
+    updatePageInfo();
+    updateBoard();
+    turning = false;
+  }, 620);
+}
+
+function nextPage() {
+  turnTo(current + 1);
+}
+
+function prevPage() {
+  turnTo(current - 1);
+}
+
+function updatePageInfo() {
+  pageInfoEl.textContent = `Page ${current + 1} / ${pages.length}`;
+}
+
+/* ============================================================
+   INPUT
+   ============================================================ */
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+    e.preventDefault();
+    nextPage();
+  } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+    e.preventDefault();
+    prevPage();
+  }
+});
+
+/* click / hold click on the stage */
+const stage = document.querySelector(".stage");
+
+function startHold(clientX) {
+  const rect = stage.getBoundingClientRect();
+  const x = clientX - rect.left;
+  const isRight = x > rect.width / 2;
+
+  holdTimer = setTimeout(() => {
+    holdInterval = setInterval(() => {
+      if (isRight) nextPage();
+      else prevPage();
+    }, 260);
+  }, 500);
+}
+
+function endHold() {
+  if (holdTimer) clearTimeout(holdTimer);
+  if (holdInterval) clearInterval(holdInterval);
+  holdTimer = null;
+  holdInterval = null;
+}
+
+stage.addEventListener("mousedown", (e) => {
+  startHold(e.clientX);
+});
+
+stage.addEventListener("mouseup", (e) => {
+  endHold();
+  // simple click: right half = next, left half = prev
+  const rect = stage.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  if (x > rect.width / 2) nextPage();
+  else prevPage();
+});
+
+stage.addEventListener("mouseleave", endHold);
+
+/* touch */
+stage.addEventListener("touchstart", (e) => {
+  const t = e.touches[0];
+  startHold(t.clientX);
+}, { passive: true });
+
+stage.addEventListener("touchend", (e) => {
+  endHold();
+  const t = e.changedTouches[0];
+  const rect = stage.getBoundingClientRect();
+  const x = t.clientX - rect.left;
+  if (x > rect.width / 2) nextPage();
+  else prevPage();
+}, { passive: true });
+
+/* ============================================================
+   INIT
+   ============================================================ */
+
+renderBook();
+updatePageInfo();
+updateBoard();
+</script>
+</body>
+</html>
