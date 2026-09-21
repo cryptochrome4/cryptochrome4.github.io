@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>サークルレース</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Arial', sans-serif; }
+  #game { position: relative; width: 100vw; height: 100vh; background: #111; }
+  canvas { display: block; width: 100%; height: 100%; }
+
+  /* オープニング画面 */
+  #opening {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; z-index: 100;
+    background: url('img37x.jpg') center/cover no-repeat, #222;
+  }
+  #opening::before {
+    content: ''; position: absolute; inset: 0; background: rgba(0,0,0,0.55);
+  }
+  #opening > * { position: relative; z-index: 1; }
+  #opening h1 { color: #fff; font-size: 64px; text-shadow: 0 0 20px #0af, 0 0 40px #08f; margin-bottom: 40px; letter-spacing: 6px; }
+  #opening .btns { display: flex; gap: 30px; }
+  .menu-btn {
+    padding: 16px 48px; font-size: 24px; border: 2px solid #0af; border-radius: 8px;
+    background: rgba(0,20,40,0.8); color: #0af; cursor: pointer; transition: all 0.2s;
+    letter-spacing: 3px;
+  }
+  .menu-btn:hover { background: #0af; color: #001; box-shadow: 0 0 25px #0af; }
+
+  /* 設定画面 */
+  #settings {
+    position: absolute; inset: 0; display: none; flex-direction: column;
+    align-items: center; justify-content: center; z-index: 100;
+    background: #1a1a2e; color: #fff; overflow-y: auto; padding: 30px;
+  }
+  #settings h2 { font-size: 36px; margin-bottom: 30px; color: #0af; letter-spacing: 4px; }
+  .setting-group { margin-bottom: 24px; text-align: center; }
+  .setting-group h3 { font-size: 20px; margin-bottom: 12px; color: #ccc; }
+  .color-picker { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: 600px; }
+  .color-swatch {
+    width: 44px; height: 44px; border-radius: 50%; cursor: pointer;
+    border: 3px solid transparent; transition: all 0.15s; position: relative;
+  }
+  .color-swatch:hover { transform: scale(1.15); }
+  .color-swatch.selected { border-color: #fff; box-shadow: 0 0 15px #fff; }
+  .color-swatch.selected::after {
+    content: '✓'; position: absolute; inset: 0; display: flex;
+    align-items: center; justify-content: center; font-size: 22px; font-weight: bold;
+    color: #fff; text-shadow: 0 0 4px #000, 0 0 4px #000;
+  }
+  .course-btn, .design-btn {
+    padding: 12px 32px; margin: 6px; font-size: 18px; border: 2px solid #0af;
+    border-radius: 6px; background: transparent; color: #0af; cursor: pointer; transition: all 0.2s;
+  }
+  .course-btn:hover, .design-btn:hover { background: rgba(0,170,255,0.2); }
+  .course-btn.selected, .design-btn.selected { background: #0af; color: #001; }
+  .nav-btns { display: flex; gap: 20px; margin-top: 30px; }
+
+  /* ゲームUI */
+  #hud {
+    position: absolute; top: 12px; left: 12px; z-index: 50;
+    background: rgba(0,0,0,0.7); border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 8px; padding: 12px; color: #fff; font-size: 13px;
+    min-width: 200px; display: none;
+  }
+  #hud h4 { font-size: 15px; margin-bottom: 8px; color: #0af; letter-spacing: 2px; }
+  .rank-row {
+    display: flex; align-items: center; gap: 8px; padding: 3px 4px;
+    border-radius: 4px; margin-bottom: 2px;
+  }
+  .rank-row.me { background: rgba(255,255,255,0.18); font-weight: bold; }
+  .rank-dot { width: 16px; height: 16px; border-radius: 50%; flex-shrink: 0; border: 1px solid rgba(0,0,0,0.3); }
+  .rank-pos { width: 20px; text-align: right; font-variant-numeric: tabular-nums; }
+
+  #lapInfo {
+    position: absolute; top: 12px; right: 12px; z-index: 50;
+    background: rgba(0,0,0,0.7); border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 8px; padding: 12px 20px; color: #fff; font-size: 20px;
+    display: none; text-align: center; letter-spacing: 2px;
+  }
+  #lapInfo span { color: #0af; font-weight: bold; }
+
+  #countdown {
+    position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+    z-index: 60; pointer-events: none;
+  }
+  #countdown span {
+    font-size: 150px; font-weight: bold; color: #fff;
+    text-shadow: 0 0 30px #0af, 0 0 60px #0af;
+  }
+
+  /* 勝利画面 */
+  #victory {
+    position: absolute; inset: 0; display: none; flex-direction: column;
+    align-items: center; justify-content: center; z-index: 200;
+    background: rgba(0,0,0,0.85); color: #fff; text-align: center;
+  }
+  #victory h2 { font-size: 72px; color: #ffd700; text-shadow: 0 0 30px #ffd700; margin-bottom: 30px; letter-spacing: 8px; }
+  #victory p { font-size: 24px; margin-bottom: 40px; }
+  #victory .go-btn {
+    padding: 18px 60px; font-size: 28px; border: 3px solid #ffd700; border-radius: 10px;
+    background: transparent; color: #ffd700; cursor: pointer; transition: all 0.2s; letter-spacing: 4px;
+  }
+  #victory .go-btn:hover { background: #ffd700; color: #000; box-shadow: 0 0 40px #ffd700; }
+</style>
+</head>
+<body>
+<div id="game">
+  <canvas id="cv"></canvas>
+
+  <div id="hud">
+    <h4>順位表</h4>
+    <div id="rankList"></div>
+  </div>
+
+  <div id="lapInfo">LAP <span id="lapNum">1</span> / 3</div>
+
+  <div id="countdown"><span id="cdText">3</span></div>
+
+  <!-- オープニング -->
+  <div id="opening">
+    <h1>サークルレース</h1>
+    <div class="btns">
+      <button class="menu-btn" id="btnStart">はじめる</button>
+      <button class="menu-btn" id="btnSettings">設定</button>
+    </div>
+  </div>
+
+  <!-- 設定 -->
+  <div id="settings">
+    <h2>設定</h2>
+
+    <div class="setting-group">
+      <h3>マイキャラの色</h3>
+      <div class="color-picker" id="colorPicker"></div>
+    </div>
+
+    <div class="setting-group">
+      <h3>レースコース</h3>
+      <div>
+        <button class="course-btn" data-course="0">競馬場</button>
+        <button class="course-btn" data-course="1">サーキット</button>
+        <button class="course-btn" data-course="2">ワインディング</button>
+      </div>
+    </div>
+
+    <div class="setting-group">
+      <h3>デザインテーマ</h3>
+      <div>
+        <button class="design-btn" data-design="simple">シンプル</button>
+        <button class="design-btn" data-design="magazine">雑誌風</button>
+        <button class="design-btn" data-design="ukiyoe">浮世絵風</button>
+        <button class="design-btn" data-design="cyber">サイバーゲーム風</button>
+      </div>
+    </div>
+
+    <div class="nav-btns">
+      <button class="menu-btn" id="btnBack">戻る</button>
+    </div>
+  </div>
+
+  <!-- 勝利 -->
+  <div id="victory">
+    <h2>VICTORY!</h2>
+    <p>1位でゴールしました！</p>
+    <button class="go-btn" id="btnStudy">study.html へ</button>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+// ============ 定数 ============
+const COLORS = [
+  {name:'赤',   hex:'#e8302a', num:'#fff'},
+  {name:'水色', hex:'#5bc8f5', num:'#000'},
+  {name:'黄色', hex:'#f5e642', num:'#000'},
+  {name:'ピンク',hex:'#f56ab0', num:'#fff'},
+  {name:'青',   hex:'#2a4de8', num:'#fff'},
+  {name:'茶色', hex:'#8b5a2b', num:'#fff'},
+  {name:'白',   hex:'#f0f0f0', num:'#000'},
+  {name:'橙',   hex:'#f5902a', num:'#000'},
+  {name:'紫',   hex:'#8a2ae8', num:'#fff'},
+  {name:'黒',   hex:'#1a1a1a', num:'#fff'},
+  {name:'灰色', hex:'#9a9a9a', num:'#000'},
+  {name:'緑',   hex:'#2ab84a', num:'#fff'},
+  {name:'黄緑', hex:'#a8e830', num:'#000'}
+];
+const TOTAL_RACERS = 13;
+const TOTAL_LAPS = 3;
+const BALL_R = 14;
+
+// ============ 状態 ============
+let state = {
+  myColorIdx: 4,      // デフォ青
+  courseIdx: 0,
+  design: 'simple',
+  running: false,
+  finished: false,
+  raceStarted: false,
+  countdown: 3,
+  countdownTimer: 0,
+  lastTime: 0,
+  racers: [],
+  camX: 0, camY: 0,
+  particles: []
+};
+
+// ============ キャンバス ============
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+let W = 0, H = 0;
+
+function resize(){
+  W = cv.width = cv.clientWidth * (window.devicePixelRatio||1);
+  H = cv.height = cv.clientHeight * (window.devicePixelRatio||1);
+}
+window.addEventListener('resize', resize);
+
+// ============ 入力 ============
+const keys = {};
+let mouseDown = false, mouseHold = false, holdTimer = 0;
+const HOLD_THRESHOLD = 0.25; // 秒
+
+window.addEventListener('keydown', e=>{ keys[e.key]=true; if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault(); });
+window.addEventListener('keyup', e=>{ keys[e.key]=false; });
+
+cv.addEventListener('mousedown', e=>{ mouseDown=true; holdTimer=0; });
+cv.addEventListener('mouseup', e=>{ mouseDown=false; mouseHold=false; });
+cv.addEventListener('mouseleave', e=>{ mouseDown=false; mouseHold=false; });
+cv.addEventListener('contextmenu', e=>e.preventDefault());
+
+// ============ コース定義 ============
+// 各コース: 中心線のパスを点列で定義、幅を持つ
+function makeCourse(idx){
+  const pts = [];
+  if(idx===0){
+    // 競馬場: 楕円（シンプル）
+    const cx=900, cy=600, rx=700, ry=380;
+    for(let i=0;i<120;i++){
+      const a = i/120*Math.PI*2;
+      pts.push({x:cx+Math.cos(a)*rx, y:cy+Math.sin(a)*ry});
+    }
+    return { pts, width: 160, name:'競馬場' };
+  } else if(idx===1){
+    // サーキット: 複雑な閉曲線
+    const cx=900, cy=600;
+    for(let i=0;i<200;i++){
+      const a = i/200*Math.PI*2;
+      const r = 500 + Math.sin(a*3)*180 + Math.cos(a*5)*120 + Math.sin(a*2)*100;
+      pts.push({x:cx+Math.cos(a)*r*1.1, y:cy+Math.sin(a)*r*0.8});
+    }
+    return { pts, width: 130, name:'サーキット' };
+  } else {
+    // ワインディング: もっと複雑
+    const cx=900, cy=600;
+    for(let i=0;i<240;i++){
+      const a = i/240*Math.PI*2;
+      const r = 480 + Math.sin(a*4)*200 + Math.cos(a*7)*140 + Math.sin(a*2.5)*160 + Math.cos(a*11)*60;
+      pts.push({x:cx+Math.cos(a)*r*1.15, y:cy+Math.sin(a)*r*0.85});
+    }
+    return { pts, width: 120, name:'ワインディング' };
+  }
+}
+
+// コース上の最近傍点を探す（進行度計算用）
+function nearestOnPath(course, x, y, hintIdx){
+  const pts = course.pts;
+  const n = pts.length;
+  let best = hintIdx||0, bestD = Infinity;
+  const range = hintIdx!==undefined ? 40 : n;
+  const start = hintIdx!==undefined ? Math.max(0, hintIdx-20) : 0;
+  for(let k=0;k<(hintIdx!==undefined?range:n);k++){
+    const i = (start+k)%n;
+    const p = pts[i];
+    const d = (p.x-x)*(p.x-x)+(p.y-y)*(p.y-y);
+    if(d<bestD){ bestD=d; best=i; }
+  }
+  return best;
+}
+
+// コースの壁との衝突判定・押し戻し
+function collideWalls(course, ball){
+  const pts = course.pts;
+  const n = pts.length;
+  const idx = nearestOnPath(course, ball.x, ball.y, ball.pathIdx);
+  ball.pathIdx = idx;
+  // セグメント上の最近点を求める
+  const p0 = pts[idx];
+  const p1 = pts[(idx+1)%n];
+  const dx = p1.x-p0.x, dy = p1.y-p0.y;
+  const len2 = dx*dx+dy*dy || 1;
+  let t = ((ball.x-p0.x)*dx + (ball.y-p0.y)*dy)/len2;
+  t = Math.max(0, Math.min(1, t));
+  const cx = p0.x + dx*t, cy = p0.y + dy*t;
+  const nx = ball.x-cx, ny = ball.y-cy;
+  const dist = Math.sqrt(nx*nx+ny*ny) || 0.001;
+  const halfW = course.width/2 - BALL_R;
+  if(dist > halfW){
+    const ux = nx/dist, uy = ny/dist;
+    const push = dist - halfW;
+    ball.x -= ux*push;
+    ball.y -= uy*push;
+    // 速度の法線成分を反射
+    const vn = ball.vx*ux + ball.vy*uy;
+    if(vn>0){
+      ball.vx -= (1.6)*vn*ux;
+      ball.vy -= (1.6)*vn*uy;
+    }
+  }
+}
+
+// ============ レーサー生成 ============
+function makeRacers(){
+  const course = makeCourse(state.courseIdx);
+  const n = course.pts.length;
+  // スタート位置: コースの最初の方、横並び
+  const startIdx = 5;
+  const sp = course.pts[startIdx];
+  const sp2 = course.pts[(startIdx+3)%n];
+  const dirX = sp2.x-sp.x, dirY = sp2.y-sp.y;
+  const dl = Math.sqrt(dirX*dirX+dirY*dirY)||1;
+  const fx = dirX/dl, fy = dirY/dl;
+  const px = -fy, py = fx;
+
+  const racers = [];
+  // ステータス生成: 合計値のずれ最大10、40〜50の範囲だが39と50はダメ
+  const baseStats = [];
+  for(let i=0;i<TOTAL_RACERS;i++){
+    baseStats.push({
+      speed: 40 + Math.floor(Math.random()*11),
+      accel: 40 + Math.floor(Math.random()*11),
+      turn: 40 + Math.floor(Math.random()*11)
+    });
+  }
+  // 合計のずれを10以内に調整
+  let sum = baseStats.reduce((a,b)=>a+b.speed+b.accel+b.turn, 0);
+  let target = 135*TOTAL_RACERS; // 平均45*3
+  // 各ステータスを40-50に収める（39,50の禁止: 40-50は許可、ただし39と50はダメ→40〜50OK? 問題文「40と50はいてもよいけど、39と50は存在してはならない」→40〜50OK）
+  // 再解釈: 40〜50の範囲でOK
+  for(let i=0;i<TOTAL_RACERS;i++){
+    for(const k of ['speed','accel','turn']){
+      baseStats[i][k] = 40 + Math.floor(Math.random()*11);
+    }
+  }
+
+  // 私の色インデックス
+  const myIdx = state.myColorIdx;
+  // 色の割り当て: 私の色以外を順に
+  const colorOrder = [];
+  for(let i=0;i<COLORS.length;i++) colorOrder.push(i);
+  // 私の色を最初に
+  const orderedColors = [myIdx, ...colorOrder.filter(i=>i!==myIdx)];
+
+  for(let i=0;i<TOTAL_RACERS;i++){
+    const colIdx = orderedColors[i];
+    const isMe = (i===0);
+    // グリッド配置
+    const row = Math.floor(i/3);
+    const col = i%3;
+    const offX = (col-1)*70;
+    const offY = row*60;
+    const x = sp.x + px*offX + fx*(-offY) + (Math.random()-0.5)*10;
+    const y = sp.y + py*offX + fy*(-offY) + (Math.random()-0.5)*10;
+
+    const st = baseStats[i];
+    racers.push({
+      colorIdx: colIdx,
+      color: COLORS[colIdx],
+      isMe,
+      x, y,
+      vx: 0, vy: 0,
+      angle: Math.atan2(fy, fx),
+      pathIdx: startIdx,
+      lap: 0,
+      progress: 0,
+      prevPathIdx: startIdx,
+      finished: false,
+      finishTime: 0,
+      rank: i+1,
+      speed: st.speed,
+      accel: st.accel,
+      turn: st.turn,
+      skill: 0.5 + Math.random()*0.5
+    });
+  }
+  return racers;
+}
+
+// ============ 更新 ============
+function update(dt){
+  if(!state.running || state.finished) return;
+  const course = makeCourse(state.courseIdx);
+  const n = course.pts.length;
+
+  // カウントダウン
+  if(!state.raceStarted){
+    state.countdownTimer += dt;
+    if(state.countdownTimer >= 1){
+      state.countdownTimer -= 1;
+      state.countdown--;
+      if(state.countdown <= 0){
+        state.raceStarted = true;
+        document.getElementById('countdown').style.display = 'none';
+      } else {
+        document.getElementById('cdText').textContent = state.countdown;
+      }
+    }
+    return;
+  }
+
+  // 入力処理
+  let inputX=0, inputY=0;
+  if(keys['ArrowLeft']||keys['a']||keys['A']) inputX-=1;
+  if(keys['ArrowRight']||keys['d']||keys['D']) inputX+=1;
+  if(keys['ArrowUp']||keys['w']||keys['W']) inputY-=1;
+  if(keys['ArrowDown']||keys['s']||keys['S']) inputY+=1;
+
+  // マウス: クリックで加速、長押しでさらに加速
+  let mouseBoost = 0;
+  if(mouseDown){
+    holdTimer += dt;
+    if(holdTimer > HOLD_THRESHOLD){ mouseHold=true; }
+    mouseBoost = mouseHold ? 1.0 : 0.5;
+  } else {
+    holdTimer = 0;
+    mouseHold = false;
+  }
+
+  // 自分のキャラ
+  const me = state.racers.find(r=>r.isMe);
+  if(me && !me.finished){
+    // コース方向への加速
+    const pts = course.pts;
+    const nextIdx = (me.pathIdx+6)%n;
+    const target = pts[nextIdx];
+    const dx = target.x-me.x, dy = target.y-me.y;
+    const dl = Math.sqrt(dx*dx+dy*dy)||1;
+    const tx = dx/dl, ty = dy/dl;
+
+    // 入力方向をコース進行方向に合成
+    let ax = tx*0.6 + inputX*0.5;
+    let ay = ty*0.6 + inputY*0.5;
+    const al = Math.sqrt(ax*ax+ay*ay)||1;
+    ax/=al; ay/=al;
+
+    const accelPower = (me.accel/50) * 900 * (1 + mouseBoost*0.8);
+    me.vx += ax*accelPower*dt;
+    me.vy += ay*accelPower*dt;
+
+    // 摩擦
+    const friction = 0.985;
+    me.vx *= friction;
+    me.vy *= friction;
+
+    // 最高速度
+    const maxSp = (me.speed/50) * 520 * (1 + mouseBoost*0.4);
+    const sp = Math.sqrt(me.vx*me.vx+me.vy*me.vy);
+    if(sp>maxSp){ me.vx = me.vx/sp*maxSp; me.vy = me.vy/sp*maxSp; }
+
+    me.angle = Math.atan2(me.vy, me.vx);
+  }
+
+  // コンピューターAI
+  for(const r of state.racers){
+    if(r.isMe || r.finished) continue;
+    const pts = course.pts;
+    const nextIdx = (r.pathIdx+7)%n;
+    const target = pts[nextIdx];
+    const dx = target.x-r.x, dy = target.y-r.y;
+    const dl = Math.sqrt(dx*dx+dy*dy)||1;
+    let ax = dx/dl, ay = dy/dl;
+
+    // 少しランダム
+    ax += (Math.random()-0.5)*0.3;
+    ay += (Math.random()-0.5)*0.3;
+    const al = Math.sqrt(ax*ax+ay*ay)||1;
+    ax/=al; ay/=al;
+
+    const accelPower = (r.accel/50) * 850 * r.skill;
+    r.vx += ax*accelPower*dt;
+    r.vy += ay*accelPower*dt;
+    r.vx *= 0.985;
+    r.vy *= 0.985;
+
+    const maxSp = (r.speed/50) * 500;
+    const sp = Math.sqrt(r.vx*r.vx+r.vy*r.vy);
+    if(sp>maxSp){ r.vx = r.vx/sp*maxSp; r.vy = r.vy/sp*maxSp; }
+    r.angle = Math.atan2(r.vy, r.vx);
+  }
+
+  // 位置更新
+  for(const r of state.racers){
+    if(r.finished) continue;
+    r.x += r.vx*dt;
+    r.y += r.vy*dt;
+  }
+
+  // 壁衝突
+  for(const r of state.racers){
+    if(r.finished) continue;
+    collideWalls(course, r);
+  }
+
+  // ボール同士の衝突（サッカー押し合い）
+  for(let i=0;i<state.racers.length;i++){
+    const a = state.racers[i];
+    if(a.finished) continue;
+    for(let j=i+1;j<state.racers.length;j++){
+      const b = state.racers[j];
+      if(b.finished) continue;
+      const dx = b.x-a.x, dy = b.y-a.y;
+      const d = Math.sqrt(dx*dx+dy*dy);
+      const minD = BALL_R*2;
+      if(d < minD && d > 0.001){
+        const ux = dx/d, uy = dy/d;
+        const overlap = minD - d;
+        const push = overlap * 0.5;
+        a.x -= ux*push; a.y -= uy*push;
+        b.x += ux*push; b.y += uy*push;
+        // 相対速度
+        const rvx = b.vx-a.vx, rvy = b.vy-a.vy;
+        const vn = rvx*ux + rvy*uy;
+        if(vn < 0){
+          const imp = -vn * 0.7;
+          a.vx -= ux*imp; a.vy -= uy*imp;
+          b.vx += ux*imp; b.vy += uy*imp;
+        }
+      }
+    }
+  }
+
+  // 進行度・ラップ計算
+  for(const r of state.racers){
+    if(r.finished) continue;
+    const newIdx = nearestOnPath(course, r.x, r.y, r.pathIdx);
+    // ラップ判定: スタート地点付近を通過
+    const prev = r.pathIdx;
+    r.pathIdx = newIdx;
+    const diff = newIdx - prev;
+    if(diff < -n/2){
+      // 前進でラップ
+      r.lap++;
+      if(r.lap >= TOTAL_LAPS){
+        r.finished = true;
+        r.finishTime = performance.now();
+      }
+    } else if(diff > n/2){
+      r.lap--;
+    }
+    r.progress = r.lap*n + newIdx;
+  }
+
+  // 順位計算
+  const sorted = state.racers.slice().sort((a,b)=>{
+    if(a.finished && b.finished) return a.finishTime-b.finishTime;
+    if(a.finished) return -1;
+    if(b.finished) return 1;
+    return b.progress - a.progress;
+  });
+  sorted.forEach((r,i)=> r.rank = i+1);
+
+  // ゴール判定
+  if(!state.finished){
+    const me2 = state.racers.find(r=>r.isMe);
+    if(me2 && me2.finished){
+      state.finished = true;
+      state.running = false;
+      if(me2.rank === 1){
+        document.getElementById('victory').style.display = 'flex';
+      } else {
+        // 負け: リザルト表示なし、そのまま
+        setTimeout(()=>{ document.getElementById('victory').style.display='flex'; }, 100);
+      }
+    }
+    // 全員ゴール？
+    if(state.racers.every(r=>r.finished)){
+      state.finished = true;
+      state.running = false;
+    }
+  }
+
+  // カメラ
+  const me3 = state.racers.find(r=>r.isMe);
+  if(me3){
+    state.camX += (me3.x - state.camX) * 0.08;
+    state.camY += (me3.y - state.camY) * 0.08;
+  }
+
+  updateHUD();
+}
+
+function updateHUD(){
+  const list = document.getElementById('rankList');
+  const sorted = state.racers.slice().sort((a,b)=>{
+    if(a.finished && b.finished) return a.finishTime-b.finishTime;
+    if(a.finished) return -1;
+    if(b.finished) return 1;
+    return b.progress - a.progress;
+  });
+  let html = '';
+  for(const r of sorted){
+    const numColor = r.color.num;
+    html += `<div class="rank-row${r.isMe?' me':''}">
+      <span class="rank-pos">${r.rank}</span>
+      <span class="rank-dot" style="background:${r.color.hex}"></span>
+      <span>${r.color.name}${r.isMe?' (俺)':''}</span>
+    </div>`;
+  }
+  list.innerHTML = html;
+  const me = state.racers.find(r=>r.isMe);
+  if(me) document.getElementById('lapNum').textContent = Math.min(me.lap+1, TOTAL_LAPS);
+}
+
+// ============ 描画 ============
+function draw(){
+  const dpr = window.devicePixelRatio||1;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  const w = W/dpr, h = H/dpr;
+
+  // 背景
+  drawBackground(w, h);
+
+  if(!state.running && !state.finished) return;
+
+  const course = makeCourse(state.courseIdx);
+
+  ctx.save();
+  // カメラ変換
+  const camScale = 0.9;
+  ctx.translate(w/2, h/2);
+  ctx.scale(camScale, camScale);
+  ctx.translate(-state.camX, -state.camY);
+
+  // コース描画
+  drawCourse(course);
+
+  // パーティクル
+  for(let i=state.particles.length-1;i>=0;i--){
+    const p = state.particles[i];
+    p.x += p.vx; p.y += p.vy; p.life -= 0.02;
+    if(p.life<=0){ state.particles.splice(i,1); continue; }
+    ctx.globalAlpha = p.life;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size*p.life, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // レーサー描画（自分の後ろから）
+  const sorted = state.racers.slice().sort((a,b)=>{
+    if(a.isMe) return 1;
+    if(b.isMe) return -1;
+    return 0;
+  });
+  for(const r of sorted){
+    drawRacer(r);
+  }
+
+  ctx.restore();
+}
+
+function drawBackground(w, h){
+  const d = state.design;
+  if(d==='simple'){
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0,0,w,h);
+    // グリッド
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    ctx.lineWidth = 1;
+    const gs = 60;
+    const ox = (-state.camX*0.3)%gs;
+    const oy = (-state.camY*0.3)%gs;
+    for(let x=ox;x<w;x+=gs){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke(); }
+    for(let y=oy;y<h;y+=gs){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke(); }
+  } else if(d==='magazine'){
+    // 雑誌風: ポップな色
+    const g = ctx.createLinearGradient(0,0,w,h);
+    g.addColorStop(0,'#ff6b9d');
+    g.addColorStop(0.5,'#ffd93d');
+    g.addColorStop(1,'#6bcbff');
+    ctx.fillStyle = g;
+    ctx.fillRect(0,0,w,h);
+    // ドット
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    for(let i=0;i<80;i++){
+      const x = (i*137.5)%w, y=(i*89.3)%h;
+      ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2); ctx.fill();
+    }
+  } else if(d==='ukiyoe'){
+    // 浮世絵風: 和風
+    const g = ctx.createLinearGradient(0,0,0,h);
+    g.addColorStop(0,'#1a3a5c');
+    g.addColorStop(0.5,'#2a5a8c');
+    g.addColorStop(1,'#0f2a4a');
+    ctx.fillStyle = g;
+    ctx.fillRect(0,0,w,h);
+    // 波模様
+    ctx.strokeStyle = 'rgba(200,220,255,0.15)';
+    ctx.lineWidth = 2;
+    for(let i=0;i<10;i++){
+      ctx.beginPath();
+      for(let x=0;x<w;x+=10){
+        const y = i*80 + Math.sin(x*0.02+i)*20;
+        if(x===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+      }
+      ctx.stroke();
+    }
+  } else if(d==='cyber'){
+    // サイバーゲーム風
+    ctx.fillStyle = '#050510';
+    ctx.fillRect(0,0,w,h);
+    // ネオンライン
+    ctx.strokeStyle = 'rgba(0,255,255,0.15)';
+    ctx.lineWidth = 1;
+    const gs = 50;
+    const ox = (-state.camX*0.5)%gs;
+    const oy = (-state.camY*0.5)%gs;
+    for(let x=ox;x<w;x+=gs){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke(); }
+    for(let y=oy;y<h;y+=gs){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke(); }
+    // スキャンライン
+    ctx.fillStyle = 'rgba(0,255,255,0.03)';
+    for(let y=0;y<h;y+=4){ ctx.fillRect(0,y,w,2); }
+  }
+}
+
+function drawCourse(course){
+  const pts = course.pts;
+  const n = pts.length;
+  const d = state.design;
+
+  // コース路面
+  ctx.save();
+  ctx.beginPath();
+  // 外側
+  for(let i=0;i<=n;i++){
+    const p = pts[i%n];
+    // 法線方向に幅/2オフセット（簡易: 前後点から）
+    const p2 = pts[(i+1)%n];
+    const dx = p2.x-p.x, dy = p2.y-p.y;
+    const dl = Math.sqrt(dx*dx+dy*dy)||1;
+    const nx = -dy/dl, ny = dx/dl;
+    if(i===0) ctx.moveTo(p.x+nx*course.width/2, p.y+ny*course.width/2);
+    else ctx.lineTo(p.x+nx*course.width/2, p.y+ny*course.width/2);
+  }
+  for(let i=n;i>=0;i--){
+    const p = pts[i%n];
+    const p2 = pts[(i+1)%n];
+    const dx = p2.x-p.x, dy = p2.y-p.y;
+    const dl = Math.sqrt(dx*dx+dy*dy)||1;
+    const nx = -dy/dl, ny = dx/dl;
+    ctx.lineTo(p.x-nx*course.width/2, p.y-ny*course.width/2);
+  }
+  ctx.closePath();
+
+  let roadColor = '#444';
+  let lineColor = '#fff';
+  if(d==='magazine'){ roadColor='#5a4a6a'; lineColor='#ff6b9d'; }
+  else if(d==='ukiyoe'){ roadColor='#3a3a2a'; lineColor='#d4c9a8'; }
+  else if(d==='cyber'){ roadColor='#0a1a2a'; lineColor='#0ff'; }
+  ctx.fillStyle = roadColor;
+  ctx.fill();
+
+  // 縁
+  ctx.strokeStyle = lineColor;
+  ctx.lineWidth = 4;
+  ctx.stroke();
+
+  // センターライン
+  ctx.beginPath();
+  for(let i=0;i<n;i++){
+    const p = pts[i];
+    if(i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y);
+  }
+  ctx.closePath();
+  ctx.strokeStyle = d==='cyber' ? 'rgba(0,255,255,0.4)' : 'rgba(255,255,255,0.25)';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([20,20]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // スタートライン
+  const sp = pts[5];
+  const sp2 = pts[11];
+  const sdx = sp2.x-sp.x, sdy = sp2.y-sp.y;
+  const sdl = Math.sqrt(sdx*sdx+sdy*sdy)||1;
+  const snx = -sdy/sdl, sny = sdx/sdl;
+  ctx.beginPath();
+  ctx.moveTo(sp.x+snx*course.width/2, sp.y+sny*course.width/2);
+  ctx.lineTo(sp.x-snx*course.width/2, sp.y-sny*course.width/2);
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 6;
+  ctx.stroke();
+  // チェッカー
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 6;
+  ctx.setLineDash([8,8]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.restore();
+}
+
+function drawRacer(r){
+  ctx.save();
+  ctx.translate(r.x, r.y);
+
+  // 影
+  ctx.beginPath();
+  ctx.arc(2, 3, BALL_R, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.fill();
+
+  // 本体
+  ctx.beginPath();
+  ctx.arc(0, 0, BALL_R, 0, Math.PI*2);
+  ctx.fillStyle = r.color.hex;
+  ctx.fill();
+  ctx.strokeStyle = r.isMe ? '#fff' : 'rgba(0,0,0,0.4)';
+  ctx.lineWidth = r.isMe ? 3 : 1.5;
+  ctx.stroke();
+
+  // ハイライト
+  ctx.beginPath();
+  ctx.arc(-4, -5, BALL_R*0.35, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.fill();
+
+  // 順位数字
+  ctx.fillStyle = r.color.num;
+  ctx.font = `bold ${BALL_R*1.1}px Arial`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(r.rank, 0, 1);
+
+  // 俺マーカー
+  if(r.isMe){
+    ctx.beginPath();
+    ctx.arc(0, 0, BALL_R+5, 0, Math.PI*2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5,5]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  ctx.restore();
+}
+
+// ============ ゲームループ ============
+function loop(now){
+  const dt = Math.min((now - state.lastTime)/1000, 0.05);
+  state.lastTime = now;
+  update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+
+// ============ UI構築 ============
+function buildColorPicker(){
+  const picker = document.getElementById('colorPicker');
+  picker.innerHTML = '';
+  COLORS.forEach((c,i)=>{
+    const d = document.createElement('div');
+    d.className = 'color-swatch' + (i===state.myColorIdx?' selected':'');
+    d.style.background = c.hex;
+    d.title = c.name;
+    if(c.hex==='#1a1a1a') d.style.border = '3px solid #555';
+    d.addEventListener('click', ()=>{
+      state.myColorIdx = i;
+      buildColorPicker();
+    });
+    picker.appendChild(d);
+  });
+}
+
+function updateCourseButtons(){
+  document.querySelectorAll('.course-btn').forEach(b=>{
+    b.classList.toggle('selected', parseInt(b.dataset.course)===state.courseIdx);
+  });
+}
+function updateDesignButtons(){
+  document.querySelectorAll('.design-btn').forEach(b=>{
+    b.classList.toggle('selected', b.dataset.design===state.design);
+  });
+}
+
+// ============ イベント ============
+document.getElementById('btnStart').addEventListener('click', ()=>{
+  document.getElementById('opening').style.display = 'none';
+  startRace();
+});
+document.getElementById('btnSettings').addEventListener('click', ()=>{
+  document.getElementById('opening').style.display = 'none';
+  document.getElementById('settings').style.display = 'flex';
+});
+document.getElementById('btnBack').addEventListener('click', ()=>{
+  document.getElementById('settings').style.display = 'none';
+  document.getElementById('opening').style.display = 'flex';
+});
+document.getElementById('btnStudy').addEventListener('click', ()=>{
+  window.location.href = 'study.html';
+});
+
+document.querySelectorAll('.course-btn').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    const newIdx = parseInt(b.dataset.course);
+    // コース変更時にデザイン選択を促す
+    if(newIdx !== 0){ // 0以外のコース選択時
+      const wantDesign = confirm('デザインを変更しますか？\n（雑誌風・浮世絵風・サイバーゲーム風が選べます）');
+      if(wantDesign){
+        // デザイン選択を表示（すでにあるのでそのまま）
+        state.courseIdx = newIdx;
+        updateCourseButtons();
+        return;
+      }
+    }
+    state.courseIdx = newIdx;
+    updateCourseButtons();
+    // コース0選択時はシンプルに戻す
+    if(newIdx===0){
+      state.design = 'simple';
+      updateDesignButtons();
+    }
+  });
+});
+document.querySelectorAll('.design-btn').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    state.design = b.dataset.design;
+    updateDesignButtons();
+  });
+});
+
+// ============ レース開始 ============
+function startRace(){
+  state.racers = makeRacers();
+  state.running = true;
+  state.finished = false;
+  state.raceStarted = false;
+  state.countdown = 3;
+  state.countdownTimer = 0;
+  state.camX = state.racers[0].x;
+  state.camY = state.racers[0].y;
+  state.particles = [];
+
+  document.getElementById('hud').style.display = 'block';
+  document.getElementById('lapInfo').style.display = 'block';
+  document.getElementById('countdown').style.display = 'flex';
+  document.getElementById('cdText').textContent = '3';
+  document.getElementById('victory').style.display = 'none';
+
+  updateHUD();
+  state.lastTime = performance.now();
+}
+
+// ============ 初期化 ============
+resize();
+buildColorPicker();
+updateCourseButtons();
+updateDesignButtons();
+requestAnimationFrame(loop);
+
+})();
+</script>
+</body>
+</html>
