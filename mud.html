@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SCATTER ｜ bitFlyer流ポートフォリオをSBI証券で再現する</title>
+  <style>
+    /* ===== 黒基調：漆黒・金・モノトーン ===== */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #000000;
+      background-image:
+        radial-gradient(ellipse at 20% 0%, rgba(40, 30, 10, 0.4) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 100%, rgba(30, 20, 40, 0.3) 0%, transparent 50%),
+        repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(255, 215, 0, 0.02) 1px, rgba(255, 215, 0, 0.02) 2px);
+      color: #e0d8c8;
+      font-family: 'Georgia', 'Times New Roman', 'Yu Mincho', serif;
+      padding: 40px 16px 100px;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      max-width: 1100px;
+      width: 100%;
+      background: #0a0a0a;
+      border: 2px solid #d4af37;
+      box-shadow:
+        0 0 0 1px #2a2a2a,
+        0 0 60px rgba(212, 175, 55, 0.15),
+        inset 0 0 80px rgba(0,0,0,0.9);
+      padding: 0 0 40px;
+      position: relative;
+    }
+
+    /* コーナー装飾 */
+    .container::before,
+    .container::after {
+      content: "";
+      position: absolute;
+      width: 60px;
+      height: 60px;
+      border: 2px solid #d4af37;
+      opacity: 0.5;
+    }
+    .container::before { top: 8px; left: 8px; border-right: none; border-bottom: none; }
+    .container::after { bottom: 8px; right: 8px; border-left: none; border-top: none; }
+
+    /* ===== ヘッダー ===== */
+    .header {
+      text-align: center;
+      padding: 50px 20px 40px;
+      border-bottom: 1px solid #2a2a2a;
+      position: relative;
+      background: linear-gradient(180deg, #0f0f0f 0%, #0a0a0a 100%);
+    }
+
+    .header h1 {
+      font-size: 2.6rem;
+      color: #d4af37;
+      letter-spacing: 8px;
+      text-shadow: 0 0 20px rgba(212, 175, 55, 0.5), 2px 2px 0 #000;
+      margin-bottom: 12px;
+      font-weight: 400;
+    }
+
+    .header .sub {
+      font-size: 0.95rem;
+      color: #888;
+      letter-spacing: 4px;
+      margin-bottom: 20px;
+    }
+
+    .header .meta-line {
+      display: inline-block;
+      border: 1px solid #d4af37;
+      padding: 6px 24px;
+      font-size: 0.8rem;
+      color: #d4af37;
+      letter-spacing: 3px;
+      background: rgba(212, 175, 55, 0.05);
+    }
+
+    /* ===== セクション ===== */
+    .section {
+      padding: 0 28px;
+      margin-top: 44px;
+    }
+
+    .section-title {
+      font-size: 1.4rem;
+      color: #d4af37;
+      letter-spacing: 4px;
+      border-left: 4px solid #d4af37;
+      padding-left: 16px;
+      margin-bottom: 22px;
+      text-shadow: 0 0 12px rgba(212, 175, 55, 0.3);
+    }
+
+    .section-title small {
+      display: block;
+      font-size: 0.75rem;
+      color: #666;
+      letter-spacing: 2px;
+      margin-top: 4px;
+      font-weight: normal;
+    }
+
+    p {
+      font-size: 0.95rem;
+      line-height: 1.9;
+      color: #b8b0a0;
+      margin-bottom: 16px;
+      text-align: justify;
+    }
+
+    strong { color: #d4af37; font-weight: normal; }
+    .hl { color: #fff; background: rgba(212, 175, 55, 0.12); padding: 0 4px; }
+
+    /* ===== 13コインのグリッド ===== */
+    .coin-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 10px;
+      margin: 20px 0 10px;
+    }
+
+    .coin-card {
+      background: #111;
+      border: 1px solid #2a2a2a;
+      border-top: 2px solid #d4af37;
+      padding: 12px 10px;
+      text-align: center;
+      transition: 0.2s;
+      position: relative;
+    }
+
+    .coin-card:hover {
+      background: #161616;
+      border-color: #d4af37;
+      box-shadow: 0 0 16px rgba(212, 175, 55, 0.15);
+    }
+
+    .coin-card .symbol {
+      font-size: 1.1rem;
+      color: #d4af37;
+      letter-spacing: 2px;
+      font-weight: bold;
+      font-family: 'Courier New', monospace;
+    }
+
+    .coin-card .name {
+      font-size: 0.72rem;
+      color: #777;
+      margin-top: 4px;
+      letter-spacing: 1px;
+    }
+
+    .coin-card .tag {
+      font-size: 0.68rem;
+      display: inline-block;
+      margin-top: 8px;
+      padding: 2px 8px;
+      border: 1px solid #444;
+      color: #999;
+      letter-spacing: 1px;
+    }
+
+    .coin-card .tag.big { border-color: #d4af37; color: #d4af37; }
+    .coin-card .tag.confident { border-color: #4a8; color: #6c8; }
+    .coin-card .tag.worry { border-color: #a44; color: #c66; }
+
+    /* ===== 比較表 ===== */
+    .map-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0 30px;
+      font-size: 0.88rem;
+    }
+
+    .map-table th {
+      background: #141414;
+      color: #d4af37;
+      padding: 12px 10px;
+      border: 1px solid #2a2a2a;
+      letter-spacing: 2px;
+      font-weight: normal;
+      text-align: left;
+    }
+
+    .map-table td {
+      padding: 11px 10px;
+      border: 1px solid #1e1e1e;
+      color: #b0a898;
+      vertical-align: top;
+    }
+
+    .map-table tr:nth-child(even) td {
+      background: #0d0d0d;
+    }
+
+    .map-table tr:hover td {
+      background: #141414;
+    }
+
+    .map-table .crypto {
+      color: #d4af37;
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+      letter-spacing: 1px;
+    }
+
+    .map-table .stock {
+      color: #e0e0e0;
+    }
+
+    /* ===== パターンカード ===== */
+    .pattern-box {
+      background: #0d0d0d;
+      border: 1px solid #2a2a2a;
+      border-top: 3px solid #d4af37;
+      padding: 0;
+      margin: 30px 0;
+      box-shadow: 0 0 30px rgba(0,0,0,0.8);
+    }
+
+    .pattern-header {
+      background: linear-gradient(90deg, #1a1508 0%, #0d0d0d 100%);
+      padding: 16px 20px;
+      border-bottom: 1px solid #2a2a2a;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .pattern-header .pnum {
+      font-size: 2rem;
+      color: #d4af37;
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+      line-height: 1;
+    }
+
+    .pattern-header h3 {
+      font-size: 1.2rem;
+      color: #e0d8c8;
+      letter-spacing: 3px;
+      font-weight: normal;
+    }
+
+    .pattern-header .verdict {
+      margin-left: auto;
+      font-size: 0.75rem;
+      padding: 4px 14px;
+      border: 1px solid #d4af37;
+      color: #d4af37;
+      letter-spacing: 2px;
+    }
+
+    .pattern-body {
+      padding: 20px 22px 24px;
+    }
+
+    /* ポートフォリオ・バー */
+    .port-bar {
+      display: flex;
+      height: 40px;
+      margin: 16px 0 10px;
+      border: 1px solid #2a2a2a;
+      overflow: hidden;
+    }
+
+    .port-seg {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      color: #000;
+      font-weight: bold;
+      letter-spacing: 1px;
+      font-family: 'Courier New', monospace;
+      transition: 0.3s;
+      cursor: default;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .port-seg:hover {
+      filter: brightness(1.3);
+    }
+
+    .seg-btc { background: #d4af37; }
+    .seg-eth { background: #9a8a5a; }
+    .seg-xrp { background: #c0a040; }
+    .seg-sol { background: #b89a4a; }
+    .seg-etc { background: #8a7a4a; }
+    .seg-other { background: #5a5040; color: #ccc; }
+
+    /* リスト */
+    .detail-list {
+      list-style: none;
+      margin: 14px 0;
+    }
+
+    .detail-list li {
+      padding: 10px 0 10px 26px;
+      border-bottom: 1px dashed #1e1e1e;
+      font-size: 0.9rem;
+      line-height: 1.7;
+      color: #b0a898;
+      position: relative;
+    }
+
+    .detail-list li:last-child { border-bottom: none; }
+
+    .detail-list li::before {
+      content: "◆";
+      position: absolute;
+      left: 0;
+      color: #d4af37;
+      font-size: 0.7rem;
+      top: 13px;
+    }
+
+    .detail-list li strong {
+      color: #e0d8c8;
+      font-weight: normal;
+    }
+
+    /* ===== 注意ボックス ===== */
+    .warn-box {
+      background: #140808;
+      border: 1px solid #4a1a1a;
+      border-left: 4px solid #a44;
+      padding: 16px 20px;
+      margin: 24px 0;
+      font-size: 0.88rem;
+      color: #c08080;
+      line-height: 1.8;
+    }
+
+    .warn-box strong { color: #e06060; }
+
+    /* ===== フッター ===== */
+    .footer {
+      text-align: center;
+      padding: 40px 20px 10px;
+      border-top: 1px solid #1a1a1a;
+      margin: 50px 28px 0;
+      font-size: 0.8rem;
+      color: #555;
+      letter-spacing: 3px;
+    }
+
+    .footer .gold {
+      color: #d4af37;
+      font-size: 1.2rem;
+      display: block;
+      margin-bottom: 10px;
+    }
+
+    /* ===== レスポンシブ ===== */
+    @media (max-width: 700px) {
+      .header h1 { font-size: 1.6rem; letter-spacing: 4px; }
+      .section { padding: 0 16px; }
+      .map-table { font-size: 0.78rem; }
+      .map-table th, .map-table td { padding: 8px 6px; }
+      .pattern-header .pnum { font-size: 1.4rem; }
+      .pattern-header h3 { font-size: 1rem; }
+      .coin-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+
+    @media (max-width: 420px) {
+      .coin-grid { grid-template-columns: repeat(2, 1fr); }
+      .map-table { display: block; overflow-x: auto; white-space: nowrap; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+      <h1>SCATTER</h1>
+      <div class="sub">〜 分散型ポートフォリオをSBI証券で再現する 〜</div>
+      <div class="meta-line">13 COINS ｜ 2 PATTERNS ｜ 2026</div>
+    </div>
+
+    <!-- ===== 前置き ===== -->
+    <div class="section">
+      <div class="section-title">
+        あなたの投資スタイル
+        <small>BITFLYER → SBI SECURITIES</small>
+      </div>
+      <p>
+        あなたは2026年6月10日に仮想通貨から投資を始めた。<strong>BTC・ETH・SOL・XRP・XLM・AVAX・LINK・POL・GRT・RENDER・DOGE・SHIB・PEPE</strong>の13銘柄。
+        そのうち<strong>RENDER・SHIB・PEPE以外</strong>は「自信を持って当てた」と感じている。
+        最初は慎重に<strong>bitFlyer Lightning</strong>でBTC・ETH・XRPに少額から入り、
+        ETHが2万円の投資で上がり続けたことをきっかけに、AIと試行錯誤しながら残りのアルトコインを見つけた。
+        XLMは横ばいだったので最近追加。まさに<strong>「小さく分散、一部に大きく」</strong>のスタイル。
+      </p>
+      <p>
+        XRPには最終的に<strong>30万円</strong>、BTCとSOLには総資産を脅かす規模を投資した。
+        これは「やってよかった」とあなた自身が認めている。
+        つまり<strong>「コア（BTC・ETH・XRP・SOL）＋サテライト（アルトコイン多数）」</strong>の構造だ。
+        このスタイルをSBI証券で再現するには、どうすればいいか。
+      </p>
+    </div>
+
+    <!-- ===== 13コイン ===== -->
+    <div class="section">
+      <div class="section-title">
+        13コインの現在地
+        <small>YOUR CRYPTO PORTFOLIO</small>
+      </div>
+      <div class="coin-grid">
+        <div class="coin-card">
+          <div class="symbol">BTC</div>
+          <div class="name">Bitcoin</div>
+          <span class="tag big">コア・大型</span>
+        </div>
+        <div class="coin-card">
+          <div class="symbol">ETH</div>
+          <div class="name">Ethereum</div>
+          <span class="tag big">コア・大型</span>
+        </div>
+        <div class="coin-card">
+          <div class="symbol">SOL</div>
+          <div class="name">Solana</div>
+          <span class="tag big">コア・大型</span>
+        </div>
+        <div class="coin-card">
+          <div class="symbol">XRP</div>
+          <div class="name">Ripple</div>
+          <span class="tag big">コア・大型</span>
+        </div>
+        <div class="coin-card">
+          <div class="symbol">XLM</div>
+          <div class="name">Stellar</div>
+          <span class="tag confident">自信あり</span>
+        </div>
+        <div class="coin-card">
+          <div class="symbol">AVAX</div>
+          <div class="name">Avalanche</div>
+          <span class="tag confident">自信あり</span>
+        </div>
+        <div class="coin-card">
+          <div class="symbol">LINK</div>
+          <div class="name">Chainlink</div>
+          <span class="tag confident">自信あり</span>
+        </div>
+        <div class="coin-card">
+          <div class="symbol">POL</div>
+          <div class="name">Polygon</div>
+          <span class="tag confident">自信あり</span>
+        </div>
+        <div class="coin-card">
+          <div class="symbol">GRT</div>
+          <div class="name">The Graph</div>
+          <span class="tag confident">自信あり</span>
+        </div>
+        <div class="coin-card">
+          <div class="symbol">RENDER</div>
+          <div class="name">Render</div>
+          <span class="tag worry">自信なし</span>
+        </div>
+        <div class="coin-card">
+          <div class="symbol">DOGE</div>
+          <div class="name">Dogecoin</div>
+          <span class="tag confident">自信あり</span>
+        </div>
+        <div class="coin-card">
+          <div class="symbol">SHIB</div>
+          <div class="name">Shiba Inu</div>
+          <span class="tag worry">自信なし</span>
+        </div>
+        <div class="coin-card">
+          <div class="symbol">PEPE</div>
+          <div class="name">Pepe</div>
+          <span class="tag worry">自信なし</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== マッピング表 ===== -->
+    <div class="section">
+      <div class="section-title">
+        SBI証券へのマッピング
+        <small>CRYPTO → STOCK / FUND</small>
+      </div>
+      <p>
+        あなたの13コインを、SBI証券で買える<strong>株式・投信・ETF</strong>に置き換えるとこうなる。
+        これはあくまで「構造」の話であり、値動きが同じという意味ではない。
+      </p>
+      <table class="map-table">
+        <thead>
+          <tr>
+            <th>仮想通貨</th>
+            <th>SBI証券での対応候補</th>
+            <th>役割</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="crypto">BTC</td>
+            <td class="stock">eMAXIS Slim 全世界株式（オルカン）<br><span style="color:#666;font-size:0.78rem;">または S&P500インデックス</span></td>
+            <td>コア。全体の40〜50%。長期積立。</td>
+          </tr>
+          <tr>
+            <td class="crypto">ETH</td>
+            <td class="stock">eMAXIS Slim 米国株式（S&P500）<br><span style="color:#666;font-size:0.78rem;">または 日経225インデックス</span></td>
+            <td>コア。BTCに次ぐ第2の柱。</td>
+          </tr>
+          <tr>
+            <td class="crypto">SOL</td>
+            <td class="stock">成長株ETF（QQQなど）<br><span style="color:#666;font-size:0.78rem;">または 個別株（半導体・AI関連）</span></td>
+            <td>コア。ハイリスク・ハイリターン枠。</td>
+          </tr>
+          <tr>
+            <td class="crypto">XRP</td>
+            <td class="stock">金融セクターETF<br><span style="color:#666;font-size:0.78rem;">または 三菱UFJ・住友商事など</span></td>
+            <td>コア。最も厚く張る部分。</td>
+          </tr>
+          <tr>
+            <td class="crypto">XLM</td>
+            <td class="stock">国際分散投信（先進国＋新興国）</td>
+            <td>サテライト。横ばいでも持ち続ける。</td>
+          </tr>
+          <tr>
+            <td class="crypto">AVAX</td>
+            <td class="stock">テクノロジーETF（XLKなど）</td>
+            <td>サテライト。成長期待。</td>
+          </tr>
+          <tr>
+            <td class="crypto">LINK</td>
+            <td class="stock">インフラ関連株（通信・電力）</td>
+            <td>サテライト。縁の下の力持ち。</td>
+          </tr>
+          <tr>
+            <td class="crypto">POL</td>
+            <td class="stock">素材・化学セクターETF</td>
+            <td>サテライト。地味だが安定。</td>
+          </tr>
+          <tr>
+            <td class="crypto">GRT</td>
+            <td class="stock">データ・クラウド関連株</td>
+            <td>サテライト。情報の流れを支える。</td>
+          </tr>
+          <tr>
+            <td class="crypto">RENDER</td>
+            <td class="stock">AI・GPU関連株（NVIDIAなど）</td>
+            <td>サテライト。ただし自信なし→少額で。</td>
+          </tr>
+          <tr>
+            <td class="crypto">DOGE</td>
+            <td class="stock">消費者向けサービス株（小売・外食）</td>
+            <td>サテライト。ミーム的だが生き残る。</td>
+          </tr>
+          <tr>
+            <td class="crypto">SHIB</td>
+            <td class="stock">小型株ETF（ラッセル2000など）</td>
+            <td>サテライト。投機枠。極小額で。</td>
+          </tr>
+          <tr>
+            <td class="crypto">PEPE</td>
+            <td class="stock">テーマ型ETF（急成長セクター）</td>
+            <td>サテライト。宝くじ枠。なくなってもいい額で。</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ===== 2つのパターン ===== -->
+    <div class="section">
+      <div class="section-title">
+        2つのポートフォリオ・パターン
+        <small>オルカン＝BTC説 vs オルカン≠BTC説</small>
+      </div>
+      <p>
+        あなたの質問の核心はこれだ。<strong>「オルカンはBTCの立ち位置なのか、それとも違うのか」</strong>。
+        どちらの説を取るかで、SBI証券でのポートフォリオは大きく変わる。
+        両方のパターンを見て、自分に合う方を選んでほしい。
+      </p>
+
+      <!-- パターン1 -->
+      <div class="pattern-box">
+        <div class="pattern-header">
+          <div class="pnum">01</div>
+          <h3>オルカン＝BTC説</h3>
+          <span class="verdict">王道・安定型</span>
+        </div>
+        <div class="pattern-body">
+          <p>
+            「オルカンはBTCと同じコアの役割を果たす」という考え方。
+            BTCが暗号資産全体の基盤であるように、オルカンは株式市場全体の基盤だ。
+            これなら<strong>オルカンを厚く持ち、サテライトで個別株・ETFを散らす</strong>ことで、
+            あなたのbitFlyer流スタイルを最も自然に再現できる。
+          </p>
+          <div class="port-bar">
+            <div class="port-seg seg-btc" style="flex:45;">オルカン 45%</div>
+            <div class="port-seg seg-eth" style="flex:20;">S&P500 20%</div>
+            <div class="port-seg seg-xrp" style="flex:15;">金融株 15%</div>
+            <div class="port-seg seg-sol" style="flex:10;">成長株 10%</div>
+            <div class="port-seg seg-other" style="flex:10;">サテライト 10%</div>
+          </div>
+          <ul class="detail-list">
+            <li><strong>オルカン（eMAXIS Slim 全世界株式）</strong>：BTCと同じコア。毎月積立。全体の45%。</li>
+            <li><strong>S&P500（eMAXIS Slim 米国株式）</strong>：ETHの役割。米国成長の柱。20%。</li>
+            <li><strong>金融セクターETF or メガバンク株</strong>：XRPの役割。あなたが最も厚く張った分野。15%。</li>
+            <li><strong>成長株ETF（QQQなど）</strong>：SOLの役割。ハイリスク枠。10%。</li>
+            <li><strong>サテライト（個別株・テーマETF）</strong>：残り10%をXLM・AVAX・LINK・POL・GRT・DOGEなどに分散。</li>
+            <li><strong>RENDER・SHIB・PEPE枠</strong>：この10%の中のさらに5%以内。なくなってもいい額で。</li>
+          </ul>
+          <p>
+            <strong>このパターンの強み：</strong>オルカンが市場全体をカバーするため、個別株の失敗を吸収しやすい。
+            bitFlyerでBTCがポートフォリオの安定軸だったのと同じ構造。
+            <strong>弱み：</strong>オルカンはBTCほど値動きが激しくないため、物足りなさを感じるかもしれない。
+          </p>
+        </div>
+      </div>
+
+      <!-- パターン2 -->
+      <div class="pattern-box">
+        <div class="pattern-header">
+          <div class="pnum">02</div>
+          <h3>オルカン≠BTC説</h3>
+          <span class="verdict">攻撃・分散型</span>
+        </div>
+        <div class="pattern-body">
+          <p>
+            「オルカンはBTCではない。BTCはもっと攻撃的で、ポートフォリオの先鋒だ」という考え方。
+            この説では<strong>BTCの代わりにS&P500やNASDAQ100をコアに据え、オルカンは脇役</strong>にする。
+            あなたの「XRPに30万円」のような集中投資を、SBI証券で再現するならこちら。
+          </p>
+          <div class="port-bar">
+            <div class="port-seg seg-btc" style="flex:30;">S&P500 30%</div>
+            <div class="port-seg seg-eth" style="flex:25;">NASDAQ100 25%</div>
+            <div class="port-seg seg-xrp" style="flex:20;">金融株 20%</div>
+            <div class="port-seg seg-sol" style="flex:15;">個別成長株 15%</div>
+            <div class="port-seg seg-other" style="flex:10;">オルカン他 10%</div>
+          </div>
+          <ul class="detail-list">
+            <li><strong>S&P500（eMAXIS Slim 米国株式）</strong>：BTCの代わりの先鋒。30%。米国企業の集合体。</li>
+            <li><strong>NASDAQ100（またはQQQ）</strong>：ETHの役割。テック集中。25%。</li>
+            <li><strong>金融セクターETF or メガバンク株</strong>：XRPの役割。あなたの最も厚い部分。20%。</li>
+            <li><strong>個別成長株（NVIDIA・Amazon・Teslaなど）</strong>：SOLの役割。15%。</li>
+            <li><strong>オルカン（全世界株式）</strong>：BTCではない。サテライトの一つ。10%。</li>
+            <li><strong>XLM・AVAX・LINK・POL・GRT・DOGE枠</strong>：個別成長株の中に分散。各1〜2%。</li>
+            <li><strong>RENDER・SHIB・PEPE枠</strong>：全体の2%以内。投機枠として割り切る。</li>
+          </ul>
+          <p>
+            <strong>このパターンの強み：</strong>より攻撃的で、あなたの「大きく張る」スタイルに合う。
+            XRPに30万円入れた判断を、金融株で再現できる。
+            <strong>弱み：</strong>オルカンがない分、分散が効きにくい。個別株の選定ミスが直撃する。
+          </p>
+        </div>
+      </div>
+
+      <!-- 比較 -->
+      <div class="section-title" style="margin-top:40px;">
+        どちらを選ぶか
+        <small>YOUR DECISION</small>
+      </div>
+      <table class="map-table">
+        <thead>
+          <tr>
+            <th>観点</th>
+            <th>パターン1（オルカン＝BTC）</th>
+            <th>パターン2（オルカン≠BTC）</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>リスク</td>
+            <td>低〜中。オルカンがクッション。</td>
+            <td>中〜高。個別株の影響が大きい。</td>
+          </tr>
+          <tr>
+            <td>リターン期待</td>
+            <td>市場平均並み。安定。</td>
+            <td>市場平均以上を狙える。攻撃的。</td>
+          </tr>
+          <tr>
+            <td>bitFlyerスタイルとの相性</td>
+            <td>BTCを厚く持った感覚に近い。</td>
+            <td>XRPに30万円入れた感覚に近い。</td>
+          </tr>
+          <tr>
+            <td>手間</td>
+            <td>積立設定すれば放置でOK。</td>
+            <td>個別株の選定・監視が必要。</td>
+          </tr>
+          <tr>
+            <td>向いている人</td>
+            <td>安定軸を作りたい人。</td>
+            <td>自分で選びたい人。攻めたい人。</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ===== 注意 ===== -->
+    <div class="section">
+      <div class="warn-box">
+        <strong>⚠️ 重要な注意：</strong>
+        仮想通貨と株式は<strong>別物</strong>だ。値動きの理由も、規制も、税制も違う。
+        bitFlyerで成功したからといって、SBI証券でも同じように成功するとは限らない。
+        特に<strong>RENDER・SHIB・PEPE</strong>のように「自信がない」とあなた自身が認めている銘柄は、
+        SBI証券では<strong>全体の2%以内</strong>に抑えることを強く勧める。
+        また、XRPに30万円入れた判断はbitFlyerでは正解だったかもしれないが、
+        SBI証券で同じことをするなら<strong>金融株の集中投資</strong>になる。
+        これはあなたの性格上、合っている可能性が高いが、リスクは理解しておくこと。
+      </div>
+    </div>
+
+    <!-- フッター -->
+    <div class="footer">
+      <span class="gold">◆</span>
+      SCATTER ｜ 13 COINS TO SBI SECURITIES<br>
+      bitFlyer流ポートフォリオを株式市場で再現する<br>
+      <span style="color:#333;">2026 ｜ ALL RIGHTS RESERVED</span>
+    </div>
+
+  </div>
+</body>
+</html>
