@@ -189,7 +189,7 @@
     }
 
     .slot-reel.spinning {
-      animation: reelSpin 0.1s linear infinite;
+      animation: reelSpin 0.15s linear infinite;
     }
 
     @keyframes reelSpin {
@@ -268,7 +268,6 @@
         linear-gradient(#7ac0e0, #7ac0e0) 28px 8px / 4px 24px no-repeat;
     }
 
-    /* スロット演出時の「押せ！」ボタン */
     .slot-push-btn {
       display: none;
       background: linear-gradient(180deg, #e04040 0%, #a02020 100%);
@@ -435,7 +434,6 @@
       color: #c08080;
     }
 
-    /* 回転エリア */
     .spin-area {
       margin-top: auto;
       background: #0a0a12;
@@ -498,7 +496,6 @@
       opacity: 0.8;
     }
 
-    /* 自動回転 */
     .auto-area {
       margin-top: 10px;
       display: flex;
@@ -552,7 +549,6 @@
     .log .log-line.event { color: #c0a060; }
     .log .log-line.system { color: #7ac0e0; }
 
-    /* モーダル */
     .modal-overlay {
       position: fixed;
       inset: 0;
@@ -679,7 +675,6 @@
               <div class="dot-symbol s7"></div>
             </div>
           </div>
-          <!-- スロット演出時の「押せ！」ボタン -->
           <button class="slot-push-btn" id="slotPushBtn" onclick="slotPush()">押せ！</button>
         </div>
 
@@ -770,7 +765,7 @@
   </div>
 
   <script>
-    // ===== 用語データ（抜粋・全用語は長いので主要＋パチンコ用語） =====
+    // ===== 用語データ（抜粋） =====
     const TERMS = [
       { term: '債券', desc: '国や企業が発行する借用証書。満期まで持つと利息がもらえる。' },
       { term: 'ファンダメンタルズ', desc: '企業の業績・財務など本質的価値。長期投資の判断材料。' },
@@ -1016,7 +1011,7 @@
       { term: '神', desc: '市場そのもの。' }
     ];
 
-    // ===== パチンコの種類（レート・交換率） =====
+    // ===== パチンコの種類 =====
     const PACHINKO_TYPES = [
       { name: '1円パチンコ', rate: 1, exchange: '等価', desc: '1玉=1円。少額で遊べる。' },
       { name: '2円パチンコ', rate: 2, exchange: '等価', desc: '1玉=2円。低貸し。' },
@@ -1028,7 +1023,6 @@
       { name: '1円パチンコ（換金率低）', rate: 1, exchange: '0.8円交換', desc: '1玉=1円だが換金は0.8円。' }
     ];
 
-    // ===== スペック（リセットごとにランダム） =====
     let spec = {};
 
     function generateSpec() {
@@ -1048,14 +1042,13 @@
         ballsPerHit: m.balls,
         modeName: m.name,
         modeDesc: m.desc,
-        ballCost: 1, // 1回転あたり持ち玉1個消費（等価時）
+        ballCost: 1,
         lowMult: 0.5,
         stopMult: 1,
         highMult: 2
       };
     }
 
-    // ===== 状態 =====
     let state = {
       wallet: 150000,
       deposit: 20000,
@@ -1070,13 +1063,13 @@
       stateDesc: '確率変動なし'
     };
 
-    const SAVE_KEY = 'sbi_pachinko_v4';
+    const SAVE_KEY = 'sbi_pachinko_v5';
 
     let autoMode = false;
     let autoTimer = null;
     let spinning = false;
+    let slotActive = false;
 
-    // ===== 初期化 =====
     function init() {
       loadSave();
       if (!spec.type) generateSpec();
@@ -1109,7 +1102,6 @@
       } catch(e) {}
     }
 
-    // ===== リセット（4回確認） =====
     let resetStep = 0;
 
     function openResetModal() {
@@ -1189,7 +1181,6 @@
       resetStep = 0;
     }
 
-    // ===== レンダリング =====
     function render() {
       document.getElementById('dSpins').textContent = state.spins;
       document.getElementById('dTotalSpins').textContent = state.totalSpins;
@@ -1223,7 +1214,6 @@
       renderLog();
     }
 
-    // ===== 自動回転 =====
     function toggleAuto() {
       autoMode = !autoMode;
       const btn = document.getElementById('autoBtn');
@@ -1238,7 +1228,7 @@
             addLog('⚠️ 持ち玉切れ。自動回転停止', 'system');
             toggleAuto();
           }
-        }, 1500);
+        }, 2000);
       } else {
         btn.textContent = '自動回転 OFF';
         btn.classList.remove('on');
@@ -1250,7 +1240,6 @@
       }
     }
 
-    // ===== 回す =====
     function doSpin(intensity) {
       if (spinning) return;
 
@@ -1273,11 +1262,13 @@
 
       addLog(`🎯 ${state.spins}回転目…（${intensity.toUpperCase()}）`, 'system');
 
+      // スロット演出開始（回転時だけ動く）
       startSlot();
 
+      // 玉を出す
       const ballCount = intensity === 'low' ? 1 : intensity === 'stop' ? 3 : 6;
       for (let i = 0; i < ballCount; i++) {
-        setTimeout(() => spawnBall(), i * 120);
+        setTimeout(() => spawnBall(), i * 150);
       }
 
       let hitRate = spec.hitRate;
@@ -1333,17 +1324,18 @@
       }, 1200);
     }
 
-    // ===== スロット演出 =====
+    // ===== スロット演出（回転時だけ動く） =====
     const SYMBOL_CLASSES = ['s7', 'sbar', 'scherry', 'sbell', 'ssuika', 'sreplay'];
 
     function startSlot() {
+      if (slotActive) return;
+      slotActive = true;
       const area = document.getElementById('slotArea');
       area.classList.add('active');
       for (let i = 0; i < 3; i++) {
         const reel = document.getElementById('reel' + i);
         reel.classList.add('spinning');
       }
-      // ランダムで「押せ！」ボタンを表示
       if (Math.random() < 0.3) {
         document.getElementById('slotPushBtn').classList.add('active');
       }
@@ -1352,12 +1344,9 @@
     function slotPush() {
       document.getElementById('slotPushBtn').classList.remove('active');
       addLog('👆 押せ！ボタンを押した！', 'event');
-      // 押すと少し有利になる（当たりやすさ+10%）
-      state._pushBonus = true;
     }
 
     function stopSlot(hit) {
-      const area = document.getElementById('slotArea');
       for (let i = 0; i < 3; i++) {
         const reel = document.getElementById('reel' + i);
         setTimeout(() => {
@@ -1371,12 +1360,12 @@
         }, i * 250);
       }
       setTimeout(() => {
-        area.classList.remove('active');
+        document.getElementById('slotArea').classList.remove('active');
         document.getElementById('slotPushBtn').classList.remove('active');
+        slotActive = false;
       }, 1200);
     }
 
-    // ===== 玉の生成 =====
     function spawnBall() {
       const board = document.getElementById('board');
       const ball = document.createElement('div');
@@ -1386,7 +1375,7 @@
       ball.style.transform = 'translateX(-50%)';
       board.appendChild(ball);
 
-      const duration = 900 + Math.random() * 400;
+      const duration = 800 + Math.random() * 400;
       ball.style.transition = `top ${duration}ms ease-in, left ${duration}ms ease-in-out`;
 
       setTimeout(() => {
@@ -1406,7 +1395,6 @@
       setTimeout(() => ball.remove(), duration + 200);
     }
 
-    // ===== 大当たり演出 =====
     function playHitFX() {
       const board = document.getElementById('board');
       board.style.animation = 'none';
@@ -1445,7 +1433,6 @@
       }
     }
 
-    // ===== 遊び方 =====
     function showHowTo() {
       showModal(`
         <h2>📖 遊び方</h2>
@@ -1458,7 +1445,7 @@
         <ul>
           <li><strong>LOW / STOP / HIGH</strong>：回転の強さ。強さで玉の数と当たりやすさが変わる。</li>
           <li><strong>自動回転</strong>：ONにすると勝手に回り続ける。</li>
-          <li><strong>スロット演出</strong>：「押せ！」ボタンが出たら押すと少し有利。</li>
+          <li><strong>スロット演出</strong>：回転時だけリールが動く。「押せ！」ボタンが出たら押す。</li>
           <li><strong>スペック</strong>：リセットごとにランダム。レート（1円〜100円）と交換率も変わる。</li>
           <li><strong>クレジット</strong>：財布から持ち玉に変える。デフォルト2万円。</li>
         </ul>
@@ -1469,7 +1456,6 @@
       `);
     }
 
-    // ===== スペック表示 =====
     function showSpec() {
       showModal(`
         <h2>⚙️ 現在のスペック</h2>
@@ -1491,7 +1477,6 @@
       `);
     }
 
-    // ===== クレジット =====
     function showCredit() {
       showModal(`
         <h2>💰 クレジット</h2>
