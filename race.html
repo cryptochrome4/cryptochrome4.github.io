@@ -338,7 +338,6 @@ bindPedal(brakeBtn,
   ()=>{ state.brakeInput = false; }
 );
 
-// ============ コース定義 ============
 function makeCourse(idx){
   const pts = [];
   if(idx===0){
@@ -367,7 +366,6 @@ function makeCourse(idx){
   }
 }
 
-// 空間グリッドで候補セグメントを絞る
 function buildCourseMesh(course){
   const pts = course.pts;
   const n = pts.length;
@@ -465,9 +463,6 @@ function collideWalls(course, mesh, ball){
   }
 }
 
-// ============ ステータス生成 ============
-// COM: 各40〜50（合計120〜150）
-// 俺:   合計80〜110（各20〜50の範囲で合計を80〜110に収める）
 function genComStats(){
   return {
     speed: 40 + Math.floor(Math.random()*11),
@@ -476,14 +471,12 @@ function genComStats(){
   };
 }
 function genMyStats(){
-  // 合計80〜110になるよう、各20〜50の範囲で3値を生成
   while(true){
-    const a = 20 + Math.floor(Math.random()*31); // 20〜50
+    const a = 20 + Math.floor(Math.random()*31);
     const b = 20 + Math.floor(Math.random()*31);
     const c = 20 + Math.floor(Math.random()*31);
     const total = a+b+c;
     if(total >= 80 && total <= 110){
-      // ランダムに3ステータスへ割り当て
       const arr = [a,b,c];
       for(let i=arr.length-1;i>0;i--){
         const j = Math.floor(Math.random()*(i+1));
@@ -494,7 +487,6 @@ function genMyStats(){
   }
 }
 
-// ============ レーサー生成 ============
 function makeRacers(){
   const course = makeCourse(state.courseIdx);
   const n = course.pts.length;
@@ -506,7 +498,6 @@ function makeRacers(){
   const px = -fy, py = fx;
 
   const racers = [];
-
   const myIdx = state.myColorIdx;
   const colorOrder = [];
   for(let i=0;i<COLORS.length;i++) colorOrder.push(i);
@@ -546,7 +537,6 @@ function makeRacers(){
   return racers;
 }
 
-// ============ 更新 ============
 function update(dt){
   if(!state.running || state.finished) return;
   const course = makeCourse(state.courseIdx);
@@ -592,29 +582,52 @@ function update(dt){
     const dl = Math.sqrt(dx*dx+dy*dy)||1;
     const tx = dx/dl, ty = dy/dl;
 
+    // アクセルON時の加速度（基準となる加速力）
+    const chargeMul = 0.4 + state.accelCharge * 1.6;
+    const accelPower = (me.accel/50) * 900 * chargeMul;
+
     if(state.accelInput){
+      // 加速: 進行方向へ加速度を加算
       let ax = tx*0.6 + inputX*0.5;
       let ay = ty*0.6 + inputY*0.5;
       const al = Math.sqrt(ax*ax+ay*ay)||1;
       ax/=al; ay/=al;
-      const chargeMul = 0.4 + state.accelCharge * 1.6;
-      const accelPower = (me.accel/50) * 900 * chargeMul;
       me.vx += ax*accelPower*dt;
       me.vy += ay*accelPower*dt;
-    }
-
-    // ブレーキは強め、アクセルOFF時は自然減速（ゆるやか）
-    if(state.brakeInput){
-      me.vx *= 0.90;
-      me.vy *= 0.90;
-    } else if(!state.accelInput){
-      // アクセルOFF時: ゆっくり減速（慣性でスーッと進む）
-      me.vx *= 0.993;
-      me.vy *= 0.993;
+    } else if(state.brakeInput){
+      // ブレーキ: 速度と逆向きに強い減速
+      const sp = Math.sqrt(me.vx*me.vx+me.vy*me.vy);
+      if(sp > 0.1){
+        const ux = me.vx/sp, uy = me.vy/sp;
+        const brakePower = accelPower * 2.0; // ブレーキは加速の2倍
+        me.vx -= ux*brakePower*dt;
+        me.vy -= uy*brakePower*dt;
+        // 行き過ぎ防止
+        const nsp = Math.sqrt(me.vx*me.vx+me.vy*me.vy);
+        if(nsp > sp){
+          me.vx = ux*sp*0.95;
+          me.vy = uy*sp*0.95;
+        }
+      }
     } else {
-      // アクセルON中は抵抗少なめ
-      me.vx *= 0.998;
-      me.vy *= 0.998;
+      // アクセルOFF: アクセルONと同じ強さの逆加速（対称）
+      const sp = Math.sqrt(me.vx*me.vx+me.vy*me.vy);
+      if(sp > 0.1){
+        const ux = me.vx/sp, uy = me.vy/sp;
+        // アクセルONと同じ accelPower を使う → 伸びが対称
+        const decelPower = accelPower * 1.0;
+        me.vx -= ux*decelPower*dt;
+        me.vy -= uy*decelPower*dt;
+        // 速度0を下回らないように
+        const nsp = Math.sqrt(me.vx*me.vx+me.vy*me.vy);
+        if(nsp > sp){
+          me.vx = 0;
+          me.vy = 0;
+        }
+      } else {
+        me.vx = 0;
+        me.vy = 0;
+      }
     }
 
     const maxSp = (me.speed/50) * 520 * (0.6 + state.accelCharge*0.6);
@@ -661,7 +674,6 @@ function update(dt){
     collideWalls(course, mesh, r);
   }
 
-  // ボール同士の衝突
   for(let i=0;i<state.racers.length;i++){
     const a = state.racers[i];
     if(a.finished) continue;
@@ -688,7 +700,6 @@ function update(dt){
     }
   }
 
-  // ラップ計算
   for(const r of state.racers){
     if(r.finished) continue;
     const near = findNearestSegment(mesh, r.x, r.y, r.hintIdx);
@@ -774,7 +785,6 @@ function updateHUD(){
   if(me) document.getElementById('lapNum').textContent = Math.min(me.lap+1, TOTAL_LAPS);
 }
 
-// ============ 描画 ============
 function draw(){
   const dpr = window.devicePixelRatio||1;
   ctx.setTransform(dpr,0,0,dpr,0,0);
