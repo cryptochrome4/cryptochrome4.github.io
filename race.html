@@ -259,7 +259,6 @@
 (function(){
 'use strict';
 
-// ============ 定数 ============
 const COLORS = [
   {name:'赤',   hex:'#e8302a', num:'#fff'},
   {name:'水色', hex:'#5bc8f5', num:'#000'},
@@ -278,10 +277,8 @@ const COLORS = [
 const TOTAL_RACERS = 13;
 const TOTAL_LAPS = 3;
 const BALL_R = 14;
-const START_IDX = 5;      // スタート/ゴールのパスインデックス
-const START_OFFSET = 0;   // スタート位置補正
+const START_IDX = 5;
 
-// ============ 状態 ============
 let state = {
   myColorIdx: 4,
   courseIdx: 0,
@@ -301,7 +298,6 @@ let state = {
   playerWon: false
 };
 
-// ============ キャンバス ============
 const cv = document.getElementById('cv');
 const ctx = cv.getContext('2d');
 let W = 0, H = 0;
@@ -312,7 +308,6 @@ function resize(){
 }
 window.addEventListener('resize', resize);
 
-// ============ 入力 ============
 const keys = {};
 window.addEventListener('keydown', e=>{
   keys[e.key]=true;
@@ -371,49 +366,98 @@ function makeCourse(idx){
   }
 }
 
-// パス上の最近傍点（ヒント付き）
-function nearestOnPath(course, x, y, hintIdx){
+// ============ コースメッシュの事前計算 ============
+// 各セグメントの位置を空間的に検索するためのグリッド
+function buildCourseMesh(course){
   const pts = course.pts;
   const n = pts.length;
-  let best = hintIdx||0, bestD = Infinity;
-  if(hintIdx!==undefined){
-    const start = Math.max(0, hintIdx-25);
-    const end = Math.min(n-1, hintIdx+25);
-    for(let i=start;i<=end;i++){
-      const p = pts[i];
-      const d = (p.x-x)*(p.x-x)+(p.y-y)*(p.y-y);
-      if(d<bestD){ bestD=d; best=i; }
-    }
-    if(bestD > 300*300){
-      // フォールバック: 全周探索
-      for(let i=0;i<n;i++){
-        const p = pts[i];
-        const d = (p.x-x)*(p.x-x)+(p.y-y)*(p.y-y);
-        if(d<bestD){ bestD=d; best=i; }
+  const segs = [];
+  for(let i=0;i<n;i++){
+    const p0 = pts[i];
+    const p1 = pts[(i+1)%n];
+    const dx = p1.x-p0.x, dy = p1.y-p0.y;
+    const len2 = dx*dx+dy*dy||1;
+    segs.push({p0, p1, dx, dy, len2, idx:i});
+  }
+  // 空間グリッド（セルサイズ200）
+  const cellSize = 200;
+  const grid = new Map();
+  function cellKey(cx, cy){ return cx+','+cy; }
+  for(let i=0;i<n;i++){
+    const s = segs[i];
+    // セグメントのバウンディングボックス内のセルに登録
+    const minX = Math.min(s.p0.x, s.p1.x) - BALL_R - 50;
+    const maxX = Math.max(s.p0.x, s.p1.x) + BALL_R + 50;
+    const minY = Math.min(s.p0.y, s.p1.y) - BALL_R - 50;
+    const maxY = Math.max(s.p0.y, s.p1.y) + BALL_R + 50;
+    const cx0 = Math.floor(minX/cellSize);
+    const cx1 = Math.floor(maxX/cellSize);
+    const cy0 = Math.floor(minY/cellSize);
+    const cy1 = Math.floor(maxY/cellSize);
+    for(let cx=cx0;cx<=cx1;cx++){
+      for(let cy=cy0;cy<=cy1;cy++){
+        const k = cellKey(cx,cy);
+        if(!grid.has(k)) grid.set(k, []);
+        grid.get(k).push(i);
       }
     }
-  } else {
-    for(let i=0;i<n;i++){
-      const p = pts[i];
-      const d = (p.x-x)*(p.x-x)+(p.y-y)*(p.y-y);
-      if(d<bestD){ bestD=d; best=i; }
-    }
   }
-  return best;
+  return { segs, grid, cellSize, n };
 }
 
-// 壁衝突
-function collideWalls(course, ball){
-  const pts = course.pts;
-  const n = pts.length;
-  const idx = nearestOnPath(course, ball.x, ball.y, ball.pathIdx);
-  const p0 = pts[idx];
-  const p1 = pts[(idx+1)%n];
-  const dx = p1.x-p0.x, dy = p1.y-p0.y;
-  const len2 = dx*dx+dy*dy || 1;
-  let t = ((ball.x-p0.x)*dx + (ball.y-p0.y)*dy)/len2;
-  t = Math.max(0, Math.min(1, t));
-  const cx = p0.x + dx*t, cy = p0.y + dy*t;
+// 空間グリッドを使って最近傍セグメントを探す
+function findNearestSegment(mesh, x, y, hintIdx){
+  const { segs, grid, cellSize, n } = mesh;
+  const cx = Math.floor(x/cellSize);
+  const cy = Math.floor(y/cellSize);
+  // 周囲3x3セルを探索、見つからなければ拡大
+  let candidates = new Set();
+  for(let rad=0; rad<=3; rad++){
+    for(let dx=-rad;dx<=rad;dx++){
+      for(let dy=-rad;dy<=rad;dy++){
+        if(rad>0 && Math.abs(dx)!==rad && Math.abs(dy)!==rad) continue;
+        const k = (cx+dx)+','+(cy+dy);
+        if(grid.has(k)){
+          for(const i of grid.get(k)) candidates.add(i);
+        }
+      }
+    }
+    if(candidates.size > 0) break;
+  }
+  // 候補がなければ全周（最終手段）
+  if(candidates.size === 0){
+    for(let i=0;i<n;i++) candidates.add(i);
+  }
+
+  // hintIdx が候補にあれば、その前後も候補に追加（連続性確保）
+  if(hintIdx !== undefined){
+    for(let d=-3; d<=3; d++){
+      const i = ((hintIdx+d)%n+n)%n;
+      candidates.add(i);
+    }
+  }
+
+  // 最短セグメントを探す
+  let bestSeg = 0, bestT = 0, bestD = Infinity;
+  for(const i of candidates){
+    const s = segs[i];
+    let t = ((x-s.p0.x)*s.dx + (y-s.p0.y)*s.dy)/s.len2;
+    t = Math.max(0, Math.min(1, t));
+    const px = s.p0.x + s.dx*t;
+    const py = s.p0.y + s.dy*t;
+    const d = (x-px)*(x-px)+(y-py)*(y-py);
+    if(d<bestD){ bestD=d; bestSeg=i; bestT=t; }
+  }
+  return { idx: bestSeg, t: bestT, contPos: bestSeg + bestT };
+}
+
+function collideWalls(course, mesh, ball){
+  const near = findNearestSegment(mesh, ball.x, ball.y, ball.hintIdx);
+  ball.hintIdx = near.idx;
+  const s = mesh.segs[near.idx];
+  const t = near.t;
+  const cx = s.p0.x + s.dx*t;
+  const cy = s.p0.y + s.dy*t;
   const nx = ball.x-cx, ny = ball.y-cy;
   const dist = Math.sqrt(nx*nx+ny*ny) || 0.001;
   const halfW = course.width/2 - BALL_R;
@@ -428,14 +472,6 @@ function collideWalls(course, ball){
       ball.vy -= (1.6)*vn*uy;
     }
   }
-}
-
-// 角度差を -PI〜PI に正規化
-function angleDiff(a, b){
-  let d = a - b;
-  while(d > Math.PI) d -= Math.PI*2;
-  while(d < -Math.PI) d += Math.PI*2;
-  return d;
 }
 
 // ============ レーサー生成 ============
@@ -471,8 +507,8 @@ function makeRacers(){
     const col = i%3;
     const offX = (col-1)*70;
     const offY = row*60;
-    const x = sp.x + px*offX + fx*(-offY) + (Math.random()-0.5)*10;
-    const y = sp.y + py*offX + fy*(-offY) + (Math.random()-0.5)*10;
+    const x = sp.x + px*offX + fx*(-offY);
+    const y = sp.y + py*offX + fy*(-offY);
 
     const st = statsList[i];
     racers.push({
@@ -482,17 +518,16 @@ function makeRacers(){
       x, y,
       vx: 0, vy: 0,
       angle: Math.atan2(fy, fx),
-      // 進行度管理: 連続的なパス位置（インデックス+小数）
+      // 進行度管理
       contPathPos: START_IDX,
-      prevContPathPos: START_IDX,
-      // ラップ数（スタート地点を前進通過した回数）
       lap: 0,
-      // 現在の連続進行度 = lap*n + contPathPos
       totalProgress: START_IDX,
+      // ラップ境界の通過検出用
+      lastPassedStart: false,
       finished: false,
       finishTime: 0,
       rank: i+1,
-      // ステータス
+      hintIdx: START_IDX,
       speed: st.speed,
       accel: st.accel,
       turn: st.turn,
@@ -502,60 +537,11 @@ function makeRacers(){
   return racers;
 }
 
-// パス上の連続位置を計算（セグメント投影で小数まで）
-function computeContPathPos(course, x, y, hintIdx){
-  const pts = course.pts;
-  const n = pts.length;
-  // ヒント付近のセグメントを探す
-  let bestSeg = 0, bestD = Infinity, bestT = 0;
-  if(hintIdx!==undefined){
-    const start = Math.max(0, hintIdx-25);
-    const end = Math.min(n-1, hintIdx+25);
-    for(let i=start;i<=end;i++){
-      const p0 = pts[i];
-      const p1 = pts[(i+1)%n];
-      const dx = p1.x-p0.x, dy = p1.y-p0.y;
-      const len2 = dx*dx+dy*dy||1;
-      let t = ((x-p0.x)*dx + (y-p0.y)*dy)/len2;
-      t = Math.max(0, Math.min(1, t));
-      const cx = p0.x+dx*t, cy = p0.y+dy*t;
-      const d = (x-cx)*(x-cx)+(y-cy)*(y-cy);
-      if(d<bestD){ bestD=d; bestSeg=i; bestT=t; }
-    }
-    if(bestD > 300*300){
-      // 全周
-      for(let i=0;i<n;i++){
-        const p0 = pts[i];
-        const p1 = pts[(i+1)%n];
-        const dx = p1.x-p0.x, dy = p1.y-p0.y;
-        const len2 = dx*dx+dy*dy||1;
-        let t = ((x-p0.x)*dx + (y-p0.y)*dy)/len2;
-        t = Math.max(0, Math.min(1, t));
-        const cx = p0.x+dx*t, cy = p0.y+dy*t;
-        const d = (x-cx)*(x-cx)+(y-cy)*(y-cy);
-        if(d<bestD){ bestD=d; bestSeg=i; bestT=t; }
-      }
-    }
-  } else {
-    for(let i=0;i<n;i++){
-      const p0 = pts[i];
-      const p1 = pts[(i+1)%n];
-      const dx = p1.x-p0.x, dy = p1.y-p0.y;
-      const len2 = dx*dx+dy*dy||1;
-      let t = ((x-p0.x)*dx + (y-p0.y)*dy)/len2;
-      t = Math.max(0, Math.min(1, t));
-      const cx = p0.x+dx*t, cy = p0.y+dy*t;
-      const d = (x-cx)*(x-cx)+(y-cy)*(y-cy);
-      if(d<bestD){ bestD=d; bestSeg=i; bestT=t; }
-    }
-  }
-  return bestSeg + bestT;
-}
-
 // ============ 更新 ============
 function update(dt){
   if(!state.running || state.finished) return;
   const course = makeCourse(state.courseIdx);
+  const mesh = buildCourseMesh(course);
   const n = course.pts.length;
 
   if(!state.raceStarted){
@@ -650,17 +636,15 @@ function update(dt){
     r.angle = Math.atan2(r.vy, r.vx);
   }
 
-  // 位置更新
   for(const r of state.racers){
     if(r.finished) continue;
     r.x += r.vx*dt;
     r.y += r.vy*dt;
   }
 
-  // 壁衝突
   for(const r of state.racers){
     if(r.finished) continue;
-    collideWalls(course, r);
+    collideWalls(course, mesh, r);
   }
 
   // ボール同士の衝突
@@ -690,22 +674,23 @@ function update(dt){
     }
   }
 
-  // 進行度・ラップ計算
+  // ラップ計算: 空間グリッドで連続位置を取得
   for(const r of state.racers){
     if(r.finished) continue;
-    const newPos = computeContPathPos(course, r.x, r.y, Math.floor(r.contPathPos));
+    const near = findNearestSegment(mesh, r.x, r.y, r.hintIdx);
+    r.hintIdx = near.idx;
+    const newPos = near.contPos;
     let diff = newPos - r.contPathPos;
-    // 前進/後退の補正（±n/2を超えるジャンプは境界越え）
+    // 境界越えの補正
     if(diff < -n*0.5) diff += n;
     else if(diff > n*0.5) diff -= n;
 
-    // 前進のみ累積（後退は減算するが、急な大ジャンプは無視）
-    r.contPathPos = newPos;
-    // 連続進行度に加算
-    r.totalProgress += diff;
+    // 前進のみ加算（後退は小さい値のみ、大ジャンプは無視）
+    if(Math.abs(diff) < n*0.25){
+      r.contPathPos = newPos;
+      r.totalProgress += diff;
+    }
 
-    // ラップ: スタート地点(START_IDX)を基準に、通算の前進量から計算
-    // totalProgress = START_IDX から始まり、n*TOTAL_LAPS 進めば3周完了
     const netProgress = r.totalProgress - START_IDX;
     r.lap = Math.floor(netProgress / n);
     if(r.lap < 0) r.lap = 0;
@@ -716,7 +701,6 @@ function update(dt){
     }
   }
 
-  // 順位: ゴール済みはフィニッシュタイム順、走行中は進行度順
   const sorted = state.racers.slice().sort((a,b)=>{
     if(a.finished && b.finished) return a.finishTime-b.finishTime;
     if(a.finished) return -1;
@@ -725,14 +709,12 @@ function update(dt){
   });
   sorted.forEach((r,i)=> r.rank = i+1);
 
-  // カメラ: 自分の位置を追う。ゴール後は固定。
   const me3 = state.racers.find(r=>r.isMe);
   if(me3){
     state.camX += (me3.x - state.camX) * 0.08;
     state.camY += (me3.y - state.camY) * 0.08;
   }
 
-  // 自分のゴール
   if(!state.myFinished){
     const me2 = state.racers.find(r=>r.isMe);
     if(me2 && me2.finished){
@@ -748,7 +730,6 @@ function update(dt){
     }
   }
 
-  // 全員ゴールでレース終了
   if(state.racers.every(r=>r.finished)){
     state.finished = true;
     state.running = false;
@@ -802,7 +783,6 @@ function draw(){
 
   drawCourse(course);
 
-  // ゴール済みは描画しない
   const sorted = state.racers.slice().filter(r=>!r.finished).sort((a,b)=>{
     if(a.isMe) return 1;
     if(b.isMe) return -1;
@@ -920,7 +900,6 @@ function drawCourse(course){
   ctx.stroke();
   ctx.setLineDash([]);
 
-  // スタート/ゴールライン
   const sp = pts[START_IDX];
   const sp2 = pts[(START_IDX+6)%n];
   const sdx = sp2.x-sp.x, sdy = sp2.y-sp.y;
@@ -983,6 +962,7 @@ function drawRacer(r){
 }
 
 // ============ ゲームループ ============
+let cachedMesh = null;
 function loop(now){
   const dt = Math.min((now - state.lastTime)/1000, 0.05);
   state.lastTime = now;
@@ -1020,7 +1000,6 @@ function updateDesignButtons(){
   });
 }
 
-// ============ リザルト ============
 function showResult(isWin){
   const title = document.getElementById('resultTitle');
   const sub = document.getElementById('resultSub');
@@ -1073,7 +1052,6 @@ function showResult(isWin){
   document.getElementById('spectate').style.display = 'none';
 }
 
-// ============ イベント ============
 document.getElementById('btnStart').addEventListener('click', ()=>{
   document.getElementById('opening').style.display = 'none';
   startRace();
@@ -1108,7 +1086,6 @@ document.querySelectorAll('.design-btn').forEach(b=>{
   });
 });
 
-// ============ レース開始 ============
 function startRace(){
   state.racers = makeRacers();
   state.running = true;
@@ -1141,7 +1118,6 @@ function startRace(){
   state.lastTime = performance.now();
 }
 
-// ============ 初期化 ============
 resize();
 buildColorPicker();
 updateCourseButtons();
