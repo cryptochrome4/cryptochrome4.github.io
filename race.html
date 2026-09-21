@@ -564,6 +564,7 @@ function update(dt){
   if(keys['ArrowUp']||keys['w']||keys['W']) inputY-=1;
   if(keys['ArrowDown']||keys['s']||keys['S']) inputY+=1;
 
+  // アクセルチャージ（長押しで溜まる）
   if(state.accelInput){
     state.accelCharge = Math.min(1.0, state.accelCharge + dt*0.8);
   } else {
@@ -572,7 +573,7 @@ function update(dt){
   const accelFill = document.getElementById('accelFill');
   if(accelFill) accelFill.style.width = (state.accelCharge*100)+'%';
 
-  // 自分の操作
+  // ============ 自分の操作 ============
   const me = state.racers.find(r=>r.isMe);
   if(me && !me.finished){
     const pts = course.pts;
@@ -582,12 +583,15 @@ function update(dt){
     const dl = Math.sqrt(dx*dx+dy*dy)||1;
     const tx = dx/dl, ty = dy/dl;
 
-    // アクセルON時の加速度（基準となる加速力）
+    // アクセルON時の加速度（これが「ジャブを出す速度」の基準）
     const chargeMul = 0.4 + state.accelCharge * 1.6;
     const accelPower = (me.accel/50) * 900 * chargeMul;
 
+    // 現在の速度と速さ
+    let sp = Math.sqrt(me.vx*me.vx + me.vy*me.vy);
+
     if(state.accelInput){
-      // 加速: 進行方向へ加速度を加算
+      // 【加速】進行方向へ accelPower*dt を足す
       let ax = tx*0.6 + inputX*0.5;
       let ay = ty*0.6 + inputY*0.5;
       const al = Math.sqrt(ax*ax+ay*ay)||1;
@@ -595,49 +599,49 @@ function update(dt){
       me.vx += ax*accelPower*dt;
       me.vy += ay*accelPower*dt;
     } else if(state.brakeInput){
-      // ブレーキ: 速度と逆向きに強い減速
-      const sp = Math.sqrt(me.vx*me.vx+me.vy*me.vy);
-      if(sp > 0.1){
+      // 【ブレーキ】速度逆向きに強めの減速（加速の2倍）
+      if(sp > 0.01){
         const ux = me.vx/sp, uy = me.vy/sp;
-        const brakePower = accelPower * 2.0; // ブレーキは加速の2倍
-        me.vx -= ux*brakePower*dt;
-        me.vy -= uy*brakePower*dt;
-        // 行き過ぎ防止
-        const nsp = Math.sqrt(me.vx*me.vx+me.vy*me.vy);
-        if(nsp > sp){
-          me.vx = ux*sp*0.95;
-          me.vy = uy*sp*0.95;
+        const brakePower = accelPower * 2.0;
+        const decAmount = brakePower * dt;
+        if(sp <= decAmount){
+          me.vx = 0; me.vy = 0;
+        } else {
+          me.vx -= ux*decAmount;
+          me.vy -= uy*decAmount;
         }
       }
     } else {
-      // アクセルOFF: アクセルONと同じ強さの逆加速（対称）
-      const sp = Math.sqrt(me.vx*me.vx+me.vy*me.vy);
-      if(sp > 0.1){
+      // 【アクセルOFF（自然減速）】ジャブを戻す速度 = 出す速度
+      // 加速と同じ accelPower を、速度と逆向きに、毎フレーム一定量引く
+      if(sp > 0.01){
         const ux = me.vx/sp, uy = me.vy/sp;
-        // アクセルONと同じ accelPower を使う → 伸びが対称
-        const decelPower = accelPower * 1.0;
-        me.vx -= ux*decelPower*dt;
-        me.vy -= uy*decelPower*dt;
-        // 速度0を下回らないように
-        const nsp = Math.sqrt(me.vx*me.vx+me.vy*me.vy);
-        if(nsp > sp){
-          me.vx = 0;
-          me.vy = 0;
+        // チャージを参照しない固定の減速力（アクセルONのMAXと同じスケール）
+        // → 「ジャブを出す速度」と揃える
+        const baseDecel = (me.accel/50) * 900 * 1.0; // accelChargeの影響なし
+        const decAmount = baseDecel * dt;
+        if(sp <= decAmount){
+          me.vx = 0; me.vy = 0;
+        } else {
+          me.vx -= ux*decAmount;
+          me.vy -= uy*decAmount;
         }
-      } else {
-        me.vx = 0;
-        me.vy = 0;
       }
     }
 
-    const maxSp = (me.speed/50) * 520 * (0.6 + state.accelCharge*0.6);
-    const sp = Math.sqrt(me.vx*me.vx+me.vy*me.vy);
-    if(sp>maxSp){ me.vx = me.vx/sp*maxSp; me.vy = me.vy/sp*maxSp; }
+    // 最高速度制限: アクセル状態に依存させない、一定の上限
+    // （チャージでMAXまで溜めた状態の速度を上限に）
+    const maxSp = (me.speed/50) * 520 * 1.2;
+    sp = Math.sqrt(me.vx*me.vx+me.vy*me.vy);
+    if(sp > maxSp){
+      me.vx = me.vx/sp*maxSp;
+      me.vy = me.vy/sp*maxSp;
+    }
 
     me.angle = Math.atan2(me.vy, me.vx);
   }
 
-  // コンピューターAI
+  // ============ コンピューターAI ============
   for(const r of state.racers){
     if(r.isMe || r.finished) continue;
     const pts = course.pts;
