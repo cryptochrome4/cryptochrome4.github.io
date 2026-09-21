@@ -103,12 +103,12 @@
   #brakeBtn.active { background: #f33; color: #001; box-shadow: 0 0 30px #f33; }
 
   #accelGauge {
-    width: 90px; height: 14px; border: 2px solid #0f0; border-radius: 7px;
+    width: 90px; height: 16px; border: 2px solid #0f0; border-radius: 8px;
     background: rgba(0,0,0,0.6); overflow: hidden;
   }
   #accelFill {
-    height: 100%; width: 0%; background: linear-gradient(90deg, #0a0, #0f0, #afa);
-    transition: width 0.05s linear;
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, #0a0, #0f0, #afa);
   }
   .pedal-label { color: #ccc; font-size: 11px; letter-spacing: 2px; }
 
@@ -280,6 +280,12 @@ const TOTAL_LAPS = 3;
 const BALL_R = 14;
 const START_IDX = 5;
 
+// チューニング定数
+const GAUGE_UP_RATE   = 1.2;   // ゲージ上昇（/秒）→ 約0.83秒で満タン
+const GAUGE_DOWN_RATE = 0.45;  // ゲージ下降（/秒）→ 約2.2秒で0
+const SPEED_RESPONSE  = 4.5;   // P制御の応答係数（大きいほど機敏）
+const BRAKE_RESPONSE  = 9.0;   // ブレーキ時の応答係数
+
 let state = {
   myColorIdx: 4,
   courseIdx: 0,
@@ -331,7 +337,7 @@ function bindPedal(btn, onDown, onUp){
 }
 bindPedal(accelBtn,
   ()=>{ state.accelInput = true; },
-  ()=>{ state.accelInput = false; state.accelCharge = 0; }
+  ()=>{ state.accelInput = false; }   // ← ゲージはここでは0にしない
 );
 bindPedal(brakeBtn,
   ()=>{ state.brakeInput = true; },
@@ -564,16 +570,17 @@ function update(dt){
   if(keys['ArrowUp']||keys['w']||keys['W']) inputY-=1;
   if(keys['ArrowDown']||keys['s']||keys['S']) inputY+=1;
 
-  // アクセルチャージ（長押しで溜まる）
+  // ===== ゲージの動き =====
+  // 押している間: 上昇 / 離している間: ゆっくり下降（タップ運転で保てる）
   if(state.accelInput){
-    state.accelCharge = Math.min(1.0, state.accelCharge + dt*0.8);
+    state.accelCharge = Math.min(1.0, state.accelCharge + GAUGE_UP_RATE * dt);
   } else {
-    state.accelCharge = 0;
+    state.accelCharge = Math.max(0, state.accelCharge - GAUGE_DOWN_RATE * dt);
   }
   const accelFill = document.getElementById('accelFill');
   if(accelFill) accelFill.style.width = (state.accelCharge*100)+'%';
 
-  // ============ 自分の操作 ============
+  // ===== 自分の操作（P制御で加速・減速を対称に） =====
   const me = state.racers.find(r=>r.isMe);
   if(me && !me.finished){
     const pts = course.pts;
@@ -583,65 +590,74 @@ function update(dt){
     const dl = Math.sqrt(dx*dx+dy*dy)||1;
     const tx = dx/dl, ty = dy/dl;
 
-    // アクセルON時の加速度（これが「ジャブを出す速度」の基準）
-    const chargeMul = 0.4 + state.accelCharge * 1.6;
-    const accelPower = (me.accel/50) * 900 * chargeMul;
+    // 目標速度: ゲージ × ステータス由来の最大速度
+    //   ゲージ0     → 目標0（止まる）
+    //   ゲージMAX   → 目標 最大速度
+    const maxSpeedByStat = (me.speed/50) * 480 + (me.accel/50) * 120; // スピードとアクセルの合成
+    const targetSpeed = state.brakeInput ? 0 : state.accelCharge * maxSpeedByStat;
 
-    // 現在の速度と速さ
+    // 現在速度と向き
     let sp = Math.sqrt(me.vx*me.vx + me.vy*me.vy);
-
-    if(state.accelInput){
-      // 【加速】進行方向へ accelPower*dt を足す
-      let ax = tx*0.6 + inputX*0.5;
-      let ay = ty*0.6 + inputY*0.5;
-      const al = Math.sqrt(ax*ax+ay*ay)||1;
-      ax/=al; ay/=al;
-      me.vx += ax*accelPower*dt;
-      me.vy += ay*accelPower*dt;
-    } else if(state.brakeInput){
-      // 【ブレーキ】速度逆向きに強めの減速（加速の2倍）
-      if(sp > 0.01){
-        const ux = me.vx/sp, uy = me.vy/sp;
-        const brakePower = accelPower * 2.0;
-        const decAmount = brakePower * dt;
-        if(sp <= decAmount){
-          me.vx = 0; me.vy = 0;
-        } else {
-          me.vx -= ux*decAmount;
-          me.vy -= uy*decAmount;
-        }
-      }
+    let dirX2 = 0, dirY2 = 0;
+    if(sp > 0.01){
+      dirX2 = me.vx/sp; dirY2 = me.vy/sp;
     } else {
-      // 【アクセルOFF（自然減速）】ジャブを戻す速度 = 出す速度
-      // 加速と同じ accelPower を、速度と逆向きに、毎フレーム一定量引く
-      if(sp > 0.01){
-        const ux = me.vx/sp, uy = me.vy/sp;
-        // チャージを参照しない固定の減速力（アクセルONのMAXと同じスケール）
-        // → 「ジャブを出す速度」と揃える
-        const baseDecel = (me.accel/50) * 900 * 1.0; // accelChargeの影響なし
-        const decAmount = baseDecel * dt;
-        if(sp <= decAmount){
+      // 停止中はコース進行方向を向く
+      dirX2 = tx; dirY2 = ty;
+    }
+
+    // P制御: 目標速度との差に比例して速度を補正
+    //   加速も減速も同じ式（＝ジャブの出し戻しが対称）
+    const response = state.brakeInput ? BRAKE_RESPONSE : SPEED_RESPONSE;
+    const speedError = targetSpeed - sp;
+
+    if(Math.abs(speedError) > 0.1){
+      // 進行方向（または速度方向）に沿って速度を補正
+      // アクセルON時はコース進行方向へ、OFF時は現在の速度方向へ
+      let accDirX, accDirY;
+      if(state.accelInput){
+        // アクセルON: 操舵も入れて進行方向へ
+        let ax = tx*0.7 + inputX*0.4;
+        let ay = ty*0.7 + inputY*0.4;
+        const al = Math.sqrt(ax*ax+ay*ay)||1;
+        accDirX = ax/al; accDirY = ay/al;
+      } else {
+        // アクセルOFF/ブレーキ: 進行方向は速度方向（惰性）
+        accDirX = dirX2; accDirY = dirY2;
+      }
+
+      // 速度補正量 = 誤差 × 応答係数 × dt
+      const dv = speedError * response * dt;
+
+      // 速度ベクトルを方向に沿って更新
+      // 加速: 方向ベクトル × dv を加算
+      // 減速: 速度の逆方向に dv を加算（dvが負なので結果的に減速）
+      me.vx += accDirX * dv;
+      me.vy += accDirY * dv;
+
+      // 速度が0を跨いで逆走しないように
+      const newSp = Math.sqrt(me.vx*me.vx+me.vy*me.vy);
+      if(newSp > 0.01){
+        const newDirX = me.vx/newSp, newDirY = me.vy/newSp;
+        if((dirX2*newDirX + dirY2*newDirY) < 0){
+          // 進行方向が逆転 → 0に
           me.vx = 0; me.vy = 0;
-        } else {
-          me.vx -= ux*decAmount;
-          me.vy -= uy*decAmount;
         }
       }
     }
 
-    // 最高速度制限: アクセル状態に依存させない、一定の上限
-    // （チャージでMAXまで溜めた状態の速度を上限に）
-    const maxSp = (me.speed/50) * 520 * 1.2;
+    // 上限クランプ
     sp = Math.sqrt(me.vx*me.vx+me.vy*me.vy);
-    if(sp > maxSp){
-      me.vx = me.vx/sp*maxSp;
-      me.vy = me.vy/sp*maxSp;
+    const absMax = maxSpeedByStat * 1.05;
+    if(sp > absMax){
+      me.vx = me.vx/sp*absMax;
+      me.vy = me.vy/sp*absMax;
     }
 
     me.angle = Math.atan2(me.vy, me.vx);
   }
 
-  // ============ コンピューターAI ============
+  // ===== コンピューターAI =====
   for(const r of state.racers){
     if(r.isMe || r.finished) continue;
     const pts = course.pts;
