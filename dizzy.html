@@ -1,0 +1,1346 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TORQUES - コマ回し対決</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%; height: 100%;
+    font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif;
+    background: #111; color: #eee; overflow: hidden;
+  }
+  #app { width: 100%; height: 100%; position: relative; }
+
+  #opening {
+    position: absolute; inset: 0;
+    background: url('img190torques.jpg') center/cover no-repeat, #111;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 100;
+  }
+  #opening::before {
+    content: ""; position: absolute; inset: 0;
+    background: rgba(0,0,0,0.45);
+  }
+  #opening h1 {
+    position: relative;
+    font-size: clamp(28px, 8vw, 64px);
+    letter-spacing: 0.15em;
+    text-shadow: 0 0 20px #0ff, 0 0 40px #08f;
+    margin-bottom: 40px;
+  }
+  #opening .sub {
+    position: relative;
+    font-size: clamp(12px, 3vw, 18px);
+    opacity: 0.8; margin-bottom: 50px; letter-spacing: 0.2em;
+  }
+  #startBtn {
+    position: relative;
+    padding: 18px 60px;
+    font-size: clamp(18px, 4vw, 26px);
+    letter-spacing: 0.3em;
+    background: linear-gradient(135deg, #06c, #0af);
+    color: #fff; border: none; border-radius: 50px;
+    cursor: pointer;
+    box-shadow: 0 0 25px rgba(0,180,255,0.7);
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  #startBtn:hover { transform: scale(1.05); box-shadow: 0 0 40px rgba(0,200,255,1); }
+
+  #game {
+    display: none;
+    position: absolute; inset: 0;
+    flex-direction: column;
+  }
+  #game.active { display: flex; }
+
+  #canvasWrap {
+    flex: 1; position: relative;
+    background: radial-gradient(circle at center, #1a1a2e 0%, #0a0a12 80%);
+    overflow: hidden;
+  }
+  #battleCanvas { display: block; width: 100%; height: 100%; }
+
+  #panels {
+    display: flex; gap: 8px;
+    padding: 8px;
+    background: rgba(0,0,0,0.75);
+    border-top: 1px solid #333;
+    min-height: 140px;
+  }
+  .panel {
+    flex: 1;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: clamp(10px, 2.4vw, 13px);
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .panel h3 {
+    font-size: clamp(11px, 2.6vw, 14px);
+    letter-spacing: 0.1em;
+    border-bottom: 1px solid #444;
+    padding-bottom: 3px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .swatch {
+    width: 14px; height: 14px; border-radius: 50%;
+    border: 1px solid #fff3; display: inline-block;
+  }
+  .stat-row {
+    display: flex; justify-content: space-between;
+    font-size: clamp(9px, 2.2vw, 12px);
+  }
+  .stat-row .label { opacity: 0.7; }
+  .stat-row .val { font-weight: bold; }
+  .hp-bar {
+    height: 6px; background: #333; border-radius: 3px; overflow: hidden;
+    margin-top: 2px;
+  }
+  .hp-bar > div {
+    height: 100%; width: 100%;
+    background: linear-gradient(90deg, #0f0, #ff0);
+    transition: width 0.15s;
+  }
+  .hyper-row {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: clamp(9px, 2.2vw, 12px);
+    margin-top: 2px;
+    color: #f6a;
+  }
+  .hyper-bar {
+    height: 6px; background: #333; border-radius: 3px; overflow: hidden;
+    flex: 1; margin-left: 6px;
+  }
+  .hyper-bar > div {
+    height: 100%;
+    background: linear-gradient(90deg, #f0f, #f6a);
+    transition: width 0.2s;
+  }
+  .hyper-row.ready { color: #fff; text-shadow: 0 0 8px #f0f; }
+
+  #centerMsg {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: clamp(20px, 6vw, 42px);
+    font-weight: bold;
+    text-shadow: 0 0 20px #000, 0 0 40px #000;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+    text-align: center;
+    letter-spacing: 0.2em;
+    z-index: 20;
+  }
+  #centerMsg.show { opacity: 1; }
+
+  #streakBadge {
+    position: absolute; top: 10px; left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.6);
+    border: 1px solid #0af;
+    padding: 4px 16px; border-radius: 20px;
+    font-size: clamp(12px, 3vw, 16px);
+    letter-spacing: 0.15em;
+    z-index: 15;
+    color: #8ef;
+  }
+
+  #timerBadge {
+    position: absolute; top: 10px; right: 12px;
+    background: rgba(0,0,0,0.6);
+    border: 1px solid #666;
+    padding: 4px 12px; border-radius: 20px;
+    font-size: clamp(11px, 2.6vw, 14px);
+    letter-spacing: 0.1em;
+    z-index: 15;
+    color: #ccc;
+  }
+
+  #battleControls {
+    position: absolute;
+    bottom: 12px; left: 50%;
+    transform: translateX(-50%);
+    z-index: 15;
+    display: flex; gap: 8px; align-items: center;
+    flex-wrap: wrap; justify-content: center;
+    max-width: 96vw;
+  }
+  #battleControls button {
+    padding: 10px 22px;
+    font-size: clamp(13px, 3vw, 16px);
+    letter-spacing: 0.15em;
+    background: linear-gradient(135deg, #06c, #0af);
+    color: #fff; border: none; border-radius: 30px;
+    cursor: pointer;
+    box-shadow: 0 0 15px rgba(0,150,255,0.6);
+  }
+  #battleControls button:disabled { opacity: 0.4; cursor: default; box-shadow: none; }
+
+  #speedGroup {
+    display: none; gap: 6px; margin-left: 6px;
+  }
+  #speedGroup.active { display: flex; }
+  #speedGroup button {
+    padding: 8px 12px;
+    font-size: clamp(12px, 2.6vw, 14px);
+    letter-spacing: 0.05em;
+    background: rgba(255,255,255,0.08);
+    color: #ccc;
+    border: 1px solid #555;
+    border-radius: 20px;
+    cursor: pointer;
+    box-shadow: none;
+    min-width: 44px;
+  }
+  #speedGroup button.on {
+    background: linear-gradient(135deg, #f60, #fa0);
+    color: #fff; border-color: #fa0;
+    box-shadow: 0 0 12px rgba(255,150,0,0.7);
+  }
+
+  #gravityPanel {
+    position: absolute;
+    top: 56px; left: 50%;
+    transform: translateX(-50%);
+    z-index: 15;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    background: rgba(0,0,0,0.6);
+    border: 1px solid #2a5a8a;
+    border-radius: 12px;
+    padding: 8px 12px;
+    max-width: 96vw;
+  }
+  #gravityPanel.active { display: flex; }
+  #gravityLabel {
+    font-size: clamp(11px, 2.6vw, 13px);
+    letter-spacing: 0.12em;
+    color: #8cf;
+  }
+  #gravityLabel b { color: #ffd94a; }
+  #gravityGroup {
+    display: flex; gap: 5px; flex-wrap: wrap; justify-content: center;
+  }
+  #gravityGroup button {
+    padding: 6px 10px;
+    font-size: clamp(11px, 2.4vw, 13px);
+    letter-spacing: 0.04em;
+    background: rgba(255,255,255,0.07);
+    color: #bbb;
+    border: 1px solid #456;
+    border-radius: 16px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  #gravityGroup button.on {
+    background: linear-gradient(135deg, #06c, #0af);
+    color: #fff; border-color: #0af;
+    box-shadow: 0 0 10px rgba(0,170,255,0.8);
+  }
+
+  #choiceOverlay {
+    display: none;
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 50;
+    align-items: center; justify-content: center;
+    flex-direction: column; gap: 12px;
+    padding: 20px;
+    overflow-y: auto;
+  }
+  #choiceOverlay.active { display: flex; }
+  #choiceOverlay h2 {
+    font-size: clamp(20px, 5vw, 32px);
+    letter-spacing: 0.2em;
+    color: #ffd94a;
+    text-shadow: 0 0 20px #ff8c00;
+    margin-bottom: 4px;
+  }
+  #choiceOverlay p { opacity: 0.85; font-size: clamp(12px,3vw,15px); margin-bottom: 6px; text-align:center;}
+  #choiceSubTitle {
+    font-size: clamp(12px, 3vw, 14px);
+    opacity: 0.75;
+    letter-spacing: 0.1em;
+    margin-top: 4px;
+  }
+  #choiceGrid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    width: min(420px, 92vw);
+  }
+  .upBtn {
+    padding: 12px 10px;
+    font-size: clamp(13px, 3.2vw, 16px);
+    letter-spacing: 0.05em;
+    background: rgba(0,170,255,0.18);
+    color: #eee;
+    border: 1px solid #0af;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+    text-align: center;
+    line-height: 1.3;
+  }
+  .upBtn:hover:not(:disabled) { background: rgba(0,170,255,0.35); transform: translateY(-2px); }
+  .upBtn:disabled {
+    opacity: 0.35;
+    cursor: default;
+    border-color: #555;
+    background: rgba(255,255,255,0.05);
+  }
+  .upBtn small { display: block; opacity: 0.7; font-size: 0.78em; margin-top: 3px; }
+
+  .choiceBtn {
+    width: min(420px, 92vw);
+    padding: 14px;
+    font-size: clamp(14px, 3.5vw, 17px);
+    letter-spacing: 0.1em;
+    background: rgba(255,255,255,0.08);
+    color: #eee;
+    border: 1px solid #0af;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+    text-align: center;
+    line-height: 1.4;
+  }
+  .choiceBtn:hover { background: rgba(0,170,255,0.25); transform: translateY(-2px); }
+  .choiceBtn small { display:block; opacity:0.65; font-size: 0.8em; margin-top:4px;}
+
+  #resultOverlay {
+    display: none;
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,0.2);
+    z-index: 80;
+    align-items: center; justify-content: center;
+    flex-direction: column; gap: 24px;
+    padding: 20px; text-align: center;
+  }
+  #resultOverlay.active { display: flex; }
+  #resultOverlay h2 {
+    font-size: clamp(28px, 8vw, 56px);
+    letter-spacing: 0.2em;
+  }
+  #resultOverlay .win { color: #ffd94a; text-shadow: 0 0 30px #ff8c00; }
+  #resultOverlay .lose { color: #ff4a6e; text-shadow: 0 0 30px #f00; }
+  #resultOverlay p { opacity: 0.8; font-size: clamp(13px,3.5vw,17px); }
+  #resultOverlay button {
+    padding: 14px 50px;
+    font-size: clamp(15px, 4vw, 20px);
+    letter-spacing: 0.2em;
+    background: linear-gradient(135deg, #06c, #0af);
+    color: #fff; border: none; border-radius: 40px;
+    cursor: pointer;
+    box-shadow: 0 0 20px rgba(0,180,255,0.7);
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="opening">
+    <h1>TORQUES</h1>
+    <div class="sub">- コマ回し対決 -</div>
+    <button id="startBtn">はじめる</button>
+  </div>
+
+  <div id="game">
+    <div id="canvasWrap">
+      <canvas id="battleCanvas"></canvas>
+      <div id="streakBadge">連勝 0 / 5</div>
+      <div id="timerBadge">30.0s</div>
+
+      <div id="gravityPanel">
+        <div id="gravityLabel">重力 <b id="gravityValue">100x</b>（あなたのみ操作可）</div>
+        <div id="gravityGroup">
+          <button data-gravity="50">弱</button>
+          <button data-gravity="100" class="on">デフォ</button>
+          <button data-gravity="150">中</button>
+          <button data-gravity="200">強</button>
+          <button data-gravity="500">超強</button>
+          <button data-gravity="1000">MAX</button>
+        </div>
+      </div>
+
+      <div id="centerMsg"></div>
+      <div id="battleControls">
+        <button id="spinBtn">スタート</button>
+        <div id="speedGroup">
+          <button data-speed="1" class="on">1x</button>
+          <button data-speed="2">2x</button>
+          <button data-speed="3">3x</button>
+          <button data-speed="4">4x</button>
+          <button data-speed="10">10x</button>
+        </div>
+      </div>
+    </div>
+    <div id="panels">
+      <div class="panel" id="playerPanel"></div>
+      <div class="panel" id="enemyPanel"></div>
+    </div>
+  </div>
+
+  <div id="choiceOverlay">
+    <h2>WIN!</h2>
+    <p>次の敵にどう挑む？</p>
+    <div id="choiceSubTitle">強化する項目を選べ（各上限：他30 / バウンド100）</div>
+    <div id="choiceGrid">
+      <button class="upBtn" data-up="attack"></button>
+      <button class="upBtn" data-up="defense"></button>
+      <button class="upBtn" data-up="stamina"></button>
+      <button class="upBtn" data-up="weight"></button>
+      <button class="upBtn" data-up="spin"></button>
+      <button class="upBtn" data-up="bounce"></button>
+    </div>
+    <div id="choiceSubTitle">または</div>
+    <button class="choiceBtn" id="rerollBtn"></button>
+  </div>
+
+  <div id="resultOverlay">
+    <h2 id="resultTitle"></h2>
+    <p id="resultMsg"></p>
+    <button id="resultBtn">オープニングへ</button>
+  </div>
+
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ===================== 定数 =====================
+  const COLORS = [
+    { name:"赤",   hex:"#e63946" },
+    { name:"水色", hex:"#4cc9f0" },
+    { name:"黄色", hex:"#ffd60a" },
+    { name:"ピンク",hex:"#ff70a6" },
+    { name:"青",   hex:"#3a86ff" },
+    { name:"茶色", hex:"#8d6e63" },
+    { name:"白",   hex:"#f1faee" },
+    { name:"橙",   hex:"#fb8500" },
+    { name:"紫",   hex:"#9b5de5" },
+    { name:"黒",   hex:"#222222" },
+    { name:"灰色", hex:"#9e9e9e" },
+    { name:"緑",   hex:"#2a9d8f" },
+    { name:"黄緑", hex:"#a7c957" },
+  ];
+  const SHAPES = ["circle","triangle","square","star","hexagon","pentagon"];
+
+  const CORE_KEYS = ["attack","defense","stamina","weight","spin"];
+  const CORE_LABELS = {
+    attack:"攻撃", defense:"防御", stamina:"持久",
+    weight:"重さ", spin:"回転"
+  };
+  const TOTAL_POINTS = 60;
+  const MIN_STAT = 3;
+  const CORE_MAX = 30;
+  const BOUNCE_MIN = 0, BOUNCE_MAX = 100;
+
+  const CORE_UP = 3;
+  const BOUNCE_UP = 7;
+
+  const MAX_HP = 80;
+  const ARENA_MARGIN = 0.82;
+  const BASE_RADIUS = 24;
+  const WIN_STREAK = 5;
+  const MAX_BATTLE_TIME = 20;
+
+  // 物理定数
+  const CENTER_PULL = 90;
+  const FRICTION = 0.45;
+  const AIR_DRAG = 0.12;
+  const PRECESS_DRIFT = 10;
+
+  // HP減少系
+  const HP_DRAIN_BASE = 4;
+  const EDGE_DRAIN = 120;
+
+  // 壁（リム）反発の下限
+  const WALL_REST_MIN = 0.08;
+
+  const FIXED_STEP = 1/120;
+
+  const GRAVITY_DEFAULT = 100;
+  const GRAVITY_MIN = 50;
+  const GRAVITY_MAX = 1000;
+
+  const HYPER_MAX = 10;
+
+  // ===================== 状態 =====================
+  const state = {
+    player:null, enemy:null, streak:0,
+    phase:"idle", rafId:null, lastTime:0,
+    battle:null, speed:1,
+    gravity: GRAVITY_DEFAULT,
+    sparks: [],
+    bolts: [],
+  };
+
+  const $ = id => document.getElementById(id);
+  const opening = $("opening");
+  const gameEl = $("game");
+  const canvas = $("battleCanvas");
+  const ctx = canvas.getContext("2d");
+  const playerPanel = $("playerPanel");
+  const enemyPanel = $("enemyPanel");
+  const spinBtn = $("spinBtn");
+  const centerMsg = $("centerMsg");
+  const streakBadge = $("streakBadge");
+  const timerBadge = $("timerBadge");
+  const choiceOverlay = $("choiceOverlay");
+  const resultOverlay = $("resultOverlay");
+  const resultTitle = $("resultTitle");
+  const resultMsg = $("resultMsg");
+  const speedGroup = $("speedGroup");
+  const gravityPanel = $("gravityPanel");
+  const gravityGroup = $("gravityGroup");
+  const gravityValue = $("gravityValue");
+
+  // ===================== ユーティリティ =====================
+  const rand = (a,b) => a + Math.random()*(b-a);
+  const randInt = (a,b) => Math.floor(rand(a,b+1));
+  const pick = arr => arr[randInt(0,arr.length-1)];
+  const clamp = (v,a,b) => Math.max(a, Math.min(b,v));
+
+  function randomCoreStats() {
+    const stats = {};
+    let remaining = TOTAL_POINTS;
+    for (const k of CORE_KEYS) { stats[k] = MIN_STAT; remaining -= MIN_STAT; }
+    let guard = 0;
+    while (remaining > 0 && guard < 10000) {
+      guard++;
+      const k = pick(CORE_KEYS);
+      if (stats[k] < CORE_MAX) { stats[k]++; remaining--; }
+    }
+    return stats;
+  }
+
+  function makeKom(base) {
+    const color = pick(COLORS);
+    const shape = pick(SHAPES);
+    const core = base && base.core ? { ...base.core } : randomCoreStats();
+    const bounce = base && typeof base.bounce === "number"
+      ? base.bounce
+      : randInt(BOUNCE_MIN, BOUNCE_MAX);
+
+    const stats = { ...core, bounce };
+    const mass = 0.6 + core.weight * 0.15;
+
+    return {
+      color: color.hex, colorName: color.name, shape,
+      core, bounce, stats,
+      hp: MAX_HP, maxHp: MAX_HP, mass,
+      hyper: 0,
+      hyperLaunched: false,
+      x:0, y:0, vx:0, vy:0, angle:0,
+      radius:0,
+    };
+  }
+
+  function totalScore(k) {
+    return k.core.attack + k.core.defense + k.core.stamina + k.core.weight + k.core.spin;
+  }
+
+  // 税金（累進課税・6段階）
+  function taxFor(diff, hyperUsed) {
+    if (hyperUsed) return 0;
+    if (diff <= 1) return 0;
+    if (diff <= 4) return 1;
+    if (diff <= 8) return 2;
+    if (diff <= 13) return 3;
+    if (diff <= 20) return 4;
+    return 5;
+  }
+
+  // ===================== Canvas =====================
+  let canvasW=0, canvasH=0, dpr=1;
+  let arena = { cx:0, cy:0, r:0 };
+
+  function resize() {
+    const wrap = canvas.parentElement;
+    const rect = wrap.getBoundingClientRect();
+    dpr = window.devicePixelRatio || 1;
+    canvasW = rect.width; canvasH = rect.height;
+    canvas.width = canvasW*dpr; canvas.height = canvasH*dpr;
+    canvas.style.width = canvasW+"px"; canvas.style.height = canvasH+"px";
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    arena.cx = canvasW/2; arena.cy = canvasH/2;
+    arena.r = Math.min(canvasW, canvasH) * 0.5 * ARENA_MARGIN;
+    const rr = BASE_RADIUS * (Math.min(canvasW,canvasH)/420);
+    if (state.player) state.player.radius = rr;
+    if (state.enemy) state.enemy.radius = rr;
+  }
+
+  function drawArena() {
+    ctx.save();
+    const gIntensity = clamp((state.gravity - GRAVITY_MIN) / (GRAVITY_MAX - GRAVITY_MIN), 0, 1);
+    const g = ctx.createRadialGradient(arena.cx, arena.cy, arena.r*0.05, arena.cx, arena.cy, arena.r);
+    g.addColorStop(0, gIntensity > 0.02
+      ? `rgba(${Math.round(58+180*gIntensity)}, ${Math.round(58-30*gIntensity)}, ${Math.round(92-60*gIntensity)}, 1)`
+      : "#3a3a5c");
+    g.addColorStop(0.5, "#22223a");
+    g.addColorStop(1, "#101020");
+    ctx.beginPath();
+    ctx.arc(arena.cx, arena.cy, arena.r, 0, Math.PI*2);
+    ctx.fillStyle = g; ctx.fill();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = gIntensity > 0.4 ? "#ff6a3d" : "#4cc9f0";
+    ctx.shadowColor = ctx.strokeStyle; ctx.shadowBlur = 18; ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.beginPath();
+    ctx.arc(arena.cx, arena.cy, arena.r*0.66, 0, Math.PI*2);
+    ctx.strokeStyle = "rgba(255,255,255,0.10)"; ctx.lineWidth=1; ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(arena.cx, arena.cy, arena.r*0.33, 0, Math.PI*2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawKom(k) {
+    if (!k) return;
+    ctx.save();
+    ctx.translate(k.x, k.y);
+
+    const hpRatio = clamp(k.hp/k.maxHp, 0, 1);
+    const wobble = (1 - hpRatio) * 0.5;
+    ctx.save();
+    ctx.translate(Math.sin(k.angle*0.7)*wobble*4, Math.cos(k.angle*0.9)*wobble*4);
+    ctx.rotate(k.angle);
+    const r = k.radius;
+
+    ctx.shadowColor = k.color; ctx.shadowBlur = 14 + hpRatio*8;
+    ctx.beginPath();
+    switch (k.shape) {
+      case "circle":   ctx.arc(0,0,r,0,Math.PI*2); break;
+      case "triangle": poly(r,3,-Math.PI/2); break;
+      case "square":   poly(r,4,Math.PI/4); break;
+      case "pentagon": poly(r,5,-Math.PI/2); break;
+      case "hexagon":  poly(r,6,0); break;
+      case "star":     star(r,r*0.45,5,-Math.PI/2); break;
+    }
+    ctx.closePath();
+    ctx.fillStyle = k.color; ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = "rgba(255,255,255,0.85)"; ctx.stroke();
+
+    ctx.shadowBlur = 0;
+    ctx.beginPath();
+    ctx.moveTo(0,0); ctx.lineTo(r*0.75,0);
+    ctx.strokeStyle = "rgba(0,0,0,0.5)"; ctx.lineWidth=2; ctx.stroke();
+
+    if (k.hyper >= HYPER_MAX) {
+      ctx.shadowBlur = 0;
+      ctx.beginPath();
+      ctx.arc(0,0,r*1.5,0,Math.PI*2);
+      ctx.strokeStyle = "rgba(255,0,255,0.7)";
+      ctx.lineWidth = 2;
+      ctx.shadowColor = "#f0f";
+      ctx.shadowBlur = 16;
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    ctx.restore();
+  }
+
+  function poly(r,n,offset) {
+    for (let i=0;i<n;i++) {
+      const a = offset + i*(Math.PI*2/n);
+      const x = Math.cos(a)*r, y = Math.sin(a)*r;
+      if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+  }
+  function star(rOut,rIn,n,offset) {
+    for (let i=0;i<n*2;i++) {
+      const rr = (i%2===0)?rOut:rIn;
+      const a = offset + i*Math.PI/n;
+      const x = Math.cos(a)*rr, y = Math.sin(a)*rr;
+      if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+  }
+
+  // ===================== 雷エフェクト =====================
+  function spawnSparks(x, y, intensity) {
+    const count = Math.round(6 + intensity * 12);
+    for (let i=0;i<count;i++) {
+      const a = rand(0, Math.PI*2);
+      const sp = rand(60, 220) * (0.6 + intensity);
+      state.sparks.push({
+        x, y,
+        vx: Math.cos(a)*sp,
+        vy: Math.sin(a)*sp,
+        life: rand(0.15, 0.35),
+        maxLife: 0.35,
+        size: rand(1.5, 3.5),
+      });
+    }
+  }
+
+  function spawnBolt(x, y, angle, intensity, colorMode) {
+    const segments = Math.round(4 + intensity * 4);
+    const length = 30 + intensity * 60;
+    const points = [{x, y}];
+    const dirx = Math.cos(angle), diry = Math.sin(angle);
+    for (let i=1;i<=segments;i++) {
+      const t = i / segments;
+      const jitter = (1 - t) * 14 * (Math.random()*2-1);
+      const px = x + dirx * length * t + (-diry) * jitter;
+      const py = y + diry * length * t + (dirx) * jitter;
+      points.push({x:px, y:py});
+    }
+    state.bolts.push({ points, life: 0.18, maxLife: 0.18, intensity, colorMode: colorMode || "normal" });
+  }
+
+  function updateEffects(dt) {
+    for (let i = state.sparks.length - 1; i >= 0; i--) {
+      const s = state.sparks[i];
+      s.x += s.vx * dt;
+      s.y += s.vy * dt;
+      s.vx *= 0.92;
+      s.vy *= 0.92;
+      s.life -= dt;
+      if (s.life <= 0) state.sparks.splice(i, 1);
+    }
+    for (let i = state.bolts.length - 1; i >= 0; i--) {
+      const b = state.bolts[i];
+      b.life -= dt;
+      if (b.life <= 0) state.bolts.splice(i, 1);
+    }
+  }
+
+  function drawEffects() {
+    ctx.save();
+    ctx.lineCap = "round";
+    for (const b of state.bolts) {
+      const a = clamp(b.life / b.maxLife, 0, 1);
+      const isHyper = b.colorMode === "hyper";
+      const strong = b.intensity > 0.7;
+      let stroke, shadow;
+      if (isHyper) {
+        stroke = `rgba(255,100,255,${a})`;
+        shadow = "#f0f";
+      } else if (strong) {
+        stroke = `rgba(255,240,150,${a})`;
+        shadow = "#ffe066";
+      } else {
+        stroke = `rgba(180,230,255,${a})`;
+        shadow = "#7fdfff";
+      }
+      ctx.strokeStyle = stroke;
+      ctx.shadowColor = shadow;
+      ctx.shadowBlur = isHyper ? 20 : 12;
+      ctx.lineWidth = (2 + b.intensity * 2) * (isHyper ? 1.6 : 1);
+      ctx.beginPath();
+      ctx.moveTo(b.points[0].x, b.points[0].y);
+      for (let i=1;i<b.points.length;i++) ctx.lineTo(b.points[i].x, b.points[i].y);
+      ctx.stroke();
+    }
+    for (const s of state.sparks) {
+      const a = clamp(s.life / s.maxLife, 0, 1);
+      ctx.fillStyle = `rgba(200,240,255,${a})`;
+      ctx.shadowColor = "#aef";
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.size, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function render() {
+    ctx.clearRect(0,0,canvasW,canvasH);
+    drawArena();
+    if (state.enemy) drawKom(state.enemy);
+    if (state.player) drawKom(state.player);
+    drawEffects();
+  }
+
+  // ===================== パネル =====================
+  function renderPanel(el,k,title) {
+    if (!k) { el.innerHTML=""; return; }
+    const c = k.core;
+    const hpPct = clamp(k.hp/k.maxHp*100,0,100);
+    const hyperPct = clamp(k.hyper/HYPER_MAX*100,0,100);
+    const isReady = k.hyper >= HYPER_MAX;
+    const maxTag = v => v >= CORE_MAX ? ' <span style="color:#ffd94a">MAX</span>' : '';
+    const maxTagB = v => v >= BOUNCE_MAX ? ' <span style="color:#ffd94a">MAX</span>' : '';
+    el.innerHTML = `
+      <h3><span class="swatch" style="background:${k.color}"></span>${title}：${k.colorName} / ${shapeName(k.shape)}</h3>
+      <div class="hp-bar"><div style="width:${hpPct}%"></div></div>
+      <div class="stat-row"><span class="label">${CORE_LABELS.attack}</span><span class="val">${c.attack}${maxTag(c.attack)}</span></div>
+      <div class="stat-row"><span class="label">${CORE_LABELS.defense}</span><span class="val">${c.defense}${maxTag(c.defense)}</span></div>
+      <div class="stat-row"><span class="label">${CORE_LABELS.stamina}</span><span class="val">${c.stamina}${maxTag(c.stamina)}</span></div>
+      <div class="stat-row"><span class="label">${CORE_LABELS.weight}</span><span class="val">${c.weight}${maxTag(c.weight)}</span></div>
+      <div class="stat-row"><span class="label">${CORE_LABELS.spin}</span><span class="val">${c.spin}${maxTag(c.spin)}</span></div>
+      <div class="stat-row"><span class="label">バウンド</span><span class="val">${k.bounce}${maxTagB(k.bounce)}</span></div>
+      <div class="hyper-row ${isReady ? "ready" : ""}">
+        <span>${isReady ? "必殺" : "ハイパー"} ${k.hyper}/${HYPER_MAX}</span>
+        <span class="hyper-bar"><div style="width:${hyperPct}%"></div></span>
+      </div>
+    `;
+  }
+  function shapeName(s) {
+    return { circle:"円", triangle:"三角", square:"四角", star:"星",
+             hexagon:"六角", pentagon:"五角" }[s] || s;
+  }
+  function updatePanels() {
+    renderPanel(playerPanel, state.player, "YOU");
+    renderPanel(enemyPanel, state.enemy, "CPU");
+    streakBadge.textContent = `連勝 ${state.streak} / ${WIN_STREAK}`;
+  }
+
+  // ===================== 戦闘開始 =====================
+  function startSpin() {
+    const p = state.player, e = state.enemy;
+    const rr = arena.r * 0.6;
+    const angP = rand(0, Math.PI*2);
+    const angE = angP + Math.PI + rand(-0.6, 0.6);
+    p.x = arena.cx + Math.cos(angP)*rr;
+    p.y = arena.cy + Math.sin(angP)*rr;
+    e.x = arena.cx + Math.cos(angE)*rr;
+    e.y = arena.cy + Math.sin(angE)*rr;
+
+    const spinBoostP = 1 + p.core.spin / 30 * 0.6;
+    const spinBoostE = 1 + e.core.spin / 30 * 0.6;
+
+    const tangentP = angP + Math.PI/2;
+    const tangentE = angE + Math.PI/2;
+    const speedP = rand(140, 200) * spinBoostP;
+    const speedE = rand(140, 200) * spinBoostE;
+    p.vx = Math.cos(tangentP)*speedP + rand(-20,20);
+    p.vy = Math.sin(tangentP)*speedP + rand(-20,20);
+    e.vx = Math.cos(tangentE)*speedE + rand(-20,20);
+    e.vy = Math.sin(tangentE)*speedE + rand(-20,20);
+
+    p.hp = p.maxHp; e.hp = e.maxHp;
+    p.hyper = 0; e.hyper = 0;
+    p.hyperLaunched = false; e.hyperLaunched = false;
+    p.angle = 0; e.angle = Math.PI;
+    p.radius = BASE_RADIUS * (Math.min(canvasW,canvasH)/420);
+    e.radius = p.radius;
+
+    state.sparks = [];
+    state.bolts = [];
+    state.battle = { elapsed: 0, hitCooldown: 0 };
+    state.phase = "battle";
+    spinBtn.disabled = true;
+    speedGroup.classList.add("active");
+    gravityPanel.classList.add("active");
+    resetSpeed();
+    resetGravity();
+    showCenter("READY...", 700, () => showCenter("GO!", 500));
+    updatePanels();
+  }
+
+  function showCenter(text, ms, cb) {
+    centerMsg.textContent = text;
+    centerMsg.classList.add("show");
+    setTimeout(() => {
+      centerMsg.classList.remove("show");
+      if (cb) cb();
+    }, ms);
+  }
+
+  // ===================== 早送り =====================
+  function applySpeedUI() {
+    [...speedGroup.querySelectorAll("button")].forEach(b => {
+      b.classList.toggle("on", Number(b.dataset.speed) === state.speed);
+    });
+  }
+  function setSpeed(s) {
+    state.speed = s;
+    applySpeedUI();
+  }
+  function resetSpeed() {
+    state.speed = 1;
+    applySpeedUI();
+  }
+  speedGroup.addEventListener("click", ev => {
+    const btn = ev.target.closest("button");
+    if (!btn) return;
+    const s = Number(btn.dataset.speed);
+    if (s !== 1 && s === state.speed) setSpeed(1);
+    else setSpeed(s);
+  });
+
+  // ===================== 重力操作 =====================
+  function applyGravityUI() {
+    [...gravityGroup.querySelectorAll("button")].forEach(b => {
+      b.classList.toggle("on", Number(b.dataset.gravity) === state.gravity);
+    });
+    gravityValue.textContent = state.gravity + "x";
+  }
+  function setGravity(g) {
+    state.gravity = g;
+    applyGravityUI();
+  }
+  function resetGravity() {
+    state.gravity = GRAVITY_DEFAULT;
+    applyGravityUI();
+  }
+  gravityGroup.addEventListener("click", ev => {
+    const btn = ev.target.closest("button");
+    if (!btn) return;
+    setGravity(Number(btn.dataset.gravity));
+  });
+
+  // ===================== 物理 =====================
+  function stepPhysics(dt) {
+    const b = state.battle;
+    if (!b) return;
+    const p = state.player, e = state.enemy;
+
+    b.elapsed += dt;
+    b.hitCooldown -= dt;
+
+    applyForces(p, dt);
+    applyForces(e, dt);
+
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    e.x += e.vx * dt; e.y += e.vy * dt;
+
+    wallCollide(p);
+    wallCollide(e);
+    komCollide(p, e, b);
+
+    const hpRatioP = clamp(p.hp/p.maxHp, 0, 1);
+    const hpRatioE = clamp(e.hp/e.maxHp, 0, 1);
+    p.angle += dt * (6 + p.core.spin*0.3) * hpRatioP;
+    e.angle -= dt * (6 + e.core.spin*0.3) * hpRatioE;
+
+    const drainP = Math.max(0.3, HP_DRAIN_BASE - p.core.stamina*2.1) * dt;
+    const drainE = Math.max(0.3, HP_DRAIN_BASE - e.core.stamina*2.1) * dt;
+    p.hp -= drainP;
+    e.hp -= drainE;
+
+    const tP = Math.hypot(p.x - arena.cx, p.y - arena.cy) / arena.r;
+    const tE = Math.hypot(e.x - arena.cx, e.y - arena.cy) / arena.r;
+    const edgeResistP = 1 - clamp(p.core.spin / 60, 0, 36);
+    const edgeResistE = 1 - clamp(e.core.spin / 60, 0, 36);
+    p.hp -= tP * tP * EDGE_DRAIN * edgeResistP * dt;
+    e.hp -= tE * tE * EDGE_DRAIN * edgeResistE * dt;
+  }
+
+  function applyForces(k, dt) {
+    const dx = arena.cx - k.x;
+    const dy = arena.cy - k.y;
+    const dist = Math.hypot(dx, dy) || 0.0001;
+    const nx = dx/dist, ny = dy/dist;
+
+    const t = dist / arena.r;
+    const pull = CENTER_PULL * state.gravity * t * (1 + (1 - t) * 0.8);
+    k.vx += nx * pull * dt;
+    k.vy += ny * pull * dt;
+
+    const hpRatio = clamp(k.hp/k.maxHp, 0, 1);
+    const drift = PRECESS_DRIFT * (1 - hpRatio) * (1 + k.core.spin*0.02);
+    k.vx += nx * drift * dt;
+    k.vy += ny * drift * dt;
+
+    const damp = 1 - (FRICTION*0.3 + AIR_DRAG) * dt;
+    k.vx *= damp;
+    k.vy *= damp;
+
+    const spinBoost = 1 + k.core.spin / 40 * 3;
+    const maxSp = 3000 * spinBoost;
+    const sp = Math.hypot(k.vx,k.vy);
+    if (sp > maxSp) { k.vx = k.vx/sp*maxSp; k.vy = k.vy/sp*maxSp; }
+  }
+
+  function wallCollide(k) {
+    const dx = k.x - arena.cx;
+    const dy = k.y - arena.cy;
+    const dist = Math.hypot(dx, dy);
+    const limit = arena.r - k.radius;
+
+    // 必殺で弾かれた直後は壁無効
+    if (k.hyperLaunched) {
+      if (Math.hypot(k.vx, k.vy) < 120) {
+        k.hyperLaunched = false;
+      }
+      if (dist > arena.r) {
+        if (k === state.player) endBattle("lose");
+        else endBattle("win");
+      }
+      return;
+    }
+
+    if (dist > limit) {
+      const nx = dx/dist, ny = dy/dist;
+      const vn = k.vx*nx + k.vy*ny;
+      if (vn > 0) {
+        const rest = clamp(WALL_REST_MIN + k.bounce/100 * 0.65, WALL_REST_MIN, 0.97);
+        k.vx -= (1 + rest) * vn * nx;
+        k.vy -= (1 + rest) * vn * ny;
+      }
+      if (dist > arena.r) {
+        if (k === state.player) endBattle("lose");
+        else endBattle("win");
+        return;
+      }
+      if (dist > limit) {
+        k.x = arena.cx + nx*limit;
+        k.y = arena.cy + ny*limit;
+      }
+    }
+  }
+
+  function komCollide(p, e, b) {
+    const dx = e.x - p.x;
+    const dy = e.y - p.y;
+    const dist = Math.hypot(dx, dy) || 0.0001;
+    const touch = p.radius + e.radius;
+    if (dist >= touch) return;
+
+    const nx = dx/dist, ny = dy/dist;
+    const overlap = touch - dist;
+
+    const totalM = p.mass + e.mass;
+    const pShare = e.mass / totalM;
+    const eShare = p.mass / totalM;
+    p.x -= nx * overlap * pShare;
+    p.y -= ny * overlap * pShare;
+    e.x += nx * overlap * eShare;
+    e.y += ny * overlap * eShare;
+
+    const rvx = e.vx - p.vx;
+    const rvy = e.vy - p.vy;
+    const vn = rvx*nx + rvy*ny;
+    if (vn > 0) return;
+
+    const avgBounce = (p.bounce + e.bounce) / 2;
+    const rest = clamp(WALL_REST_MIN + avgBounce/100 * 0.70, WALL_REST_MIN, 0.97);
+    const j = -(1 + rest) * vn / (1/p.mass + 1/e.mass);
+
+    p.vx -= j * nx / p.mass;
+    p.vy -= j * ny / p.mass;
+    e.vx += j * nx / e.mass;
+    e.vy += j * ny / e.mass;
+
+    const contactX = (p.x + e.x) / 2;
+    const contactY = (p.y + e.y) / 2;
+
+    if (b.hitCooldown <= 0) {
+      const pReady = p.hyper >= HYPER_MAX;
+      const eReady = e.hyper >= HYPER_MAX;
+
+      const atkP = p.core.attack;
+      const atkE = e.core.attack;
+      const defP = p.core.defense;
+      const defE = e.core.defense;
+
+      const diffE = Math.max(0, atkP - defE);
+      const diffP = Math.max(0, atkE - defP);
+
+      const taxE = taxFor(diffE, pReady);
+      const taxP = taxFor(diffP, eReady);
+
+      const dmgToE = Math.max(0, diffE - taxE) * 0.4;
+      const dmgToP = Math.max(0, diffP - taxP) * 0.4;
+      e.hp -= dmgToE;
+      p.hp -= dmgToP;
+
+      for (let i=0;i<taxE;i++) if (Math.random() < 0.5) p.hyper = Math.min(HYPER_MAX, p.hyper + 1);
+      for (let i=0;i<taxP;i++) if (Math.random() < 0.5) e.hyper = Math.min(HYPER_MAX, e.hyper + 1);
+
+      const rawKnockToE = Math.max(0, p.bounce - e.bounce) * 15 + p.bounce * 0.15;
+      const rawKnockToP = Math.max(0, e.bounce - p.bounce) * 15 + e.bounce * 0.15;
+
+      let resistP = 1 - clamp(defP / 50, 0, 0.5)
+                      - clamp(p.core.weight / 60, 0, 0.5)
+                      - clamp(p.core.spin / 60, 0, 0.5);
+      let resistE = 1 - clamp(defE / 50, 0, 0.5)
+                      - clamp(e.core.weight / 60, 0, 0.5)
+                      - clamp(e.core.spin / 60, 0, 0.5);
+      resistP = Math.max(0.1, resistP);
+      resistE = Math.max(0.1, resistE);
+
+      let knockToP = rawKnockToP * resistP;
+      let knockToE = rawKnockToE * resistE;
+
+      function hyperPower(k) {
+        return k.bounce * 1.0
+             + k.core.attack * 0.3
+             + k.core.spin * 0.3
+             + k.core.weight * 0.3;
+      }
+      function hyperGuard(k) {
+        return k.core.defense * 0.6
+             + k.core.weight * 0.4
+             + k.core.spin * 0.4
+             + k.bounce * 0.4;
+      }
+
+      if (pReady) {
+        const power = hyperPower(p);
+        const guard = hyperGuard(e);
+        const hyperKnock = Math.max(5, power * 2.0 * 7 - guard);
+        knockToE = Math.max(knockToE, hyperKnock);
+        e.hyperLaunched = true;
+        p.hyper = 0;
+
+        spawnBolt(contactX, contactY, Math.atan2(ny, nx), 1.2, "hyper");
+        spawnBolt(contactX, contactY, Math.atan2(-ny, -nx), 1.2, "hyper");
+        spawnBolt(contactX, contactY, rand(0, Math.PI*2), 1.0, "hyper");
+        showCenter("必殺!", 500);
+      }
+      if (eReady) {
+        const power = hyperPower(e);
+        const guard = hyperGuard(p);
+        const hyperKnock = Math.max(5, power * 2.0 * 7 - guard);
+        knockToP = Math.max(knockToP, hyperKnock);
+        p.hyperLaunched = true;
+        e.hyper = 0;
+
+        spawnBolt(contactX, contactY, Math.atan2(ny, nx), 1.2, "hyper");
+        spawnBolt(contactX, contactY, Math.atan2(-ny, -nx), 1.2, "hyper");
+        spawnBolt(contactX, contactY, rand(0, Math.PI*2), 1.0, "hyper");
+      }
+
+      e.vx += nx * knockToE; e.vy += ny * knockToE;
+      p.vx -= nx * knockToP; p.vy -= ny * knockToP;
+
+      b.hitCooldown = 0.10;
+
+      const intensity = clamp(Math.abs(vn) / 400, 0.15, 1);
+      spawnSparks(contactX, contactY, intensity);
+      spawnBolt(contactX, contactY, Math.atan2(ny, nx) + rand(-0.5,0.5), intensity);
+      spawnBolt(contactX, contactY, Math.atan2(-ny, -nx) + rand(-0.5,0.5), intensity);
+      if (intensity > 0.5) {
+        spawnBolt(contactX, contactY, rand(0, Math.PI*2), intensity * 0.8);
+      }
+    } else {
+      if (Math.random() < 0.4) spawnSparks(contactX, contactY, 0.25);
+    }
+  }
+
+  // ===================== 戦闘更新 =====================
+  function updateBattle(dt) {
+    const b = state.battle;
+    if (!b) return;
+
+    let remaining = dt * state.speed;
+    let guard = 0;
+    while (remaining > 0 && guard < 2000) {
+      guard++;
+      const s = Math.min(FIXED_STEP, remaining);
+      stepPhysics(s);
+      remaining -= s;
+      if (state.phase !== "battle") break;
+    }
+
+    updateEffects(dt);
+
+    const remain = Math.max(0, MAX_BATTLE_TIME - b.elapsed);
+    timerBadge.textContent = remain.toFixed(1) + "s";
+    if (b.elapsed >= MAX_BATTLE_TIME && state.phase === "battle") {
+      judgeByHP();
+      return;
+    }
+
+    if (state.phase === "battle") {
+      const p = state.player, e = state.enemy;
+      if (p.hp <= 0 || e.hp <= 0) {
+        judgeByHP();
+        return;
+      }
+    }
+
+    updatePanels();
+  }
+
+  function judgeByHP() {
+    const p = state.player, e = state.enemy;
+    if (p.hp < e.hp) endBattle("lose");
+    else if (e.hp < p.hp) endBattle("win");
+    else {
+      const sp = totalScore(p), se = totalScore(e);
+      if (sp > se) endBattle("win");
+      else if (se > sp) endBattle("lose");
+      else endBattle("draw");
+    }
+  }
+
+  // ===================== ループ =====================
+  function loop(t) {
+    if (!state.lastTime) state.lastTime = t;
+    let dt = (t - state.lastTime)/1000;
+    state.lastTime = t;
+    dt = Math.min(dt, 0.04);
+
+    if (state.phase === "battle") {
+      updateBattle(dt);
+    } else {
+      if (state.player) state.player.angle += dt*3;
+      if (state.enemy) state.enemy.angle -= dt*3;
+      updateEffects(dt);
+    }
+    render();
+    state.rafId = requestAnimationFrame(loop);
+  }
+
+  // ===================== 勝敗 =====================
+  function endBattle(result) {
+    if (state.phase === "ended") return;
+    state.phase = "ended";
+    spinBtn.disabled = false;
+    speedGroup.classList.remove("active");
+    gravityPanel.classList.remove("active");
+    resetSpeed();
+    resetGravity();
+
+    if (result === "win") {
+      state.streak++;
+      updatePanels();
+      if (state.streak >= WIN_STREAK) {
+        showCenter("5連勝!!", 1200, () => { window.location.href = "ability.html"; });
+        return;
+      }
+      showCenter("WIN!", 900, () => setTimeout(openChoice, 200));
+    } else if (result === "lose") {
+      state.streak = 0;
+      updatePanels();
+      showCenter("LOSE...", 1000, () => showResult(false));
+    } else {
+      state.streak = 0;
+      updatePanels();
+      showCenter("DRAW", 1000, () => showResult(false));
+    }
+  }
+
+  // ===================== 選択 =====================
+  function openChoice() {
+    const p = state.player;
+    updateUpButton("attack",  CORE_LABELS.attack,  p.core.attack,  CORE_UP, CORE_MAX);
+    updateUpButton("defense", CORE_LABELS.defense, p.core.defense, CORE_UP, CORE_MAX);
+    updateUpButton("stamina", CORE_LABELS.stamina, p.core.stamina, CORE_UP, CORE_MAX);
+    updateUpButton("weight",  CORE_LABELS.weight,  p.core.weight,  CORE_UP, CORE_MAX);
+    updateUpButton("spin",    CORE_LABELS.spin,    p.core.spin,    CORE_UP, CORE_MAX);
+    updateUpButton("bounce",  "バウンド",          p.bounce,       BOUNCE_UP, BOUNCE_MAX);
+
+    $("rerollBtn").innerHTML = `ランダム生成で新しいコマにする<small>パラメータ再抽選（強化なし）</small>`;
+    choiceOverlay.classList.add("active");
+  }
+  function updateUpButton(key, label, current, up, max) {
+    const btn = document.querySelector(`.upBtn[data-up="${key}"]`);
+    const next = Math.min(max, current + up);
+    const isMax = current >= max;
+    btn.disabled = isMax;
+    btn.innerHTML = `${label} +${up}<small>${current} → ${next}${isMax ? "（MAX）" : ""}</small>`;
+  }
+  function closeChoice() { choiceOverlay.classList.remove("active"); }
+
+  document.querySelectorAll(".upBtn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const key = btn.dataset.up;
+      const p = state.player;
+      if (key === "bounce") {
+        p.bounce = Math.min(BOUNCE_MAX, p.bounce + BOUNCE_UP);
+        p.stats.bounce = p.bounce;
+      } else {
+        p.core[key] = Math.min(CORE_MAX, p.core[key] + CORE_UP);
+        p.stats[key] = p.core[key];
+        if (key === "weight") p.mass = 0.6 + p.core.weight * 0.08;
+      }
+      closeChoice();
+      nextEnemy();
+    });
+  });
+
+  $("rerollBtn").addEventListener("click", () => {
+    closeChoice();
+    state.player = makeKom(null);
+    nextEnemy();
+  });
+
+  function nextEnemy() {
+    state.enemy = makeKom(null);
+    resetPositions();
+    updatePanels();
+    state.phase = "idle";
+    spinBtn.disabled = false;
+    spinBtn.textContent = "スタート";
+    speedGroup.classList.remove("active");
+    gravityPanel.classList.remove("active");
+    resetSpeed();
+    resetGravity();
+    state.sparks = [];
+    state.bolts = [];
+    timerBadge.textContent = MAX_BATTLE_TIME.toFixed(1) + "s";
+    showCenter("NEXT BATTLE", 800);
+  }
+
+  function resetPositions() {
+    const rr = arena.r*0.6;
+    if (state.player) { state.player.x = arena.cx - rr; state.player.y = arena.cy; state.player.angle=0; }
+    if (state.enemy)  { state.enemy.x  = arena.cx + rr; state.enemy.y  = arena.cy; state.enemy.angle=Math.PI; }
+  }
+
+  // ===================== 結果 =====================
+  function showResult(isWin) {
+    resultOverlay.classList.add("active");
+    resultTitle.textContent = isWin ? "WIN" : "GAME OVER";
+    resultTitle.className = isWin ? "win" : "lose";
+    resultMsg.textContent = isWin ? "5連勝達成！" : "連勝は " + state.streak + " でストップ…";
+  }
+  $("resultBtn").addEventListener("click", () => {
+    resultOverlay.classList.remove("active");
+    backToOpening();
+  });
+
+  function backToOpening() {
+    state.player=null; state.enemy=null; state.streak=0;
+    state.phase="idle";
+    speedGroup.classList.remove("active");
+    gravityPanel.classList.remove("active");
+    resetSpeed();
+    resetGravity();
+    state.sparks = [];
+    state.bolts = [];
+    gameEl.classList.remove("active");
+    opening.style.display = "flex";
+  }
+
+  // ===================== 開始 =====================
+  function startGame() {
+    opening.style.display = "none";
+    gameEl.classList.add("active");
+    state.streak = 0;
+    state.player = makeKom(null);
+    state.enemy = makeKom(null);
+    resize();
+    resetPositions();
+    updatePanels();
+    state.phase = "idle";
+    spinBtn.disabled = false;
+    spinBtn.textContent = "スタート";
+    speedGroup.classList.remove("active");
+    gravityPanel.classList.remove("active");
+    resetSpeed();
+    resetGravity();
+    state.sparks = [];
+    state.bolts = [];
+    timerBadge.textContent = MAX_BATTLE_TIME.toFixed(1) + "s";
+  }
+
+  $("startBtn").addEventListener("click", startGame);
+  spinBtn.addEventListener("click", () => {
+    if (state.phase === "idle" || state.phase === "ended") {
+      state.phase = "idle";
+      startSpin();
+    }
+  });
+  window.addEventListener("resize", () => { if (gameEl.classList.contains("active")) resize(); });
+
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
