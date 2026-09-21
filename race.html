@@ -81,6 +81,32 @@
   }
   #lapInfo span { color: #0af; font-weight: bold; }
 
+  /* アクセル/ブレーキボタン（自分のみ） */
+  #pedals {
+    position: absolute; bottom: 24px; right: 24px; z-index: 55;
+    display: none; flex-direction: column; gap: 12px; align-items: center;
+  }
+  .pedal-btn {
+    width: 110px; padding: 14px 0; font-size: 18px; font-weight: bold;
+    border: 3px solid; border-radius: 12px; cursor: pointer; user-select: none;
+    letter-spacing: 3px; transition: all 0.1s; text-align: center;
+  }
+  #accelBtn { border-color: #0f0; color: #0f0; background: rgba(0,40,0,0.75); }
+  #accelBtn.active { background: #0f0; color: #001; box-shadow: 0 0 25px #0f0; }
+  #brakeBtn { border-color: #f33; color: #f33; background: rgba(40,0,0,0.75); }
+  #brakeBtn.active { background: #f33; color: #001; box-shadow: 0 0 25px #f33; }
+
+  /* アクセルゲージ */
+  #accelGauge {
+    width: 110px; height: 14px; border: 2px solid #0f0; border-radius: 7px;
+    background: rgba(0,0,0,0.6); overflow: hidden; margin-bottom: 4px;
+  }
+  #accelFill {
+    height: 100%; width: 0%; background: linear-gradient(90deg, #0a0, #0f0, #afa);
+    transition: width 0.05s linear;
+  }
+  #accelLabel { color: #0f0; font-size: 11px; letter-spacing: 2px; margin-bottom: 2px; }
+
   #countdown {
     position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
     z-index: 60; pointer-events: none;
@@ -103,6 +129,49 @@
     background: transparent; color: #ffd700; cursor: pointer; transition: all 0.2s; letter-spacing: 4px;
   }
   #victory .go-btn:hover { background: #ffd700; color: #000; box-shadow: 0 0 40px #ffd700; }
+
+  /* リザルト画面 */
+  #result {
+    position: absolute; inset: 0; display: none; flex-direction: column;
+    z-index: 300; background: rgba(10,10,25,0.97); color: #fff;
+    overflow-y: auto; padding: 40px 20px 80px;
+  }
+  #result h2 {
+    font-size: 44px; color: #0af; text-align: center; margin-bottom: 8px;
+    letter-spacing: 6px; text-shadow: 0 0 20px #0af;
+  }
+  #result .subtitle { text-align: center; font-size: 18px; color: #aaa; margin-bottom: 30px; }
+  #resultTable {
+    max-width: 900px; margin: 0 auto; width: 100%;
+    border-collapse: collapse; font-size: 15px;
+  }
+  #resultTable th, #resultTable td {
+    padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.12);
+    text-align: center;
+  }
+  #resultTable th {
+    background: rgba(0,170,255,0.2); color: #0af; font-weight: bold;
+    letter-spacing: 1px; position: sticky; top: 0;
+  }
+  #resultTable tr.me { background: rgba(255,255,255,0.12); font-weight: bold; }
+  #resultTable tr.winner td { color: #ffd700; }
+  .res-dot { display: inline-block; width: 18px; height: 18px; border-radius: 50%; vertical-align: middle; border: 1px solid rgba(255,255,255,0.3); }
+  .stat-bar-wrap { display: inline-block; width: 90px; height: 12px; background: rgba(255,255,255,0.1); border-radius: 6px; overflow: hidden; vertical-align: middle; }
+  .stat-bar { height: 100%; background: linear-gradient(90deg, #0af, #0ff); }
+  .stat-val { display: inline-block; width: 30px; text-align: right; margin-left: 4px; font-variant-numeric: tabular-nums; }
+  #result .total-cell { color: #ffd700; font-weight: bold; }
+  #result .btn-row { text-align: center; margin-top: 36px; }
+  #result .again-btn {
+    padding: 14px 40px; font-size: 20px; border: 2px solid #0af; border-radius: 8px;
+    background: transparent; color: #0af; cursor: pointer; letter-spacing: 3px; transition: all 0.2s;
+  }
+  #result .again-btn:hover { background: #0af; color: #001; box-shadow: 0 0 25px #0af; }
+  #result footer {
+    text-align: center; margin-top: 30px; padding-top: 20px;
+    border-top: 1px solid rgba(255,255,255,0.15); color: #888; font-size: 14px;
+  }
+  #result footer a { color: #0af; text-decoration: none; border-bottom: 1px dotted #0af; }
+  #result footer a:hover { color: #0ff; }
 </style>
 </head>
 <body>
@@ -115,6 +184,14 @@
   </div>
 
   <div id="lapInfo">LAP <span id="lapNum">1</span> / 3</div>
+
+  <!-- アクセル・ブレーキ（自分のみ） -->
+  <div id="pedals">
+    <div id="accelLabel">ACCEL</div>
+    <div id="accelGauge"><div id="accelFill"></div></div>
+    <div class="pedal-btn" id="accelBtn">アクセル</div>
+    <div class="pedal-btn" id="brakeBtn">ブレーキ</div>
+  </div>
 
   <div id="countdown"><span id="cdText">3</span></div>
 
@@ -160,11 +237,30 @@
     </div>
   </div>
 
-  <!-- 勝利 -->
+  <!-- 勝利演出 -->
   <div id="victory">
     <h2>VICTORY!</h2>
     <p>1位でゴールしました！</p>
-    <button class="go-btn" id="btnStudy">study.html へ</button>
+  </div>
+
+  <!-- リザルト -->
+  <div id="result">
+    <h2 id="resultTitle">RESULT</h2>
+    <div class="subtitle" id="resultSub">全員のステータス公開</div>
+    <table id="resultTable">
+      <thead>
+        <tr>
+          <th>順位</th><th>色</th><th>スピード</th><th>アクセル</th><th>コーナー</th><th>合計</th>
+        </tr>
+      </thead>
+      <tbody id="resultBody"></tbody>
+    </table>
+    <div class="btn-row">
+      <button class="again-btn" id="btnAgain">もう一度</button>
+    </div>
+    <footer>
+      つぎはこちら → <a href="study.html">study.html</a>
+    </footer>
   </div>
 </div>
 
@@ -194,7 +290,7 @@ const BALL_R = 14;
 
 // ============ 状態 ============
 let state = {
-  myColorIdx: 4,      // デフォ青
+  myColorIdx: 4,
   courseIdx: 0,
   design: 'simple',
   running: false,
@@ -205,7 +301,10 @@ let state = {
   lastTime: 0,
   racers: [],
   camX: 0, camY: 0,
-  particles: []
+  particles: [],
+  accelInput: false,   // アクセル押下中
+  accelCharge: 0,      // 0.0～1.0 長押しで溜まる
+  brakeInput: false    // ブレーキ押下中
 };
 
 // ============ キャンバス ============
@@ -221,23 +320,40 @@ window.addEventListener('resize', resize);
 
 // ============ 入力 ============
 const keys = {};
-let mouseDown = false, mouseHold = false, holdTimer = 0;
-const HOLD_THRESHOLD = 0.25; // 秒
 
-window.addEventListener('keydown', e=>{ keys[e.key]=true; if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault(); });
+window.addEventListener('keydown', e=>{
+  keys[e.key]=true;
+  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
+});
 window.addEventListener('keyup', e=>{ keys[e.key]=false; });
 
-cv.addEventListener('mousedown', e=>{ mouseDown=true; holdTimer=0; });
-cv.addEventListener('mouseup', e=>{ mouseDown=false; mouseHold=false; });
-cv.addEventListener('mouseleave', e=>{ mouseDown=false; mouseHold=false; });
-cv.addEventListener('contextmenu', e=>e.preventDefault());
+// アクセル・ブレーキボタン
+const accelBtn = document.getElementById('accelBtn');
+const brakeBtn = document.getElementById('brakeBtn');
+
+function bindPedal(btn, onDown, onUp){
+  const down = (e)=>{ e.preventDefault(); btn.classList.add('active'); onDown(); };
+  const up = (e)=>{ e.preventDefault(); btn.classList.remove('active'); onUp(); };
+  btn.addEventListener('mousedown', down);
+  btn.addEventListener('mouseup', up);
+  btn.addEventListener('mouseleave', up);
+  btn.addEventListener('touchstart', down, {passive:false});
+  btn.addEventListener('touchend', up);
+  btn.addEventListener('touchcancel', up);
+}
+bindPedal(accelBtn,
+  ()=>{ state.accelInput = true; },
+  ()=>{ state.accelInput = false; state.accelCharge = 0; }
+);
+bindPedal(brakeBtn,
+  ()=>{ state.brakeInput = true; },
+  ()=>{ state.brakeInput = false; }
+);
 
 // ============ コース定義 ============
-// 各コース: 中心線のパスを点列で定義、幅を持つ
 function makeCourse(idx){
   const pts = [];
   if(idx===0){
-    // 競馬場: 楕円（シンプル）
     const cx=900, cy=600, rx=700, ry=380;
     for(let i=0;i<120;i++){
       const a = i/120*Math.PI*2;
@@ -245,7 +361,6 @@ function makeCourse(idx){
     }
     return { pts, width: 160, name:'競馬場' };
   } else if(idx===1){
-    // サーキット: 複雑な閉曲線
     const cx=900, cy=600;
     for(let i=0;i<200;i++){
       const a = i/200*Math.PI*2;
@@ -254,7 +369,6 @@ function makeCourse(idx){
     }
     return { pts, width: 130, name:'サーキット' };
   } else {
-    // ワインディング: もっと複雑
     const cx=900, cy=600;
     for(let i=0;i<240;i++){
       const a = i/240*Math.PI*2;
@@ -265,29 +379,41 @@ function makeCourse(idx){
   }
 }
 
-// コース上の最近傍点を探す（進行度計算用）
 function nearestOnPath(course, x, y, hintIdx){
   const pts = course.pts;
   const n = pts.length;
   let best = hintIdx||0, bestD = Infinity;
-  const range = hintIdx!==undefined ? 40 : n;
-  const start = hintIdx!==undefined ? Math.max(0, hintIdx-20) : 0;
-  for(let k=0;k<(hintIdx!==undefined?range:n);k++){
-    const i = (start+k)%n;
-    const p = pts[i];
-    const d = (p.x-x)*(p.x-x)+(p.y-y)*(p.y-y);
-    if(d<bestD){ bestD=d; best=i; }
+  if(hintIdx!==undefined){
+    const start = Math.max(0, hintIdx-25);
+    const end = Math.min(n-1, hintIdx+25);
+    for(let i=start;i<=end;i++){
+      const p = pts[i];
+      const d = (p.x-x)*(p.x-x)+(p.y-y)*(p.y-y);
+      if(d<bestD){ bestD=d; best=i; }
+    }
+    // 念のため全周もチェック（外れた場合用）
+    if(bestD > 500*500){
+      for(let i=0;i<n;i++){
+        const p = pts[i];
+        const d = (p.x-x)*(p.x-x)+(p.y-y)*(p.y-y);
+        if(d<bestD){ bestD=d; best=i; }
+      }
+    }
+  } else {
+    for(let i=0;i<n;i++){
+      const p = pts[i];
+      const d = (p.x-x)*(p.x-x)+(p.y-y)*(p.y-y);
+      if(d<bestD){ bestD=d; best=i; }
+    }
   }
   return best;
 }
 
-// コースの壁との衝突判定・押し戻し
 function collideWalls(course, ball){
   const pts = course.pts;
   const n = pts.length;
   const idx = nearestOnPath(course, ball.x, ball.y, ball.pathIdx);
   ball.pathIdx = idx;
-  // セグメント上の最近点を求める
   const p0 = pts[idx];
   const p1 = pts[(idx+1)%n];
   const dx = p1.x-p0.x, dy = p1.y-p0.y;
@@ -303,7 +429,6 @@ function collideWalls(course, ball){
     const push = dist - halfW;
     ball.x -= ux*push;
     ball.y -= uy*push;
-    // 速度の法線成分を反射
     const vn = ball.vx*ux + ball.vy*uy;
     if(vn>0){
       ball.vx -= (1.6)*vn*ux;
@@ -316,7 +441,6 @@ function collideWalls(course, ball){
 function makeRacers(){
   const course = makeCourse(state.courseIdx);
   const n = course.pts.length;
-  // スタート位置: コースの最初の方、横並び
   const startIdx = 5;
   const sp = course.pts[startIdx];
   const sp2 = course.pts[(startIdx+3)%n];
@@ -326,38 +450,23 @@ function makeRacers(){
   const px = -fy, py = fx;
 
   const racers = [];
-  // ステータス生成: 合計値のずれ最大10、40〜50の範囲だが39と50はダメ
-  const baseStats = [];
+  const statsList = [];
   for(let i=0;i<TOTAL_RACERS;i++){
-    baseStats.push({
+    statsList.push({
       speed: 40 + Math.floor(Math.random()*11),
       accel: 40 + Math.floor(Math.random()*11),
       turn: 40 + Math.floor(Math.random()*11)
     });
   }
-  // 合計のずれを10以内に調整
-  let sum = baseStats.reduce((a,b)=>a+b.speed+b.accel+b.turn, 0);
-  let target = 135*TOTAL_RACERS; // 平均45*3
-  // 各ステータスを40-50に収める（39,50の禁止: 40-50は許可、ただし39と50はダメ→40〜50OK? 問題文「40と50はいてもよいけど、39と50は存在してはならない」→40〜50OK）
-  // 再解釈: 40〜50の範囲でOK
-  for(let i=0;i<TOTAL_RACERS;i++){
-    for(const k of ['speed','accel','turn']){
-      baseStats[i][k] = 40 + Math.floor(Math.random()*11);
-    }
-  }
 
-  // 私の色インデックス
   const myIdx = state.myColorIdx;
-  // 色の割り当て: 私の色以外を順に
   const colorOrder = [];
   for(let i=0;i<COLORS.length;i++) colorOrder.push(i);
-  // 私の色を最初に
   const orderedColors = [myIdx, ...colorOrder.filter(i=>i!==myIdx)];
 
   for(let i=0;i<TOTAL_RACERS;i++){
     const colIdx = orderedColors[i];
     const isMe = (i===0);
-    // グリッド配置
     const row = Math.floor(i/3);
     const col = i%3;
     const offX = (col-1)*70;
@@ -365,7 +474,7 @@ function makeRacers(){
     const x = sp.x + px*offX + fx*(-offY) + (Math.random()-0.5)*10;
     const y = sp.y + py*offX + fy*(-offY) + (Math.random()-0.5)*10;
 
-    const st = baseStats[i];
+    const st = statsList[i];
     racers.push({
       colorIdx: colIdx,
       color: COLORS[colIdx],
@@ -374,16 +483,17 @@ function makeRacers(){
       vx: 0, vy: 0,
       angle: Math.atan2(fy, fx),
       pathIdx: startIdx,
+      prevPathIdx: startIdx,
       lap: 0,
       progress: 0,
-      prevPathIdx: startIdx,
       finished: false,
       finishTime: 0,
       rank: i+1,
       speed: st.speed,
       accel: st.accel,
       turn: st.turn,
-      skill: 0.5 + Math.random()*0.5
+      skill: 0.5 + Math.random()*0.5,
+      startX: x, startY: y
     });
   }
   return racers;
@@ -395,7 +505,6 @@ function update(dt){
   const course = makeCourse(state.courseIdx);
   const n = course.pts.length;
 
-  // カウントダウン
   if(!state.raceStarted){
     state.countdownTimer += dt;
     if(state.countdownTimer >= 1){
@@ -411,28 +520,25 @@ function update(dt){
     return;
   }
 
-  // 入力処理
+  // 入力
   let inputX=0, inputY=0;
   if(keys['ArrowLeft']||keys['a']||keys['A']) inputX-=1;
   if(keys['ArrowRight']||keys['d']||keys['D']) inputX+=1;
   if(keys['ArrowUp']||keys['w']||keys['W']) inputY-=1;
   if(keys['ArrowDown']||keys['s']||keys['S']) inputY+=1;
 
-  // マウス: クリックで加速、長押しでさらに加速
-  let mouseBoost = 0;
-  if(mouseDown){
-    holdTimer += dt;
-    if(holdTimer > HOLD_THRESHOLD){ mouseHold=true; }
-    mouseBoost = mouseHold ? 1.0 : 0.5;
+  // アクセルチャージ
+  if(state.accelInput){
+    state.accelCharge = Math.min(1.0, state.accelCharge + dt*0.8);
   } else {
-    holdTimer = 0;
-    mouseHold = false;
+    state.accelCharge = 0;
   }
+  const accelFill = document.getElementById('accelFill');
+  if(accelFill) accelFill.style.width = (state.accelCharge*100)+'%';
 
   // 自分のキャラ
   const me = state.racers.find(r=>r.isMe);
   if(me && !me.finished){
-    // コース方向への加速
     const pts = course.pts;
     const nextIdx = (me.pathIdx+6)%n;
     const target = pts[nextIdx];
@@ -440,23 +546,31 @@ function update(dt){
     const dl = Math.sqrt(dx*dx+dy*dy)||1;
     const tx = dx/dl, ty = dy/dl;
 
-    // 入力方向をコース進行方向に合成
-    let ax = tx*0.6 + inputX*0.5;
-    let ay = ty*0.6 + inputY*0.5;
-    const al = Math.sqrt(ax*ax+ay*ay)||1;
-    ax/=al; ay/=al;
+    // アクセルを押していないと動かない
+    if(state.accelInput){
+      let ax = tx*0.6 + inputX*0.5;
+      let ay = ty*0.6 + inputY*0.5;
+      const al = Math.sqrt(ax*ax+ay*ay)||1;
+      ax/=al; ay/=al;
 
-    const accelPower = (me.accel/50) * 900 * (1 + mouseBoost*0.8);
-    me.vx += ax*accelPower*dt;
-    me.vy += ay*accelPower*dt;
+      // クリック: 即時加速, 長押しチャージ: MAXまで
+      const chargeMul = 0.4 + state.accelCharge * 1.6;
+      const accelPower = (me.accel/50) * 900 * chargeMul;
+      me.vx += ax*accelPower*dt;
+      me.vy += ay*accelPower*dt;
+    }
 
-    // 摩擦
-    const friction = 0.985;
+    // ブレーキ
+    if(state.brakeInput){
+      me.vx *= 0.94;
+      me.vy *= 0.94;
+    }
+
+    const friction = state.accelInput ? 0.985 : 0.94; // アクセル離すと減速
     me.vx *= friction;
     me.vy *= friction;
 
-    // 最高速度
-    const maxSp = (me.speed/50) * 520 * (1 + mouseBoost*0.4);
+    const maxSp = (me.speed/50) * 520 * (0.6 + state.accelCharge*0.6);
     const sp = Math.sqrt(me.vx*me.vx+me.vy*me.vy);
     if(sp>maxSp){ me.vx = me.vx/sp*maxSp; me.vy = me.vy/sp*maxSp; }
 
@@ -472,8 +586,6 @@ function update(dt){
     const dx = target.x-r.x, dy = target.y-r.y;
     const dl = Math.sqrt(dx*dx+dy*dy)||1;
     let ax = dx/dl, ay = dy/dl;
-
-    // 少しランダム
     ax += (Math.random()-0.5)*0.3;
     ay += (Math.random()-0.5)*0.3;
     const al = Math.sqrt(ax*ax+ay*ay)||1;
@@ -491,20 +603,18 @@ function update(dt){
     r.angle = Math.atan2(r.vy, r.vx);
   }
 
-  // 位置更新
   for(const r of state.racers){
     if(r.finished) continue;
     r.x += r.vx*dt;
     r.y += r.vy*dt;
   }
 
-  // 壁衝突
   for(const r of state.racers){
     if(r.finished) continue;
     collideWalls(course, r);
   }
 
-  // ボール同士の衝突（サッカー押し合い）
+  // ボール同士の衝突
   for(let i=0;i<state.racers.length;i++){
     const a = state.racers[i];
     if(a.finished) continue;
@@ -520,7 +630,6 @@ function update(dt){
         const push = overlap * 0.5;
         a.x -= ux*push; a.y -= uy*push;
         b.x += ux*push; b.y += uy*push;
-        // 相対速度
         const rvx = b.vx-a.vx, rvy = b.vy-a.vy;
         const vn = rvx*ux + rvy*uy;
         if(vn < 0){
@@ -536,24 +645,24 @@ function update(dt){
   for(const r of state.racers){
     if(r.finished) continue;
     const newIdx = nearestOnPath(course, r.x, r.y, r.pathIdx);
-    // ラップ判定: スタート地点付近を通過
     const prev = r.pathIdx;
     r.pathIdx = newIdx;
     const diff = newIdx - prev;
-    if(diff < -n/2){
-      // 前進でラップ
+    // 前進でラップ: 進行度が大きく戻った（境界越え）
+    if(diff < -n*0.5){
       r.lap++;
       if(r.lap >= TOTAL_LAPS){
         r.finished = true;
         r.finishTime = performance.now();
       }
-    } else if(diff > n/2){
-      r.lap--;
+    } else if(diff > n*0.5){
+      // 後退でラップ取り消し
+      if(r.lap > 0) r.lap--;
     }
     r.progress = r.lap*n + newIdx;
   }
 
-  // 順位計算
+  // 順位
   const sorted = state.racers.slice().sort((a,b)=>{
     if(a.finished && b.finished) return a.finishTime-b.finishTime;
     if(a.finished) return -1;
@@ -562,31 +671,34 @@ function update(dt){
   });
   sorted.forEach((r,i)=> r.rank = i+1);
 
-  // ゴール判定
+  // カメラ
+  const me3 = state.racers.find(r=>r.isMe);
+  if(me3){
+    state.camX += (me3.x - state.camX) * 0.08;
+    state.camY += (me3.y - state.camY) * 0.08;
+  }
+
+  // 自分のゴール判定
   if(!state.finished){
     const me2 = state.racers.find(r=>r.isMe);
     if(me2 && me2.finished){
       state.finished = true;
       state.running = false;
       if(me2.rank === 1){
+        // 勝利演出
         document.getElementById('victory').style.display = 'flex';
+        setTimeout(()=>{
+          document.getElementById('victory').style.display = 'none';
+          showResult(true);
+        }, 1800);
       } else {
-        // 負け: リザルト表示なし、そのまま
-        setTimeout(()=>{ document.getElementById('victory').style.display='flex'; }, 100);
+        showResult(false);
       }
-    }
-    // 全員ゴール？
-    if(state.racers.every(r=>r.finished)){
+    } else if(state.racers.every(r=>r.finished)){
       state.finished = true;
       state.running = false;
+      showResult(false);
     }
-  }
-
-  // カメラ
-  const me3 = state.racers.find(r=>r.isMe);
-  if(me3){
-    state.camX += (me3.x - state.camX) * 0.08;
-    state.camY += (me3.y - state.camY) * 0.08;
   }
 
   updateHUD();
@@ -602,7 +714,6 @@ function updateHUD(){
   });
   let html = '';
   for(const r of sorted){
-    const numColor = r.color.num;
     html += `<div class="rank-row${r.isMe?' me':''}">
       <span class="rank-pos">${r.rank}</span>
       <span class="rank-dot" style="background:${r.color.hex}"></span>
@@ -620,24 +731,21 @@ function draw(){
   ctx.setTransform(dpr,0,0,dpr,0,0);
   const w = W/dpr, h = H/dpr;
 
-  // 背景
   drawBackground(w, h);
 
   if(!state.running && !state.finished) return;
+  if(state.racers.length===0) return;
 
   const course = makeCourse(state.courseIdx);
 
   ctx.save();
-  // カメラ変換
   const camScale = 0.9;
   ctx.translate(w/2, h/2);
   ctx.scale(camScale, camScale);
   ctx.translate(-state.camX, -state.camY);
 
-  // コース描画
   drawCourse(course);
 
-  // パーティクル
   for(let i=state.particles.length-1;i>=0;i--){
     const p = state.particles[i];
     p.x += p.vx; p.y += p.vy; p.life -= 0.02;
@@ -650,7 +758,6 @@ function draw(){
   }
   ctx.globalAlpha = 1;
 
-  // レーサー描画（自分の後ろから）
   const sorted = state.racers.slice().sort((a,b)=>{
     if(a.isMe) return 1;
     if(b.isMe) return -1;
@@ -668,7 +775,6 @@ function drawBackground(w, h){
   if(d==='simple'){
     ctx.fillStyle = '#1a1a2e';
     ctx.fillRect(0,0,w,h);
-    // グリッド
     ctx.strokeStyle = 'rgba(255,255,255,0.05)';
     ctx.lineWidth = 1;
     const gs = 60;
@@ -677,28 +783,24 @@ function drawBackground(w, h){
     for(let x=ox;x<w;x+=gs){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke(); }
     for(let y=oy;y<h;y+=gs){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke(); }
   } else if(d==='magazine'){
-    // 雑誌風: ポップな色
     const g = ctx.createLinearGradient(0,0,w,h);
     g.addColorStop(0,'#ff6b9d');
     g.addColorStop(0.5,'#ffd93d');
     g.addColorStop(1,'#6bcbff');
     ctx.fillStyle = g;
     ctx.fillRect(0,0,w,h);
-    // ドット
     ctx.fillStyle = 'rgba(255,255,255,0.3)';
     for(let i=0;i<80;i++){
       const x = (i*137.5)%w, y=(i*89.3)%h;
       ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2); ctx.fill();
     }
   } else if(d==='ukiyoe'){
-    // 浮世絵風: 和風
     const g = ctx.createLinearGradient(0,0,0,h);
     g.addColorStop(0,'#1a3a5c');
     g.addColorStop(0.5,'#2a5a8c');
     g.addColorStop(1,'#0f2a4a');
     ctx.fillStyle = g;
     ctx.fillRect(0,0,w,h);
-    // 波模様
     ctx.strokeStyle = 'rgba(200,220,255,0.15)';
     ctx.lineWidth = 2;
     for(let i=0;i<10;i++){
@@ -710,10 +812,8 @@ function drawBackground(w, h){
       ctx.stroke();
     }
   } else if(d==='cyber'){
-    // サイバーゲーム風
     ctx.fillStyle = '#050510';
     ctx.fillRect(0,0,w,h);
-    // ネオンライン
     ctx.strokeStyle = 'rgba(0,255,255,0.15)';
     ctx.lineWidth = 1;
     const gs = 50;
@@ -721,7 +821,6 @@ function drawBackground(w, h){
     const oy = (-state.camY*0.5)%gs;
     for(let x=ox;x<w;x+=gs){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke(); }
     for(let y=oy;y<h;y+=gs){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke(); }
-    // スキャンライン
     ctx.fillStyle = 'rgba(0,255,255,0.03)';
     for(let y=0;y<h;y+=4){ ctx.fillRect(0,y,w,2); }
   }
@@ -732,13 +831,10 @@ function drawCourse(course){
   const n = pts.length;
   const d = state.design;
 
-  // コース路面
   ctx.save();
   ctx.beginPath();
-  // 外側
   for(let i=0;i<=n;i++){
     const p = pts[i%n];
-    // 法線方向に幅/2オフセット（簡易: 前後点から）
     const p2 = pts[(i+1)%n];
     const dx = p2.x-p.x, dy = p2.y-p.y;
     const dl = Math.sqrt(dx*dx+dy*dy)||1;
@@ -763,13 +859,10 @@ function drawCourse(course){
   else if(d==='cyber'){ roadColor='#0a1a2a'; lineColor='#0ff'; }
   ctx.fillStyle = roadColor;
   ctx.fill();
-
-  // 縁
   ctx.strokeStyle = lineColor;
   ctx.lineWidth = 4;
   ctx.stroke();
 
-  // センターライン
   ctx.beginPath();
   for(let i=0;i<n;i++){
     const p = pts[i];
@@ -794,7 +887,6 @@ function drawCourse(course){
   ctx.strokeStyle = '#fff';
   ctx.lineWidth = 6;
   ctx.stroke();
-  // チェッカー
   ctx.strokeStyle = '#000';
   ctx.lineWidth = 6;
   ctx.setLineDash([8,8]);
@@ -808,13 +900,11 @@ function drawRacer(r){
   ctx.save();
   ctx.translate(r.x, r.y);
 
-  // 影
   ctx.beginPath();
   ctx.arc(2, 3, BALL_R, 0, Math.PI*2);
   ctx.fillStyle = 'rgba(0,0,0,0.3)';
   ctx.fill();
 
-  // 本体
   ctx.beginPath();
   ctx.arc(0, 0, BALL_R, 0, Math.PI*2);
   ctx.fillStyle = r.color.hex;
@@ -823,20 +913,17 @@ function drawRacer(r){
   ctx.lineWidth = r.isMe ? 3 : 1.5;
   ctx.stroke();
 
-  // ハイライト
   ctx.beginPath();
   ctx.arc(-4, -5, BALL_R*0.35, 0, Math.PI*2);
   ctx.fillStyle = 'rgba(255,255,255,0.35)';
   ctx.fill();
 
-  // 順位数字
   ctx.fillStyle = r.color.num;
   ctx.font = `bold ${BALL_R*1.1}px Arial`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(r.rank, 0, 1);
 
-  // 俺マーカー
   if(r.isMe){
     ctx.beginPath();
     ctx.arc(0, 0, BALL_R+5, 0, Math.PI*2);
@@ -888,6 +975,51 @@ function updateDesignButtons(){
   });
 }
 
+// ============ リザルト ============
+function showResult(isWin){
+  const title = document.getElementById('resultTitle');
+  const sub = document.getElementById('resultSub');
+  if(isWin){
+    title.textContent = '🏆 VICTORY! 🏆';
+    title.style.color = '#ffd700';
+    title.style.textShadow = '0 0 30px #ffd700';
+    sub.textContent = '1位でゴール！全員のステータス公開';
+  } else {
+    title.textContent = 'RESULT';
+    title.style.color = '#0af';
+    title.style.textShadow = '0 0 20px #0af';
+    sub.textContent = 'レース終了！全員のステータス公開';
+  }
+
+  const sorted = state.racers.slice().sort((a,b)=>{
+    if(a.finished && b.finished) return a.finishTime-b.finishTime;
+    if(a.finished) return -1;
+    if(b.finished) return 1;
+    return b.progress - a.progress;
+  });
+
+  const tbody = document.getElementById('resultBody');
+  let html = '';
+  sorted.forEach((r)=>{
+    const total = r.speed + r.accel + r.turn;
+    const cls = (r.isMe?'me ':'') + (r.rank===1?'winner':'');
+    html += `<tr class="${cls}">
+      <td>${r.rank}位</td>
+      <td><span class="res-dot" style="background:${r.color.hex}"></span> ${r.color.name}${r.isMe?' (俺)':''}</td>
+      <td><div class="stat-bar-wrap"><div class="stat-bar" style="width:${r.speed/50*100}%"></div></div><span class="stat-val">${r.speed}</span></td>
+      <td><div class="stat-bar-wrap"><div class="stat-bar" style="width:${r.accel/50*100}%"></div></div><span class="stat-val">${r.accel}</span></td>
+      <td><div class="stat-bar-wrap"><div class="stat-bar" style="width:${r.turn/50*100}%"></div></div><span class="stat-val">${r.turn}</span></td>
+      <td class="total-cell">${total}</td>
+    </tr>`;
+  });
+  tbody.innerHTML = html;
+
+  document.getElementById('result').style.display = 'flex';
+  document.getElementById('hud').style.display = 'none';
+  document.getElementById('lapInfo').style.display = 'none';
+  document.getElementById('pedals').style.display = 'none';
+}
+
 // ============ イベント ============
 document.getElementById('btnStart').addEventListener('click', ()=>{
   document.getElementById('opening').style.display = 'none';
@@ -901,30 +1033,18 @@ document.getElementById('btnBack').addEventListener('click', ()=>{
   document.getElementById('settings').style.display = 'none';
   document.getElementById('opening').style.display = 'flex';
 });
-document.getElementById('btnStudy').addEventListener('click', ()=>{
-  window.location.href = 'study.html';
+document.getElementById('btnAgain').addEventListener('click', ()=>{
+  document.getElementById('result').style.display = 'none';
+  document.getElementById('opening').style.display = 'flex';
+  state.finished = false;
+  state.running = false;
+  state.racers = [];
 });
 
 document.querySelectorAll('.course-btn').forEach(b=>{
   b.addEventListener('click', ()=>{
-    const newIdx = parseInt(b.dataset.course);
-    // コース変更時にデザイン選択を促す
-    if(newIdx !== 0){ // 0以外のコース選択時
-      const wantDesign = confirm('デザインを変更しますか？\n（雑誌風・浮世絵風・サイバーゲーム風が選べます）');
-      if(wantDesign){
-        // デザイン選択を表示（すでにあるのでそのまま）
-        state.courseIdx = newIdx;
-        updateCourseButtons();
-        return;
-      }
-    }
-    state.courseIdx = newIdx;
+    state.courseIdx = parseInt(b.dataset.course);
     updateCourseButtons();
-    // コース0選択時はシンプルに戻す
-    if(newIdx===0){
-      state.design = 'simple';
-      updateDesignButtons();
-    }
   });
 });
 document.querySelectorAll('.design-btn').forEach(b=>{
@@ -942,15 +1062,24 @@ function startRace(){
   state.raceStarted = false;
   state.countdown = 3;
   state.countdownTimer = 0;
+  state.accelInput = false;
+  state.accelCharge = 0;
+  state.brakeInput = false;
   state.camX = state.racers[0].x;
   state.camY = state.racers[0].y;
   state.particles = [];
 
   document.getElementById('hud').style.display = 'block';
   document.getElementById('lapInfo').style.display = 'block';
+  document.getElementById('pedals').style.display = 'flex';
   document.getElementById('countdown').style.display = 'flex';
   document.getElementById('cdText').textContent = '3';
   document.getElementById('victory').style.display = 'none';
+  document.getElementById('result').style.display = 'none';
+  document.getElementById('accelFill').style.width = '0%';
+
+  accelBtn.classList.remove('active');
+  brakeBtn.classList.remove('active');
 
   updateHUD();
   state.lastTime = performance.now();
