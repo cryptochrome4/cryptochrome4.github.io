@@ -156,6 +156,7 @@
   .res-dot { display: inline-block; width: 18px; height: 18px; border-radius: 50%; vertical-align: middle; border: 1px solid rgba(255,255,255,0.3); }
   .stat-bar-wrap { display: inline-block; width: 90px; height: 12px; background: rgba(255,255,255,0.1); border-radius: 6px; overflow: hidden; vertical-align: middle; }
   .stat-bar { height: 100%; background: linear-gradient(90deg, #0af, #0ff); }
+  .stat-bar.me-bar { background: linear-gradient(90deg, #ff6, #fa0); }
   .stat-val { display: inline-block; width: 30px; text-align: right; margin-left: 4px; font-variant-numeric: tabular-nums; }
   #result .total-cell { color: #ffd700; font-weight: bold; }
   #result .btn-row { text-align: center; margin-top: 36px; }
@@ -366,8 +367,7 @@ function makeCourse(idx){
   }
 }
 
-// ============ コースメッシュの事前計算 ============
-// 各セグメントの位置を空間的に検索するためのグリッド
+// 空間グリッドで候補セグメントを絞る
 function buildCourseMesh(course){
   const pts = course.pts;
   const n = pts.length;
@@ -379,13 +379,11 @@ function buildCourseMesh(course){
     const len2 = dx*dx+dy*dy||1;
     segs.push({p0, p1, dx, dy, len2, idx:i});
   }
-  // 空間グリッド（セルサイズ200）
   const cellSize = 200;
   const grid = new Map();
   function cellKey(cx, cy){ return cx+','+cy; }
   for(let i=0;i<n;i++){
     const s = segs[i];
-    // セグメントのバウンディングボックス内のセルに登録
     const minX = Math.min(s.p0.x, s.p1.x) - BALL_R - 50;
     const maxX = Math.max(s.p0.x, s.p1.x) + BALL_R + 50;
     const minY = Math.min(s.p0.y, s.p1.y) - BALL_R - 50;
@@ -405,12 +403,10 @@ function buildCourseMesh(course){
   return { segs, grid, cellSize, n };
 }
 
-// 空間グリッドを使って最近傍セグメントを探す
 function findNearestSegment(mesh, x, y, hintIdx){
   const { segs, grid, cellSize, n } = mesh;
   const cx = Math.floor(x/cellSize);
   const cy = Math.floor(y/cellSize);
-  // 周囲3x3セルを探索、見つからなければ拡大
   let candidates = new Set();
   for(let rad=0; rad<=3; rad++){
     for(let dx=-rad;dx<=rad;dx++){
@@ -424,20 +420,15 @@ function findNearestSegment(mesh, x, y, hintIdx){
     }
     if(candidates.size > 0) break;
   }
-  // 候補がなければ全周（最終手段）
   if(candidates.size === 0){
     for(let i=0;i<n;i++) candidates.add(i);
   }
-
-  // hintIdx が候補にあれば、その前後も候補に追加（連続性確保）
   if(hintIdx !== undefined){
     for(let d=-3; d<=3; d++){
       const i = ((hintIdx+d)%n+n)%n;
       candidates.add(i);
     }
   }
-
-  // 最短セグメントを探す
   let bestSeg = 0, bestT = 0, bestD = Infinity;
   for(const i of candidates){
     const s = segs[i];
@@ -474,6 +465,35 @@ function collideWalls(course, mesh, ball){
   }
 }
 
+// ============ ステータス生成 ============
+// COM: 各40〜50（合計120〜150）
+// 俺:   合計80〜110（各20〜50の範囲で合計を80〜110に収める）
+function genComStats(){
+  return {
+    speed: 40 + Math.floor(Math.random()*11),
+    accel: 40 + Math.floor(Math.random()*11),
+    turn:  40 + Math.floor(Math.random()*11)
+  };
+}
+function genMyStats(){
+  // 合計80〜110になるよう、各20〜50の範囲で3値を生成
+  while(true){
+    const a = 20 + Math.floor(Math.random()*31); // 20〜50
+    const b = 20 + Math.floor(Math.random()*31);
+    const c = 20 + Math.floor(Math.random()*31);
+    const total = a+b+c;
+    if(total >= 80 && total <= 110){
+      // ランダムに3ステータスへ割り当て
+      const arr = [a,b,c];
+      for(let i=arr.length-1;i>0;i--){
+        const j = Math.floor(Math.random()*(i+1));
+        [arr[i],arr[j]] = [arr[j],arr[i]];
+      }
+      return { speed: arr[0], accel: arr[1], turn: arr[2] };
+    }
+  }
+}
+
 // ============ レーサー生成 ============
 function makeRacers(){
   const course = makeCourse(state.courseIdx);
@@ -486,14 +506,6 @@ function makeRacers(){
   const px = -fy, py = fx;
 
   const racers = [];
-  const statsList = [];
-  for(let i=0;i<TOTAL_RACERS;i++){
-    statsList.push({
-      speed: 40 + Math.floor(Math.random()*11),
-      accel: 40 + Math.floor(Math.random()*11),
-      turn: 40 + Math.floor(Math.random()*11)
-    });
-  }
 
   const myIdx = state.myColorIdx;
   const colorOrder = [];
@@ -510,7 +522,7 @@ function makeRacers(){
     const x = sp.x + px*offX + fx*(-offY);
     const y = sp.y + py*offX + fy*(-offY);
 
-    const st = statsList[i];
+    const st = isMe ? genMyStats() : genComStats();
     racers.push({
       colorIdx: colIdx,
       color: COLORS[colIdx],
@@ -518,12 +530,9 @@ function makeRacers(){
       x, y,
       vx: 0, vy: 0,
       angle: Math.atan2(fy, fx),
-      // 進行度管理
       contPathPos: START_IDX,
       lap: 0,
       totalProgress: START_IDX,
-      // ラップ境界の通過検出用
-      lastPassedStart: false,
       finished: false,
       finishTime: 0,
       rank: i+1,
@@ -594,14 +603,19 @@ function update(dt){
       me.vy += ay*accelPower*dt;
     }
 
+    // ブレーキは強め、アクセルOFF時は自然減速（ゆるやか）
     if(state.brakeInput){
-      me.vx *= 0.94;
-      me.vy *= 0.94;
+      me.vx *= 0.90;
+      me.vy *= 0.90;
+    } else if(!state.accelInput){
+      // アクセルOFF時: ゆっくり減速（慣性でスーッと進む）
+      me.vx *= 0.993;
+      me.vy *= 0.993;
+    } else {
+      // アクセルON中は抵抗少なめ
+      me.vx *= 0.998;
+      me.vy *= 0.998;
     }
-
-    const friction = state.accelInput ? 0.985 : 0.94;
-    me.vx *= friction;
-    me.vy *= friction;
 
     const maxSp = (me.speed/50) * 520 * (0.6 + state.accelCharge*0.6);
     const sp = Math.sqrt(me.vx*me.vx+me.vy*me.vy);
@@ -674,18 +688,16 @@ function update(dt){
     }
   }
 
-  // ラップ計算: 空間グリッドで連続位置を取得
+  // ラップ計算
   for(const r of state.racers){
     if(r.finished) continue;
     const near = findNearestSegment(mesh, r.x, r.y, r.hintIdx);
     r.hintIdx = near.idx;
     const newPos = near.contPos;
     let diff = newPos - r.contPathPos;
-    // 境界越えの補正
     if(diff < -n*0.5) diff += n;
     else if(diff > n*0.5) diff -= n;
 
-    // 前進のみ加算（後退は小さい値のみ、大ジャンプは無視）
     if(Math.abs(diff) < n*0.25){
       r.contPathPos = newPos;
       r.totalProgress += diff;
@@ -961,8 +973,6 @@ function drawRacer(r){
   ctx.restore();
 }
 
-// ============ ゲームループ ============
-let cachedMesh = null;
 function loop(now){
   const dt = Math.min((now - state.lastTime)/1000, 0.05);
   state.lastTime = now;
@@ -971,7 +981,6 @@ function loop(now){
   requestAnimationFrame(loop);
 }
 
-// ============ UI構築 ============
 function buildColorPicker(){
   const picker = document.getElementById('colorPicker');
   picker.innerHTML = '';
@@ -1027,12 +1036,13 @@ function showResult(isWin){
   sorted.forEach((r)=>{
     const total = r.speed + r.accel + r.turn;
     const cls = (r.isMe?'me ':'') + (r.rank===1?'winner':'');
+    const barCls = r.isMe ? 'stat-bar me-bar' : 'stat-bar';
     html += `<tr class="${cls}">
       <td>${r.rank}位</td>
       <td><span class="res-dot" style="background:${r.color.hex}"></span> ${r.color.name}${r.isMe?' (俺)':''}</td>
-      <td><div class="stat-bar-wrap"><div class="stat-bar" style="width:${r.speed/50*100}%"></div></div><span class="stat-val">${r.speed}</span></td>
-      <td><div class="stat-bar-wrap"><div class="stat-bar" style="width:${r.accel/50*100}%"></div></div><span class="stat-val">${r.accel}</span></td>
-      <td><div class="stat-bar-wrap"><div class="stat-bar" style="width:${r.turn/50*100}%"></div></div><span class="stat-val">${r.turn}</span></td>
+      <td><div class="stat-bar-wrap"><div class="${barCls}" style="width:${r.speed/50*100}%"></div></div><span class="stat-val">${r.speed}</span></td>
+      <td><div class="stat-bar-wrap"><div class="${barCls}" style="width:${r.accel/50*100}%"></div></div><span class="stat-val">${r.accel}</span></td>
+      <td><div class="stat-bar-wrap"><div class="${barCls}" style="width:${r.turn/50*100}%"></div></div><span class="stat-val">${r.turn}</span></td>
       <td class="total-cell">${total}</td>
     </tr>`;
   });
