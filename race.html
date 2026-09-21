@@ -285,6 +285,9 @@ const GAUGE_UP_RATE   = 1.2;
 const GAUGE_DOWN_RATE = 0.45;
 const SPEED_RESPONSE  = 4.5;
 const BRAKE_RESPONSE  = 9.0;
+// 操舵: 1秒あたりの最大旋回角（ラジアン）
+// キャラの turn ステータスでスケールする
+const STEER_RATE_MAX  = 3.2;
 
 let state = {
   myColorIdx: 4,
@@ -476,10 +479,9 @@ function genComStats(){
     turn:  40 + Math.floor(Math.random()*11)
   };
 }
-// 俺: 合計110〜140（各30〜50）
 function genMyStats(){
   while(true){
-    const a = 30 + Math.floor(Math.random()*21); // 30〜50
+    const a = 30 + Math.floor(Math.random()*21);
     const b = 30 + Math.floor(Math.random()*21);
     const c = 30 + Math.floor(Math.random()*21);
     const total = a+b+c;
@@ -581,7 +583,7 @@ function update(dt){
   const accelFill = document.getElementById('accelFill');
   if(accelFill) accelFill.style.width = (state.accelCharge*100)+'%';
 
-  // ===== 自分の操作（P制御） =====
+  // ===== 自分の操作 =====
   const me = state.racers.find(r=>r.isMe);
   if(me && !me.finished){
     const pts = course.pts;
@@ -591,73 +593,73 @@ function update(dt){
     const dl = Math.sqrt(dx*dx+dy*dy)||1;
     const tx = dx/dl, ty = dy/dl;
 
-    // 目標速度: ゲージ × ステータス由来の最大速度
+    // ----- 操舵（速度ベクトルを回転させる） -----
+    // キー入力があるとき、速度ベクトルを回転させる
+    let sp = Math.sqrt(me.vx*me.vx + me.vy*me.vy);
+    if((inputX !== 0 || inputY !== 0) && sp > 0.5){
+      // 現在の速度方向
+      let dirX2 = me.vx/sp, dirY2 = me.vy/sp;
+      // 入力方向ベクトル（正規化）
+      const il = Math.sqrt(inputX*inputX + inputY*inputY)||1;
+      const ix = inputX/il, iy = inputY/il;
+      // 速度方向と入力方向の外積（z成分）で回転方向を決める
+      const cross = dirX2*iy - dirY2*ix;
+      const dot = dirX2*ix + dirY2*iy;
+
+      // 目標とする回転量（1フレームあたり）
+      // turnステータスでスケール
+      const turnFactor = (me.turn/50);
+      // 速度が高いほど曲がりにくい（空力・慣性）
+      const speedFactor = Math.max(0.25, 1.0 - sp/700);
+      const maxSteerRate = STEER_RATE_MAX * turnFactor * speedFactor;
+
+      // 入力方向と速度方向の角度差を求めて、その方向に回す
+      let angleDiff = Math.atan2(cross, dot);
+      // クランプ
+      const maxRot = maxSteerRate * dt;
+      if(angleDiff > maxRot) angleDiff = maxRot;
+      else if(angleDiff < -maxRot) angleDiff = -maxRot;
+
+      // 速度ベクトルを回転
+      const cos = Math.cos(angleDiff);
+      const sin = Math.sin(angleDiff);
+      const nvx = me.vx*cos - me.vy*sin;
+      const nvy = me.vx*sin + me.vy*cos;
+      me.vx = nvx;
+      me.vy = nvy;
+    } else if(sp > 0.5 && sp < 0.5) {
+      // ほぼ停止中は何もしない
+    }
+
+    // ----- 加減速（P制御） -----
+    sp = Math.sqrt(me.vx*me.vx + me.vy*me.vy);
     const maxSpeedByStat = (me.speed/50) * 480 + (me.accel/50) * 120;
     const targetSpeed = state.brakeInput ? 0 : state.accelCharge * maxSpeedByStat;
 
-    // 現在速度と向き
-    let sp = Math.sqrt(me.vx*me.vx + me.vy*me.vy);
-    let dirX2 = 0, dirY2 = 0;
-    if(sp > 0.01){
-      dirX2 = me.vx/sp; dirY2 = me.vy/sp;
-    } else {
-      dirX2 = tx; dirY2 = ty;
-    }
-
-    // P制御
     const response = state.brakeInput ? BRAKE_RESPONSE : SPEED_RESPONSE;
     const speedError = targetSpeed - sp;
 
     if(Math.abs(speedError) > 0.1){
-      // 進行方向の決定
+      // 加速方向: 速度があれば速度方向、なければコース進行方向
       let accDirX, accDirY;
-
-      // 速度がほぼゼロなら、コース進行方向 + キー入力で向きを決める
-      if(sp < 5){
-        let ax = tx*0.7 + inputX*0.5;
-        let ay = ty*0.7 + inputY*0.5;
-        const al = Math.sqrt(ax*ax+ay*ay)||1;
-        accDirX = ax/al; accDirY = ay/al;
+      if(sp > 0.5){
+        accDirX = me.vx/sp;
+        accDirY = me.vy/sp;
       } else {
-        // 速度がある程度ある場合:
-        // 基本は速度方向、キー入力で操舵（常に効く）
-        let steerX = inputX, steerY = inputY;
-        const sl = Math.sqrt(steerX*steerX + steerY*steerY);
-
-        if(sl > 0.01){
-          // 操舵あり: 速度方向と操舵方向を合成
-          // 速度方向を軸に、操舵で曲げる
-          // （アクセルON時は操舵強め、OFF時は弱め）
-          const steerWeight = state.accelInput ? 0.55 : 0.35;
-          let ax = dirX2*(1-steerWeight) + (steerX/sl)*steerWeight;
-          let ay = dirY2*(1-steerWeight) + (steerY/sl)*steerWeight;
-          const al = Math.sqrt(ax*ax+ay*ay)||1;
-          accDirX = ax/al; accDirY = ay/al;
-        } else {
-          // 操舵なし: 速度方向に真っ直ぐ
-          accDirX = dirX2; accDirY = dirY2;
-        }
+        accDirX = tx;
+        accDirY = ty;
       }
-
-      // 速度補正量 = 誤差 × 応答係数 × dt
       const dv = speedError * response * dt;
+      me.vx += accDirX * dv;
+      me.vy += accDirY * dv;
 
-      // 加速: 補正方向へ加算 / 減速: 速度の逆方向に減算
-      if(speedError > 0){
-        // 加速: 操舵方向へ加速
-        me.vx += accDirX * dv;
-        me.vy += accDirY * dv;
-      } else {
-        // 減速: 速度方向の逆向きに減速（操舵で曲げない）
-        me.vx -= dirX2 * (-dv);
-        me.vy -= dirY2 * (-dv);
-      }
-
-      // 速度が0を跨いで逆走しないように
+      // 逆走防止
       const newSp = Math.sqrt(me.vx*me.vx+me.vy*me.vy);
       if(newSp > 0.01 && sp > 0.01){
         const newDirX = me.vx/newSp, newDirY = me.vy/newSp;
-        if((dirX2*newDirX + dirY2*newDirY) < 0){
+        const oldDirX = me.vx - accDirX*dv;
+        // 簡易: 速度が符号反転したら0
+        if((accDirX*newDirX + accDirY*newDirY) < 0){
           me.vx = 0; me.vy = 0;
         }
       }
