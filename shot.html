@@ -54,6 +54,7 @@
       font-size: 14px;
       color: #7a8b9b;
       letter-spacing: 0.5px;
+      gap: 16px;
     }
 
     .footer .status {
@@ -69,6 +70,40 @@
     .footer .status .highlight {
       color: #00e6b0;
       text-shadow: 0 0 8px #00e6b088;
+    }
+
+    .reload-btn {
+      background: #1a2530;
+      color: #00e6b0;
+      border: 2px solid #00e6b0;
+      border-radius: 40px;
+      padding: 8px 28px;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      box-shadow: 0 0 12px #00e6b033;
+      font-family: inherit;
+    }
+
+    .reload-btn:hover {
+      background: #00e6b0;
+      color: #0a0c0f;
+      box-shadow: 0 0 24px #00e6b0aa;
+    }
+
+    .reload-btn:active {
+      transform: scale(0.96);
+    }
+
+    .reload-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+      border-color: #4a5a6a;
+      color: #4a5a6a;
+      background: #151b22;
+      box-shadow: none;
     }
 
     .victory-footer {
@@ -105,6 +140,8 @@
       font-size: 12px;
       color: #4a5a6a;
       margin-top: 4px;
+      text-align: center;
+      width: 100%;
     }
   </style>
 </head>
@@ -117,7 +154,10 @@
         <span>弾: <span id="ammoDisplay" class="highlight">10</span>/10</span>
         <span>敵: <span id="enemyDisplay" class="highlight">4</span></span>
       </div>
-      <div class="hint">R3: 武器方向 / 移動: 上下左右 / 射撃: クリック / 連射: 長押し / リロード: R</div>
+      <button class="reload-btn" id="reloadBtn">RELOAD (R)</button>
+    </div>
+    <div class="hint" id="hint">
+      移動: 上下左右キー / エイム: マウスカーソル / 射撃: クリック or 〇ボタン / リロード: ボタン or Rキー
     </div>
     <div class="victory-footer hidden" id="victoryFooter">
       <a href="study.html">📚 study.html へ進む</a>
@@ -132,6 +172,8 @@
       const enemyDisplay = document.getElementById('enemyDisplay');
       const victoryFooter = document.getElementById('victoryFooter');
       const footer = document.getElementById('footer');
+      const hint = document.getElementById('hint');
+      const reloadBtn = document.getElementById('reloadBtn');
 
       const W = 800, H = 600;
 
@@ -141,7 +183,7 @@
         y: H / 2,
         hp: 90,
         maxHp: 90,
-        angle: 0,           // ラジアン
+        angle: 0,           // ラジアン（マウスカーソル方向）
         ammo: 10,
         maxAmmo: 10,
         reloading: false,
@@ -157,18 +199,7 @@
         { x: W - 100, y: H - 100, label: '東南' },
       ];
 
-      let enemies = enemyPositions.map((pos, i) => ({
-        id: i,
-        x: pos.x,
-        y: pos.y,
-        hp: 10,
-        maxHp: 10,
-        alive: true,
-        fireTimer: 0,
-        fireInterval: 90,      // フレーム間隔（約1.5秒 @60fps）
-        angle: 0,
-        label: pos.label,
-      }));
+      let enemies = [];
 
       // 弾
       let bullets = [];
@@ -183,24 +214,22 @@
         ArrowRight: false,
       };
 
-      // R3（右スティック押し込み）の代わり: キーボードの Q/E で回転、またはマウスでエイム
-      // 実際のPS4コントローラーではGamepad APIでR3を検出するが、ここではキーボード＋マウスで再現
-      // R3の難しさを再現するため、回転はキーで行い、マウスエイムは補助的に使えるようにする
-      let r3RotationSpeed = 0.04;
-      let useMouseAim = false; // マウス移動でエイム（R3の代わり）
-
       // マウス位置（エイム用）
       let mouseX = W / 2, mouseY = H / 2;
 
       // 射撃
       let isFiring = false;
-      let fireInterval = 10;      // 連射間隔（フレーム）
+      let fireInterval = 10;
       let fireTimer = 0;
 
       // ゲームループ
       let lastTime = 0;
       let gameOver = false;
       let victory = false;
+
+      // ゲームパッド
+      let gamepadConnected = false;
+      let prevFireButton = false;
 
       // ---- ユーティリティ ----
       function distance(x1, y1, x2, y2) {
@@ -213,6 +242,21 @@
         return a;
       }
 
+      function initEnemies() {
+        enemies = enemyPositions.map((pos, i) => ({
+          id: i,
+          x: pos.x,
+          y: pos.y,
+          hp: 10,
+          maxHp: 10,
+          alive: true,
+          fireTimer: 30 + i * 20,
+          fireInterval: 90,
+          angle: 0,
+          label: pos.label,
+        }));
+      }
+
       // ---- 入力ハンドラ ----
       window.addEventListener('keydown', (e) => {
         if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
@@ -223,15 +267,6 @@
           e.preventDefault();
           reload();
         }
-        // Q/E で R3 回転（R3の代わり）
-        if (e.key === 'q' || e.key === 'Q') {
-          e.preventDefault();
-          player.angle = normalizeAngle(player.angle - r3RotationSpeed * 3);
-        }
-        if (e.key === 'e' || e.key === 'E') {
-          e.preventDefault();
-          player.angle = normalizeAngle(player.angle + r3RotationSpeed * 3);
-        }
       });
 
       window.addEventListener('keyup', (e) => {
@@ -241,15 +276,13 @@
         }
       });
 
-      // マウスエイム（R3の代替として、マウスでも方向を変えられるように）
+      // マウスエイム（カーソル追従で武器方向を変える）
       canvas.addEventListener('mousemove', (e) => {
         const rect = canvas.getBoundingClientRect();
         const scaleX = canvas.width / rect.width;
         const scaleY = canvas.height / rect.height;
         mouseX = (e.clientX - rect.left) * scaleX;
         mouseY = (e.clientY - rect.top) * scaleY;
-        // マウスが動いたらマウスエイムを有効にする
-        useMouseAim = true;
       });
 
       // 射撃: クリック / 長押し
@@ -257,7 +290,7 @@
         if (e.button === 0) {
           e.preventDefault();
           isFiring = true;
-          fireTimer = 0; // 即座に発射
+          fireTimer = 0;
         }
       });
 
@@ -267,19 +300,65 @@
         }
       });
 
+      // リロードボタン
+      reloadBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        reload();
+      });
+
       // リロード
       function reload() {
         if (player.reloading) return;
         if (player.ammo === player.maxAmmo) return;
+        if (gameOver || victory) return;
         player.reloading = true;
-        player.reloadTimer = 60; // 1秒 @60fps
+        player.reloadTimer = 60;
       }
+
+      // ---- ゲームパッド（PS4コントローラー）----
+      window.addEventListener('gamepadconnected', (e) => {
+        gamepadConnected = true;
+        console.log('Gamepad connected:', e.gamepad.id);
+      });
+
+      window.addEventListener('gamepaddisconnected', () => {
+        gamepadConnected = false;
+      });
+
+      function pollGamepad() {
+        if (gamepadConnected) {
+          const gamepads = navigator.getGamepads();
+          for (let gp of gamepads) {
+            if (!gp) continue;
+
+            // 左スティックで移動
+            const lx = gp.axes[0] || 0;
+            const ly = gp.axes[1] || 0;
+            if (Math.abs(lx) > 0.2) player.x += lx * 5;
+            if (Math.abs(ly) > 0.2) player.y += ly * 5;
+
+            // 〇ボタン（ボタン0）で射撃
+            const fireButton = gp.buttons[0] && gp.buttons[0].pressed;
+            if (fireButton && !prevFireButton) {
+              // 押した瞬間
+              isFiring = true;
+              fireTimer = 0;
+            } else if (!fireButton && prevFireButton) {
+              // 離した瞬間
+              isFiring = false;
+            }
+            prevFireButton = fireButton;
+          }
+        }
+        requestAnimationFrame(pollGamepad);
+      }
+      pollGamepad();
 
       // ---- ゲームロジック ----
       function update(dt) {
         if (gameOver || victory) return;
 
-        // 移動
+        // 移動（キーボード）
         const MOVE_SPEED = 4;
         if (keys.ArrowUp) player.y -= MOVE_SPEED;
         if (keys.ArrowDown) player.y += MOVE_SPEED;
@@ -290,12 +369,10 @@
         player.x = Math.max(30, Math.min(W - 30, player.x));
         player.y = Math.max(30, Math.min(H - 30, player.y));
 
-        // マウスエイムが有効なら角度を更新（R3の代わり）
-        if (useMouseAim) {
-          const dx = mouseX - player.x;
-          const dy = mouseY - player.y;
-          player.angle = Math.atan2(dy, dx);
-        }
+        // マウスカーソル方向にエイム
+        const dx = mouseX - player.x;
+        const dy = mouseY - player.y;
+        player.angle = Math.atan2(dy, dx);
 
         // リロード処理
         if (player.reloading) {
@@ -309,7 +386,6 @@
         // 射撃処理
         if (isFiring && !player.reloading && player.ammo > 0) {
           if (fireTimer <= 0) {
-            // 発射
             const spread = 0.02;
             const angle = player.angle + (Math.random() - 0.5) * spread;
             bullets.push({
@@ -322,9 +398,6 @@
             });
             player.ammo--;
             fireTimer = fireInterval;
-            if (player.ammo <= 0) {
-              // 自動リロードはしない（手動リロード必須）
-            }
           } else {
             fireTimer--;
           }
@@ -342,7 +415,7 @@
             bullets.splice(i, 1);
             continue;
           }
-          // 敵との当たり判定
+          // プレイヤーの弾と敵の当たり判定
           if (b.owner === 'player') {
             for (let e of enemies) {
               if (!e.alive) continue;
@@ -361,14 +434,10 @@
         // 敵の更新
         let aliveEnemies = enemies.filter(e => e.alive);
         for (let e of aliveEnemies) {
-          // 敵の角度（プレイヤー方向）
           e.angle = Math.atan2(player.y - e.y, player.x - e.x);
-
-          // 射撃タイマー
           e.fireTimer--;
           if (e.fireTimer <= 0) {
             e.fireTimer = e.fireInterval + Math.floor(Math.random() * 30);
-            // 敵の発射
             const angle = e.angle + (Math.random() - 0.5) * 0.1;
             bullets.push({
               x: e.x + Math.cos(angle) * 20,
@@ -401,19 +470,28 @@
           victory = true;
           victoryFooter.classList.remove('hidden');
           footer.classList.add('hidden');
+          hint.classList.add('hidden');
         }
 
         // 表示更新
         hpDisplay.textContent = Math.max(0, player.hp);
         ammoDisplay.textContent = player.reloading ? '...' : player.ammo;
         enemyDisplay.textContent = enemies.filter(e => e.alive).length;
+
+        // リロードボタンの有効/無効
+        reloadBtn.disabled = player.reloading || player.ammo === player.maxAmmo || gameOver || victory;
+        if (player.reloading) {
+          reloadBtn.textContent = 'RELOADING...';
+        } else {
+          reloadBtn.textContent = 'RELOAD (R)';
+        }
       }
 
       // ---- 描画 ----
       function draw() {
         ctx.clearRect(0, 0, W, H);
 
-        // 背景グリッド（Sbit風）
+        // 背景グリッド
         ctx.strokeStyle = '#1a2530';
         ctx.lineWidth = 1;
         for (let x = 0; x <= W; x += 40) {
@@ -456,7 +534,6 @@
         // 敵描画
         for (let e of enemies) {
           if (!e.alive) continue;
-          // 敵の体
           ctx.shadowColor = '#ff4d6d';
           ctx.shadowBlur = 20;
           ctx.fillStyle = '#2a0a12';
@@ -466,19 +543,19 @@
           ctx.strokeStyle = '#ff4d6d';
           ctx.lineWidth = 2;
           ctx.stroke();
-          // HPバー
+
           const hpRatio = e.hp / e.maxHp;
           ctx.shadowBlur = 0;
           ctx.fillStyle = '#1a0a0e';
           ctx.fillRect(e.x - 25, e.y - 34, 50, 6);
           ctx.fillStyle = hpRatio > 0.5 ? '#ff4d6d' : '#ff8a5c';
           ctx.fillRect(e.x - 25, e.y - 34, 50 * hpRatio, 6);
-          // ラベル
+
           ctx.fillStyle = '#7a8b9b';
           ctx.font = '10px sans-serif';
           ctx.textAlign = 'center';
           ctx.fillText(e.label, e.x, e.y + 40);
-          // 敵の銃口
+
           ctx.shadowBlur = 10;
           ctx.shadowColor = '#ff4d6d';
           ctx.fillStyle = '#ff4d6d';
@@ -508,7 +585,6 @@
         ctx.lineTo(player.x + Math.cos(player.angle) * 34, player.y + Math.sin(player.angle) * 34);
         ctx.stroke();
 
-        // 銃口
         ctx.fillStyle = '#00e6b0';
         ctx.beginPath();
         ctx.arc(player.x + Math.cos(player.angle) * 34, player.y + Math.sin(player.angle) * 34, 5, 0, Math.PI * 2);
@@ -562,7 +638,7 @@
 
       // ---- ゲームループ ----
       function gameLoop(timestamp) {
-        const dt = Math.min(1, (timestamp - lastTime) / 1000 * 60); // 60fps基準
+        const dt = Math.min(1, (timestamp - lastTime) / 1000 * 60);
         lastTime = timestamp;
 
         if (!gameOver && !victory) {
@@ -573,7 +649,7 @@
         requestAnimationFrame(gameLoop);
       }
 
-      // リスタート（ゲームオーバー時）
+      // リスタート
       canvas.addEventListener('click', (e) => {
         if (gameOver) {
           resetGame();
@@ -589,76 +665,22 @@
         player.reloading = false;
         player.reloadTimer = 0;
         bullets = [];
-        enemies = enemyPositions.map((pos, i) => ({
-          id: i,
-          x: pos.x,
-          y: pos.y,
-          hp: 10,
-          maxHp: 10,
-          alive: true,
-          fireTimer: 30 + i * 20,
-          fireInterval: 90,
-          angle: 0,
-          label: pos.label,
-        }));
+        initEnemies();
         gameOver = false;
         victory = false;
         victoryFooter.classList.add('hidden');
         footer.classList.remove('hidden');
+        hint.classList.remove('hidden');
         isFiring = false;
         fireTimer = 0;
-        useMouseAim = false;
         mouseX = W / 2;
         mouseY = H / 2;
       }
 
       // ---- 初期化 ----
+      initEnemies();
       resetGame();
       requestAnimationFrame(gameLoop);
-
-      // マウスがキャンバスから出たらマウスエイムを無効化（任意）
-      canvas.addEventListener('mouseleave', () => {
-        // useMouseAim = false; // そのままでもOK
-      });
-
-      // ゲームパッドAPI（PS4コントローラーがあればR3を検出）
-      window.addEventListener('gamepadconnected', (e) => {
-        console.log('Gamepad connected:', e.gamepad.id);
-      });
-
-      // ゲームパッドのポーリング（R3押し込みで回転をリセットなど、拡張可能）
-      function pollGamepad() {
-        const gamepads = navigator.getGamepads();
-        for (let gp of gamepads) {
-          if (!gp) continue;
-          // R3: 右スティック押し込み（ボタン11）
-          const r3Pressed = gp.buttons[11] && gp.buttons[11].pressed;
-          if (r3Pressed) {
-            // R3押し込み中は右スティックのX軸で回転
-            const rx = gp.axes[2] || 0;
-            if (Math.abs(rx) > 0.2) {
-              player.angle = normalizeAngle(player.angle + rx * 0.06);
-              useMouseAim = false; // ゲームパッド操作時はマウスエイム無効
-            }
-          }
-          // 左スティックで移動
-          const lx = gp.axes[0] || 0;
-          const ly = gp.axes[1] || 0;
-          if (Math.abs(lx) > 0.2) player.x += lx * 4;
-          if (Math.abs(ly) > 0.2) player.y += ly * 4;
-          // 射撃（R2）
-          const r2 = gp.buttons[7] && gp.buttons[7].pressed;
-          if (r2) {
-            isFiring = true;
-          } else {
-            // キーボード/マウスとの競合を避けるため、R2が離されたらisFiringをfalseに
-            // ただしマウス長押し中は維持したいので、ここでは何もしない
-          }
-        }
-        requestAnimationFrame(pollGamepad);
-      }
-      // ゲームパッドポーリングは必要な場合のみ有効化（コメントアウトを外す）
-      // pollGamepad();
     })();
   </script>
 </body>
