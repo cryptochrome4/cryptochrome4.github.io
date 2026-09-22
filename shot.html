@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SHOT - Sbit風シューティング</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      user-select: none;
+    }
+
+    body {
+      background: #0a0c0f;
+      font-family: 'Segoe UI', 'Helvetica Neue', sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      color: #e0e0e0;
+      overflow: hidden;
+    }
+
+    .game-wrapper {
+      background: #11161c;
+      border-radius: 24px;
+      padding: 24px 24px 16px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8), 0 0 0 1px #2a3a4a inset;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      width: fit-content;
+    }
+
+    canvas {
+      display: block;
+      border-radius: 16px;
+      background: #0b0f14;
+      box-shadow: 0 0 30px rgba(0, 255, 200, 0.1);
+      cursor: crosshair;
+      width: 800px;
+      height: 600px;
+    }
+
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      padding: 8px 12px 0;
+      font-size: 14px;
+      color: #7a8b9b;
+      letter-spacing: 0.5px;
+    }
+
+    .footer .status {
+      display: flex;
+      gap: 24px;
+    }
+
+    .footer .status span {
+      color: #b0c8d8;
+      font-weight: 500;
+    }
+
+    .footer .status .highlight {
+      color: #00e6b0;
+      text-shadow: 0 0 8px #00e6b088;
+    }
+
+    .victory-footer {
+      display: flex;
+      justify-content: center;
+      width: 100%;
+      margin-top: 8px;
+    }
+
+    .victory-footer a {
+      color: #00e6b0;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 18px;
+      padding: 10px 28px;
+      border: 2px solid #00e6b0;
+      border-radius: 40px;
+      transition: all 0.2s ease;
+      background: #00e6b010;
+      letter-spacing: 1px;
+    }
+
+    .victory-footer a:hover {
+      background: #00e6b0;
+      color: #0a0c0f;
+      box-shadow: 0 0 24px #00e6b0aa;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .hint {
+      font-size: 12px;
+      color: #4a5a6a;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="game-wrapper">
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <div class="footer" id="footer">
+      <div class="status">
+        <span>HP: <span id="hpDisplay" class="highlight">90</span></span>
+        <span>弾: <span id="ammoDisplay" class="highlight">10</span>/10</span>
+        <span>敵: <span id="enemyDisplay" class="highlight">4</span></span>
+      </div>
+      <div class="hint">R3: 武器方向 / 移動: 上下左右 / 射撃: クリック / 連射: 長押し / リロード: R</div>
+    </div>
+    <div class="victory-footer hidden" id="victoryFooter">
+      <a href="study.html">📚 study.html へ進む</a>
+    </div>
+  </div>
+  <script>
+    (function() {
+      const canvas = document.getElementById('gameCanvas');
+      const ctx = canvas.getContext('2d');
+      const hpDisplay = document.getElementById('hpDisplay');
+      const ammoDisplay = document.getElementById('ammoDisplay');
+      const enemyDisplay = document.getElementById('enemyDisplay');
+      const victoryFooter = document.getElementById('victoryFooter');
+      const footer = document.getElementById('footer');
+
+      const W = 800, H = 600;
+
+      // ---- ゲーム状態 ----
+      let player = {
+        x: W / 2,
+        y: H / 2,
+        hp: 90,
+        maxHp: 90,
+        angle: 0,           // ラジアン
+        ammo: 10,
+        maxAmmo: 10,
+        reloading: false,
+        reloadTimer: 0,
+        fireCooldown: 0,
+      };
+
+      // 敵: 西北, 東北, 南西, 東南
+      const enemyPositions = [
+        { x: 100, y: 100, label: '西北' },
+        { x: W - 100, y: 100, label: '東北' },
+        { x: 100, y: H - 100, label: '南西' },
+        { x: W - 100, y: H - 100, label: '東南' },
+      ];
+
+      let enemies = enemyPositions.map((pos, i) => ({
+        id: i,
+        x: pos.x,
+        y: pos.y,
+        hp: 10,
+        maxHp: 10,
+        alive: true,
+        fireTimer: 0,
+        fireInterval: 90,      // フレーム間隔（約1.5秒 @60fps）
+        angle: 0,
+        label: pos.label,
+      }));
+
+      // 弾
+      let bullets = [];
+      const BULLET_SPEED = 8;
+      const BULLET_RADIUS = 4;
+
+      // 入力
+      const keys = {
+        ArrowUp: false,
+        ArrowDown: false,
+        ArrowLeft: false,
+        ArrowRight: false,
+      };
+
+      // R3（右スティック押し込み）の代わり: キーボードの Q/E で回転、またはマウスでエイム
+      // 実際のPS4コントローラーではGamepad APIでR3を検出するが、ここではキーボード＋マウスで再現
+      // R3の難しさを再現するため、回転はキーで行い、マウスエイムは補助的に使えるようにする
+      let r3RotationSpeed = 0.04;
+      let useMouseAim = false; // マウス移動でエイム（R3の代わり）
+
+      // マウス位置（エイム用）
+      let mouseX = W / 2, mouseY = H / 2;
+
+      // 射撃
+      let isFiring = false;
+      let fireInterval = 10;      // 連射間隔（フレーム）
+      let fireTimer = 0;
+
+      // ゲームループ
+      let lastTime = 0;
+      let gameOver = false;
+      let victory = false;
+
+      // ---- ユーティリティ ----
+      function distance(x1, y1, x2, y2) {
+        return Math.hypot(x2 - x1, y2 - y1);
+      }
+
+      function normalizeAngle(a) {
+        while (a < 0) a += Math.PI * 2;
+        while (a >= Math.PI * 2) a -= Math.PI * 2;
+        return a;
+      }
+
+      // ---- 入力ハンドラ ----
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+          e.preventDefault();
+          keys[e.key] = true;
+        }
+        if (e.key === 'r' || e.key === 'R') {
+          e.preventDefault();
+          reload();
+        }
+        // Q/E で R3 回転（R3の代わり）
+        if (e.key === 'q' || e.key === 'Q') {
+          e.preventDefault();
+          player.angle = normalizeAngle(player.angle - r3RotationSpeed * 3);
+        }
+        if (e.key === 'e' || e.key === 'E') {
+          e.preventDefault();
+          player.angle = normalizeAngle(player.angle + r3RotationSpeed * 3);
+        }
+      });
+
+      window.addEventListener('keyup', (e) => {
+        if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+          e.preventDefault();
+          keys[e.key] = false;
+        }
+      });
+
+      // マウスエイム（R3の代替として、マウスでも方向を変えられるように）
+      canvas.addEventListener('mousemove', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        mouseX = (e.clientX - rect.left) * scaleX;
+        mouseY = (e.clientY - rect.top) * scaleY;
+        // マウスが動いたらマウスエイムを有効にする
+        useMouseAim = true;
+      });
+
+      // 射撃: クリック / 長押し
+      canvas.addEventListener('mousedown', (e) => {
+        if (e.button === 0) {
+          e.preventDefault();
+          isFiring = true;
+          fireTimer = 0; // 即座に発射
+        }
+      });
+
+      window.addEventListener('mouseup', (e) => {
+        if (e.button === 0) {
+          isFiring = false;
+        }
+      });
+
+      // リロード
+      function reload() {
+        if (player.reloading) return;
+        if (player.ammo === player.maxAmmo) return;
+        player.reloading = true;
+        player.reloadTimer = 60; // 1秒 @60fps
+      }
+
+      // ---- ゲームロジック ----
+      function update(dt) {
+        if (gameOver || victory) return;
+
+        // 移動
+        const MOVE_SPEED = 4;
+        if (keys.ArrowUp) player.y -= MOVE_SPEED;
+        if (keys.ArrowDown) player.y += MOVE_SPEED;
+        if (keys.ArrowLeft) player.x -= MOVE_SPEED;
+        if (keys.ArrowRight) player.x += MOVE_SPEED;
+
+        // 画面内に制限
+        player.x = Math.max(30, Math.min(W - 30, player.x));
+        player.y = Math.max(30, Math.min(H - 30, player.y));
+
+        // マウスエイムが有効なら角度を更新（R3の代わり）
+        if (useMouseAim) {
+          const dx = mouseX - player.x;
+          const dy = mouseY - player.y;
+          player.angle = Math.atan2(dy, dx);
+        }
+
+        // リロード処理
+        if (player.reloading) {
+          player.reloadTimer--;
+          if (player.reloadTimer <= 0) {
+            player.reloading = false;
+            player.ammo = player.maxAmmo;
+          }
+        }
+
+        // 射撃処理
+        if (isFiring && !player.reloading && player.ammo > 0) {
+          if (fireTimer <= 0) {
+            // 発射
+            const spread = 0.02;
+            const angle = player.angle + (Math.random() - 0.5) * spread;
+            bullets.push({
+              x: player.x + Math.cos(angle) * 20,
+              y: player.y + Math.sin(angle) * 20,
+              vx: Math.cos(angle) * BULLET_SPEED,
+              vy: Math.sin(angle) * BULLET_SPEED,
+              life: 120,
+              owner: 'player',
+            });
+            player.ammo--;
+            fireTimer = fireInterval;
+            if (player.ammo <= 0) {
+              // 自動リロードはしない（手動リロード必須）
+            }
+          } else {
+            fireTimer--;
+          }
+        } else {
+          fireTimer = 0;
+        }
+
+        // 弾更新
+        for (let i = bullets.length - 1; i >= 0; i--) {
+          const b = bullets[i];
+          b.x += b.vx;
+          b.y += b.vy;
+          b.life--;
+          if (b.x < -20 || b.x > W + 20 || b.y < -20 || b.y > H + 20 || b.life <= 0) {
+            bullets.splice(i, 1);
+            continue;
+          }
+          // 敵との当たり判定
+          if (b.owner === 'player') {
+            for (let e of enemies) {
+              if (!e.alive) continue;
+              if (distance(b.x, b.y, e.x, e.y) < 24) {
+                e.hp -= 10;
+                bullets.splice(i, 1);
+                if (e.hp <= 0) {
+                  e.alive = false;
+                }
+                break;
+              }
+            }
+          }
+        }
+
+        // 敵の更新
+        let aliveEnemies = enemies.filter(e => e.alive);
+        for (let e of aliveEnemies) {
+          // 敵の角度（プレイヤー方向）
+          e.angle = Math.atan2(player.y - e.y, player.x - e.x);
+
+          // 射撃タイマー
+          e.fireTimer--;
+          if (e.fireTimer <= 0) {
+            e.fireTimer = e.fireInterval + Math.floor(Math.random() * 30);
+            // 敵の発射
+            const angle = e.angle + (Math.random() - 0.5) * 0.1;
+            bullets.push({
+              x: e.x + Math.cos(angle) * 20,
+              y: e.y + Math.sin(angle) * 20,
+              vx: Math.cos(angle) * BULLET_SPEED * 0.8,
+              vy: Math.sin(angle) * BULLET_SPEED * 0.8,
+              life: 180,
+              owner: 'enemy',
+            });
+          }
+        }
+
+        // 敵の弾とプレイヤーの当たり判定
+        for (let i = bullets.length - 1; i >= 0; i--) {
+          const b = bullets[i];
+          if (b.owner === 'enemy') {
+            if (distance(b.x, b.y, player.x, player.y) < 22) {
+              player.hp -= 10;
+              bullets.splice(i, 1);
+              if (player.hp <= 0) {
+                player.hp = 0;
+                gameOver = true;
+              }
+            }
+          }
+        }
+
+        // 勝利判定
+        if (enemies.every(e => !e.alive)) {
+          victory = true;
+          victoryFooter.classList.remove('hidden');
+          footer.classList.add('hidden');
+        }
+
+        // 表示更新
+        hpDisplay.textContent = Math.max(0, player.hp);
+        ammoDisplay.textContent = player.reloading ? '...' : player.ammo;
+        enemyDisplay.textContent = enemies.filter(e => e.alive).length;
+      }
+
+      // ---- 描画 ----
+      function draw() {
+        ctx.clearRect(0, 0, W, H);
+
+        // 背景グリッド（Sbit風）
+        ctx.strokeStyle = '#1a2530';
+        ctx.lineWidth = 1;
+        for (let x = 0; x <= W; x += 40) {
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, H);
+          ctx.stroke();
+        }
+        for (let y = 0; y <= H; y += 40) {
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(W, y);
+          ctx.stroke();
+        }
+
+        // 四隅のマーカー
+        ctx.fillStyle = '#1e2e3e';
+        ctx.fillRect(0, 0, 8, 8);
+        ctx.fillRect(W - 8, 0, 8, 8);
+        ctx.fillRect(0, H - 8, 8, 8);
+        ctx.fillRect(W - 8, H - 8, 8, 8);
+
+        // 弾描画
+        for (let b of bullets) {
+          if (b.owner === 'player') {
+            ctx.fillStyle = '#00e6b0';
+            ctx.shadowColor = '#00e6b0';
+            ctx.shadowBlur = 12;
+          } else {
+            ctx.fillStyle = '#ff4d6d';
+            ctx.shadowColor = '#ff4d6d';
+            ctx.shadowBlur = 12;
+          }
+          ctx.beginPath();
+          ctx.arc(b.x, b.y, BULLET_RADIUS, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.shadowBlur = 0;
+
+        // 敵描画
+        for (let e of enemies) {
+          if (!e.alive) continue;
+          // 敵の体
+          ctx.shadowColor = '#ff4d6d';
+          ctx.shadowBlur = 20;
+          ctx.fillStyle = '#2a0a12';
+          ctx.beginPath();
+          ctx.arc(e.x, e.y, 22, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = '#ff4d6d';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          // HPバー
+          const hpRatio = e.hp / e.maxHp;
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = '#1a0a0e';
+          ctx.fillRect(e.x - 25, e.y - 34, 50, 6);
+          ctx.fillStyle = hpRatio > 0.5 ? '#ff4d6d' : '#ff8a5c';
+          ctx.fillRect(e.x - 25, e.y - 34, 50 * hpRatio, 6);
+          // ラベル
+          ctx.fillStyle = '#7a8b9b';
+          ctx.font = '10px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(e.label, e.x, e.y + 40);
+          // 敵の銃口
+          ctx.shadowBlur = 10;
+          ctx.shadowColor = '#ff4d6d';
+          ctx.fillStyle = '#ff4d6d';
+          ctx.beginPath();
+          ctx.arc(e.x + Math.cos(e.angle) * 18, e.y + Math.sin(e.angle) * 18, 5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.shadowBlur = 0;
+        }
+
+        // プレイヤー描画
+        ctx.shadowColor = '#00e6b0';
+        ctx.shadowBlur = 24;
+        ctx.fillStyle = '#0a1a1a';
+        ctx.beginPath();
+        ctx.arc(player.x, player.y, 18, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#00e6b0';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+
+        // プレイヤーの銃
+        ctx.shadowBlur = 16;
+        ctx.strokeStyle = '#00e6b0';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(player.x, player.y);
+        ctx.lineTo(player.x + Math.cos(player.angle) * 34, player.y + Math.sin(player.angle) * 34);
+        ctx.stroke();
+
+        // 銃口
+        ctx.fillStyle = '#00e6b0';
+        ctx.beginPath();
+        ctx.arc(player.x + Math.cos(player.angle) * 34, player.y + Math.sin(player.angle) * 34, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // プレイヤーHPバー
+        const playerHpRatio = Math.max(0, player.hp / player.maxHp);
+        ctx.fillStyle = '#1a2a2a';
+        ctx.fillRect(player.x - 30, player.y - 40, 60, 6);
+        ctx.fillStyle = playerHpRatio > 0.5 ? '#00e6b0' : '#ffb84d';
+        ctx.fillRect(player.x - 30, player.y - 40, 60 * playerHpRatio, 6);
+
+        // リロード表示
+        if (player.reloading) {
+          ctx.fillStyle = '#00e6b0';
+          ctx.font = 'bold 16px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('RELOADING...', player.x, player.y - 55);
+        }
+
+        // ゲームオーバー
+        if (gameOver) {
+          ctx.fillStyle = 'rgba(0,0,0,0.7)';
+          ctx.fillRect(0, 0, W, H);
+          ctx.fillStyle = '#ff4d6d';
+          ctx.font = 'bold 48px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('GAME OVER', W / 2, H / 2);
+          ctx.font = '18px sans-serif';
+          ctx.fillStyle = '#b0c8d8';
+          ctx.fillText('クリックでリスタート', W / 2, H / 2 + 50);
+        }
+
+        // 勝利
+        if (victory) {
+          ctx.fillStyle = 'rgba(0,0,0,0.6)';
+          ctx.fillRect(0, 0, W, H);
+          ctx.fillStyle = '#00e6b0';
+          ctx.font = 'bold 52px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.shadowColor = '#00e6b0';
+          ctx.shadowBlur = 30;
+          ctx.fillText('VICTORY', W / 2, H / 2 - 20);
+          ctx.shadowBlur = 0;
+          ctx.font = '18px sans-serif';
+          ctx.fillStyle = '#b0c8d8';
+          ctx.fillText('下のリンクから study.html へ', W / 2, H / 2 + 50);
+        }
+      }
+
+      // ---- ゲームループ ----
+      function gameLoop(timestamp) {
+        const dt = Math.min(1, (timestamp - lastTime) / 1000 * 60); // 60fps基準
+        lastTime = timestamp;
+
+        if (!gameOver && !victory) {
+          update(dt);
+        }
+        draw();
+
+        requestAnimationFrame(gameLoop);
+      }
+
+      // リスタート（ゲームオーバー時）
+      canvas.addEventListener('click', (e) => {
+        if (gameOver) {
+          resetGame();
+        }
+      });
+
+      function resetGame() {
+        player.x = W / 2;
+        player.y = H / 2;
+        player.hp = 90;
+        player.angle = 0;
+        player.ammo = 10;
+        player.reloading = false;
+        player.reloadTimer = 0;
+        bullets = [];
+        enemies = enemyPositions.map((pos, i) => ({
+          id: i,
+          x: pos.x,
+          y: pos.y,
+          hp: 10,
+          maxHp: 10,
+          alive: true,
+          fireTimer: 30 + i * 20,
+          fireInterval: 90,
+          angle: 0,
+          label: pos.label,
+        }));
+        gameOver = false;
+        victory = false;
+        victoryFooter.classList.add('hidden');
+        footer.classList.remove('hidden');
+        isFiring = false;
+        fireTimer = 0;
+        useMouseAim = false;
+        mouseX = W / 2;
+        mouseY = H / 2;
+      }
+
+      // ---- 初期化 ----
+      resetGame();
+      requestAnimationFrame(gameLoop);
+
+      // マウスがキャンバスから出たらマウスエイムを無効化（任意）
+      canvas.addEventListener('mouseleave', () => {
+        // useMouseAim = false; // そのままでもOK
+      });
+
+      // ゲームパッドAPI（PS4コントローラーがあればR3を検出）
+      window.addEventListener('gamepadconnected', (e) => {
+        console.log('Gamepad connected:', e.gamepad.id);
+      });
+
+      // ゲームパッドのポーリング（R3押し込みで回転をリセットなど、拡張可能）
+      function pollGamepad() {
+        const gamepads = navigator.getGamepads();
+        for (let gp of gamepads) {
+          if (!gp) continue;
+          // R3: 右スティック押し込み（ボタン11）
+          const r3Pressed = gp.buttons[11] && gp.buttons[11].pressed;
+          if (r3Pressed) {
+            // R3押し込み中は右スティックのX軸で回転
+            const rx = gp.axes[2] || 0;
+            if (Math.abs(rx) > 0.2) {
+              player.angle = normalizeAngle(player.angle + rx * 0.06);
+              useMouseAim = false; // ゲームパッド操作時はマウスエイム無効
+            }
+          }
+          // 左スティックで移動
+          const lx = gp.axes[0] || 0;
+          const ly = gp.axes[1] || 0;
+          if (Math.abs(lx) > 0.2) player.x += lx * 4;
+          if (Math.abs(ly) > 0.2) player.y += ly * 4;
+          // 射撃（R2）
+          const r2 = gp.buttons[7] && gp.buttons[7].pressed;
+          if (r2) {
+            isFiring = true;
+          } else {
+            // キーボード/マウスとの競合を避けるため、R2が離されたらisFiringをfalseに
+            // ただしマウス長押し中は維持したいので、ここでは何もしない
+          }
+        }
+        requestAnimationFrame(pollGamepad);
+      }
+      // ゲームパッドポーリングは必要な場合のみ有効化（コメントアウトを外す）
+      // pollGamepad();
+    })();
+  </script>
+</body>
+</html>
