@@ -123,55 +123,47 @@
   const skSword = document.getElementById('skSword');
 
   const W = 800, H = 600;
-  const MAP_W = 800, MAP_H = 600;      // 1マップのサイズ
-  const MAP_COLS = 11, MAP_ROWS = 11;  // 11×11 = 121マップ
-  const WORLD_W = MAP_W * MAP_COLS;    // 8800
-  const WORLD_H = MAP_H * MAP_ROWS;    // 6600
+  const MAP_W = 800, MAP_H = 600;
+  const MAP_COLS = 11, MAP_ROWS = 11;
+  const WORLD_W = MAP_W * MAP_COLS;
+  const WORLD_H = MAP_H * MAP_ROWS;
 
   // ============================================================
   //  ゲーム状態
   // ============================================================
   let player = {
-    x: WORLD_W / 2, y: WORLD_H / 2,   // 中央マップの中央
+    x: WORLD_W / 2, y: WORLD_H / 2,
     hp: 90, maxHp: 90,
     angle: 0,
     ammo: 0,
-    speed: 10,          // デフォ10
-    gunPower: 10,       // 銃の攻撃力（デフォ10）
-    rapidPower: 0,      // 連射力（デフォ0、+1で連射速度上昇）
-    swordPower: 20,     // 剣の攻撃力（デフォ20）
-    mode: 'gun',        // 'gun' or 'sword'
+    speed: 10,
+    gunPower: 10,
+    rapidPower: 0,
+    swordPower: 20,
+    mode: 'gun',
     reloading: false,
     reloadTimer: 0,
-    swingTimer: 0,      // 剣の振りアニメ用
+    swingTimer: 0,
     swingAngle: 0,
   };
 
   let skillPoints = 0;
-
-  // 敵 / 弾 / 回復
   let enemies = [];
-  let bullets = [];      // {x,y,vx,vy,life,owner,damage}
-  let items = [];        // {x,y,type:'ammo'|'heal'}
-  let magmas = [];       // {x,y,timer,phase}  phase:0予兆ピンク,1橙,2赤
-
-  // 階段（1つ）
+  let bullets = [];
+  let items = [];
+  let magmas = [];
   let stairs = null;
 
-  // 入力
   const keys = { ArrowUp:false, ArrowDown:false, ArrowLeft:false, ArrowRight:false };
-  let mouseX = W/2, mouseY = H/2;   // 画面座標
+  let mouseX = W/2, mouseY = H/2;
   let isFiring = false;
   let fireTimer = 0;
   let swordCooldown = 0;
 
-  // ゲームループ
   let lastTime = 0;
   let gameOver = false;
   let victory = false;
-
-  // マグマタイマー
-  let magmaTimer = 10 * 60;  // 10秒 @60fps
+  let magmaTimer = 10 * 60;
 
   // ============================================================
   //  ユーティリティ
@@ -181,7 +173,6 @@
   const dist = (x1,y1,x2,y2) => Math.hypot(x2-x1, y2-y1);
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
-  // ランダムなワールド座標を返す（マップ内側に余白を持たせる）
   function randomWorldPos(margin = 60) {
     return {
       x: rand(margin, WORLD_W - margin),
@@ -199,14 +190,13 @@
     magmas = [];
     skillPoints = 0;
 
-    // 敵40人（全マップ合わせて）
+    // 敵40人（全マップ合計）
     for (let i = 0; i < 40; i++) {
       const p = randomWorldPos(80);
       const hp = randInt(10, 500);
       const atk = randInt(10, 30);
-      // AIパラメータ
-      const chases = Math.random() < 0.5;          // 50%が追尾
-      const chaseRange = chases ? rand(80, 900) : 0; // 最大900でどこからでも
+      const chases = Math.random() < 0.5;
+      const chaseRange = chases ? rand(80, 900) : 0;
       const shootRange = rand(150, 700);
       enemies.push({
         x: p.x, y: p.y,
@@ -222,7 +212,7 @@
       });
     }
 
-    // 弾30個（全マップ合わせて）
+    // 弾30個
     for (let i = 0; i < 30; i++) {
       const p = randomWorldPos(40);
       items.push({ x:p.x, y:p.y, type:'ammo' });
@@ -233,11 +223,11 @@
       items.push({ x:p.x, y:p.y, type:'heal' });
     }
 
-    // 階段：中央マップから十分離れた位置に1つ
+    // 階段
     const sp = randomWorldPos(200);
     stairs = { x: sp.x, y: sp.y, w: 60, h: 60 };
 
-    // マグマ初期化
+    // マグマ初期
     spawnMagma(40);
   }
 
@@ -246,9 +236,9 @@
       const p = randomWorldPos(20);
       magmas.push({
         x: p.x, y: p.y,
-        timer: 180,   // 3秒後に赤
-        phase: 0,     // 0:ピンク,1:橙,2:赤
-        life: 999999, // 永続（消えない）
+        timer: 180,
+        phase: 0,
+        hit: false,
       });
     }
   }
@@ -340,7 +330,6 @@
     updateModeBtn();
   });
 
-  // スキルボタン
   function trySkill(cost, apply) {
     if (gameOver || victory) return;
     if (skillPoints < cost) return;
@@ -358,17 +347,16 @@
   function reload() {
     if (gameOver || victory) return;
     if (player.reloading) return;
-    if (player.ammo >= 10) return;   // 10発以上はリロード不要（最大10）
+    if (player.ammo >= 10) return;
     player.reloading = true;
-    player.reloadTimer = 60;         // 1秒
+    player.reloadTimer = 60;
   }
 
   function swingSword() {
     if (swordCooldown > 0) return;
-    swordCooldown = 24;    // 0.4秒
+    swordCooldown = 24;
     player.swingTimer = 12;
-    // 近接判定：プレイヤーから半径60以内の敵にダメージ
-    const RANGE = 70;
+    const RANGE = 90;   // 修正: 70 → 90
     for (const e of enemies) {
       if (!e.alive) continue;
       if (dist(player.x, player.y, e.x, e.y) < RANGE) {
@@ -384,8 +372,8 @@
   function update(dt) {
     if (gameOver || victory) return;
 
-    // --- 移動 ---
-    const sp = player.speed * 0.4;   // デフォ10 → 実効4
+    // 移動
+    const sp = player.speed * 0.4;
     if (keys.ArrowUp)    player.y -= sp;
     if (keys.ArrowDown)  player.y += sp;
     if (keys.ArrowLeft)  player.x -= sp;
@@ -393,15 +381,14 @@
     player.x = clamp(player.x, 20, WORLD_W - 20);
     player.y = clamp(player.y, 20, WORLD_H - 20);
 
-    // --- エイム（マウス） ---
-    // マウス画面座標 → ワールド座標
+    // エイム
     const camX = clamp(player.x - W/2, 0, WORLD_W - W);
     const camY = clamp(player.y - H/2, 0, WORLD_H - H);
     const wmx = mouseX + camX;
     const wmy = mouseY + camY;
     player.angle = Math.atan2(wmy - player.y, wmx - player.x);
 
-    // --- リロード ---
+    // リロード
     if (player.reloading) {
       player.reloadTimer--;
       if (player.reloadTimer <= 0) {
@@ -410,9 +397,8 @@
       }
     }
 
-    // --- 射撃 ---
+    // 射撃
     if (player.mode === 'gun') {
-      // 連射間隔：rapidPowerで短縮（最小3フレーム）
       const interval = Math.max(3, 10 - player.rapidPower);
       if (isFiring && !player.reloading && player.ammo > 0) {
         if (fireTimer <= 0) {
@@ -421,8 +407,8 @@
           bullets.push({
             x: player.x + Math.cos(a) * 22,
             y: player.y + Math.sin(a) * 22,
-            vx: Math.cos(a) * 10,
-            vy: Math.sin(a) * 10,
+            vx: Math.cos(a) * 8,    // 修正: 10 → 8（トンネリング防止）
+            vy: Math.sin(a) * 8,
             life: 90,
             owner: 'player',
             damage: player.gunPower,
@@ -437,7 +423,7 @@
       }
     }
 
-    // --- 剣クールダウン ---
+    // 剣クールダウン
     if (swordCooldown > 0) swordCooldown--;
     if (player.swingTimer > 0) {
       player.swingTimer--;
@@ -446,7 +432,7 @@
       player.swingAngle = 0;
     }
 
-    // --- 弾更新 ---
+    // 弾更新
     for (let i = bullets.length - 1; i >= 0; i--) {
       const b = bullets[i];
       b.x += b.vx;
@@ -457,15 +443,17 @@
         continue;
       }
       if (b.owner === 'player') {
+        let hit = false;
         for (const e of enemies) {
           if (!e.alive) continue;
-          if (dist(b.x, b.y, e.x, e.y) < 22) {
+          if (dist(b.x, b.y, e.x, e.y) < 28) {   // 修正: 22 → 28
             e.hp -= b.damage;
-            bullets.splice(i, 1);
+            hit = true;
             if (e.hp <= 0) { e.alive = false; skillPoints += 1; }
             break;
           }
         }
+        if (hit) bullets.splice(i, 1);
       } else {
         if (dist(b.x, b.y, player.x, player.y) < 20) {
           player.hp -= b.damage;
@@ -475,8 +463,7 @@
       }
     }
 
-    // --- 敵AI ---
-    // 主人公のいるマップ＋隣接マップ（3×3マップ範囲）の敵だけ動かす
+    // 敵AI
     const pmx = Math.floor(player.x / MAP_W);
     const pmy = Math.floor(player.y / MAP_H);
     const actX0 = (pmx - 1) * MAP_W, actX1 = (pmx + 2) * MAP_W;
@@ -487,18 +474,15 @@
       const d = dist(player.x, player.y, e.x, e.y);
       e.angle = Math.atan2(player.y - e.y, player.x - e.x);
 
-      // アクティブ範囲外なら射撃だけ止める（移動もしない）
       const active = e.x >= actX0 && e.x < actX1 && e.y >= actY0 && e.y < actY1;
       if (!active) continue;
 
-      // 追尾
       if (e.chases && d < e.chaseRange) {
         const a = Math.atan2(player.y - e.y, player.x - e.x);
         e.x += Math.cos(a) * e.speed;
         e.y += Math.sin(a) * e.speed;
       }
 
-      // 射撃
       e.fireTimer--;
       if (e.fireTimer <= 0 && d < e.shootRange) {
         e.fireTimer = randInt(60, 140);
@@ -515,7 +499,7 @@
       }
     }
 
-    // --- アイテム取得 ---
+    // アイテム取得
     for (let i = items.length - 1; i >= 0; i--) {
       const it = items[i];
       if (dist(it.x, it.y, player.x, player.y) < 24) {
@@ -528,16 +512,15 @@
       }
     }
 
-    // --- マグマ更新 ---
+    // マグマ
     for (const m of magmas) {
       if (m.phase < 2) {
         m.timer--;
         if (m.timer <= 0) {
           m.phase++;
-          m.timer = m.phase === 1 ? 120 : 999999; // 橙→赤
+          m.timer = m.phase === 1 ? 120 : 999999;
         }
       }
-      // 赤マグマに触れたら80ダメージ（1回だけ）
       if (m.phase === 2 && !m.hit) {
         if (dist(m.x, m.y, player.x, player.y) < 26) {
           player.hp -= 80;
@@ -547,14 +530,13 @@
       }
     }
 
-    // マグマ追加タイマー（10秒ごと40個）
     magmaTimer--;
     if (magmaTimer <= 0) {
       magmaTimer = 10 * 60;
       spawnMagma(40);
     }
 
-    // --- 階段クリア判定 ---
+    // 階段
     if (stairs && dist(player.x, player.y, stairs.x + stairs.w/2, stairs.y + stairs.h/2) < 40) {
       victory = true;
       victoryFooter.classList.remove('hidden');
@@ -563,7 +545,7 @@
       document.querySelector('.btn-row').classList.add('hidden');
     }
 
-    // --- 表示更新 ---
+    // 表示更新
     hpDisplay.textContent = Math.max(0, player.hp);
     ammoDisplay.textContent = player.reloading ? '...' : player.ammo;
     enemyDisplay.textContent = enemies.filter(e => e.alive).length;
@@ -586,14 +568,13 @@
   function draw() {
     ctx.clearRect(0, 0, W, H);
 
-    // カメラ
     const camX = clamp(player.x - W/2, 0, WORLD_W - W);
     const camY = clamp(player.y - H/2, 0, WORLD_H - H);
 
     ctx.save();
     ctx.translate(-camX, -camY);
 
-    // 背景グリッド（ワールド全体）
+    // グリッド
     ctx.strokeStyle = '#141d26';
     ctx.lineWidth = 1;
     const gx0 = Math.floor(camX / 40) * 40;
@@ -605,7 +586,7 @@
       ctx.beginPath(); ctx.moveTo(camX, y); ctx.lineTo(camX + W, y); ctx.stroke();
     }
 
-    // マップ境界線（11×11）
+    // マップ境界
     ctx.strokeStyle = '#1e3a4a';
     ctx.lineWidth = 2;
     for (let c = 0; c <= MAP_COLS; c++) {
@@ -617,7 +598,7 @@
       ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(WORLD_W, y); ctx.stroke();
     }
 
-    // マグマ描画
+    // マグマ
     for (const m of magmas) {
       if (m.x < camX - 40 || m.x > camX + W + 40 || m.y < camY - 40 || m.y > camY + H + 40) continue;
       if (m.phase === 0) {
@@ -634,7 +615,7 @@
       ctx.shadowBlur = 0;
     }
 
-    // アイテム描画
+    // アイテム
     for (const it of items) {
       if (it.x < camX - 40 || it.x > camX + W + 40 || it.y < camY - 40 || it.y > camY + H + 40) continue;
       if (it.type === 'ammo') {
@@ -655,10 +636,9 @@
       }
     }
 
-    // 階段描画
+    // 階段
     if (stairs) {
       const s = stairs;
-      // 上の階へ続く階段（ドット絵風）
       ctx.fillStyle = '#2a1a0a';
       ctx.fillRect(s.x, s.y, s.w, s.h);
       ctx.fillStyle = '#7a5a2a';
@@ -674,7 +654,7 @@
       ctx.fillText('UP', s.x + s.w/2, s.y - 6);
     }
 
-    // 敵描画
+    // 敵
     for (const e of enemies) {
       if (!e.alive) continue;
       if (e.x < camX - 60 || e.x > camX + W + 60 || e.y < camY - 60 || e.y > camY + H + 60) continue;
@@ -685,21 +665,19 @@
       ctx.strokeStyle = '#ff4d6d'; ctx.lineWidth = 2; ctx.stroke();
       ctx.shadowBlur = 0;
 
-      // HPバー
       const hpR = clamp(e.hp / e.maxHp, 0, 1);
       ctx.fillStyle = '#1a0a0e';
       ctx.fillRect(e.x - 22, e.y - 30, 44, 5);
       ctx.fillStyle = hpR > 0.5 ? '#ff4d6d' : (hpR > 0.25 ? '#ff8a5c' : '#ff3b1f');
       ctx.fillRect(e.x - 22, e.y - 30, 44 * hpR, 5);
 
-      // 銃口
       ctx.fillStyle = '#ff4d6d';
       ctx.beginPath();
       ctx.arc(e.x + Math.cos(e.angle)*16, e.y + Math.sin(e.angle)*16, 4, 0, Math.PI*2);
       ctx.fill();
     }
 
-    // 弾描画
+    // 弾
     for (const b of bullets) {
       if (b.x < camX - 20 || b.x > camX + W + 20 || b.y < camY - 20 || b.y > camY + H + 20) continue;
       if (b.owner === 'player') {
@@ -713,7 +691,7 @@
       ctx.shadowBlur = 0;
     }
 
-    // プレイヤー描画
+    // プレイヤー
     ctx.shadowColor = '#00e6b0'; ctx.shadowBlur = 20;
     ctx.fillStyle = '#0a1a1a';
     ctx.beginPath(); ctx.arc(player.x, player.y, 16, 0, Math.PI*2); ctx.fill();
@@ -731,7 +709,6 @@
       ctx.arc(player.x + Math.cos(player.angle)*32, player.y + Math.sin(player.angle)*32, 5, 0, Math.PI*2);
       ctx.fill();
     } else {
-      // 剣
       const sa = player.angle + player.swingAngle - 0.6;
       ctx.strokeStyle = '#7ad7ff'; ctx.lineWidth = 5;
       ctx.shadowColor = '#7ad7ff'; ctx.shadowBlur = 16;
@@ -742,7 +719,6 @@
       ctx.shadowBlur = 0;
     }
 
-    // HPバー
     const hpR = clamp(player.hp / player.maxHp, 0, 1);
     ctx.fillStyle = '#1a2a2a';
     ctx.fillRect(player.x - 26, player.y - 36, 52, 5);
@@ -757,9 +733,6 @@
     }
 
     ctx.restore();
-
-    // 画面端の暗闇（マップ外の雰囲気）
-    // 何もなし
 
     // ゲームオーバー
     if (gameOver) {
