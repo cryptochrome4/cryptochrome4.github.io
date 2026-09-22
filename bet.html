@@ -69,7 +69,6 @@ body {
     #0a0a12;
 }
 
-/* ネジ（釘） */
 .nail {
   position: absolute;
   width: 6px;
@@ -80,7 +79,6 @@ body {
   box-shadow: 0 0 3px rgba(200,200,200,0.5);
 }
 
-/* 土管（左右2つ） */
 .pipe {
   position: absolute;
   bottom: 60px;
@@ -135,7 +133,6 @@ body {
   box-shadow: inset 0 0 20px rgba(0,0,0,0.5), 0 0 25px rgba(150, 255, 100, 0.8);
 }
 
-/* 玉 */
 .ball {
   position: absolute;
   width: 11px;
@@ -148,7 +145,6 @@ body {
   will-change: transform;
 }
 
-/* スロット演出 */
 .slot-area {
   position: absolute;
   top: 50%;
@@ -210,12 +206,10 @@ body {
   white-space: nowrap;
 }
 
-/* 文字サイズ調整 */
 .slot-symbol.len1 { font-size: 2rem; }
 .slot-symbol.len2 { font-size: 1.5rem; letter-spacing: -2px; }
 .slot-symbol.len3 { font-size: 1.1rem; letter-spacing: -2px; }
 
-/* 大当たり表示 */
 .hit-display {
   position: absolute;
   top: 20px;
@@ -264,7 +258,6 @@ body {
   margin-top: 8px;
 }
 
-/* 右パネル */
 .panel {
   flex: 1 1 320px;
   background: linear-gradient(180deg, #22222e 0%, #15151f 100%);
@@ -572,7 +565,6 @@ body {
   <div class="board" id="board">
     <div class="board-bg"></div>
 
-    <!-- 土管（左右） -->
     <div class="pipe pipe-left" id="pipeLeft">
       <div class="pipe-body"></div>
       <div class="pipe-top"></div>
@@ -584,14 +576,12 @@ body {
       <div class="pipe-label">土管</div>
     </div>
 
-    <!-- スロット演出 -->
     <div class="slot-area" id="slotArea">
       <div class="slot-window"><div class="slot-reel" id="reel0"></div></div>
       <div class="slot-window"><div class="slot-reel" id="reel1"></div></div>
       <div class="slot-window"><div class="slot-reel" id="reel2"></div></div>
     </div>
 
-    <!-- 当たり表示 -->
     <div class="hit-display" id="hitDisplay">
       <div class="hit-label">当選用語</div>
       <div class="hit-term" id="hitTerm">---</div>
@@ -616,7 +606,7 @@ body {
     <div class="data-box"><span class="label">持ち玉</span><span class="value small" id="dBalls">0</span></div>
     <div class="data-box"><span class="label">差玉</span><span class="value small" id="dDiff">0</span></div>
     <div class="data-box"><span class="label">レート</span><span class="value small" id="dRate">4円</span></div>
-    <div class="data-box"><span class="label">交換率</span><span class="value small" id="dExchange">等価</span></div>
+    <div class="data-box"><span class="label">スロット率</span><span class="value small" id="dSlotRate">1/3</span></div>
   </div>
 
   <div class="term-display">
@@ -663,16 +653,15 @@ body {
 <script>
 // ===== スロット図柄（大当たり順） =====
 const SLOT_SYMBOLS = [
-  { str: '§ｦ', len: 2, rank: '最強' },
-  { str: '甜', len: 1, rank: '大当たり' },
-  { str: '¡=º', len: 3, rank: '大当たり' },
-  { str: '朔', len: 1, rank: '当たり' },
-  { str: '果', len: 1, rank: '当たり' },
-  { str: '葡', len: 1, rank: '小当たり' }
+  { str: '§ｦ', len: 2, rank: '最強', weight: 3, balls: 3000 },
+  { str: '甜', len: 1, rank: '大当たり', weight: 5, balls: 1500 },
+  { str: '¡=º', len: 3, rank: '大当たり', weight: 10, balls: 1000 },
+  { str: '朔', len: 1, rank: '当たり', weight: 20, balls: 700 },
+  { str: '果', len: 1, rank: '当たり', weight: 30, balls: 500 },
+  { str: '葡', len: 1, rank: '小当たり', weight: 32, balls: 300 }
 ];
 
 // ===== 用語プール =====
-// 当たり用（7割）と大当たり用（3割）に分ける
 const TERMS_ATARI = [
   { term: '債券', desc: '国や企業が発行する借用証書。満期まで持つと利息がもらえる。' },
   { term: 'ファンダメンタルズ', desc: '企業の業績・財務など本質的価値。長期投資の判断材料。' },
@@ -983,7 +972,6 @@ const TERMS_DAIATARI = [
   { term: '神', desc: '市場そのもの。' }
 ];
 
-// ===== レート =====
 const PACHINKO_TYPES = [
   { name: '1円パチンコ', rate: 1, exchange: '等価', desc: '1玉=1円。少額で遊べる。' },
   { name: '2円パチンコ', rate: 2, exchange: '等価', desc: '1玉=2円。低貸し。' },
@@ -999,21 +987,20 @@ let spec = {};
 
 function generateSpec() {
   const type = PACHINKO_TYPES[Math.floor(Math.random() * PACHINKO_TYPES.length)];
-  const modes = [
-    { name: 'ノーマル', desc: '標準スペック', hitRate: 1/30, balls: 500 },
-    { name: 'ライト', desc: '軽い・当たりやすい', hitRate: 1/20, balls: 350 },
-    { name: 'ミドル', desc: 'バランス型', hitRate: 1/50, balls: 800 },
-    { name: 'ハード', desc: '重い・出玉多め', hitRate: 1/80, balls: 1200 },
-    { name: '爆裂', desc: '超重い・超出玉', hitRate: 1/120, balls: 2500 },
-    { name: '甘デジ', desc: '甘い・連荘しやすい', hitRate: 1/15, balls: 300 }
+  // スロット当選率もランダム
+  const slotRates = [
+    { name: '甘', rate: 1/2, desc: 'スロットが揃いやすい' },
+    { name: 'ライト', rate: 1/3, desc: 'バランス型' },
+    { name: 'ミドル', rate: 1/5, desc: '標準' },
+    { name: 'ハード', rate: 1/8, desc: '揃いにくい' },
+    { name: '激辛', rate: 1/12, desc: '超揃いにくい' }
   ];
-  const m = modes[Math.floor(Math.random() * modes.length)];
+  const sr = slotRates[Math.floor(Math.random() * slotRates.length)];
   spec = {
     type: type,
-    hitRate: m.hitRate,
-    ballsPerHit: m.balls,
-    modeName: m.name,
-    modeDesc: m.desc,
+    slotRate: sr.rate,
+    slotRateName: sr.name,
+    slotRateDesc: sr.desc,
     ballCost: 1
   };
 }
@@ -1032,15 +1019,13 @@ let state = {
   stateDesc: '確率変動なし'
 };
 
-const SAVE_KEY = 'sbi_pachinko_v8';
+const SAVE_KEY = 'sbi_pachinko_v9';
 
 let autoMode = false;
 let autoTimer = null;
 let spinning = false;
 let slotActive = false;
-let slotReserved = false;
 
-// ===== ネジ配置 =====
 let nails = [];
 
 function generateNails() {
@@ -1049,12 +1034,10 @@ function generateNails() {
   const W = board.clientWidth || 620;
   const H = board.clientHeight || 600;
 
-  // 盤面全体にランダム配置（100本以上）
   const count = 100 + Math.floor(Math.random() * 40);
   for (let i = 0; i < count; i++) {
     const x = 30 + Math.random() * (W - 60);
     const y = 60 + Math.random() * (H - 200);
-    // 土管の直上を避ける
     const pipeLeftX = 60 + 35;
     const pipeRightX = W - 60 - 35;
     if (Math.abs(x - pipeLeftX) < 40 && y > H - 200) continue;
@@ -1081,7 +1064,7 @@ function init() {
   addLog('▶ SBI証券パチンコへようこそ', 'system');
   addLog(`▶ 財布：${state.wallet.toLocaleString()}円 ｜ 持ち玉：${state.balls}`, 'system');
   addLog(`▶ ${spec.type.name}（${spec.type.desc}）`, 'system');
-  addLog(`▶ スペック：${spec.modeName}（${spec.modeDesc}）`, 'system');
+  addLog(`▶ スロット当選率：${spec.slotRateName}（1/${Math.round(1/spec.slotRate)}）`, 'system');
   addLog(`▶ ネジ：${nails.length}本 ｜ 土管：左右2つ`, 'system');
 }
 
@@ -1170,7 +1153,7 @@ function confirmReset() {
     generateNails();
     addLog('🔄 リセットしました', 'system');
     addLog(`▶ 新しいスペック：${spec.type.name}（${spec.type.desc}）`, 'system');
-    addLog(`▶ ${spec.modeName}（${spec.modeDesc}）`, 'system');
+    addLog(`▶ スロット当選率：${spec.slotRateName}（1/${Math.round(1/spec.slotRate)}）`, 'system');
     addLog(`▶ 財布：${state.wallet.toLocaleString()}円 ｜ 持ち玉：${state.balls}`, 'system');
     addLog(`▶ ネジ：${nails.length}本 ｜ 土管：左右2つ`, 'system');
     closeModal();
@@ -1201,7 +1184,7 @@ function render() {
 
   if (spec.type) {
     document.getElementById('dRate').textContent = spec.type.rate + '円';
-    document.getElementById('dExchange').textContent = spec.type.exchange;
+    document.getElementById('dSlotRate').textContent = '1/' + Math.round(1/spec.slotRate);
     document.getElementById('machineTop').textContent = `SBI証券パチンコ ～ ${spec.type.name} ～`;
   }
   renderLog();
@@ -1229,7 +1212,7 @@ function toggleAuto() {
     btn.classList.add('on');
     addLog('🔄 自動回転 ON', 'system');
     autoTimer = setInterval(() => {
-      if (!spinning && state.balls >= spec.ballCost) {
+      if (!spinning && !slotActive && state.balls >= spec.ballCost) {
         doSpin('stop');
       } else if (state.balls < spec.ballCost) {
         addLog('⚠️ 持ち玉切れ。自動回転停止', 'system');
@@ -1247,7 +1230,6 @@ function toggleAuto() {
   }
 }
 
-// ===== 玉の物理シミュレーション =====
 function simulateBall(startX, startY, vx0, vy0) {
   return new Promise(resolve => {
     const board = document.getElementById('board');
@@ -1281,12 +1263,10 @@ function simulateBall(startX, startY, vx0, vy0) {
       x += vx;
       y += vy;
 
-      // 壁
       if (x < 12) { x = 12; vx = Math.abs(vx) * 0.4; }
       if (x > W - 12) { x = W - 12; vx = -Math.abs(vx) * 0.5; }
       if (y < 12) { y = 12; vy = Math.abs(vy) * 0.4; }
 
-      // ネジ衝突
       for (const n of nails) {
         const dx = x - n.x;
         const dy = y - n.y;
@@ -1304,19 +1284,8 @@ function simulateBall(startX, startY, vx0, vy0) {
         }
       }
 
-      // 土管判定（左右）
       if (y > pipeTopY && y < pipeTopY + 30) {
-        if (Math.abs(x - pipeLeftX) < 30) {
-          ball.style.background = 'radial-gradient(circle at 35% 35%, #aaffaa, #2a7a2a)';
-          ball.style.boxShadow = '0 0 15px #80ff80';
-          setTimeout(() => {
-            ball.style.opacity = '0';
-            setTimeout(() => ball.remove(), 200);
-          }, 150);
-          resolve('pipe');
-          return;
-        }
-        if (Math.abs(x - pipeRightX) < 30) {
+        if (Math.abs(x - pipeLeftX) < 30 || Math.abs(x - pipeRightX) < 30) {
           ball.style.background = 'radial-gradient(circle at 35% 35%, #aaffaa, #2a7a2a)';
           ball.style.boxShadow = '0 0 15px #80ff80';
           setTimeout(() => {
@@ -1328,7 +1297,6 @@ function simulateBall(startX, startY, vx0, vy0) {
         }
       }
 
-      // 底
       if (y > H - 8) {
         ball.style.opacity = '0';
         setTimeout(() => ball.remove(), 200);
@@ -1373,16 +1341,13 @@ async function doSpin(intensity) {
 
   addLog(`🎯 ${state.spins}回転目…（${intensity.toUpperCase()}）`, 'system');
 
-  // 玉を複数発射
   const ballCount = intensity === 'low' ? 5 : intensity === 'stop' ? 15 : 30;
   const board = document.getElementById('board');
-  const H = board.clientHeight || 600;
   const W = board.clientWidth || 620;
 
   const promises = [];
   for (let i = 0; i < ballCount; i++) {
-    // x座標 1〜15 のどこかからランダム
-    const lane = 1 + Math.floor(Math.random() * 15); // 1〜15
+    const lane = 1 + Math.floor(Math.random() * 15);
     const startX = 20 + (lane - 1) * ((W - 40) / 14);
     const startY = 20;
     const vx0 = (Math.random() - 0.5) * 1.5;
@@ -1397,22 +1362,21 @@ async function doSpin(intensity) {
   let pipeCount = 0;
   results.forEach(r => { if (r === 'pipe') pipeCount++; });
 
-  // 土管に入ったらスロット開始
+  // 土管に入ったらスロット開始（当たり確定）
   if (pipeCount > 0) {
     addLog(`🟢 土管入賞！ ${pipeCount}個`, 'event');
-    // 当たり用語を表示（7割プール）
+    // 当たり用語（7割プール）
     const term = TERMS_ATARI[Math.floor(Math.random() * TERMS_ATARI.length)];
     state.zukan[term.term] = (state.zukan[term.term] || 0) + 1;
     document.getElementById('tTerm').textContent = term.term;
     document.getElementById('tDesc').textContent = term.desc;
     addLog(`📖 当たり用語：【${term.term}】${term.desc}`, 'hit');
 
-    // スロット開始
+    // スロット開始（前の当たり優先、予約なし）
     if (!slotActive) {
       startSlot();
     } else {
       addLog('⏳ スロット中。予約はされません', 'system');
-      slotReserved = false;
     }
   } else {
     addLog(`…ハズレ`, 'miss');
@@ -1426,10 +1390,8 @@ async function doSpin(intensity) {
   doSave();
 }
 
-// ===== スロット =====
 function buildReel(reel) {
   reel.innerHTML = '';
-  // スロット図柄を繰り返し並べる
   const symbols = [...SLOT_SYMBOLS, ...SLOT_SYMBOLS, ...SLOT_SYMBOLS];
   symbols.forEach(sym => {
     const s = document.createElement('div');
@@ -1456,60 +1418,59 @@ function startSlot() {
     reel.classList.add('spinning');
   }
 
-  // 1.5秒後に停止
   setTimeout(() => {
-    // 揃う図柄を決定（重み付き）
-    const weights = [3, 5, 10, 20, 30, 32]; // 大当たり順、§ｦが最強で出にくい
-    const total = weights.reduce((a,b) => a+b, 0);
-    let rand = Math.random() * total;
-    let chosenIndex = 0;
-    for (let i = 0; i < weights.length; i++) {
-      rand -= weights[i];
-      if (rand <= 0) { chosenIndex = i; break; }
-    }
-    const chosen = SLOT_SYMBOLS[chosenIndex];
+    // スロット当選判定（スペックのslotRate）
+    const slotHit = Math.random() < spec.slotRate;
 
-    // 3リール停止
-    for (let i = 0; i < 3; i++) {
+    if (slotHit) {
+      // 揃う図柄を重み付き抽選
+      const weights = SLOT_SYMBOLS.map(s => s.weight);
+      const total = weights.reduce((a,b) => a+b, 0);
+      let rand = Math.random() * total;
+      let chosenIndex = 0;
+      for (let i = 0; i < weights.length; i++) {
+        rand -= weights[i];
+        if (rand <= 0) { chosenIndex = i; break; }
+      }
+      const chosen = SLOT_SYMBOLS[chosenIndex];
+
+      // 3リール停止（揃う）
+      for (let i = 0; i < 3; i++) {
+        setTimeout(() => {
+          const reel = document.getElementById('reel' + i);
+          reel.classList.remove('spinning');
+          reel.innerHTML = '';
+          const s = document.createElement('div');
+          s.className = 'slot-symbol len' + chosen.len;
+          s.textContent = chosen.str;
+          reel.appendChild(s);
+        }, i * 300);
+      }
+
       setTimeout(() => {
-        const reel = document.getElementById('reel' + i);
-        reel.classList.remove('spinning');
-        reel.innerHTML = '';
-        const s = document.createElement('div');
-        s.className = 'slot-symbol len' + chosen.len;
-        s.textContent = chosen.str;
-        reel.appendChild(s);
-      }, i * 300);
-    }
+        document.getElementById('slotArea').classList.remove('active');
+        slotActive = false;
 
-    // 全部停止後、大当たり判定
-    setTimeout(() => {
-      document.getElementById('slotArea').classList.remove('active');
-      slotActive = false;
-
-      // 大当たり（全リール揃った）
-      const isDaiatari = true; // 必ず揃う（演出として）
-      if (isDaiatari) {
+        // 大当たり成立
         state.totalHits++;
         state.chain++;
-        state.balls += spec.ballsPerHit;
+        state.balls += chosen.balls;
 
-        // 大当たり用語を表示（3割プール）
+        // 大当たり用語（3割プール）
         const term = TERMS_DAIATARI[Math.floor(Math.random() * TERMS_DAIATARI.length)];
         state.zukan[term.term] = (state.zukan[term.term] || 0) + 1;
 
         document.getElementById('tTerm').textContent = term.term;
         document.getElementById('tDesc').textContent = term.desc;
 
-        // 当たり表示
         const hitDisplay = document.getElementById('hitDisplay');
         document.getElementById('hitTerm').textContent = term.term;
         document.getElementById('hitDesc').textContent = term.desc;
-        document.getElementById('hitRank').textContent = `図柄：${chosen.str}（${chosen.rank}）`;
+        document.getElementById('hitRank').textContent = `図柄：${chosen.str}（${chosen.rank}） ｜ +${chosen.balls}玉`;
         hitDisplay.classList.add('active');
 
         addLog(`🎉 大当たり！【${term.term}】${term.desc}`, 'hit');
-        addLog(`💰 +${spec.ballsPerHit}玉 獲得！ 連荘：${state.chain} ｜ 図柄：${chosen.str}`, 'hit');
+        addLog(`💰 +${chosen.balls}玉 獲得！ 連荘：${state.chain} ｜ 図柄：${chosen.str}`, 'hit');
 
         if (Math.random() < 0.3) {
           state.stateMode = '確変';
@@ -1521,15 +1482,37 @@ function startSlot() {
           addLog(`⭐ 状態変化：時短`, 'event');
         }
 
-        // 当たり表示を3秒後に消す
         setTimeout(() => {
           hitDisplay.classList.remove('active');
         }, 3500);
 
         render();
         doSave();
+      }, 3 * 300 + 500);
+    } else {
+      // ハズレ：バラバラの図柄で停止
+      for (let i = 0; i < 3; i++) {
+        setTimeout(() => {
+          const reel = document.getElementById('reel' + i);
+          reel.classList.remove('spinning');
+          reel.innerHTML = '';
+          const randomSym = SLOT_SYMBOLS[Math.floor(Math.random() * SLOT_SYMBOLS.length)];
+          const s = document.createElement('div');
+          s.className = 'slot-symbol len' + randomSym.len;
+          s.textContent = randomSym.str;
+          reel.appendChild(s);
+        }, i * 300);
       }
-    }, 3 * 300 + 500);
+
+      setTimeout(() => {
+        document.getElementById('slotArea').classList.remove('active');
+        slotActive = false;
+        addLog('…スロットハズレ', 'miss');
+        state.chain = 0;
+        render();
+        doSave();
+      }, 3 * 300 + 500);
+    }
   }, 1500);
 }
 
@@ -1544,20 +1527,21 @@ function showHowTo() {
       <li>スロット中に別の玉が土管に入っても予約されない（前の当たり優先）。</li>
       <li>スロットが揃ったら「大当たり」。</li>
     </ul>
+    <p><strong>二段階抽選：</strong></p>
+    <ul>
+      <li><strong>第一段階</strong>：玉が土管に入るか（物理）→ 入ったら当たり確定。当たり用語（7割）を獲得。</li>
+      <li><strong>第二段階</strong>：スロットが揃うか（確率）→ 揃ったら大当たり。大当たり用語（3割）を獲得。</li>
+    </ul>
     <p><strong>スロット図柄（大当たり順）：</strong></p>
     <ul>
-      <li><strong>§ｦ</strong>（最強）</li>
-      <li><strong>甜</strong></li>
-      <li><strong>¡=º</strong></li>
-      <li><strong>朔</strong></li>
-      <li><strong>果</strong></li>
-      <li><strong>葡</strong>（最弱）</li>
+      <li><strong>§ｦ</strong>（最強、+3000玉）</li>
+      <li><strong>甜</strong>（+1500玉）</li>
+      <li><strong>¡=º</strong>（+1000玉）</li>
+      <li><strong>朔</strong>（+700玉）</li>
+      <li><strong>果</strong>（+500玉）</li>
+      <li><strong>葡</strong>（最弱、+300玉）</li>
     </ul>
-    <p><strong>用語プール：</strong></p>
-    <ul>
-      <li>当たり用語：全体の7割</li>
-      <li>大当たり用語：全体の3割</li>
-    </ul>
+    <p><strong>スロット当選率：</strong>リセットごとにランダム（1/2 〜 1/12）。</p>
     <p><strong>レート：</strong>1円、2円、4円、5円、10円、100円からランダム。</p>
     <div class="modal-btns">
       <button class="pbtn" onclick="closeModal()">閉じる</button>
@@ -1570,16 +1554,18 @@ function showSpec() {
     <h2>⚙️ 現在のスペック</h2>
     <p><strong>レート：</strong>${spec.type.name}（${spec.type.desc}）</p>
     <p><strong>交換率：</strong>${spec.type.exchange}</p>
-    <p><strong>モード：</strong>${spec.modeName}（${spec.modeDesc}）</p>
+    <p><strong>スロット当選率：</strong>${spec.slotRateName}（1/${Math.round(1/spec.slotRate)}）${spec.slotRateDesc}</p>
     <ul>
-      <li>スロット当選確率：1/${Math.round(1/spec.hitRate)}</li>
-      <li>1回の出玉：${spec.ballsPerHit}玉</li>
       <li>1回転の消費：${spec.ballCost}玉</li>
       <li>ネジの数：${nails.length}本</li>
       <li>土管：左右2つ</li>
       <li>玉の発射数：LOW 5個 / STOP 15個 / HIGH 30個</li>
       <li>当たり用語：${TERMS_ATARI.length}個（7割）</li>
       <li>大当たり用語：${TERMS_DAIATARI.length}個（3割）</li>
+    </ul>
+    <p><strong>図柄ごとの出玉：</strong></p>
+    <ul>
+      ${SLOT_SYMBOLS.map(s => `<li>${s.str}（${s.rank}）：+${s.balls}玉</li>`).join('')}
     </ul>
     <p style="color:#88a;font-size:0.8rem;">※リセットするとスペックとネジ配置がランダムに変わります</p>
     <div class="modal-btns">
