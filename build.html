@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>間取り図ランダム探索 - 貧乏から金持ちまで</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #2b2b2b;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: 'Segoe UI', 'Meiryo', sans-serif;
+    }
+    .game-container {
+      background: #1e1e1e;
+      border-radius: 24px;
+      padding: 20px 20px 12px;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.7);
+    }
+    .floor-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 8px 12px;
+      color: #ddd;
+      font-weight: bold;
+      letter-spacing: 1px;
+    }
+    .floor-label {
+      background: #3a3a3a;
+      padding: 6px 18px;
+      border-radius: 30px;
+      font-size: 1rem;
+      box-shadow: inset 0 1px 3px #00000055;
+    }
+    .status {
+      font-size: 0.9rem;
+      color: #aaa;
+    }
+    canvas {
+      display: block;
+      margin: 0 auto;
+      border-radius: 16px;
+      box-shadow: 0 0 0 2px #3a3a3a;
+      background: #f5f0e8;
+      cursor: pointer;
+      width: 100%;
+      height: auto;
+      image-rendering: crisp-edges;
+    }
+    .footer {
+      margin-top: 14px;
+      padding: 10px 12px 6px;
+      text-align: center;
+      color: #bbb;
+      font-size: 0.95rem;
+      border-top: 1px solid #3a3a3a;
+      min-height: 44px;
+    }
+    .footer a {
+      color: #ffd966;
+      text-decoration: none;
+      font-weight: bold;
+      background: #3a3a3a;
+      padding: 6px 18px;
+      border-radius: 30px;
+      transition: 0.15s;
+      display: inline-block;
+    }
+    .footer a:hover {
+      background: #5a5a5a;
+      color: #fff3c9;
+    }
+    .message {
+      font-size: 1rem;
+      color: #ffb86b;
+    }
+  </style>
+</head>
+<body>
+<div class="game-container">
+  <div class="floor-header">
+    <span class="floor-label" id="floorLabel">1F</span>
+    <span class="status" id="statusMsg">矢印キー:移動 / クリック:ドア・階段</span>
+  </div>
+  <canvas id="gameCanvas" width="800" height="600"></canvas>
+  <div class="footer" id="footer">
+    <span>🚪 玄関を目指せ</span>
+  </div>
+</div>
+
+<script>
+  (function() {
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const floorLabel = document.getElementById('floorLabel');
+    const statusMsg = document.getElementById('statusMsg');
+    const footer = document.getElementById('footer');
+
+    // マップ設定
+    const MAP_W = 10;
+    const MAP_H = 8;
+    const TILE_SIZE = 60; // 600x480相当だがキャンバスは800x600、余白調整
+    const OFFSET_X = 100; // (800 - 10*60)/2 = 100
+    const OFFSET_Y = 60;  // (600 - 8*60)/2 = 60
+
+    // タイルの種類
+    const T = {
+      FLOOR: 0,       // 床
+      WALL: 1,        // 壁
+      DOOR: 2,        // ドア(閉)
+      DOOR_OPEN: 3,   // ドア(開)
+      STAIRS_UP: 4,   // 上り階段
+      STAIRS_DOWN: 5, // 下り階段
+      ENTRANCE: 6,    // 玄関(ゴール)
+      PLAYER: 7,      // プレイヤー(描画用、マップには保存しない)
+    };
+
+    // 部屋の名称パターン(バラエティ豊かに)
+    const ROOM_NAMES = [
+      '和室', '洋室', '寝室', '子供部屋', '書斎', 'リビング', 'ダイニング', 'キッチン',
+      '浴室', '洗面所', 'トイレ', 'WC', '便所', 'お手洗い', '化粧室', '洗面', '脱衣所',
+      '納戸', '物置', '倉庫', '収納', 'クローゼット', '押入れ', 'ウォークインクローゼット',
+      '玄関', 'ホール', '廊下', '階段', '踊り場', 'バルコニー', 'ベランダ', 'テラス',
+      '屋根裏', '地下室', 'ガレージ', '車庫', '庭', '坪庭', '中庭', '縁側',
+      '床の間', '仏間', '神棚', '押入れ', '物入', 'パントリー', 'ランドリー',
+      'ゲストルーム', 'メイド部屋', '書庫', '音楽室', 'シアタールーム', 'ジム',
+      'サウナ', 'プール', 'ワインセラー', '秘密の部屋'
+    ];
+
+    // グローバル状態
+    let floors = [];          // 階層データ { map: 2D配列, rooms: 部屋名2D配列 }
+    let currentFloor = 0;     // 0 = 1F, 1 = 2F, ...
+    let playerPos = { x: 0, y: 0 };
+    let gameCleared = false;
+
+    // 描画用の一時変数
+    let hoverTile = { x: -1, y: -1 };
+
+    // ========== ユーティリティ ==========
+    function randInt(max) {
+      return Math.floor(Math.random() * max);
+    }
+
+    function shuffle(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = randInt(i + 1);
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    // ランダムな部屋名を返す
+    function getRandomRoomName() {
+      return ROOM_NAMES[randInt(ROOM_NAMES.length)];
+    }
+
+    // ========== 間取り生成 ==========
+    // 指定サイズのマップを壁で初期化
+    function createEmptyMap(w, h) {
+      const map = [];
+      for (let y = 0; y < h; y++) {
+        const row = [];
+        for (let x = 0; x < w; x++) {
+          row.push(T.WALL);
+        }
+        map.push(row);
+      }
+      return map;
+    }
+
+    // ランダムに部屋(矩形)を掘る(壁を床に)
+    function carveRooms(map, roomNames, numRooms) {
+      const w = map[0].length;
+      const h = map.length;
+      const rooms = [];
+      let attempts = 0;
+      const maxAttempts = 200;
+
+      while (rooms.length < numRooms && attempts < maxAttempts) {
+        attempts++;
+        const roomW = randInt(4) + 3; // 3~6
+        const roomH = randInt(3) + 3; // 3~5
+        const x = randInt(w - roomW - 1) + 1;
+        const y = randInt(h - roomH - 1) + 1;
+
+        // 既存の部屋と重ならないかチェック(少しマージン)
+        let overlap = false;
+        for (let r of rooms) {
+          if (x < r.x + r.w + 1 && x + roomW + 1 > r.x &&
+              y < r.y + r.h + 1 && y + roomH + 1 > r.y) {
+            overlap = true;
+            break;
+          }
+        }
+        if (overlap) continue;
+
+        // 部屋を掘る
+        for (let dy = 0; dy < roomH; dy++) {
+          for (let dx = 0; dx < roomW; dx++) {
+            map[y + dy][x + dx] = T.FLOOR;
+          }
+        }
+        rooms.push({ x, y, w: roomW, h: roomH, name: getRandomRoomName() });
+
+        // 部屋名をマップに記録(描画用)
+        for (let dy = 0; dy < roomH; dy++) {
+          for (let dx = 0; dx < roomW; dx++) {
+            roomNames[y + dy][x + dx] = rooms[rooms.length - 1].name;
+          }
+        }
+      }
+
+      // 部屋が1つもできなかったら強制的に1つ作る
+      if (rooms.length === 0) {
+        const x = 2, y = 2, roomW = 4, roomH = 4;
+        for (let dy = 0; dy < roomH; dy++) {
+          for (let dx = 0; dx < roomW; dx++) {
+            map[y + dy][x + dx] = T.FLOOR;
+            roomNames[y + dy][x + dx] = '洋室';
+          }
+        }
+        rooms.push({ x, y, w: roomW, h: roomH, name: '洋室' });
+      }
+
+      return rooms;
+    }
+
+    // 部屋同士を廊下で接続(ドアも配置)
+    function connectRooms(map, roomNames, rooms) {
+      const w = map[0].length;
+      const h = map.length;
+
+      // すべての部屋を順に接続(最小全域木風)
+      for (let i = 1; i < rooms.length; i++) {
+        const a = rooms[i - 1];
+        const b = rooms[i];
+        // aの中心とbの中心を結ぶL字経路を掘る
+        const ax = Math.floor(a.x + a.w / 2);
+        const ay = Math.floor(a.y + a.h / 2);
+        const bx = Math.floor(b.x + b.w / 2);
+        const by = Math.floor(b.y + b.h / 2);
+
+        // 水平→垂直 or 垂直→水平 ランダム
+        if (Math.random() < 0.5) {
+          carveCorridor(map, roomNames, ax, ay, bx, ay);
+          carveCorridor(map, roomNames, bx, ay, bx, by);
+        } else {
+          carveCorridor(map, roomNames, ax, ay, ax, by);
+          carveCorridor(map, roomNames, ax, by, bx, by);
+        }
+      }
+
+      // 追加の接続でループを作る(ドア経由で玄関に出やすく)
+      for (let k = 0; k < 2; k++) {
+        const a = rooms[randInt(rooms.length)];
+        const b = rooms[randInt(rooms.length)];
+        if (a === b) continue;
+        const ax = Math.floor(a.x + a.w / 2);
+        const ay = Math.floor(a.y + a.h / 2);
+        const bx = Math.floor(b.x + b.w / 2);
+        const by = Math.floor(b.y + b.h / 2);
+        if (Math.random() < 0.5) {
+          carveCorridor(map, roomNames, ax, ay, bx, ay);
+          carveCorridor(map, roomNames, bx, ay, bx, by);
+        } else {
+          carveCorridor(map, roomNames, ax, ay, ax, by);
+          carveCorridor(map, roomNames, ax, by, bx, by);
+        }
+      }
+    }
+
+    // 廊下を掘る(壁を床に、部屋名は「廊下」)
+    function carveCorridor(map, roomNames, x1, y1, x2, y2) {
+      const w = map[0].length;
+      const h = map.length;
+      const steps = Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1));
+      if (steps === 0) return;
+      const dx = (x2 - x1) / steps;
+      const dy = (y2 - y1) / steps;
+      let x = x1, y = y1;
+      for (let s = 0; s <= steps; s++) {
+        const ix = Math.round(x);
+        const iy = Math.round(y);
+        if (ix >= 0 && ix < w && iy >= 0 && iy < h) {
+          if (map[iy][ix] === T.WALL) {
+            map[iy][ix] = T.FLOOR;
+            if (roomNames[iy][ix] === '') roomNames[iy][ix] = '廊下';
+          }
+        }
+        x += dx;
+        y += dy;
+      }
+    }
+
+    // ドアを配置(壁から床に接続する部分)
+    function placeDoors(map, roomNames) {
+      const w = map[0].length;
+      const h = map.length;
+      // 壁のうち、両側が床で、その床が異なる部屋名ならドア候補
+      for (let y = 1; y < h - 1; y++) {
+        for (let x = 1; x < w - 1; x++) {
+          if (map[y][x] !== T.WALL) continue;
+          // 上下左右の床の数をカウント
+          const dirs = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+          let floorCount = 0;
+          let roomNamesAround = [];
+          for (let [dx, dy] of dirs) {
+            const nx = x + dx, ny = y + dy;
+            if (map[ny] && map[ny][nx] === T.FLOOR) {
+              floorCount++;
+              roomNamesAround.push(roomNames[ny][nx]);
+            }
+          }
+          // 2つ以上の床に接して、かつ部屋名が異なる or 廊下と部屋
+          if (floorCount >= 2) {
+            const uniqueNames = [...new Set(roomNamesAround)];
+            if (uniqueNames.length >= 2 && Math.random() < 0.4) {
+              map[y][x] = T.DOOR;
+            }
+          }
+        }
+      }
+      // 確実にいくつかドアを作る(接続性のため)
+      for (let y = 1; y < h - 1; y++) {
+        for (let x = 1; x < w - 1; x++) {
+          if (map[y][x] === T.WALL) {
+            const left = map[y][x - 1] === T.FLOOR;
+            const right = map[y][x + 1] === T.FLOOR;
+            const up = map[y - 1][x] === T.FLOOR;
+            const down = map[y + 1][x] === T.FLOOR;
+            if ((left && right && !up && !down) || (up && down && !left && !right)) {
+              if (Math.random() < 0.5) map[y][x] = T.DOOR;
+            }
+          }
+        }
+      }
+    }
+
+    // 階段を配置(上り・下り) 1フロアに1つずつ
+    function placeStairs(map, floorIndex, totalFloors) {
+      const w = map[0].length;
+      const h = map.length;
+      // 上り階段(最上階以外)
+      if (floorIndex < totalFloors - 1) {
+        let placed = false;
+        for (let attempt = 0; attempt < 100; attempt++) {
+          const x = randInt(w - 2) + 1;
+          const y = randInt(h - 2) + 1;
+          if (map[y][x] === T.FLOOR) {
+            map[y][x] = T.STAIRS_UP;
+            placed = true;
+            break;
+          }
+        }
+        if (!placed) {
+          // 強制配置
+          for (let y = 1; y < h - 1; y++) {
+            for (let x = 1; x < w - 1; x++) {
+              if (map[y][x] === T.FLOOR) {
+                map[y][x] = T.STAIRS_UP;
+                placed = true;
+                break;
+              }
+            }
+            if (placed) break;
+          }
+        }
+      }
+      // 下り階段(1階以外)
+      if (floorIndex > 0) {
+        let placed = false;
+        for (let attempt = 0; attempt < 100; attempt++) {
+          const x = randInt(w - 2) + 1;
+          const y = randInt(h - 2) + 1;
+          if (map[y][x] === T.FLOOR) {
+            map[y][x] = T.STAIRS_DOWN;
+            placed = true;
+            break;
+          }
+        }
+        if (!placed) {
+          for (let y = 1; y < h - 1; y++) {
+            for (let x = 1; x < w - 1; x++) {
+              if (map[y][x] === T.FLOOR) {
+                map[y][x] = T.STAIRS_DOWN;
+                placed = true;
+                break;
+              }
+            }
+            if (placed) break;
+          }
+        }
+      }
+    }
+
+    // 玄関を配置(1階のみ) プレイヤー初期位置から最も遠い床
+    function placeEntrance(map, playerX, playerY) {
+      const w = map[0].length;
+      const h = map.length;
+      let bestDist = -1;
+      let bestPos = null;
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          if (map[y][x] === T.FLOOR) {
+            const dist = Math.abs(x - playerX) + Math.abs(y - playerY);
+            if (dist > bestDist) {
+              bestDist = dist;
+              bestPos = { x, y };
+            }
+          }
+        }
+      }
+      if (bestPos) {
+        map[bestPos.y][bestPos.x] = T.ENTRANCE;
+      } else {
+        // フォールバック
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            if (map[y][x] === T.FLOOR) {
+              map[y][x] = T.ENTRANCE;
+              return;
+            }
+          }
+        }
+      }
+    }
+
+    // プレイヤー初期位置を決定(玄関から最も遠い床)
+    function findFarthestFloorFromEntrance(map) {
+      const w = map[0].length;
+      const h = map.length;
+      // 玄関位置を探す
+      let entrancePos = null;
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          if (map[y][x] === T.ENTRANCE) {
+            entrancePos = { x, y };
+            break;
+          }
+        }
+        if (entrancePos) break;
+      }
+      if (!entrancePos) return { x: 1, y: 1 };
+
+      let bestDist = -1;
+      let bestPos = { x: 1, y: 1 };
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          if (map[y][x] === T.FLOOR) {
+            const dist = Math.abs(x - entrancePos.x) + Math.abs(y - entrancePos.y);
+            if (dist > bestDist) {
+              bestDist = dist;
+              bestPos = { x, y };
+            }
+          }
+        }
+      }
+      return bestPos;
+    }
+
+    // 階層を生成
+    function generateFloors() {
+      const totalFloors = randInt(3) + 2; // 2~4階建て
+      const newFloors = [];
+
+      // まず全フロアのマップを生成
+      for (let f = 0; f < totalFloors; f++) {
+        const map = createEmptyMap(MAP_W, MAP_H);
+        const roomNames = Array(MAP_H).fill().map(() => Array(MAP_W).fill(''));
+        const numRooms = randInt(4) + 3; // 3~6部屋
+        const rooms = carveRooms(map, roomNames, numRooms);
+        connectRooms(map, roomNames, rooms);
+        placeDoors(map, roomNames);
+        placeStairs(map, f, totalFloors);
+        newFloors.push({ map, roomNames, rooms });
+      }
+
+      // 1階に玄関を配置(まずプレイヤー位置を仮決め→玄関配置→プレイヤー再配置)
+      // 1階のマップで、適当な床から最も遠い場所に玄関
+      const groundMap = newFloors[0].map;
+      const tempPlayer = { x: 1, y: 1 };
+      // 適当な床を探す
+      outer:
+      for (let y = 0; y < MAP_H; y++) {
+        for (let x = 0; x < MAP_W; x++) {
+          if (groundMap[y][x] === T.FLOOR) {
+            tempPlayer.x = x;
+            tempPlayer.y = y;
+            break outer;
+          }
+        }
+      }
+      placeEntrance(groundMap, tempPlayer.x, tempPlayer.y);
+      // 玄関から最も遠い床をプレイヤー初期位置に
+      const startPos = findFarthestFloorFromEntrance(groundMap);
+      newFloors[0].startPos = startPos;
+
+      // 他フロアのstartPosは後で階段移動時に設定(とりあえず床)
+      for (let f = 1; f < totalFloors; f++) {
+        newFloors[f].startPos = { x: 1, y: 1 };
+        // 適当な床を探す
+        const m = newFloors[f].map;
+        outer2:
+        for (let y = 0; y < MAP_H; y++) {
+          for (let x = 0; x < MAP_W; x++) {
+            if (m[y][x] === T.FLOOR) {
+              newFloors[f].startPos = { x, y };
+              break outer2;
+            }
+          }
+        }
+      }
+
+      return newFloors;
+    }
+
+    // ========== ゲーム初期化 ==========
+    function initGame() {
+      floors = generateFloors();
+      currentFloor = 0;
+      playerPos = { ...floors[0].startPos };
+      gameCleared = false;
+      footer.innerHTML = '<span>🚪 玄関を目指せ</span>';
+      updateFloorLabel();
+    }
+
+    function updateFloorLabel() {
+      floorLabel.textContent = (currentFloor + 1) + 'F';
+    }
+
+    // ========== 移動 ==========
+    function tryMove(dx, dy) {
+      if (gameCleared) return;
+      const map = floors[currentFloor].map;
+      const nx = playerPos.x + dx;
+      const ny = playerPos.y + dy;
+      if (nx < 0 || nx >= MAP_W || ny < 0 || ny >= MAP_H) return;
+
+      const tile = map[ny][nx];
+      if (tile === T.WALL) return;
+      if (tile === T.DOOR) return; // 閉じたドアは通れない
+      if (tile === T.STAIRS_UP || tile === T.STAIRS_DOWN) return; // 階段はクリックでのみ
+
+      // 移動可能
+      playerPos.x = nx;
+      playerPos.y = ny;
+
+      // 玄関チェック
+      if (tile === T.ENTRANCE) {
+        gameCleared = true;
+        statusMsg.textContent = '🎉 玄関に出た！ クリア！';
+        footer.innerHTML = '<span class="message">🏆 勝利！</span> <a href="variant.html" target="_self">variant.html へ</a>';
+      }
+    }
+
+    // ========== クリック処理 ==========
+    function handleCanvasClick(e) {
+      if (gameCleared) return;
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      const mouseX = (e.clientX - rect.left) * scaleX;
+      const mouseY = (e.clientY - rect.top) * scaleY;
+
+      const gridX = Math.floor((mouseX - OFFSET_X) / TILE_SIZE);
+      const gridY = Math.floor((mouseY - OFFSET_Y) / TILE_SIZE);
+
+      if (gridX < 0 || gridX >= MAP_W || gridY < 0 || gridY >= MAP_H) return;
+
+      const map = floors[currentFloor].map;
+      const tile = map[gridY][gridX];
+
+      // プレイヤーが隣接しているか(上下左右)
+      const dx = Math.abs(gridX - playerPos.x);
+      const dy = Math.abs(gridY - playerPos.y);
+      const isAdjacent = (dx === 1 && dy === 0) || (dx === 0 && dy === 1);
+
+      if (!isAdjacent && tile !== T.STAIRS_UP && tile !== T.STAIRS_DOWN) return;
+
+      // ドアを開ける
+      if (tile === T.DOOR && isAdjacent) {
+        map[gridY][gridX] = T.DOOR_OPEN;
+        return;
+      }
+
+      // 階段(上り)
+      if (tile === T.STAIRS_UP && isAdjacent) {
+        if (currentFloor + 1 < floors.length) {
+          currentFloor++;
+          playerPos = { ...floors[currentFloor].startPos };
+          updateFloorLabel();
+        }
+        return;
+      }
+
+      // 階段(下り)
+      if (tile === T.STAIRS_DOWN && isAdjacent) {
+        if (currentFloor - 1 >= 0) {
+          currentFloor--;
+          playerPos = { ...floors[currentFloor].startPos };
+          updateFloorLabel();
+        }
+        return;
+      }
+    }
+
+    // ========== 描画 ==========
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (!floors.length) return;
+      const map = floors[currentFloor].map;
+      const roomNames = floors[currentFloor].roomNames;
+
+      // 背景
+      ctx.fillStyle = '#f5f0e8';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // タイル描画
+      for (let y = 0; y < MAP_H; y++) {
+        for (let x = 0; x < MAP_W; x++) {
+          const px = OFFSET_X + x * TILE_SIZE;
+          const py = OFFSET_Y + y * TILE_SIZE;
+          const tile = map[y][x];
+
+          // 床・廊下
+          if (tile === T.FLOOR || tile === T.DOOR_OPEN || tile === T.STAIRS_UP || tile === T.STAIRS_DOWN || tile === T.ENTRANCE) {
+            ctx.fillStyle = '#ede7d9';
+            ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+            ctx.strokeStyle = '#d6cdb8';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(px, py, TILE_SIZE, TILE_SIZE);
+          }
+
+          if (tile === T.WALL) {
+            ctx.fillStyle = '#8b7a66';
+            ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+            ctx.fillStyle = '#6b5d4e';
+            ctx.fillRect(px + 4, py + 4, TILE_SIZE - 8, TILE_SIZE - 8);
+          } else if (tile === T.DOOR) {
+            ctx.fillStyle = '#b38b5d';
+            ctx.fillRect(px + 6, py + 6, TILE_SIZE - 12, TILE_SIZE - 12);
+            ctx.fillStyle = '#7a5a3a';
+            ctx.fillRect(px + 14, py + 14, TILE_SIZE - 28, TILE_SIZE - 28);
+            // ドアノブ
+            ctx.fillStyle = '#ffd966';
+            ctx.beginPath();
+            ctx.arc(px + TILE_SIZE - 18, py + TILE_SIZE / 2, 5, 0, Math.PI * 2);
+            ctx.fill();
+          } else if (tile === T.DOOR_OPEN) {
+            ctx.fillStyle = '#c9a77b';
+            ctx.fillRect(px + 4, py + 4, TILE_SIZE - 8, TILE_SIZE - 8);
+            // 開いたドアの線
+            ctx.strokeStyle = '#8b6b4a';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(px + 10, py + 10);
+            ctx.lineTo(px + TILE_SIZE - 10, py + TILE_SIZE - 10);
+            ctx.stroke();
+          } else if (tile === T.STAIRS_UP) {
+            // 上り階段
+            ctx.fillStyle = '#a89a85';
+            ctx.fillRect(px + 4, py + 4, TILE_SIZE - 8, TILE_SIZE - 8);
+            ctx.fillStyle = '#7d6e5a';
+            for (let i = 0; i < 4; i++) {
+              ctx.fillRect(px + 8, py + 8 + i * 12, TILE_SIZE - 16, 8);
+            }
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 12px sans-serif';
+            ctx.fillText('▲', px + 18, py + 38);
+          } else if (tile === T.STAIRS_DOWN) {
+            ctx.fillStyle = '#a89a85';
+            ctx.fillRect(px + 4, py + 4, TILE_SIZE - 8, TILE_SIZE - 8);
+            ctx.fillStyle = '#7d6e5a';
+            for (let i = 0; i < 4; i++) {
+              ctx.fillRect(px + 8, py + 8 + i * 12, TILE_SIZE - 16, 8);
+            }
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 12px sans-serif';
+            ctx.fillText('▼', px + 18, py + 38);
+          } else if (tile === T.ENTRANCE) {
+            ctx.fillStyle = '#d4b48c';
+            ctx.fillRect(px + 2, py + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+            ctx.fillStyle = '#6b4f2e';
+            ctx.fillRect(px + 8, py + 8, TILE_SIZE - 16, TILE_SIZE - 16);
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 14px sans-serif';
+            ctx.fillText('玄関', px + 12, py + 38);
+          }
+
+          // 部屋名描画(床系のみ)
+          if ((tile === T.FLOOR || tile === T.ENTRANCE || tile === T.DOOR_OPEN) && roomNames[y][x]) {
+            ctx.fillStyle = '#3a3a3a';
+            ctx.font = '10px "Meiryo", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            const name = roomNames[y][x];
+            if (name.length > 5) {
+              ctx.font = '8px "Meiryo", sans-serif';
+            }
+            ctx.fillText(name, px + TILE_SIZE / 2, py + TILE_SIZE / 2 - 4);
+          }
+        }
+      }
+
+      // プレイヤー描画
+      const px = OFFSET_X + playerPos.x * TILE_SIZE;
+      const py = OFFSET_Y + playerPos.y * TILE_SIZE;
+      ctx.beginPath();
+      ctx.arc(px + TILE_SIZE / 2, py + TILE_SIZE / 2, TILE_SIZE * 0.3, 0, Math.PI * 2);
+      ctx.fillStyle = '#4a90e2';
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 20px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('👤', px + TILE_SIZE / 2, py + TILE_SIZE / 2);
+
+      // グリッド外枠
+      ctx.strokeStyle = '#3a3a3a';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(OFFSET_X - 2, OFFSET_Y - 2, MAP_W * TILE_SIZE + 4, MAP_H * TILE_SIZE + 4);
+    }
+
+    // ========== アニメーションループ ==========
+    function gameLoop() {
+      draw();
+      requestAnimationFrame(gameLoop);
+    }
+
+    // ========== イベント登録 ==========
+    window.addEventListener('keydown', (e) => {
+      if (gameCleared) return;
+      const key = e.key;
+      e.preventDefault();
+      if (key === 'ArrowUp') tryMove(0, -1);
+      else if (key === 'ArrowDown') tryMove(0, 1);
+      else if (key === 'ArrowLeft') tryMove(-1, 0);
+      else if (key === 'ArrowRight') tryMove(1, 0);
+    });
+
+    canvas.addEventListener('click', handleCanvasClick);
+
+    // タッチサポート(簡易)
+    canvas.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      const fakeEvent = {
+        clientX: touch.clientX,
+        clientY: touch.clientY,
+      };
+      handleCanvasClick(fakeEvent);
+    }, { passive: false });
+
+    // ========== 起動 ==========
+    initGame();
+    gameLoop();
+
+    // リスタートボタン(フッターに小さく)
+    // クリア後でも遊べるように、リロードで対応
+  })();
+</script>
+</body>
+</html>
