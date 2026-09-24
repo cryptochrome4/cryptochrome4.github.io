@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SBI証券 ポートフォリオ・琳派</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@300;400;500&display=swap');
+
+  :root {
+    --kin: #c9a84c;         /* 金 */
+    --kin-light: #e8d5a3;
+    --kin-deep: #8a6a28;
+    --shu: #b13a2e;         /* 朱 */
+    --shu-light: #d46a5a;
+    --ai: #1b2a4a;          /* 藍 */
+    --ai-light: #3a4a70;
+    --sumi: #1a1614;        /* 墨 */
+    --washi: #f5efe3;       /* 和紙 */
+    --matcha: #5a7a4a;      /* 抹茶 */
+    --fuji: #7a6a9a;        /* 藤 */
+    --sakura: #d98a9a;      /* 桜 */
+    --kurenai: #8a1a2e;     /* 紅 */
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Shippori Mincho', 'Zen Kaku Gothic New', serif;
+    background: #0e0a06;
+    color: var(--washi);
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  /* 金屏風の背景 */
+  .gold-screen {
+    position: fixed;
+    inset: 0;
+    background:
+      linear-gradient(135deg, #1a1208 0%, #2a1e10 25%, #1a1208 50%, #2a1e10 75%, #1a1208 100%);
+    z-index: 0;
+  }
+
+  .gold-screen::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 20% 30%, rgba(201,168,76,0.15) 0%, transparent 40%),
+      radial-gradient(ellipse at 80% 70%, rgba(201,168,76,0.12) 0%, transparent 40%),
+      radial-gradient(ellipse at 50% 50%, rgba(177,58,46,0.06) 0%, transparent 50%);
+    pointer-events: none;
+  }
+
+  /* 金箔の粒々 */
+  .gold-screen::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      radial-gradient(circle at 10% 15%, rgba(232,213,163,0.15) 0%, transparent 1.5%),
+      radial-gradient(circle at 30% 80%, rgba(232,213,163,0.12) 0%, transparent 1%),
+      radial-gradient(circle at 70% 20%, rgba(232,213,163,0.1) 0%, transparent 1.2%),
+      radial-gradient(circle at 90% 60%, rgba(232,213,163,0.13) 0%, transparent 0.8%),
+      radial-gradient(circle at 50% 45%, rgba(232,213,163,0.08) 0%, transparent 1%),
+      radial-gradient(circle at 15% 55%, rgba(232,213,163,0.1) 0%, transparent 0.9%),
+      radial-gradient(circle at 85% 85%, rgba(232,213,163,0.11) 0%, transparent 1.1%);
+    pointer-events: none;
+  }
+
+  /* 額縁（金） */
+  .frame {
+    position: fixed;
+    inset: 12px;
+    border: 3px solid var(--kin);
+    box-shadow:
+      inset 0 0 0 1px var(--kin-deep),
+      0 0 0 1px var(--sumi),
+      0 0 60px rgba(201,168,76,0.25);
+    pointer-events: none;
+    z-index: 5;
+    opacity: 0.9;
+  }
+  .frame::before {
+    content: '❦';
+    position: absolute;
+    top: -18px; left: 50%;
+    transform: translateX(-50%);
+    color: var(--kin);
+    font-size: 1.5rem;
+    background: #1a1208;
+    padding: 0 16px;
+  }
+  .frame::after {
+    content: '❦';
+    position: absolute;
+    bottom: -18px; left: 50%;
+    transform: translateX(-50%);
+    color: var(--kin);
+    font-size: 1.5rem;
+    background: #1a1208;
+    padding: 0 16px;
+  }
+
+  /* 四隅の花 */
+  .corner-flower {
+    position: fixed;
+    z-index: 6;
+    pointer-events: none;
+    opacity: 0.7;
+  }
+  .corner-flower.tl { top: 15px; left: 15px; }
+  .corner-flower.tr { top: 15px; right: 15px; }
+  .corner-flower.bl { bottom: 15px; left: 15px; }
+  .corner-flower.br { bottom: 15px; right: 15px; }
+
+  /* 流水（尾形光琳の燕子花図風） */
+  .ryusui {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: 300px;
+    z-index: 1;
+    pointer-events: none;
+    opacity: 0.35;
+  }
+
+  .ryusui svg { width: 100%; height: 100%; }
+
+  /* 花々 */
+  .hana {
+    position: fixed;
+    z-index: 2;
+    pointer-events: none;
+    opacity: 0.5;
+    font-size: 2.5rem;
+  }
+
+  .container {
+    position: relative;
+    z-index: 10;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 60px 30px 80px;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 45px;
+    position: relative;
+  }
+
+  /* 家紋風の円 */
+  .kamon {
+    width: 100px;
+    height: 100px;
+    margin: 0 auto 20px;
+    position: relative;
+  }
+  .kamon svg { width: 100%; height: 100%; }
+
+  h1 {
+    font-family: 'Shippori Mincho', serif;
+    font-size: clamp(1.8rem, 4.5vw, 2.8rem);
+    font-weight: 600;
+    letter-spacing: 0.25em;
+    color: var(--kin-light);
+    text-shadow:
+      0 0 30px rgba(201,168,76,0.6),
+      0 0 60px rgba(201,168,76,0.3),
+      2px 2px 0 var(--shu);
+    margin-bottom: 12px;
+  }
+
+  .subtitle {
+    font-size: 0.95rem;
+    letter-spacing: 0.4em;
+    color: var(--kin);
+    opacity: 0.85;
+    font-weight: 400;
+  }
+
+  .world-note {
+    display: inline-block;
+    margin-top: 14px;
+    padding: 8px 24px;
+    border: 1px solid var(--shu);
+    background: rgba(177,58,46,0.15);
+    font-size: 0.78rem;
+    letter-spacing: 0.2em;
+    color: var(--shu-light);
+  }
+
+  .divider {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    margin: 22px 0;
+    color: var(--kin);
+    font-size: 1.2rem;
+  }
+  .divider::before, .divider::after {
+    content: '';
+    height: 1px;
+    width: 100px;
+    background: linear-gradient(to right, transparent, var(--kin), var(--shu));
+  }
+  .divider::after { background: linear-gradient(to left, transparent, var(--kin), var(--shu)); }
+
+  /* 凡例 */
+  .legend {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    flex-wrap: wrap;
+    margin-bottom: 40px;
+    font-size: 0.85rem;
+    letter-spacing: 0.15em;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--kin-light);
+    opacity: 0.95;
+  }
+  .dot {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    border: 1.5px solid var(--kin);
+  }
+  .dot.fund { background: var(--matcha); }
+  .dot.stock { background: var(--shu); }
+  .dot.bond { background: var(--fuji); }
+
+  /* グリッド */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+    gap: 28px;
+  }
+
+  /* カード（金屏風の小屏風風） */
+  .card {
+    background:
+      linear-gradient(160deg, rgba(26,18,8,0.95), rgba(14,10,6,0.98));
+    border: 2px solid rgba(201,168,76,0.5);
+    border-radius: 2px;
+    padding: 36px 24px 24px;
+    position: relative;
+    transition: all 0.4s ease;
+    opacity: 0;
+    transform: translateY(20px);
+    animation: fadeIn 0.6s ease forwards;
+    box-shadow:
+      inset 0 0 40px rgba(0,0,0,0.6),
+      0 4px 20px rgba(0,0,0,0.5);
+    overflow: hidden;
+  }
+
+  .card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(circle at 20% 20%, rgba(201,168,76,0.06) 0%, transparent 40%),
+      radial-gradient(circle at 80% 80%, rgba(177,58,46,0.05) 0%, transparent 40%);
+    pointer-events: none;
+  }
+
+  @keyframes fadeIn {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .card:hover {
+    border-color: var(--kin);
+    box-shadow:
+      inset 0 0 40px rgba(0,0,0,0.5),
+      0 0 40px rgba(201,168,76,0.35),
+      0 4px 24px rgba(0,0,0,0.6);
+    transform: translateY(-3px);
+  }
+
+  /* 上部の飾り線 */
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 50%;
+    transform: translateX(-50%);
+    width: 80%;
+    height: 3px;
+    background: linear-gradient(to right, transparent, var(--shu), var(--kin), var(--shu), transparent);
+    z-index: 1;
+  }
+
+  .card-ornament {
+    position: absolute;
+    top: -14px; left: 50%;
+    transform: translateX(-50%);
+    color: var(--kin);
+    font-size: 1.2rem;
+    background: #0e0a06;
+    padding: 0 14px;
+    letter-spacing: 6px;
+    z-index: 2;
+  }
+
+  .card-header {
+    text-align: center;
+    margin-bottom: 18px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .persona-name {
+    font-family: 'Shippori Mincho', serif;
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--kin-light);
+    letter-spacing: 0.1em;
+    margin-bottom: 6px;
+    text-shadow: 0 0 10px rgba(201,168,76,0.4);
+  }
+
+  .persona-desc {
+    font-size: 0.78rem;
+    color: var(--kin);
+    opacity: 0.7;
+    font-style: italic;
+    letter-spacing: 0.05em;
+  }
+
+  .total {
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--matcha);
+    margin: 14px 0;
+    padding: 8px 0;
+    border-top: 1px solid rgba(201,168,76,0.25);
+    border-bottom: 1px solid rgba(201,168,76,0.25);
+    letter-spacing: 0.15em;
+    font-weight: 500;
+    position: relative;
+    z-index: 1;
+  }
+
+  .coin-list {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .coin-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.88rem;
+  }
+
+  .coin-symbol {
+    width: 78px;
+    font-weight: 600;
+    color: var(--washi);
+    font-family: 'Shippori Mincho', serif;
+    font-size: 0.75rem;
+    letter-spacing: 0.02em;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+  }
+
+  .coin-bar-wrap {
+    flex: 1;
+    height: 18px;
+    background: rgba(245,239,227,0.06);
+    border: 1px solid rgba(201,168,76,0.2);
+    border-radius: 1px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .coin-bar {
+    height: 100%;
+    border-radius: 1px;
+    transition: width 0.9s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    position: relative;
+  }
+
+  .coin-bar.fund {
+    background: linear-gradient(90deg, rgba(90,122,74,0.5), var(--matcha));
+    border-right: 1px solid #9aba8a;
+  }
+  .coin-bar.stock {
+    background: linear-gradient(90deg, rgba(177,58,46,0.5), var(--shu-light));
+    border-right: 1px solid var(--shu-light);
+  }
+  .coin-bar.bond {
+    background: linear-gradient(90deg, rgba(122,106,154,0.5), var(--fuji));
+    border-right: 1px solid #a89ac0;
+  }
+
+  .coin-amount {
+    width: 78px;
+    text-align: right;
+    font-family: 'Zen Kaku Gothic New', sans-serif;
+    font-size: 0.72rem;
+    color: var(--kin-light);
+  }
+
+  .coin-pct {
+    width: 42px;
+    text-align: right;
+    font-size: 0.68rem;
+    color: var(--kin);
+    opacity: 0.8;
+    font-family: 'Zen Kaku Gothic New', sans-serif;
+  }
+
+  .badge {
+    font-size: 0.55rem;
+    padding: 1px 4px;
+    border-radius: 1px;
+    letter-spacing: 0.02em;
+    font-family: 'Zen Kaku Gothic New', sans-serif;
+    line-height: 1.4;
+  }
+  .badge.fund {
+    background: rgba(90,122,74,0.3);
+    color: #a8c898;
+    border: 1px solid rgba(90,122,74,0.5);
+  }
+  .badge.stock {
+    background: rgba(177,58,46,0.25);
+    color: var(--shu-light);
+    border: 1px solid rgba(177,58,46,0.45);
+  }
+  .badge.bond {
+    background: rgba(122,106,154,0.3);
+    color: #b8a8d8;
+    border: 1px solid rgba(122,106,154,0.5);
+  }
+
+  footer {
+    text-align: center;
+    margin-top: 60px;
+    font-size: 0.75rem;
+    color: var(--kin);
+    opacity: 0.6;
+    letter-spacing: 0.2em;
+    line-height: 1.8;
+    position: relative;
+    z-index: 10;
+  }
+
+  .footer-note {
+    display: inline-block;
+    margin-top: 10px;
+    padding: 8px 20px;
+    border: 1px solid rgba(177,58,46,0.5);
+    background: rgba(177,58,46,0.1);
+    font-size: 0.7rem;
+    color: var(--shu-light);
+  }
+
+  @media (max-width: 600px) {
+    .container { padding: 40px 16px 60px; }
+    .grid { grid-template-columns: 1fr; }
+    .frame { inset: 6px; }
+    .coin-symbol { width: 62px; font-size: 0.68rem; }
+    .coin-amount { width: 68px; font-size: 0.68rem; }
+    .coin-pct { width: 36px; font-size: 0.62rem; }
+    .kamon { width: 75px; height: 75px; }
+    .ryusui { height: 180px; }
+    .hana { font-size: 1.5rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 金屏風 -->
+<div class="gold-screen"></div>
+
+<!-- 額縁 -->
+<div class="frame"></div>
+
+<!-- 四隅の花 -->
+<div class="corner-flower tl">
+  <svg width="60" height="60" viewBox="0 0 60 60" fill="none">
+    <circle cx="30" cy="18" r="6" fill="#d98a9a" opacity="0.6"/>
+    <circle cx="42" cy="30" r="6" fill="#d98a9a" opacity="0.6"/>
+    <circle cx="30" cy="42" r="6" fill="#d98a9a" opacity="0.6"/>
+    <circle cx="18" cy="30" r="6" fill="#d98a9a" opacity="0.6"/>
+    <circle cx="30" cy="30" r="4" fill="#c9a84c"/>
+  </svg>
+</div>
+<div class="corner-flower tr">
+  <svg width="60" height="60" viewBox="0 0 60 60" fill="none">
+    <circle cx="30" cy="18" r="6" fill="#d98a9a" opacity="0.6"/>
+    <circle cx="42" cy="30" r="6" fill="#d98a9a" opacity="0.6"/>
+    <circle cx="30" cy="42" r="6" fill="#d98a9a" opacity="0.6"/>
+    <circle cx="18" cy="30" r="6" fill="#d98a9a" opacity="0.6"/>
+    <circle cx="30" cy="30" r="4" fill="#c9a84c"/>
+  </svg>
+</div>
+<div class="corner-flower bl">
+  <svg width="60" height="60" viewBox="0 0 60 60" fill="none">
+    <circle cx="30" cy="18" r="6" fill="#d98a9a" opacity="0.6"/>
+    <circle cx="42" cy="30" r="6" fill="#d98a9a" opacity="0.6"/>
+    <circle cx="30" cy="42" r="6" fill="#d98a9a" opacity="0.6"/>
+    <circle cx="18" cy="30" r="6" fill="#d98a9a" opacity="0.6"/>
+    <circle cx="30" cy="30" r="4" fill="#c9a84c"/>
+  </svg>
+</div>
+<div class="corner-flower br">
+  <svg width="60" height="60" viewBox="0 0 60 60" fill="none">
+    <circle cx="30" cy="18" r="6" fill="#d98a9a" opacity="0.6"/>
+    <circle cx="42" cy="30" r="6" fill="#d98a9a" opacity="0.6"/>
+    <circle cx="30" cy="42" r="6" fill="#d98a9a" opacity="0.6"/>
+    <circle cx="18" cy="30" r="6" fill="#d98a9a" opacity="0.6"/>
+    <circle cx="30" cy="30" r="4" fill="#c9a84c"/>
+  </svg>
+</div>
+
+<!-- 流水（琳派風） -->
+<svg class="ryusui" viewBox="0 0 1200 300" preserveAspectRatio="none" fill="none" stroke="#c9a84c" stroke-width="1.5">
+  <path d="M0 150 Q100 100 200 150 T400 150 T600 150 T800 150 T1000 150 T1200 150" opacity="0.5"/>
+  <path d="M0 180 Q100 130 200 180 T400 180 T600 180 T800 180 T1000 180 T1200 180" opacity="0.4"/>
+  <path d="M0 210 Q100 160 200 210 T400 210 T600 210 T800 210 T1000 210 T1200 210" opacity="0.3"/>
+  <path d="M0 240 Q100 190 200 240 T400 240 T600 240 T800 240 T1000 240 T1200 240" opacity="0.2"/>
+  <!-- 燕子花 -->
+  <g opacity="0.4" fill="#7a6a9a">
+    <ellipse cx="200" cy="130" rx="8" ry="16" transform="rotate(-20 200 130)"/>
+    <ellipse cx="210" cy="125" rx="8" ry="16" transform="rotate(10 210 125)"/>
+    <ellipse cx="195" cy="120" rx="8" ry="16" transform="rotate(-40 195 120)"/>
+  </g>
+  <g opacity="0.4" fill="#7a6a9a">
+    <ellipse cx="700" cy="140" rx="8" ry="16" transform="rotate(-20 700 140)"/>
+    <ellipse cx="710" cy="135" rx="8" ry="16" transform="rotate(10 710 135)"/>
+    <ellipse cx="695" cy="130" rx="8" ry="16" transform="rotate(-40 695 130)"/>
+  </g>
+  <g opacity="0.4" fill="#7a6a9a">
+    <ellipse cx="1000" cy="160" rx="8" ry="16" transform="rotate(-20 1000 160)"/>
+    <ellipse cx="1010" cy="155" rx="8" ry="16" transform="rotate(10 1010 155)"/>
+    <ellipse cx="995" cy="150" rx="8" ry="16" transform="rotate(-40 995 150)"/>
+  </g>
+</svg>
+
+<!-- 花々 -->
+<div class="hana" style="top:15%; left:5%; color:#d98a9a;">❀</div>
+<div class="hana" style="top:25%; right:8%; color:#7a6a9a; transform:rotate(15deg);">❀</div>
+<div class="hana" style="bottom:30%; left:12%; color:#b13a2e; transform:rotate(-25deg);">❀</div>
+<div class="hana" style="top:60%; right:5%; color:#c9a84c; transform:rotate(40deg); font-size:1.8rem;">❀</div>
+
+<div class="container">
+  <header>
+    <!-- 家紋 -->
+    <div class="kamon">
+      <svg viewBox="0 0 100 100" fill="none">
+        <circle cx="50" cy="50" r="46" stroke="#c9a84c" stroke-width="2" fill="none" opacity="0.9"/>
+        <circle cx="50" cy="50" r="38" stroke="#b13a2e" stroke-width="1" fill="none" opacity="0.7"/>
+        <path d="M50 12 L58 42 L88 50 L58 58 L50 88 L42 58 L12 50 L42 42 Z" fill="#c9a84c" opacity="0.2"/>
+        <circle cx="50" cy="50" r="10" fill="#b13a2e" opacity="0.6"/>
+        <circle cx="50" cy="50" r="4" fill="#c9a84c"/>
+      </svg>
+    </div>
+
+    <h1>SBI証券 Portfolio</h1>
+    <div class="divider">❁</div>
+    <p class="subtitle">人物タイプ別 株式・投信配分</p>
+    <div class="world-note">— オルカンとS&P500が存在しない世界線 —</div>
+  </header>
+
+  <div class="legend">
+    <div class="legend-item"><span class="dot fund"></span>投信（インデックス）</div>
+    <div class="legend-item"><span class="dot stock"></span>個別株・ETF</div>
+    <div class="legend-item"><span class="dot bond"></span>債券・REIT</div>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <footer>
+    <p>※ 各タイプは最低3,000円以上をいずれかの銘柄に投資</p>
+    <p style="margin-top:6px;">投信: 日経225 / TOPIX / 米国小型株 ｜ 個別株: 金融・商社・半導体 ｜ 債券・REIT: 安定枠</p>
+    <div class="footer-note">
+      この世界線では「オルカン」と「S&P500」が存在しないため、代替として日経225・TOPIX・米国小型株・NASDAQ100などで全世界分散を再現
+    </div>
+  </footer>
+</div>
+
+<script>
+// ============================================================
+// データ定義：オルカンとS&P500が存在しない世界線
+// ============================================================
+
+const ASSETS = [
+  // BTC枠 → 日経225インデックス（日本全体）
+  { symbol: '日経225',    name: '日経225インデックス投信',  type: 'fund'  },
+  // ETH枠 → TOPIXインデックス（日本全体・東証）
+  { symbol: 'TOPIX',     name: 'TOPIXインデックス投信',    type: 'fund'  },
+  // XRP枠 → 金融株（メガバンク）
+  { symbol: '金融株',     name: '三菱UFJ・三井住友など',     type: 'stock' },
+  // XLM枠 → 海外債券ETF
+  { symbol: '海外債券',   name: '先進国債券ETF',            type: 'bond'  },
+  // SOL枠 → NASDAQ100
+  { symbol: 'NASDAQ',    name: 'NASDAQ100投信',            type: 'fund'  },
+  // AVAX枠 → 半導体株
+  { symbol: '半導体',     name: '東京エレクトロンなど',      type: 'stock' },
+  // LINK枠 → 商社株
+  { symbol: '商社株',     name: '三菱商事・伊藤忠など',      type: 'stock' },
+  // POL枠 → 素材・化学ETF
+  { symbol: '素材ETF',    name: '素材・化学セクター',        type: 'stock' },
+  // GRT枠 → 情報・通信株
+  { symbol: '情報通信',   name: 'NTT・ソフトバンクなど',     type: 'stock' },
+  // RENDER枠 → AI・GPU関連
+  { symbol: 'AI関連',     name: 'NVIDIA・アドバンテスト',    type: 'stock' },
+  // DOGE枠 → 消費者向け株
+  { symbol: '消費株',     name: 'ファストリ・ニトリなど',    type: 'stock' },
+  // SHIB枠 → 小型株ETF
+  { symbol: '小型株',     name: '東証グロース250 ETF',       type: 'stock' },
+  // PEPE枠 → テーマ型ETF
+  { symbol: 'テーマETF',  name: 'ロボティクス・EVなど',      type: 'stock' },
+  // 追加：米国小型株（全世界分散の代替）
+  { symbol: '米国小型',   name: 'ラッセル2000 ETF',         type: 'fund'  },
+  // 追加：新興国株（全世界分散の代替）
+  { symbol: '新興国',     name: '新興国株式インデックス',    type: 'fund'  },
+];
+
+// 各タイプの重み（0 = 買わない、数値が大きいほど多く買う）
+const PERSONAS = [
+  {
+    name: '陰キャ公認会計士 ハマ',
+    desc: 'リスク管理は徹底。でも消費株に揺れる',
+    weights: {
+      '日経225': 22, 'TOPIX': 18, '米国小型': 8, '新興国': 5,
+      '金融株': 12, '海外債券': 10,
+      'NASDAQ': 8, '半導体': 3, '商社株': 5, '素材ETF': 2,
+      '情報通信': 1, 'AI関連': 1, '消費株': 0, '小型株': 0, 'テーマETF': 0
+    }
+  },
+  {
+    name: '陰キャ社長 モーリー',
+    desc: 'テックとインフラに全振り。でもテーマETFは買う',
+    weights: {
+      '日経225': 15, 'TOPIX': 12, '米国小型': 6, '新興国': 4,
+      '金融株': 5, '海外債券': 5,
+      'NASDAQ': 15, '半導体': 10, '商社株': 10, '素材ETF': 5,
+      '情報通信': 3, 'AI関連': 5, '消費株': 0, '小型株': 0, 'テーマETF': 2
+    }
+  },
+  {
+    name: '土方労働者のパワー系 グッチ',
+    desc: '消費株と小型株で夢を見る。日経225は貯金',
+    weights: {
+      '日経225': 12, 'TOPIX': 8, '米国小型': 5, '新興国': 3,
+      '金融株': 10, '海外債券': 5,
+      'NASDAQ': 5, '半導体': 5, '商社株': 3, '素材ETF': 2,
+      '情報通信': 0, 'AI関連': 0, '消費株': 25, '小型株': 15, 'テーマETF': 5
+    }
+  },
+  {
+    name: '入れ墨ラッパーヤンキー 松崎',
+    desc: 'テーマETFと小型株で一発逆転。金融株も応援',
+    weights: {
+      '日経225': 8, 'TOPIX': 6, '米国小型': 4, '新興国': 2,
+      '金融株': 15, '海外債券': 5,
+      'NASDAQ': 5, '半導体': 3, '商社株': 2, '素材ETF': 0,
+      '情報通信': 0, 'AI関連': 0, '消費株': 15, '小型株': 20, 'テーマETF': 15
+    }
+  },
+  {
+    name: '背が高く顔も良しだがポンコツ君 松葉',
+    desc: '見た目は完璧。ポートフォリオは謎',
+    weights: {
+      '日経225': 12, 'TOPIX': 10, '米国小型': 6, '新興国': 4,
+      '金融株': 10, '海外債券': 10,
+      'NASDAQ': 10, '半導体': 5, '商社株': 5, '素材ETF': 5,
+      '情報通信': 2, 'AI関連': 3, '消費株': 5, '小型株': 3, 'テーマETF': 2
+    }
+  },
+  {
+    name: '優等生男子 藤巻',
+    desc: '教科書通り。日経225とTOPIX中心、たまに冒険',
+    weights: {
+      '日経225': 22, 'TOPIX': 18, '米国小型': 8, '新興国': 5,
+      '金融株': 10, '海外債券': 10,
+      'NASDAQ': 8, '半導体': 5, '商社株': 5, '素材ETF': 3,
+      '情報通信': 1, 'AI関連': 2, '消費株': 1, '小型株': 0, 'テーマETF': 0
+    }
+  },
+  {
+    name: 'パワハラ気質だか社会性の高い人 青木',
+    desc: '結果を出す。商社株とNASDAQで攻める',
+    weights: {
+      '日経225': 18, 'TOPIX': 14, '米国小型': 6, '新興国': 4,
+      '金融株': 10, '海外債券': 5,
+      'NASDAQ': 12, '半導体': 8, '商社株': 8, '素材ETF': 4,
+      '情報通信': 2, 'AI関連': 3, '消費株': 2, '小型株': 1, 'テーマETF': 0
+    }
+  },
+  {
+    name: 'ギャル 和田/あいか',
+    desc: 'かわいい銘柄が好き。消費株とテーマETFは外せない',
+    weights: {
+      '日経225': 8, 'TOPIX': 6, '米国小型': 4, '新興国': 2,
+      '金融株': 5, '海外債券': 5,
+      'NASDAQ': 8, '半導体': 3, '商社株': 2, '素材ETF': 2,
+      '情報通信': 0, 'AI関連': 0, '消費株': 25, '小型株': 15, 'テーマETF': 15
+    }
+  },
+  {
+    name: '優等生女子 ニコ',
+    desc: '堅実に。でもAI関連と情報通信にちょっと興味',
+    weights: {
+      '日経225': 20, 'TOPIX': 16, '米国小型': 7, '新興国': 4,
+      '金融株': 10, '海外債券': 10,
+      'NASDAQ': 8, '半導体': 5, '商社株': 5, '素材ETF': 3,
+      '情報通信': 3, 'AI関連': 3, '消費株': 2, '小型株': 1, 'テーマETF': 0
+    }
+  },
+  {
+    name: '上品な女アイドル まりな',
+    desc: 'ファンに優しい。日経225と海外債券で安定感',
+    weights: {
+      '日経225': 22, 'TOPIX': 16, '米国小型': 6, '新興国': 4,
+      '金融株': 10, '海外債券': 15,
+      'NASDAQ': 5, '半導体': 3, '商社株': 5, '素材ETF': 2,
+      '情報通信': 1, 'AI関連': 1, '消費株': 3, '小型株': 2, 'テーマETF': 3
+    }
+  },
+  {
+    name: '女性の権利を主張するバツイチのグラビア女 エリナ',
+    desc: '自立と自由。NASDAQと半導体で攻める',
+    weights: {
+      '日経225': 12, 'TOPIX': 10, '米国小型': 5, '新興国': 3,
+      '金融株': 10, '海外債券': 5,
+      'NASDAQ': 15, '半導体': 10, '商社株': 8, '素材ETF': 5,
+      '情報通信': 3, 'AI関連': 3, '消費株': 5, '小型株': 3, 'テーマETF': 3
+    }
+  },
+  {
+    name: '工場で働く人 工場長',
+    desc: 'コツコツ積み立て。日経225と金融株が柱',
+    weights: {
+      '日経225': 20, 'TOPIX': 14, '米国小型': 5, '新興国': 3,
+      '金融株': 15, '海外債券': 10,
+      'NASDAQ': 5, '半導体': 5, '商社株': 5, '素材ETF': 3,
+      '情報通信': 2, 'AI関連': 2, '消費株': 5, '小型株': 5, 'テーマETF': 3
+    }
+  },
+  {
+    name: '借金まみれのパチンカス 能登',
+    desc: '一発狙い。テーマETFと小型株と消費株に全ベット',
+    weights: {
+      '日経225': 4, 'TOPIX': 3, '米国小型': 2, '新興国': 1,
+      '金融株': 5, '海外債券': 0,
+      'NASDAQ': 5, '半導体': 0, '商社株': 0, '素材ETF': 0,
+      '情報通信': 0, 'AI関連': 0, '消費株': 30, '小型株': 25, 'テーマETF': 25
+    }
+  },
+  {
+    name: '成績優秀の営業マンだがリアリティーショーに参加すると尖ってる人 為国',
+    desc: '普段は堅実、でも小型株とテーマETFに謎の自信',
+    weights: {
+      '日経225': 16, 'TOPIX': 12, '米国小型': 6, '新興国': 4,
+      '金融株': 10, '海外債券': 5,
+      'NASDAQ': 10, '半導体': 5, '商社株': 5, '素材ETF': 3,
+      '情報通信': 2, 'AI関連': 2, '消費株': 8, '小型株': 5, 'テーマETF': 5
+    }
+  },
+  {
+    name: 'バンドマンのプログラマー せお丸',
+    desc: '技術に理解あり。情報通信とAI関連は応援',
+    weights: {
+      '日経225': 12, 'TOPIX': 10, '米国小型': 5, '新興国': 3,
+      '金融株': 5, '海外債券': 5,
+      'NASDAQ': 10, '半導体': 5, '商社株': 10, '素材ETF': 5,
+      '情報通信': 8, 'AI関連': 8, '消費株': 3, '小型株': 3, 'テーマETF': 3
+    }
+  },
+  {
+    name: '親が金持ちの慶応のちゃら男 のすけ',
+    desc: 'とりあえず全部買う。消費株で遊ぶ',
+    weights: {
+      '日経225': 16, 'TOPIX': 12, '米国小型': 5, '新興国': 3,
+      '金融株': 5, '海外債券': 5,
+      'NASDAQ': 10, '半導体': 5, '商社株': 5, '素材ETF': 5,
+      '情報通信': 3, 'AI関連': 3, '消費株': 10, '小型株': 8, 'テーマETF': 6
+    }
+  },
+  {
+    name: '一般的な主婦 かな',
+    desc: '安定第一。日経225とTOPIXと海外債券でコツコツ',
+    weights: {
+      '日経225': 22, 'TOPIX': 16, '米国小型': 6, '新興国': 4,
+      '金融株': 10, '海外債券': 15,
+      'NASDAQ': 5, '半導体': 3, '商社株': 3, '素材ETF': 2,
+      '情報通信': 1, 'AI関連': 1, '消費株': 3, '小型株': 2, 'テーマETF': 0
+    }
+  },
+];
+
+// ============================================================
+// ポートフォリオ計算
+// ============================================================
+
+const TOTAL_BUDGET = 50000;
+
+function buildPortfolio(persona) {
+  const weights = persona.weights;
+  const active = ASSETS.filter(a => (weights[a.symbol] || 0) > 0);
+
+  const minTotal = active.length * 3000;
+  const budget = Math.max(TOTAL_BUDGET, minTotal);
+
+  const totalWeight = active.reduce((s, a) => s + weights[a.symbol], 0);
+
+  let allocs = active.map(a => ({
+    ...a,
+    weight: weights[a.symbol],
+    amount: Math.round((weights[a.symbol] / totalWeight) * budget / 100) * 100
+  }));
+
+  allocs.forEach(a => { if (a.amount < 3000) a.amount = 3000; });
+
+  let sum = allocs.reduce((s, a) => s + a.amount, 0);
+  if (sum > 0) {
+    const scale = budget / sum;
+    allocs.forEach(a => {
+      a.amount = Math.round(a.amount * scale / 100) * 100;
+      if (a.amount < 3000) a.amount = 3000;
+    });
+  }
+
+  const finalTotal = allocs.reduce((s, a) => s + a.amount, 0);
+  const maxAmount = Math.max(...allocs.map(a => a.amount));
+
+  return { allocs, total: finalTotal, maxAmount };
+}
+
+// ============================================================
+// レンダリング
+// ============================================================
+
+const grid = document.getElementById('grid');
+
+PERSONAS.forEach((persona, idx) => {
+  const { allocs, total, maxAmount } = buildPortfolio(persona);
+
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.style.animationDelay = `${idx * 0.08}s`;
+
+  const ornament = document.createElement('div');
+  ornament.className = 'card-ornament';
+  ornament.textContent = '❦ ❦';
+  card.appendChild(ornament);
+
+  const header = document.createElement('div');
+  header.className = 'card-header';
+  header.innerHTML = `
+    <div class="persona-name">${persona.name}</div>
+    <div class="persona-desc">${persona.desc}</div>
+  `;
+  card.appendChild(header);
+
+  const totalEl = document.createElement('div');
+  totalEl.className = 'total';
+  totalEl.textContent = `総投資額 ¥${total.toLocaleString()}`;
+  card.appendChild(totalEl);
+
+  const list = document.createElement('div');
+  list.className = 'coin-list';
+
+  const sorted = [...allocs].sort((a, b) => b.amount - a.amount);
+
+  sorted.forEach(asset => {
+    const pct = ((asset.amount / total) * 100).toFixed(1);
+    const barWidth = maxAmount > 0 ? (asset.amount / maxAmount) * 100 : 0;
+    const typeClass = asset.type;
+    const badgeText = asset.type === 'fund' ? '投' : asset.type === 'stock' ? '株' : '債';
+    const badgeClass = asset.type;
+
+    const row = document.createElement('div');
+    row.className = 'coin-row';
+    row.innerHTML = `
+      <div class="coin-symbol">${asset.symbol}<span class="badge ${badgeClass}">${badgeText}</span></div>
+      <div class="coin-bar-wrap">
+        <div class="coin-bar ${typeClass}" style="width:0%" data-width="${barWidth}%"></div>
+      </div>
+      <div class="coin-amount">¥${asset.amount.toLocaleString()}</div>
+      <div class="coin-pct">${pct}%</div>
+    `;
+    list.appendChild(row);
+  });
+
+  card.appendChild(list);
+  grid.appendChild(card);
+});
+
+setTimeout(() => {
+  document.querySelectorAll('.coin-bar').forEach(bar => {
+    bar.style.width = bar.dataset.width;
+  });
+}, 300);
+</script>
+</body>
+</html>
