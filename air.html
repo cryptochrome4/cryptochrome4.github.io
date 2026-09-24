@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SBI証券テレビ ｜ air.html</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap');
+
+  :root {
+    --tv-frame: #2a2018;
+    --tv-frame-dark: #1a1208;
+    --screen-bg: #0a0a12;
+    --kin: #c9a84c;
+    --shu: #b13a2e;
+    --washi: #f5efe3;
+    --sumi: #1a1614;
+    --ai: #1b2a4a;
+    --matcha: #5a7a4a;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Zen Kaku Gothic New', 'Shippori Mincho', sans-serif;
+    background: #0e0a06;
+    color: var(--washi);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    overflow-x: hidden;
+  }
+
+  /* テレビ本体 */
+  .tv {
+    width: 100%;
+    max-width: 980px;
+    background: linear-gradient(160deg, var(--tv-frame), var(--tv-frame-dark));
+    border-radius: 20px;
+    padding: 24px 24px 60px;
+    box-shadow:
+      inset 0 0 0 3px #4a3a24,
+      inset 0 0 0 5px #1a1208,
+      0 0 0 2px #0e0a06,
+      0 20px 60px rgba(0,0,0,0.8),
+      0 0 80px rgba(201,168,76,0.15);
+    position: relative;
+  }
+
+  /* テレビ上部のロゴ */
+  .tv-brand {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.7rem;
+    letter-spacing: 0.4em;
+    color: var(--kin);
+    opacity: 0.7;
+    font-family: 'Shippori Mincho', serif;
+  }
+
+  /* 画面 */
+  .screen {
+    background: var(--screen-bg);
+    border-radius: 10px;
+    border: 3px solid #0a0a06;
+    box-shadow:
+      inset 0 0 60px rgba(0,0,0,0.9),
+      inset 0 0 0 1px rgba(201,168,76,0.2);
+    position: relative;
+    overflow: hidden;
+    aspect-ratio: 16 / 10;
+    min-height: 420px;
+  }
+
+  /* 走査線 */
+  .screen::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      rgba(0,0,0,0.15) 0px,
+      rgba(0,0,0,0.15) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  /* 各チャンネルのシーン */
+  .scene {
+    position: absolute;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 0;
+    animation: sceneIn 0.5s ease;
+  }
+
+  .scene.active { display: flex; }
+
+  @keyframes sceneIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  /* 背景 */
+  .scene-bg {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+  }
+
+  /* 図形学の人形 */
+  .figure {
+    position: absolute;
+    z-index: 10;
+    transition: transform 0.3s;
+  }
+
+  .figure svg {
+    display: block;
+    overflow: visible;
+  }
+
+  /* 口パク */
+  .mouth {
+    transition: d 0.15s ease;
+  }
+  .mouth-open { display: block; }
+  .mouth-closed { display: none; }
+
+  /* 字幕 */
+  .subtitle {
+    position: relative;
+    z-index: 20;
+    margin: 0 20px 20px;
+    background: rgba(0,0,0,0.85);
+    border: 2px solid var(--kin);
+    border-radius: 4px;
+    padding: 12px 20px;
+    font-size: clamp(0.9rem, 2.2vw, 1.15rem);
+    line-height: 1.6;
+    color: var(--washi);
+    text-align: center;
+    letter-spacing: 0.08em;
+    box-shadow: 0 0 20px rgba(0,0,0,0.8);
+    min-height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Shippori Mincho', serif;
+    transition: opacity 0.3s;
+  }
+
+  .subtitle .speaker {
+    position: absolute;
+    top: -12px;
+    left: 16px;
+    background: var(--kin);
+    color: var(--sumi);
+    font-size: 0.7rem;
+    padding: 2px 10px;
+    border-radius: 2px;
+    letter-spacing: 0.15em;
+    font-weight: 700;
+  }
+
+  /* チャンネルロゴ（右上） */
+  .ch-logo {
+    position: absolute;
+    top: 12px;
+    right: 16px;
+    z-index: 30;
+    background: rgba(0,0,0,0.7);
+    border: 2px solid var(--kin);
+    padding: 4px 14px;
+    font-size: 0.75rem;
+    letter-spacing: 0.2em;
+    color: var(--kin);
+    font-family: 'Shippori Mincho', serif;
+  }
+
+  /* 番組名（左上） */
+  .program-title {
+    position: absolute;
+    top: 12px;
+    left: 16px;
+    z-index: 30;
+    background: rgba(177,58,46,0.85);
+    border: 2px solid var(--kin);
+    padding: 4px 14px;
+    font-size: 0.72rem;
+    letter-spacing: 0.15em;
+    color: var(--washi);
+    font-family: 'Shippori Mincho', serif;
+  }
+
+  /* ニュースのテロップ */
+  .news-ticker {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--shu);
+    z-index: 25;
+    padding: 6px 0;
+    overflow: hidden;
+    border-top: 2px solid var(--kin);
+  }
+
+  .news-ticker-inner {
+    display: inline-block;
+    white-space: nowrap;
+    animation: ticker 20s linear infinite;
+    font-size: 0.85rem;
+    letter-spacing: 0.1em;
+    color: var(--washi);
+    font-family: 'Shippori Mincho', serif;
+  }
+
+  @keyframes ticker {
+    from { transform: translateX(100%); }
+    to { transform: translateX(-100%); }
+  }
+
+  /* ドット絵の小道具 */
+  .prop {
+    position: absolute;
+    z-index: 15;
+    image-rendering: pixelated;
+  }
+
+  /* リモコン */
+  .remote {
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(160deg, #2a2018, #1a1208);
+    border: 2px solid #4a3a24;
+    border-radius: 12px;
+    padding: 10px 14px;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+    z-index: 200;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .remote-label {
+    font-size: 0.6rem;
+    color: var(--kin);
+    letter-spacing: 0.2em;
+    margin-right: 6px;
+    font-family: 'Shippori Mincho', serif;
+  }
+
+  .ch-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: linear-gradient(160deg, #3a2a18, #1a1208);
+    border: 2px solid var(--kin);
+    color: var(--kin);
+    font-size: 0.7rem;
+    cursor: pointer;
+    font-family: 'Zen Kaku Gothic New', sans-serif;
+    font-weight: 700;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .ch-btn:hover {
+    background: linear-gradient(160deg, #5a3a18, #2a1a08);
+    box-shadow: 0 0 12px rgba(201,168,76,0.6);
+    transform: scale(1.1);
+  }
+
+  .ch-btn.active {
+    background: var(--shu);
+    color: var(--washi);
+    box-shadow: 0 0 16px rgba(177,58,46,0.8);
+  }
+
+  /* 電源ランプ */
+  .power-led {
+    position: absolute;
+    bottom: 14px;
+    right: 20px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #e04040;
+    box-shadow: 0 0 8px #e04040;
+    animation: ledPulse 2s ease infinite;
+  }
+
+  @keyframes ledPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  /* チャンネル一覧の表示 */
+  .ch-info {
+    position: absolute;
+    bottom: 60px;
+    left: 20px;
+    z-index: 30;
+    background: rgba(0,0,0,0.7);
+    border-left: 4px solid var(--kin);
+    padding: 6px 14px;
+    font-size: 0.7rem;
+    letter-spacing: 0.15em;
+    color: var(--kin);
+    font-family: 'Shippori Mincho', serif;
+  }
+
+  @media (max-width: 600px) {
+    .tv { padding: 16px 12px 70px; border-radius: 14px; }
+    .screen { min-height: 300px; aspect-ratio: 16 / 11; }
+    .subtitle { font-size: 0.8rem; padding: 10px 14px; margin: 0 10px 14px; min-height: 50px; }
+    .ch-btn { width: 28px; height: 28px; font-size: 0.6rem; }
+    .remote { padding: 8px 10px; gap: 4px; }
+    .ch-logo, .program-title { font-size: 0.6rem; padding: 3px 8px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="tv">
+  <div class="tv-brand">SBI テレビジョン</div>
+
+  <div class="screen" id="screen">
+    <!-- チャンネルロゴ -->
+    <div class="ch-logo" id="chLogo">CH 1</div>
+    <!-- 番組名 -->
+    <div class="program-title" id="programTitle">SBIニュース</div>
+    <!-- チャンネル情報 -->
+    <div class="ch-info" id="chInfo">◆ SBI証券の最新情報をお届け</div>
+
+    <!-- ===== CH1: ニュース ===== -->
+    <div class="scene active" data-ch="1">
+      <div class="scene-bg" style="background: linear-gradient(180deg, #1a2a4a 0%, #0a0a12 100%);"></div>
+
+      <!-- ニュースキャスター（図形学） -->
+      <div class="figure" style="bottom: 100px; left: 50%; transform: translateX(-50%);">
+        <svg width="200" height="260" viewBox="0 0 200 260">
+          <!-- 頭 -->
+          <circle cx="100" cy="60" r="38" fill="#f0d8b8" stroke="#8a6a48" stroke-width="2"/>
+          <!-- 髪 -->
+          <path d="M62 50 Q100 10 138 50 Q140 30 100 22 Q60 30 62 50" fill="#3a2a1a"/>
+          <!-- 目 -->
+          <ellipse cx="85" cy="58" rx="4" ry="5" fill="#1a1614"/>
+          <ellipse cx="115" cy="58" rx="4" ry="5" fill="#1a1614"/>
+          <!-- 眉 -->
+          <line x1="78" y1="48" x2="92" y2="46" stroke="#3a2a1a" stroke-width="2"/>
+          <line x1="108" y1="46" x2="122" y2="48" stroke="#3a2a1a" stroke-width="2"/>
+          <!-- 口（口パク用） -->
+          <ellipse class="mouth" cx="100" cy="78" rx="10" ry="4" fill="#8a3a3a"/>
+          <!-- 体 -->
+          <path d="M60 100 L140 100 L150 220 L50 220 Z" fill="#1b2a4a" stroke="#0a0a12" stroke-width="2"/>
+          <!-- ネクタイ -->
+          <path d="M95 100 L105 100 L110 160 L100 170 L90 160 Z" fill="#b13a2e"/>
+          <!-- 腕 -->
+          <path d="M60 120 L35 180 L50 185 L70 130" fill="#1b2a4a" stroke="#0a0a12" stroke-width="2"/>
+          <path d="M140 120 L165 180 L150 185 L130 130" fill="#1b2a4a" stroke="#0a0a12" stroke-width="2"/>
+        </svg>
+      </div>
+
+      <!-- ドット絵の小道具：ニュース原稿 -->
+      <div class="prop" style="bottom: 140px; left: 25%;">
+        <svg width="60" height="40" viewBox="0 0 60 40">
+          <rect x="0" y="0" width="60" height="40" fill="#f5efe3" stroke="#1a1614" stroke-width="2"/>
+          <line x1="8" y1="10" x2="52" y2="10" stroke="#1a1614" stroke-width="2"/>
+          <line x1="8" y1="18" x2="52" y2="18" stroke="#1a1614" stroke-width="2"/>
+          <line x1="8" y1="26" x2="40" y2="26" stroke="#1a1614" stroke-width="2"/>
+        </svg>
+      </div>
+
+      <!-- ニューステロップ -->
+      <div class="news-ticker" style="bottom: 90px;">
+        <div class="news-ticker-inner">◆ SBI証券 売買手数料無料コースが好調 ｜ 新NISA口座数が業界トップに ｜ 米国株の取扱銘柄を拡大 ｜ 投資信託のラインナップが過去最多に ◆</div>
+      </div>
+
+      <div class="subtitle" id="sub1">
+        <span class="speaker">キャスター</span>
+        本日のSBI証券ニュースです。売買手数料無料コースの利用者が急増しています。
+      </div>
+    </div>
+
+    <!-- ===== CH2: バラエティ ===== -->
+    <div class="scene" data-ch="2">
+      <div class="scene-bg" style="background: linear-gradient(180deg, #4a2a1a 0%, #1a0a06 100%);"></div>
+
+      <!-- 司会者（図形学） -->
+      <div class="figure" style="bottom: 100px; left: 20%;">
+        <svg width="180" height="240" viewBox="0 0 180 240">
+          <circle cx="90" cy="55" r="35" fill="#f0d8b8" stroke="#8a6a48" stroke-width="2"/>
+          <path d="M55 45 Q90 5 125 45 Q128 25 90 18 Q52 25 55 45" fill="#1a1614"/>
+          <ellipse cx="76" cy="53" rx="4" ry="5" fill="#1a1614"/>
+          <ellipse cx="104" cy="53" rx="4" ry="5" fill="#1a1614"/>
+          <ellipse class="mouth" cx="90" cy="72" rx="9" ry="4" fill="#8a3a3a"/>
+          <path d="M55 92 L125 92 L135 210 L45 210 Z" fill="#b13a2e" stroke="#0a0a12" stroke-width="2"/>
+        </svg>
+      </div>
+
+      <!-- ゲスト（図形学） -->
+      <div class="figure" style="bottom: 100px; right: 20%;">
+        <svg width="180" height="240" viewBox="0 0 180 240">
+          <circle cx="90" cy="55" r="35" fill="#f0d8b8" stroke="#8a6a48" stroke-width="2"/>
+          <path d="M55 50 Q90 15 125 50 Q130 40 90 30 Q50 40 55 50" fill="#6a4a2a"/>
+          <ellipse cx="76" cy="53" rx="4" ry="5" fill="#1a1614"/>
+          <ellipse cx="104" cy="53" rx="4" ry="5" fill="#1a1614"/>
+          <ellipse class="mouth" cx="90" cy="72" rx="9" ry="4" fill="#8a3a3a"/>
+          <path d="M55 92 L125 92 L135 210 L45 210 Z" fill="#5a7a4a" stroke="#0a0a12" stroke-width="2"/>
+        </svg>
+      </div>
+
+      <!-- ドット絵の小道具：椅子 -->
+      <div class="prop" style="bottom: 95px; left: 50%; transform: translateX(-50%);">
+        <svg width="80" height="30" viewBox="0 0 80 30">
+          <rect x="0" y="0" width="80" height="10" fill="#8a6a28" stroke="#1a1614" stroke-width="2"/>
+          <rect x="5" y="10" width="8" height="20" fill="#8a6a28" stroke="#1a1614" stroke-width="2"/>
+          <rect x="67" y="10" width="8" height="20" fill="#8a6a28" stroke="#1a1614" stroke-width="2"/>
+        </svg>
+      </div>
+
+      <div class="subtitle" id="sub2">
+        <span class="speaker">司会</span>
+        今日はSBI証券の魅力を徹底解剖！ゲストの方は普段どうやって銘柄を選んでいますか？
+      </div>
+    </div>
+
+    <!-- ===== CH3: NHK子ども向け教育 ===== -->
+    <div class="scene" data-ch="3">
+      <div class="scene-bg" style="background: linear-gradient(180deg, #2a4a2a 0%, #0a1a0a 100%);"></div>
+
+      <!-- 先生（図形学） -->
+      <div class="figure" style="bottom: 100px; left: 30%;">
+        <svg width="160" height="220" viewBox="0 0 160 220">
+          <circle cx="80" cy="50" r="32" fill="#f0d8b8" stroke="#8a6a48" stroke-width="2"/>
+          <path d="M48 42 Q80 10 112 42 Q114 28 80 22 Q46 28 48 42" fill="#3a2a1a"/>
+          <ellipse cx="68" cy="48" rx="4" ry="5" fill="#1a1614"/>
+          <ellipse cx="92" cy="48" rx="4" ry="5" fill="#1a1614"/>
+          <ellipse class="mouth" cx="80" cy="66" rx="9" ry="4" fill="#8a3a3a"/>
+          <path d="M50 82 L110 82 L120 200 L40 200 Z" fill="#4a7a4a" stroke="#0a0a12" stroke-width="2"/>
+        </svg>
+      </div>
+
+      <!-- 子ども（図形学） -->
+      <div class="figure" style="bottom: 100px; right: 25%;">
+        <svg width="120" height="170" viewBox="0 0 120 170">
+          <circle cx="60" cy="40" r="26" fill="#f0d8b8" stroke="#8a6a48" stroke-width="2"/>
+          <path d="M36 34 Q60 8 84 34 Q86 22 60 16 Q34 22 36 34" fill="#1a1614"/>
+          <circle cx="50" cy="38" r="3" fill="#1a1614"/>
+          <circle cx="70" cy="38" r="3" fill="#1a1614"/>
+          <ellipse class="mouth" cx="60" cy="52" rx="7" ry="3" fill="#8a3a3a"/>
+          <path d="M38 66 L82 66 L90 150 L30 150 Z" fill="#c9a84c" stroke="#0a0a12" stroke-width="2"/>
+        </svg>
+      </div>
+
+      <!-- ドット絵の小道具：黒板 -->
+      <div class="prop" style="top: 40px; left: 50%; transform: translateX(-50%);">
+        <svg width="200" height="80" viewBox="0 0 200 80">
+          <rect x="0" y="0" width="200" height="80" fill="#2a4a2a" stroke="#8a6a28" stroke-width="4"/>
+          <text x="100" y="45" text-anchor="middle" fill="#f5efe3" font-size="16" font-family="serif">SBI証券</text>
+        </svg>
+      </div>
+
+      <div class="subtitle" id="sub3">
+        <span class="speaker">先生</span>
+        みんな、SBI証券って知ってるかな？株や投資信託が買える、とっても便利なところなんだよ。
+      </div>
+    </div>
+
+    <!-- ===== CH4: ドラマ ===== -->
+    <div class="scene" data-ch="4">
+      <div class="scene-bg" style="background: linear-gradient(180deg, #1a1a2a 0%, #0a0a12 100%);"></div>
+
+      <!-- 男性（図形学） -->
+      <div class="figure" style="bottom: 100px; left: 25%;">
+        <svg width="180" height="250" viewBox="0 0 180 250">
+          <circle cx="90" cy="55" r="34" fill="#f0d8b8" stroke="#8a6a48" stroke-width="2"/>
+          <path d="M56 48 Q90 15 124 48 Q126 32 90 26 Q54 32 56 48" fill="#2a1a0a"/>
+          <ellipse cx="76" cy="52" rx="4" ry="5" fill="#1a1614"/>
+          <ellipse cx="104" cy="52" rx="4" ry="5" fill="#1a1614"/>
+          <ellipse class="mouth" cx="90" cy="72" rx="9" ry="4" fill="#8a3a3a"/>
+          <path d="M54 90 L126 90 L136 220 L44 220 Z" fill="#2a2a3a" stroke="#0a0a12" stroke-width="2"/>
+          <path d="M85 90 L95 90 L98 140 L90 148 L82 140 Z" fill="#c9a84c"/>
+        </svg>
+      </div>
+
+      <!-- 女性（図形学） -->
+      <div class="figure" style="bottom: 100px; right: 25%;">
+        <svg width="180" height="250" viewBox="0 0 180 250">
+          <circle cx="90" cy="55" r="34" fill="#f0d8b8" stroke="#8a6a48" stroke-width="2"/>
+          <path d="M56 50 Q90 20 124 50 Q130 40 90 30 Q50 40 56 50" fill="#4a2a1a"/>
+          <ellipse cx="76" cy="52" rx="4" ry="5" fill="#1a1614"/>
+          <ellipse cx="104" cy="52" rx="4" ry="5" fill="#1a1614"/>
+          <ellipse class="mouth" cx="90" cy="72" rx="9" ry="4" fill="#8a3a3a"/>
+          <path d="M54 90 L126 90 L136 220 L44 220 Z" fill="#4a3a5a" stroke="#0a0a12" stroke-width="2"/>
+        </svg>
+      </div>
+
+      <!-- ドット絵の小道具：テーブル -->
+      <div class="prop" style="bottom: 90px; left: 50%; transform: translateX(-50%);">
+        <svg width="140" height="50" viewBox="0 0 140 50">
+          <rect x="0" y="0" width="140" height="12" fill="#8a6a28" stroke="#1a1614" stroke-width="2"/>
+          <rect x="10" y="12" width="8" height="38" fill="#8a6a28" stroke="#1a1614" stroke-width="2"/>
+          <rect x="122" y="12" width="8" height="38" fill="#8a6a28" stroke="#1a1614" stroke-width="2"/>
+        </svg>
+      </div>
+
+      <div class="subtitle" id="sub4">
+        <span class="speaker">男性</span>
+        私はSBI証券で10年投資を続けている。最初は少額から、少しずつ学んできたんだ。
+      </div>
+    </div>
+
+    <!-- ===== CH5: アニメ ===== -->
+    <div class="scene" data-ch="5">
+      <div class="scene-bg" style="background: linear-gradient(180deg, #4a2a4a 0%, #1a0a1a 100%);"></div>
+
+      <!-- アニメキャラ（図形学・大きい目） -->
+      <div class="figure" style="bottom: 100px; left: 35%;">
+        <svg width="160" height="220" viewBox="0 0 160 220">
+          <circle cx="80" cy="55" r="38" fill="#ffe8d0" stroke="#8a6a48" stroke-width="2"/>
+          <path d="M42 45 Q80 5 118 45 Q122 25 80 18 Q38 25 42 45" fill="#c9a84c"/>
+          <ellipse cx="65" cy="55" rx="8" ry="10" fill="#1a1614"/>
+          <ellipse cx="95" cy="55" rx="8" ry="10" fill="#1a1614"/>
+          <circle cx="67" cy="52" r="3" fill="#fff"/>
+          <circle cx="97" cy="52" r="3" fill="#fff"/>
+          <ellipse class="mouth" cx="80" cy="78" rx="10" ry="5" fill="#8a3a3a"/>
+          <path d="M46 92 L114 92 L124 210 L36 210 Z" fill="#b13a2e" stroke="#0a0a12" stroke-width="2"/>
+        </svg>
+      </div>
+
+      <!-- ドット絵の小道具：魔法の杖 -->
+      <div class="prop" style="bottom: 150px; right: 30%;">
+        <svg width="20" height="80" viewBox="0 0 20 80">
+          <rect x="8" y="10" width="4" height="70" fill="#8a6a28" stroke="#1a1614" stroke-width="2"/>
+          <circle cx="10" cy="8" r="8" fill="#c9a84c" stroke="#1a1614" stroke-width="2"/>
+        </svg>
+      </div>
+
+      <div class="subtitle" id="sub5">
+        <span class="speaker">主人公</span>
+        みんな、SBI証券の力で、未来の自分に投資しよう！これがぼくたちの新しい魔法だ！
+      </div>
+    </div>
+
+    <!-- ===== CH6: 映画 ===== -->
+    <div class="scene" data-ch="6">
+      <div class="scene-bg" style="background: linear-gradient(180deg, #0a0a12 0%, #1a1a2a 50%, #0a0a12 100%);"></div>
+
+      <!-- 映画風の人物（図形学・横顔） -->
+      <div class="figure" style="bottom: 100px; left: 50%; transform: translateX(-50%);">
+        <svg width="220" height="280" viewBox="0 0 220 280">
+          <circle cx="110" cy="65" r="42" fill="#f0d8b8" stroke="#8a6a48" stroke-width="2"/>
+          <path d="M68 58 Q110 15 152 58 Q156 40 110 30 Q64 40 68 58" fill="#2a1a0a"/>
+          <ellipse cx="92" cy="62" rx="5" ry="6" fill="#1a1614"/>
+          <ellipse cx="128" cy="62" rx="5" ry="6" fill="#1a1614"/>
+          <ellipse class="mouth" cx="110" cy="86" rx="10" ry="4" fill="#8a3a3a"/>
+          <path d="M68 108 L152 108 L164 260 L56 260 Z" fill="#1a1a2a" stroke="#0a0a12" stroke-width="2"/>
+          <!-- 光の表現 -->
+          <circle cx="110" cy="65" r="50" fill="none" stroke="#c9a84c" stroke-width="1" opacity="0.3"/>
+        </svg>
+      </div>
+
+      <!-- ドット絵の小道具：映画のフィルム -->
+      <div class="prop" style="top: 30px; left: 20px;">
+        <svg width="80" height="40" viewBox="0 0 80 40">
+          <rect x="0" y="0" width="80" height="40" fill="#1a1614" stroke="#8a6a28" stroke-width="2"/>
+          <rect x="5" y="5" width="8" height="6" fill="#f5efe3"/>
+          <rect x="5" y="15" width="8" height="6" fill="#f5efe3"/>
+          <rect x="5" y="25" width="8" height="6" fill="#f5efe3"/>
+          <rect x="67" y="5" width="8" height="6" fill="#f5efe3"/>
+          <rect x="67" y="15" width="8" height="6" fill="#f5efe3"/>
+          <rect x="67" y="25" width="8" height="6" fill="#f5efe3"/>
+        </svg>
+      </div>
+
+      <div class="subtitle" id="sub6">
+        <span class="speaker">ナレーション</span>
+        彼は知らなかった。SBI証券の口座を開くことが、人生を変える第一歩になることを。
+      </div>
+    </div>
+
+    <!-- ===== CH7: 漫才 ===== -->
+    <div class="scene" data-ch="7">
+      <div class="scene-bg" style="background: linear-gradient(180deg, #4a3a1a 0%, #1a1208 100%);"></div>
+
+      <!-- ボケ（図形学） -->
+      <div class="figure" style="bottom: 100px; left: 25%;">
+        <svg width="160" height="220" viewBox="0 0 160 220">
+          <circle cx="80" cy="50" r="32" fill="#f0d8b8" stroke="#8a6a48" stroke-width="2"/>
+          <path d="M48 42 Q80 10 112 42 Q114 28 80 22 Q46 28 48 42" fill="#1a1614"/>
+          <ellipse cx="68" cy="48" rx="4" ry="5" fill="#1a1614"/>
+          <ellipse cx="92" cy="48" rx="4" ry="5" fill="#1a1614"/>
+          <ellipse class="mouth" cx="80" cy="66" rx="10" ry="5" fill="#8a3a3a"/>
+          <path d="M50 82 L110 82 L120 200 L40 200 Z" fill="#c9a84c" stroke="#0a0a12" stroke-width="2"/>
+        </svg>
+      </div>
+
+      <!-- ツッコミ（図形学） -->
+      <div class="figure" style="bottom: 100px; right: 25%;">
+        <svg width="160" height="220" viewBox="0 0 160 220">
+          <circle cx="80" cy="50" r="32" fill="#f0d8b8" stroke="#8a6a48" stroke-width="2"/>
+          <path d="M48 42 Q80 10 112 42 Q114 28 80 22 Q46 28 48 42" fill="#3a2a1a"/>
+          <ellipse cx="68" cy="48" rx="4" ry="5" fill="#1a1614"/>
+          <ellipse cx="92" cy="48" rx="4" ry="5" fill="#1a1614"/>
+          <ellipse class="mouth" cx="80" cy="66" rx="10" ry="5" fill="#8a3a3a"/>
+          <path d="M50 82 L110 82 L120 200 L40 200 Z" fill="#4a7a8a" stroke="#0a0a12" stroke-width="2"/>
+        </svg>
+      </div>
+
+      <!-- ドット絵の小道具：扇子 -->
+      <div class="prop" style="bottom: 150px; left: 45%;">
+        <svg width="40" height="50" viewBox="0 0 40 50">
+          <path d="M20 45 L5 10 Q20 0 35 10 Z" fill="#b13a2e" stroke="#1a1614" stroke-width="2"/>
+        </svg>
+      </div>
+
+      <div class="subtitle" id="sub7">
+        <span class="speaker">ボケ</span>
+        俺、SBI証券で100万円儲けたわ！
+      </div>
+    </div>
+
+    <!-- ===== CH8: 国会生放送 ===== -->
+    <div class="scene" data-ch="8">
+      <div class="scene-bg" style="background: linear-gradient(180deg, #2a2a4a 0%, #0a0a1a 100%);"></div>
+
+      <!-- 演台（ドット絵） -->
+      <div class="prop" style="bottom: 90px; left: 50%; transform: translateX(-50%);">
+        <svg width="120" height="70" viewBox="0 0 120 70">
+          <rect x="0" y="0" width="120" height="50" fill="#8a6a28" stroke="#1a1614" stroke-width="3"/>
+          <rect x="10" y="50" width="100" height="20" fill="#6a4a18" stroke="#1a1614" stroke-width="3"/>
+          <line x1="20" y1="15" x2="100" y2="15" stroke="#f5efe3" stroke-width="2"/>
+          <line x1="20" y1="25" x2="100" y2="25" stroke="#f5efe3" stroke-width="2"/>
+          <line x1="20" y1="35" x2="80" y2="35" stroke="#f5efe3" stroke-width="2"/>
+        </svg>
+      </div>
+
+      <!-- 議員（図形学） -->
+      <div class="figure" style="bottom: 110px; left: 50%; transform: translateX(-50%);">
+        <svg width="140" height="200" viewBox="0 0 140 200">
+          <circle cx="70" cy="45" r="30" fill="#f0d8b8" stroke="#8a6a48" stroke-width="2"/>
+          <path d="M40 38 Q70 8 100 38 Q102 24 70 18 Q38 24 40 38" fill="#4a4a4a"/>
+          <ellipse cx="60" cy="43" rx="4" ry="5" fill="#1a1614"/>
+          <ellipse cx="80" cy="43" rx="4" ry="5" fill="#1a1614"/>
+          <ellipse class="mouth" cx="70" cy="60" rx="9" ry="4" fill="#8a3a3a"/>
+          <path d="M45 75 L95 75 L105 180 L35 180 Z" fill="#2a2a3a" stroke="#0a0a12" stroke-width="2"/>
+        </svg>
+      </div>
+
+      <!-- 国会中継のテロップ -->
+      <div class="news-ticker" style="bottom: 90px;">
+        <div class="news-ticker-inner">◆ 国会中継 ｜ SBI証券を活用した資産形成について質問がなされています ｜ 投資初心者の支援策について議論 ◆</div>
+      </div>
+
+      <div class="subtitle" id="sub8">
+        <span class="speaker">議員</span>
+        政府は、SBI証券をはじめとするネット証券の普及を通じて、国民の資産形成をどのように支援していくお考えですか。
+      </div>
+    </div>
+  </div>
+
+  <!-- リモコン -->
+  <div class="remote" id="remote">
+    <span class="remote-label">CH</span>
+    <button class="ch-btn active" data-ch="1" onclick="changeChannel(1)">1</button>
+    <button class="ch-btn" data-ch="2" onclick="changeChannel(2)">2</button>
+    <button class="ch-btn" data-ch="3" onclick="changeChannel(3)">3</button>
+    <button class="ch-btn" data-ch="4" onclick="changeChannel(4)">4</button>
+    <button class="ch-btn" data-ch="5" onclick="changeChannel(5)">5</button>
+    <button class="ch-btn" data-ch="6" onclick="changeChannel(6)">6</button>
+    <button class="ch-btn" data-ch="7" onclick="changeChannel(7)">7</button>
+    <button class="ch-btn" data-ch="8" onclick="changeChannel(8)">8</button>
+  </div>
+
+  <!-- 電源ランプ -->
+  <div class="power-led"></div>
+</div>
+
+<script>
+// ============================================================
+// チャンネル切り替え
+// ============================================================
+
+const CHANNELS = {
+  1: { name: 'SBIニュース', info: '◆ SBI証券の最新情報をお届け', logo: 'CH 1' },
+  2: { name: 'SBIバラエティ', info: '◆ 今夜のゲストとSBI証券を語る', logo: 'CH 2' },
+  3: { name: 'SBI子ども教室', info: '◆ みんなで学ぼうSBI証券', logo: 'CH 3' },
+  4: { name: 'SBIドラマ', info: '◆ 投資家たちの物語', logo: 'CH 4' },
+  5: { name: 'SBIアニメ', info: '◆ 未来への投資', logo: 'CH 5' },
+  6: { name: 'SBI映画', info: '◆ 人生を変える第一歩', logo: 'CH 6' },
+  7: { name: 'SBI漫才', info: '◆ 笑って学ぶSBI証券', logo: 'CH 7' },
+  8: { name: 'SBI国会中継', info: '◆ 国会中継 生放送', logo: 'CH 8' },
+};
+
+let currentCh = 1;
+
+function changeChannel(ch) {
+  currentCh = ch;
+  // シーン切り替え
+  document.querySelectorAll('.scene').forEach(s => s.classList.remove('active'));
+  const scene = document.querySelector(`.scene[data-ch="${ch}"]`);
+  if (scene) scene.classList.add('active');
+
+  // ロゴ・番組名・情報
+  const info = CHANNELS[ch];
+  document.getElementById('chLogo').textContent = info.logo;
+  document.getElementById('programTitle').textContent = info.name;
+  document.getElementById('chInfo').textContent = info.info;
+
+  // ボタン
+  document.querySelectorAll('.ch-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector(`.ch-btn[data-ch="${ch}"]`).classList.add('active');
+}
+
+// ============================================================
+// 口パクアニメーション
+// ============================================================
+
+function animateMouths() {
+  document.querySelectorAll('.mouth').forEach(mouth => {
+    const open = Math.random() > 0.5;
+    mouth.setAttribute('ry', open ? 6 : 3);
+    mouth.setAttribute('rx', open ? 11 : 10);
+  });
+}
+
+setInterval(animateMouths, 200);
+
+// ============================================================
+// 字幕の切り替え（各チャンネルで複数セリフ）
+// ============================================================
+
+const SUBTITLES = {
+  1: [
+    { speaker: 'キャスター', text: '本日のSBI証券ニュースです。売買手数料無料コースの利用者が急増しています。' },
+    { speaker: 'キャスター', text: '新NISA口座数は業界トップ。投資初心者の関心が高まっています。' },
+    { speaker: 'キャスター', text: '米国株の取扱銘柄も拡大。今後もサービス充実が期待されます。' },
+  ],
+  2: [
+    { speaker: '司会', text: '今日はSBI証券の魅力を徹底解剖！ゲストの方は普段どうやって銘柄を選んでいますか？' },
+    { speaker: 'ゲスト', text: '私はやっぱり、手数料の安さと銘柄の多さで選んでますね。SBIは文句なし。' },
+    { speaker: '司会', text: 'なるほど！投資信託のラインナップも豊富ですからね。' },
+  ],
+  3: [
+    { speaker: '先生', text: 'みんな、SBI証券って知ってるかな？株や投資信託が買える、とっても便利なところなんだよ。' },
+    { speaker: '子ども', text: '先生！投資ってむずかしくないの？' },
+    { speaker: '先生', text: '大丈夫。SBI証券なら少額から始められるし、アプリも使いやすいんだよ。' },
+  ],
+  4: [
+    { speaker: '男性', text: '私はSBI証券で10年投資を続けている。最初は少額から、少しずつ学んできたんだ。' },
+    { speaker: '女性', text: '私も去年から始めました。最初は怖かったけど、慣れると毎日が楽しくなります。' },
+    { speaker: '男性', text: 'そうだろう。投資は人生を豊かにする。SBI証券はそのパートナーだ。' },
+  ],
+  5: [
+    { speaker: '主人公', text: 'みんな、SBI証券の力で、未来の自分に投資しよう！これがぼくたちの新しい魔法だ！' },
+    { speaker: '仲間', text: 'すごい！これでぼくも株主になれるんだね！' },
+    { speaker: '主人公', text: 'そうさ。SBI証券の口座があれば、誰でも投資家になれるんだ！' },
+  ],
+  6: [
+    { speaker: 'ナレーション', text: '彼は知らなかった。SBI証券の口座を開くことが、人生を変える第一歩になることを。' },
+    { speaker: 'ナレーション', text: '最初の一歩は小さくても、積み重ねれば大きな力になる。' },
+    { speaker: 'ナレーション', text: 'これが、資産形成という名の、静かな革命である。' },
+  ],
+  7: [
+    { speaker: 'ボケ', text: '俺、SBI証券で100万円儲けたわ！' },
+    { speaker: 'ツッコミ', text: 'お前、口座開いたの昨日やろ！まだ1円も入れてへんわ！' },
+    { speaker: 'ボケ', text: 'ええやん、夢くらい見せてくれても！' },
+  ],
+  8: [
+    { speaker: '議員', text: '政府は、SBI証券をはじめとするネット証券の普及を通じて、国民の資産形成をどのように支援していくお考えですか。' },
+    { speaker: '大臣', text: 'ネット証券の普及は、国民の資産形成にとって極めて重要であります。政府としても支援してまいります。' },
+    { speaker: '議員', text: '具体的な施策について、お聞かせください。' },
+  ],
+};
+
+let subIndex = {};
+
+function updateSubtitle(ch) {
+  if (!subIndex[ch]) subIndex[ch] = 0;
+  const list = SUBTITLES[ch];
+  if (!list) return;
+
+  const sub = list[subIndex[ch] % list.length];
+  const subEl = document.getElementById('sub' + ch);
+  if (subEl) {
+    subEl.innerHTML = `<span class="speaker">${sub.speaker}</span>${sub.text}`;
+  }
+  subIndex[ch]++;
+}
+
+// 各チャンネルの字幕を定期的に切り替え
+setInterval(() => {
+  updateSubtitle(currentCh);
+}, 5000);
+
+// 初回
+updateSubtitle(1);
+</script>
+</body>
+</html>
