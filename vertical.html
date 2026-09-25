@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ギリシャ証券 - マーケット情報</title>
+<style>
+  /* ===== グランジ風ベース ===== */
+  @import url('https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;600;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap');
+
+  :root {
+    --concrete: #2b2b2b;
+    --concrete-light: #3a3a3a;
+    --concrete-dark: #1a1a1a;
+    --rust: #a85a3a;
+    --rust-bright: #c96a45;
+    --acid: #b8c94a;
+    --bone: #d8d2c2;
+    --bone-dim: #9a9488;
+    --blood: #7a2a1a;
+    --ink: #e8e2d4;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body { height: 100%; }
+
+  body {
+    font-family: 'Zen Kaku Gothic New', 'Shippori Mincho', sans-serif;
+    background: var(--concrete);
+    background-image:
+      /* グランジノイズ */
+      radial-gradient(circle at 15% 20%, rgba(0,0,0,0.35), transparent 40%),
+      radial-gradient(circle at 85% 70%, rgba(0,0,0,0.3), transparent 45%),
+      radial-gradient(circle at 50% 50%, rgba(80,70,50,0.15), transparent 60%),
+      repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(0,0,0,0.08) 3px, rgba(0,0,0,0.08) 6px),
+      repeating-linear-gradient(-45deg, transparent, transparent 5px, rgba(255,255,255,0.015) 5px, rgba(255,255,255,0.015) 10px);
+    color: var(--ink);
+    min-height: 100vh;
+    display: flex;
+    overflow-x: hidden;
+  }
+
+  /* ===== 左サイドバー ===== */
+  .sidebar {
+    width: 280px;
+    min-width: 280px;
+    background: var(--concrete-dark);
+    background-image:
+      radial-gradient(circle at 30% 10%, rgba(120,60,30,0.15), transparent 50%),
+      radial-gradient(circle at 80% 90%, rgba(60,60,40,0.2), transparent 50%),
+      repeating-linear-gradient(0deg, transparent, transparent 4px, rgba(0,0,0,0.15) 4px, rgba(0,0,0,0.15) 8px);
+    border-right: 3px solid #000;
+    box-shadow: inset -8px 0 20px rgba(0,0,0,0.6), 6px 0 18px rgba(0,0,0,0.5);
+    padding: 20px 0 40px;
+    height: 100vh;
+    overflow-y: auto;
+    position: sticky;
+    top: 0;
+  }
+
+  .sidebar::-webkit-scrollbar { width: 8px; }
+  .sidebar::-webkit-scrollbar-track { background: #111; }
+  .sidebar::-webkit-scrollbar-thumb { background: #444; border: 1px solid #222; }
+
+  .sidebar-title {
+    font-family: 'Shippori Mincho', serif;
+    font-size: 1.1rem;
+    font-weight: 800;
+    letter-spacing: 0.2em;
+    color: var(--acid);
+    text-shadow: 2px 2px 0 #000, 0 0 12px rgba(184,201,74,0.4);
+    padding: 6px 22px 18px;
+    border-bottom: 2px dashed #444;
+    margin-bottom: 14px;
+    text-transform: uppercase;
+  }
+
+  /* 大カテゴリ */
+  .cat {
+    border-bottom: 1px solid #333;
+  }
+  .cat-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    background: transparent;
+    border: none;
+    padding: 12px 20px;
+    font-family: 'Shippori Mincho', serif;
+    font-size: 0.98rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--bone);
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.18s;
+    text-shadow: 1px 1px 0 #000;
+    position: relative;
+  }
+  .cat-header:hover {
+    background: linear-gradient(90deg, rgba(168,90,58,0.25), transparent);
+    color: var(--acid);
+    padding-left: 26px;
+  }
+  .cat-header::before {
+    content: '▶';
+    font-size: 0.7rem;
+    color: var(--rust);
+    margin-right: 8px;
+    transition: transform 0.25s;
+    display: inline-block;
+  }
+  .cat.open .cat-header::before {
+    transform: rotate(90deg);
+    color: var(--acid);
+  }
+  .cat-header span.label { flex: 1; }
+
+  /* サブ項目 */
+  .cat-items {
+    display: none;
+    background: #151515;
+    border-top: 1px solid #000;
+    box-shadow: inset 0 3px 8px rgba(0,0,0,0.7);
+  }
+  .cat.open .cat-items { display: block; }
+
+  .cat-items button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: none;
+    border-bottom: 1px dotted #2e2e2e;
+    padding: 9px 20px 9px 34px;
+    font-family: 'Zen Kaku Gothic New', sans-serif;
+    font-size: 0.85rem;
+    color: var(--bone-dim);
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+  }
+  .cat-items button::before {
+    content: '▶';
+    position: absolute;
+    left: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.55rem;
+    color: #555;
+    transition: color 0.15s;
+  }
+  .cat-items button:hover {
+    background: linear-gradient(90deg, rgba(184,201,74,0.12), transparent);
+    color: var(--acid);
+    padding-left: 40px;
+  }
+  .cat-items button:hover::before { color: var(--acid); }
+
+  /* ===== メインエリア ===== */
+  .main {
+    flex: 1;
+    padding: 40px 50px;
+    position: relative;
+    overflow-y: auto;
+    height: 100vh;
+  }
+
+  .main h1 {
+    font-family: 'Shippori Mincho', serif;
+    font-size: 2.4rem;
+    font-weight: 800;
+    letter-spacing: 0.15em;
+    color: var(--bone);
+    text-shadow: 3px 3px 0 #000, 0 0 20px rgba(168,90,58,0.5);
+    margin-bottom: 8px;
+    position: relative;
+  }
+  .main h1::after {
+    content: '';
+    display: block;
+    width: 120px;
+    height: 4px;
+    margin-top: 12px;
+    background: linear-gradient(90deg, var(--rust), var(--acid), transparent);
+  }
+  .main .subtitle {
+    font-size: 0.9rem;
+    letter-spacing: 0.2em;
+    color: var(--bone-dim);
+    margin-bottom: 30px;
+  }
+  .main .hint {
+    font-size: 0.85rem;
+    color: #777;
+    border-left: 3px solid var(--rust);
+    padding: 8px 14px;
+    background: rgba(0,0,0,0.25);
+    max-width: 520px;
+    line-height: 1.7;
+  }
+
+  /* ===== モーダル ===== */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    background-image: radial-gradient(circle at 50% 50%, rgba(60,40,20,0.3), transparent 70%);
+    z-index: 500;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+  }
+  .modal-overlay.open { display: flex; }
+
+  .modal {
+    background: #1e1e1e;
+    background-image:
+      radial-gradient(circle at 20% 15%, rgba(120,60,30,0.18), transparent 50%),
+      repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(0,0,0,0.2) 4px, rgba(0,0,0,0.2) 8px);
+    border: 2px solid var(--rust);
+    border-radius: 4px;
+    max-width: 620px;
+    width: 100%;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 0 0 1px #000, 0 0 40px rgba(168,90,58,0.3), 10px 10px 0 rgba(0,0,0,0.6);
+    position: relative;
+    animation: modalIn 0.22s ease;
+  }
+  @keyframes modalIn {
+    from { opacity: 0; transform: translateY(14px) scale(0.97); filter: blur(3px); }
+    to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+  }
+
+  .modal-header {
+    background: linear-gradient(180deg, #2a2a2a, #151515);
+    padding: 16px 22px;
+    border-bottom: 2px solid var(--rust);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+  .modal-header h2 {
+    font-family: 'Shippori Mincho', serif;
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: var(--acid);
+    text-shadow: 2px 2px 0 #000;
+  }
+  .modal-close {
+    background: var(--blood);
+    color: var(--ink);
+    border: 1px solid #000;
+    border-radius: 3px;
+    width: 32px;
+    height: 32px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+  }
+  .modal-close:hover { background: var(--rust-bright); transform: rotate(90deg); }
+
+  .modal-body { padding: 22px 26px 30px; }
+
+  .modal-body .meaning { margin-bottom: 20px; }
+  .modal-body .meaning h3 {
+    font-size: 0.78rem;
+    letter-spacing: 0.2em;
+    color: var(--acid);
+    margin-bottom: 10px;
+    border-left: 4px solid var(--rust);
+    padding-left: 10px;
+    text-transform: uppercase;
+    text-shadow: 1px 1px 0 #000;
+  }
+  .modal-body .meaning p {
+    font-size: 0.95rem;
+    line-height: 1.85;
+    color: var(--bone);
+  }
+
+  .modal-body .soccer {
+    background: rgba(0,0,0,0.45);
+    border: 1px dashed var(--acid);
+    border-radius: 4px;
+    padding: 16px 18px;
+    position: relative;
+  }
+  .modal-body .soccer::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(-45deg, transparent, transparent 6px, rgba(184,201,74,0.03) 6px, rgba(184,201,74,0.03) 12px);
+    pointer-events: none;
+  }
+  .modal-body .soccer h3 {
+    font-size: 0.78rem;
+    letter-spacing: 0.2em;
+    color: var(--acid);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-transform: uppercase;
+    text-shadow: 1px 1px 0 #000;
+    position: relative;
+  }
+  .modal-body .soccer p {
+    font-size: 0.95rem;
+    line-height: 1.85;
+    color: var(--bone);
+    position: relative;
+  }
+
+  /* ===== レスポンシブ ===== */
+  @media (max-width: 760px) {
+    body { flex-direction: column; }
+    .sidebar {
+      width: 100%;
+      min-width: 0;
+      height: auto;
+      max-height: 45vh;
+      position: relative;
+      border-right: none;
+      border-bottom: 3px solid #000;
+    }
+    .main {
+      height: auto;
+      padding: 24px 18px;
+    }
+    .main h1 { font-size: 1.6rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== 左サイドバー ===== -->
+<aside class="sidebar">
+  <div class="sidebar-title">MARKET DATA</div>
+
+  <!-- 指数・為替・金利 -->
+  <div class="cat" data-cat>
+    <button class="cat-header" data-term="指数・為替・金利"><span class="label">指数・為替・金利</span></button>
+    <div class="cat-items">
+      <button data-term="株価指数">株価指数</button>
+      <button data-term="株価指数先物">株価指数先物</button>
+      <button data-term="外国為替">外国為替</button>
+      <button data-term="コモディティ">コモディティ</button>
+      <button data-term="債券">債券</button>
+      <button data-term="政策金利">政策金利</button>
+      <button data-term="国内市場概況">国内市場概況</button>
+    </div>
+  </div>
+
+  <!-- ランキング -->
+  <div class="cat" data-cat>
+    <button class="cat-header" data-term="ランキング"><span class="label">ランキング</span></button>
+    <div class="cat-items">
+      <button data-term="国内株式（ランキング）">国内株式</button>
+      <button data-term="外国株式（ランキング）">外国株式</button>
+      <button data-term="投資信託（ランキング）">投資信託</button>
+      <button data-term="FX（ランキング）">FX</button>
+      <button data-term="店頭CFD（ランキング）">店頭CFD</button>
+      <button data-term="NISA（ランキング）">NISA</button>
+      <button data-term="オプション（ランキング）">オプション</button>
+    </div>
+  </div>
+
+  <!-- 経済カレンダー -->
+  <div class="cat" data-cat>
+    <button class="cat-header" data-term="経済カレンダー"><span class="label">経済カレンダー</span></button>
+    <div class="cat-items">
+      <button data-term="決算スケジュール">決算スケジュール</button>
+      <button data-term="経済指標">経済指標</button>
+    </div>
+  </div>
+
+  <!-- 投資情報 -->
+  <div class="cat" data-cat>
+    <button class="cat-header" data-term="投資情報"><span class="label">投資情報</span></button>
+    <div class="cat-items">
+      <button data-term="レポート">レポート</button>
+      <button data-term="投資情報メディア">投資情報メディア</button>
+      <button data-term="朝刊・夕刊">朝刊・夕刊</button>
+    </div>
+  </div>
+
+  <!-- 朝イチ情報 -->
+  <div class="cat" data-cat>
+    <button class="cat-header" data-term="朝イチ情報"><span class="label">朝イチ情報</span></button>
+    <div class="cat-items">
+      <button data-term="朝イチ情報（本体）">朝イチ情報</button>
+      <button data-term="国内市況">国内市況</button>
+      <button data-term="海外市況">海外市況</button>
+      <button data-term="FX市況">FX市況</button>
+      <button data-term="先物・オプション市況">先物・オプション市況</button>
+    </div>
+  </div>
+
+  <!-- ニュース -->
+  <div class="cat" data-cat>
+    <button class="cat-header" data-term="ニュース"><span class="label">ニュース</span></button>
+    <div class="cat-items">
+      <button data-term="マーケット（ニュース）">マーケット</button>
+      <button data-term="株式（ニュース）">株式</button>
+      <button data-term="先物（ニュース）">先物</button>
+      <button data-term="為替・金利（ニュース）">為替・金利</button>
+      <button data-term="債券（ニュース）">債券</button>
+      <button data-term="経済指標（ニュース）">経済指標</button>
+    </div>
+  </div>
+
+  <!-- ご注意情報 -->
+  <div class="cat" data-cat>
+    <button class="cat-header" data-term="ご注意情報"><span class="label">ご注意情報</span></button>
+    <div class="cat-items">
+      <button data-term="国内株式現物　本日の注意銘柄">国内株式現物　本日の注意銘柄</button>
+      <button data-term="国内株式信用　本日の注意銘柄">国内株式信用　本日の注意銘柄</button>
+      <button data-term="国内株式　取引注意事項">国内株式　取引注意事項</button>
+      <button data-term="資本剰余金を原資とする配当の取扱い">資本剰余金を原資とする配当の取扱い</button>
+      <button data-term="主要指標・外国為替について">主要指標・外国為替について</button>
+    </div>
+  </div>
+
+  <!-- サポート2 -->
+  <div class="cat" data-cat>
+    <button class="cat-header" data-term="サポート2"><span class="label">サポート2</span></button>
+    <div class="cat-items">
+      <button data-term="SBI証券のセキュリティ/認証サービス">SBI証券のセキュリティ/認証サービス</button>
+      <button data-term="ご意見・ご要望">ご意見・ご要望</button>
+    </div>
+  </div>
+
+</aside>
+
+<!-- ===== メイン ===== -->
+<main class="main">
+  <h1>ギリシャ証券</h1>
+  <p class="subtitle">MARKET INFORMATION TERMINAL</p>
+  <p class="hint">
+    左のメニューから気になる項目をクリックしてください。<br>
+    「この言葉の意味」と「サッカーで例えると」の解説が表示されます。
+  </p>
+</main>
+
+<!-- ===== モーダル ===== -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modalTitle">タイトル</h2>
+      <button class="modal-close" id="modalClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="meaning">
+        <h3>■ この言葉の意味</h3>
+        <p id="modalMeaning"></p>
+      </div>
+      <div class="soccer">
+        <h3>⚽ サッカーで例えると</h3>
+        <p id="modalSoccer"></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   用語解説データ
+   ============================================================ */
+const TERMS = {
+
+  /* --- 指数・為替・金利 --- */
+  "指数・為替・金利": {
+    meaning: "株式市場全体の動きを示す株価指数、通貨同士の交換比率である為替、お金の貸し借りにかかる金利をまとめたマーケット情報のカテゴリ。",
+    soccer: "試合のスコア（指数）、ピッチの状態（為替）、気温・湿度（金利）をまとめて確認する、試合前の環境チェック。"
+  },
+  "株価指数": {
+    meaning: "複数の銘柄の株価を平均・加重して算出した、市場全体の値動きを示す指標。日経平均株価やTOPIX、S&P500など。",
+    soccer: "チーム全体の勝率や平均得点。個々の選手ではなく、チームの強さをひとつの数字で表したもの。"
+  },
+  "株価指数先物": {
+    meaning: "株価指数を対象とした先物取引。将来の決められた日に、決められた価格で売買する契約。",
+    soccer: "シーズン終了後の順位を予想して賭ける、未来の成績予想契約。"
+  },
+  "外国為替": {
+    meaning: "異なる通貨同士を交換する取引。ドル円、ユーロドルなどのレートが変動する。",
+    soccer: "海外リーグとの移籍交渉。異なる通貨（チーム）の価値をお互いに交換する。"
+  },
+  "コモディティ": {
+    meaning: "原油、金、銀、大豆などの商品（現物・先物）。インフレや景気の影響を受けやすい。",
+    soccer: "ユニフォームやボール、スパイクなどの道具。試合に直接関係する現物資材。"
+  },
+  "債券": {
+    meaning: "国や企業が資金調達のために発行する借用証書。満期に元本が返済され、利息が支払われる。",
+    soccer: "レンタル移籍。一定期間お金（選手）を貸して、レンタル料（利息）を受け取る。"
+  },
+  "政策金利": {
+    meaning: "中央銀行が設定する基準金利。景気や物価に応じて引き上げ・引き下げされる。",
+    soccer: "リーグの規則。試合のルールを決める上位組織（中央銀行）が設定する基準。"
+  },
+  "国内市場概況": {
+    meaning: "日本国内の株式市場全体の状況をまとめた概要。値上がり・値下がり、出来高など。",
+    soccer: "Jリーグの今節の総括。全体の傾向や注目試合をまとめたもの。"
+  },
+
+  /* --- ランキング --- */
+  "ランキング": {
+    meaning: "取引量や値上がり率、人気度などで並べた順位表。注目されている銘柄がわかる。",
+    soccer: "得点ランキングやアシストランキング。誰が活躍しているか一目でわかる。"
+  },
+  "国内株式（ランキング）": {
+    meaning: "国内株式の売買代金、値上がり率、値下がり率などのランキング。",
+    soccer: "Jリーグの得点ランキング。国内選手の活躍度がわかる。"
+  },
+  "外国株式（ランキング）": {
+    meaning: "外国株式の人気銘柄、値動きランキング。米国株などが対象。",
+    soccer: "海外リーグの得点ランキング。世界のスター選手の活躍度。"
+  },
+  "投資信託（ランキング）": {
+    meaning: "投資信託の純資産額、リターン、人気度などのランキング。",
+    soccer: "クラブの人気ランキング。どのチーム（ファンド）が支持されているか。"
+  },
+  "FX（ランキング）": {
+    meaning: "FX取引の通貨ペア別の取引量や人気ランキング。",
+    soccer: "国際試合の人気カードランキング。どの対戦が注目されているか。"
+  },
+  "店頭CFD（ランキング）": {
+    meaning: "店頭CFDの取引量や人気銘柄のランキング。",
+    soccer: "練習試合の人気カード。注目される非公式戦。"
+  },
+  "NISA（ランキング）": {
+    meaning: "NISA口座で人気の投資信託や銘柄のランキング。",
+    soccer: "特別ルール枠での人気選手ランキング。優遇措置を受けられる選手。"
+  },
+  "オプション（ランキング）": {
+    meaning: "オプション取引の出来高や人気銘柄のランキング。",
+    soccer: "契約オプションの人気ランキング。将来の獲得権利の注目度。"
+  },
+
+  /* --- 経済カレンダー --- */
+  "経済カレンダー": {
+    meaning: "経済指標の発表予定や決算発表日をカレンダー形式で確認できる機能。",
+    soccer: "試合スケジュール表。いつ重要な試合（指標発表）があるか確認する。"
+  },
+  "決算スケジュール": {
+    meaning: "企業の決算発表の予定日をまとめたスケジュール。投資判断の材料になる。",
+    soccer: "各チームの成績発表の予定表。シーズン終わりの順位確定スケジュール。"
+  },
+  "経済指標": {
+    meaning: "GDP、消費者物価指数、雇用統計など、経済の状態を示す統計データ。",
+    soccer: "チームの戦績データ。勝率、得点、失点などの統計。"
+  },
+
+  /* --- 投資情報 --- */
+  "投資情報": {
+    meaning: "投資判断に役立つレポートやメディア、新聞などの情報をまとめたカテゴリ。",
+    soccer: "スカウティング資料や試合分析。次の試合に活かすための情報源。"
+  },
+  "レポート": {
+    meaning: "アナリストによる企業分析や市場動向のレポート。",
+    soccer: "スカウティングレポート。相手チーム（銘柄）の分析資料。"
+  },
+  "投資情報メディア": {
+    meaning: "投資に関する記事や動画、コラムなどを配信するメディア。",
+    soccer: "サッカー専門誌や解説番組。プレー（投資）の参考になる情報。"
+  },
+  "朝刊・夕刊": {
+    meaning: "朝と夕方に配信される市場情報のまとめ。新聞のように読める。",
+    soccer: "朝刊スポーツ紙と夕刊スポーツ紙。1日の試合結果をまとめて読む。"
+  },
+
+  /* --- 朝イチ情報 --- */
+  "朝イチ情報": {
+    meaning: "朝に配信される市場の最新情報。前日の動きや今日の見通しをまとめたもの。",
+    soccer: "朝のミーティング。今日の試合（相場）の作戦を確認する。"
+  },
+  "朝イチ情報（本体）": {
+    meaning: "朝イチ情報の本体ページ。前日の市場動向と今日の注目ポイント。",
+    soccer: "朝のミーティング本編。今日の試合の作戦を確認する。"
+  },
+  "国内市況": {
+    meaning: "日本国内の株式市場の状況。日経平均や東証の動き。",
+    soccer: "Jリーグの今節の結果。国内試合の総括。"
+  },
+  "海外市況": {
+    meaning: "海外の株式市場の状況。NYダウやナスダックなどの動き。",
+    soccer: "海外リーグの今節の結果。プレミアやラ・リーガの総括。"
+  },
+  "FX市況": {
+    meaning: "外国為替市場の状況。主要通貨ペアの動き。",
+    soccer: "国際試合の結果。各国代表の戦績。"
+  },
+  "先物・オプション市況": {
+    meaning: "先物・オプション市場の状況。限月ごとの価格や出来高。",
+    soccer: "将来の移籍市場の動向。契約オプションの価値変動。"
+  },
+
+  /* --- ニュース --- */
+  "ニュース": {
+    meaning: "市場や企業に関する最新ニュース。投資判断の材料になる。",
+    soccer: "試合速報。リアルタイムで何が起きているか知る。"
+  },
+  "マーケット（ニュース）": {
+    meaning: "市場全体に関するニュース。株価、為替、金利などの動向。",
+    soccer: "試合全体の速報。リーグの動きをまとめて知る。"
+  },
+  "株式（ニュース）": {
+    meaning: "個別株に関するニュース。決算、提携、不祥事など。",
+    soccer: "個別選手のニュース。移籍、怪我、活躍など。"
+  },
+  "先物（ニュース）": {
+    meaning: "先物市場に関するニュース。指数先物や商品先物の動向。",
+    soccer: "将来の試合に関するニュース。次節の予想など。"
+  },
+  "為替・金利（ニュース）": {
+    meaning: "為替レートや金利に関するニュース。中央銀行の政策など。",
+    soccer: "国際情勢やリーグ規則のニュース。環境の変化を知る。"
+  },
+  "債券（ニュース）": {
+    meaning: "債券市場に関するニュース。国債利回りや発行の動向。",
+    soccer: "レンタル移籍のニュース。選手の貸し借りの動向。"
+  },
+  "経済指標（ニュース）": {
+    meaning: "経済指標の発表に関するニュース。結果と市場への影響。",
+    soccer: "試合結果の統計ニュース。勝敗データの分析。"
+  },
+
+  /* --- ご注意情報 --- */
+  "ご注意情報": {
+    meaning: "取引に関する注意喚起や重要なお知らせをまとめたカテゴリ。",
+    soccer: "審判からの注意や警告。試合前に確認すべきルール。"
+  },
+  "国内株式現物　本日の注意銘柄": {
+    meaning: "本日、現物取引で注意が必要な銘柄の一覧。異常な値動きや制度変更など。",
+    soccer: "今日の試合で注意すべき選手。危険なプレーをする相手。"
+  },
+  "国内株式信用　本日の注意銘柄": {
+    meaning: "本日、信用取引で注意が必要な銘柄の一覧。規制や制限がかかるもの。",
+    soccer: "今日の試合で警告を受けている選手。次にファウルすると退場。"
+  },
+  "国内株式　取引注意事項": {
+    meaning: "国内株式取引に関する注意事項。売買単位や呼値の変更など。",
+    soccer: "試合のルールブック。守るべき規則の確認。"
+  },
+  "資本剰余金を原資とする配当の取扱い": {
+    meaning: "資本剰余金を原資とした配当の税務上の取扱いに関する注意事項。",
+    soccer: "特別ボーナスの支払いルール。通常と異なる報酬の扱い。"
+  },
+  "主要指標・外国為替について": {
+    meaning: "主要な株価指数や外国為替に関する注意事項や説明。",
+    soccer: "主要な試合と国際試合に関する注意事項。"
+  },
+
+  /* --- サポート2 --- */
+  "サポート2": {
+    meaning: "セキュリティや意見・要望など、利用者をサポートする情報のカテゴリ。",
+    soccer: "チームドクターやフロント。困ったときの相談窓口。"
+  },
+  "SBI証券のセキュリティ/認証サービス": {
+    meaning: "SBI証券が提供するセキュリティ対策と認証サービスの案内。",
+    soccer: "スタジアムの警備と入場認証。安全に試合を見るための仕組み。"
+  },
+  "ご意見・ご要望": {
+    meaning: "利用者からの意見や要望を送る窓口。サービス改善に役立てられる。",
+    soccer: "サポーターからの声。チーム運営に反映される意見箱。"
+  }
+};
+
+/* ============================================================
+   モーダル制御
+   ============================================================ */
+const overlay = document.getElementById('modalOverlay');
+const modalTitle = document.getElementById('modalTitle');
+const modalMeaning = document.getElementById('modalMeaning');
+const modalSoccer = document.getElementById('modalSoccer');
+const modalClose = document.getElementById('modalClose');
+
+function openModal(term) {
+  const data = TERMS[term];
+  modalTitle.textContent = term;
+  if (data) {
+    modalMeaning.textContent = data.meaning;
+    modalSoccer.textContent = data.soccer;
+  } else {
+    modalMeaning.textContent = "この用語の解説は準備中です。";
+    modalSoccer.textContent = "サッカー例えも準備中です。";
+  }
+  overlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModal() {
+  overlay.classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+modalClose.addEventListener('click', closeModal);
+overlay.addEventListener('click', (e) => {
+  if (e.target === overlay) closeModal();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeModal();
+});
+
+/* ============================================================
+   カテゴリ開閉
+   ============================================================ */
+document.querySelectorAll('[data-cat]').forEach(cat => {
+  const header = cat.querySelector('.cat-header');
+  header.addEventListener('click', (e) => {
+    e.stopPropagation();
+    cat.classList.toggle('open');
+  });
+});
+
+/* ============================================================
+   すべての data-term ボタンにモーダルを紐付け
+   （カテゴリヘッダー含む、ただし開閉もするのでstopPropagation）
+   ============================================================ */
+document.querySelectorAll('[data-term]').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openModal(btn.dataset.term);
+  });
+});
+
+/* カテゴリヘッダーは開閉しつつモーダルも開く（両立） */
+document.querySelectorAll('.cat-header').forEach(header => {
+  header.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const term = header.dataset.term;
+    if (term) openModal(term);
+  });
+});
+</script>
+
+</body>
+</html>
