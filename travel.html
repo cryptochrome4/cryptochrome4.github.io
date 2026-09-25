@@ -14,12 +14,27 @@
     -webkit-tap-highlight-color:transparent;
   }
 
-  /* ===== Opening ===== */
+  #loading {
+    position:fixed; inset:0; z-index:2000;
+    display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    background:#0a0c0f; gap:20px;
+  }
+  #loading .spinner {
+    width:48px; height:48px;
+    border:3px solid rgba(0,230,176,0.2);
+    border-top-color:#00e6b0;
+    border-radius:50%;
+    animation:spin 1s linear infinite;
+  }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  #loading p { color:#7a8b9b; font-size:13px; letter-spacing:0.2em; }
+
   #opening {
     position:fixed; inset:0; z-index:1000;
     background-image:url('img40x.jpg');
     background-size:cover; background-position:center;
-    display:flex; flex-direction:column;
+    display:none; flex-direction:column;
     align-items:center; justify-content:center;
     gap:30px; transition:opacity 0.5s ease;
   }
@@ -53,7 +68,6 @@
   #startBtn:active { transform:scale(0.98); }
   #opening.hidden-opening { opacity:0; pointer-events:none; }
 
-  /* ===== Game ===== */
   #game { display:none; position:fixed; inset:0; }
   #mapSvg {
     position:absolute; inset:0;
@@ -63,7 +77,6 @@
     touch-action:none;
   }
 
-  /* ===== POOL ===== */
   #pool {
     position:fixed;
     left:16px; top:16px;
@@ -115,7 +128,6 @@
     padding:0 4px;
   }
 
-  /* ===== SVG 州 ===== */
   .stateHole {
     fill:rgba(0,0,0,0.55);
     stroke:rgba(0,230,176,0.6);
@@ -126,61 +138,61 @@
   .stateGhost {
     fill:rgba(60,110,160,0.22);
     stroke:rgba(140,190,230,0.28);
-    stroke-width:1;
+    stroke-width:0.8;
+    vector-effect:non-scaling-stroke;
+  }
+  .stateGhostAlaska {
+    fill:rgba(230,57,70,0.35);
+    stroke:rgba(255,180,180,0.5);
+    stroke-width:0.8;
     vector-effect:non-scaling-stroke;
   }
   .statePlaced {
     fill:rgba(0,230,176,0.85);
     stroke:#d8ffe8;
-    stroke-width:2;
+    stroke-width:1.5;
     vector-effect:non-scaling-stroke;
   }
   .statePlacedAlaska {
     fill:rgba(230,57,70,0.9);
     stroke:#ffd8d8;
-    stroke-width:2;
+    stroke-width:1.5;
     vector-effect:non-scaling-stroke;
   }
   .stateGhostLabel {
     fill:rgba(180,210,235,0.38);
-    font-size:11px; font-weight:500;
-    letter-spacing:0.05em;
+    font-size:9px; font-weight:500;
     pointer-events:none;
     text-anchor:middle;
   }
   .statePlacedLabel {
     fill:#0a0c0f;
-    font-size:11px; font-weight:700;
-    letter-spacing:0.05em;
+    font-size:9px; font-weight:700;
     pointer-events:none;
     text-anchor:middle;
   }
   .statePlacedAlaskaLabel {
     fill:#fff;
-    font-size:11px; font-weight:700;
-    letter-spacing:0.05em;
+    font-size:9px; font-weight:700;
     pointer-events:none;
     text-anchor:middle;
   }
 
-  /* ===== カナダ ===== */
   .canadaShape {
     fill:rgba(255,255,255,0.92);
     stroke:rgba(180,200,220,0.7);
-    stroke-width:2;
+    stroke-width:1.5;
     vector-effect:non-scaling-stroke;
   }
   .canadaLabel {
     fill:#0a0c0f;
-    font-size:80px;
+    font-size:60px;
     font-weight:900;
     letter-spacing:0.4em;
     pointer-events:none;
     text-anchor:middle;
-    dominant-baseline:middle;
   }
 
-  /* ===== ドラッグ中 ===== */
   .dragPiece {
     fill:rgba(0,230,176,0.95);
     stroke:#e0fff8;
@@ -198,7 +210,6 @@
     pointer-events:none;
   }
 
-  /* ===== Win ===== */
   #win {
     position:fixed; inset:0; z-index:500;
     display:none; flex-direction:column;
@@ -257,6 +268,11 @@
 </head>
 <body>
 
+<div id="loading">
+  <div class="spinner"></div>
+  <p>LOADING MAP DATA...</p>
+</div>
+
 <div id="opening">
   <h1>USA PUZZLE</h1>
   <div class="subtitle">- 50 STATES -</div>
@@ -288,530 +304,458 @@
   </div>
 </div>
 
+<!-- ライブラリ -->
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3-geo@3"></script>
+
 <script>
-/* =========================================================
-   州データ
-   簡略多角形（-1..1 正規化）+ 面積比
-   ========================================================= */
-const STATE_DATA = [
-  { name:"Alaska",        pts:"-0.7,-0.5 -0.3,-0.7 0.3,-0.5 0.6,-0.1 0.4,0.5 0.0,0.7 -0.5,0.5 -0.7,0.0", area:1.00 },
-  { name:"Texas",         pts:"-0.7,-0.6 0.5,-0.6 0.7,0.0 0.4,0.4 0.1,0.7 -0.3,0.5 -0.7,0.2", area:0.85 },
-  { name:"California",    pts:"-0.4,-0.8 0.3,-0.8 0.5,-0.2 0.3,0.4 0.0,0.8 -0.4,0.5 -0.5,0.0", area:0.80 },
-  { name:"Montana",       pts:"-0.7,-0.3 0.5,-0.4 0.7,0.0 0.3,0.4 -0.5,0.4 -0.7,0.0", area:0.75 },
-  { name:"New Mexico",    pts:"-0.5,-0.5 0.5,-0.5 0.6,0.5 -0.5,0.5", area:0.65 },
-  { name:"Arizona",       pts:"-0.6,-0.5 0.5,-0.5 0.5,0.2 0.0,0.6 -0.5,0.3", area:0.65 },
-  { name:"Nevada",        pts:"-0.5,-0.6 0.4,-0.6 0.5,0.5 -0.3,0.6", area:0.60 },
-  { name:"Colorado",      pts:"-0.6,-0.4 0.6,-0.4 0.6,0.4 -0.6,0.4", area:0.60 },
-  { name:"Oregon",        pts:"-0.6,-0.4 0.5,-0.4 0.5,0.3 -0.3,0.6 -0.6,0.2", area:0.55 },
-  { name:"Wyoming",       pts:"-0.6,-0.4 0.6,-0.4 0.6,0.4 -0.6,0.4", area:0.55 },
-  { name:"Utah",          pts:"-0.5,-0.5 0.4,-0.5 0.5,0.3 -0.2,0.6 -0.5,0.2", area:0.55 },
-  { name:"Idaho",         pts:"-0.4,-0.7 0.3,-0.7 0.4,0.5 -0.2,0.7", area:0.55 },
-  { name:"Minnesota",     pts:"-0.5,-0.5 0.5,-0.5 0.6,0.3 0.0,0.6 -0.5,0.3", area:0.55 },
-  { name:"Kansas",        pts:"-0.6,-0.3 0.6,-0.3 0.6,0.3 -0.6,0.3", area:0.55 },
-  { name:"Nebraska",      pts:"-0.6,-0.3 0.6,-0.3 0.6,0.3 -0.6,0.3", area:0.52 },
-  { name:"South Dakota",  pts:"-0.6,-0.3 0.6,-0.3 0.6,0.3 -0.6,0.3", area:0.50 },
-  { name:"North Dakota",  pts:"-0.6,-0.3 0.6,-0.3 0.6,0.3 -0.6,0.3", area:0.48 },
-  { name:"Missouri",      pts:"-0.5,-0.5 0.5,-0.5 0.5,0.4 -0.3,0.6 -0.5,0.2", area:0.48 },
-  { name:"Oklahoma",      pts:"-0.6,-0.3 0.6,-0.3 0.5,0.4 -0.4,0.4", area:0.47 },
-  { name:"Washington",    pts:"-0.6,-0.4 0.5,-0.4 0.5,0.3 -0.3,0.6 -0.6,0.2", area:0.47 },
-  { name:"Michigan",      pts:"-0.5,-0.5 0.3,-0.5 0.6,0.0 0.4,0.5 -0.3,0.5 -0.5,0.1", area:0.45 },
-  { name:"Georgia",       pts:"-0.5,-0.5 0.5,-0.5 0.5,0.4 0.0,0.6 -0.5,0.3", area:0.42 },
-  { name:"Wisconsin",     pts:"-0.4,-0.5 0.4,-0.5 0.5,0.4 -0.2,0.6 -0.4,0.2", area:0.42 },
-  { name:"Florida",       pts:"-0.4,-0.6 0.4,-0.6 0.4,-0.1 0.2,0.3 0.0,0.8 -0.2,0.3 -0.4,-0.1", area:0.40 },
-  { name:"Illinois",      pts:"-0.4,-0.6 0.4,-0.6 0.4,0.6 -0.4,0.6", area:0.40 },
-  { name:"Iowa",          pts:"-0.5,-0.4 0.5,-0.4 0.5,0.4 -0.5,0.4", area:0.38 },
-  { name:"New York",      pts:"-0.5,-0.5 0.5,-0.5 0.5,0.3 -0.3,0.5 -0.5,0.3", area:0.38 },
-  { name:"North Carolina",pts:"-0.6,-0.3 0.6,-0.3 0.5,0.3 -0.5,0.3", area:0.36 },
-  { name:"Arkansas",      pts:"-0.5,-0.4 0.5,-0.4 0.5,0.4 -0.4,0.4", area:0.36 },
-  { name:"Alabama",       pts:"-0.4,-0.5 0.4,-0.5 0.4,0.5 -0.4,0.5", area:0.35 },
-  { name:"Louisiana",     pts:"-0.5,-0.4 0.5,-0.4 0.4,0.4 0.0,0.5 -0.4,0.3", area:0.33 },
-  { name:"Mississippi",   pts:"-0.4,-0.5 0.4,-0.5 0.4,0.5 -0.4,0.5", area:0.32 },
-  { name:"Pennsylvania",  pts:"-0.5,-0.4 0.5,-0.4 0.5,0.4 -0.5,0.4", area:0.32 },
-  { name:"Ohio",          pts:"-0.5,-0.4 0.5,-0.4 0.5,0.4 -0.5,0.4", area:0.30 },
-  { name:"Virginia",      pts:"-0.6,-0.3 0.6,-0.3 0.5,0.3 -0.5,0.3", area:0.30 },
-  { name:"Tennessee",     pts:"-0.6,-0.3 0.6,-0.3 0.5,0.3 -0.5,0.3", area:0.30 },
-  { name:"Kentucky",      pts:"-0.5,-0.4 0.5,-0.4 0.5,0.4 -0.5,0.4", area:0.28 },
-  { name:"Indiana",       pts:"-0.4,-0.5 0.4,-0.5 0.4,0.5 -0.4,0.5", area:0.26 },
-  { name:"Maine",         pts:"-0.3,-0.6 0.4,-0.6 0.4,0.4 0.0,0.6 -0.3,0.3", area:0.25 },
-  { name:"South Carolina",pts:"-0.4,-0.4 0.4,-0.4 0.4,0.4 -0.4,0.4", area:0.24 },
-  { name:"West Virginia", pts:"-0.4,-0.4 0.4,-0.4 0.4,0.4 -0.4,0.4", area:0.22 },
-  { name:"Maryland",      pts:"-0.5,-0.3 0.5,-0.3 0.5,0.3 -0.5,0.3", area:0.18 },
-  { name:"Vermont",       pts:"-0.3,-0.5 0.3,-0.5 0.3,0.5 -0.3,0.5", area:0.15 },
-  { name:"New Hampshire", pts:"-0.3,-0.5 0.3,-0.5 0.3,0.5 -0.3,0.5", area:0.15 },
-  { name:"Massachusetts", pts:"-0.5,-0.3 0.5,-0.3 0.5,0.3 -0.5,0.3", area:0.14 },
-  { name:"New Jersey",    pts:"-0.3,-0.5 0.3,-0.5 0.4,0.5 -0.3,0.5", area:0.13 },
-  { name:"Connecticut",   pts:"-0.4,-0.3 0.4,-0.3 0.4,0.3 -0.4,0.3", area:0.10 },
-  { name:"Delaware",      pts:"-0.2,-0.5 0.2,-0.5 0.2,0.5 -0.2,0.5", area:0.06 },
-  { name:"Rhode Island",  pts:"-0.3,-0.3 0.3,-0.3 0.3,0.3 -0.3,0.3", area:0.04 },
-];
+(async function () {
+  /* =========================================================
+     データ読み込み
+     ========================================================= */
+  const loading = document.getElementById("loading");
+  const opening = document.getElementById("opening");
+  const startBtn = document.getElementById("startBtn");
+  const game = document.getElementById("game");
+  const mapSvg = document.getElementById("mapSvg");
+  const poolEl = document.getElementById("pool");
+  const winEl = document.getElementById("win");
 
-/* =========================================================
-   固定配置（実際の地理に近い）
-   列: 0..8（西→東）
-   行: 1..6（北→南）  行0 はカナダ
-   ========================================================= */
-const FIXED_POSITIONS = {
-  // 行1（最北）
-  "Washington":    [0, 1],
-  "Idaho":         [1, 1],
-  "Montana":       [2, 1],
-  "North Dakota":  [3, 1],
-  "Minnesota":     [4, 1],
-  "Wisconsin":     [5, 1],
-  "Michigan":      [6, 1],
-  "New York":      [7, 1],
-  "Maine":         [8, 1],
+  const SVG_NS = "http://www.w3.org/2000/svg";
 
-  // 行2
-  "Oregon":        [0, 2],
-  "Nevada":        [1, 2],
-  "Wyoming":       [2, 2],
-  "South Dakota":  [3, 2],
-  "Iowa":          [4, 2],
-  "Illinois":      [5, 2],
-  "Indiana":       [6, 2],
-  "Ohio":          [7, 2],
-  "Pennsylvania":  [8, 2],
+  let usTopo, canadaTopo;
 
-  // 行3
-  "California":    [0, 3],
-  "Utah":          [1, 3],
-  "Colorado":      [2, 3],
-  "Nebraska":      [3, 3],
-  "Missouri":      [4, 3],
-  "Kentucky":      [5, 3],
-  "West Virginia": [6, 3],
-  "Virginia":      [7, 3],
-  "New Jersey":    [8, 3],
-
-  // 行4
-  "Arizona":       [0, 4],
-  "New Mexico":    [1, 4],
-  "Kansas":        [2, 4],
-  "Arkansas":      [3, 4],
-  "Tennessee":     [4, 4],
-  "North Carolina":[5, 4],
-  "South Carolina":[6, 4],
-  "Maryland":      [7, 4],
-  "Delaware":      [8, 4],
-
-  // 行5
-  "Alaska":        [0, 5],
-  "Texas":         [1, 5],
-  "Oklahoma":      [2, 5],
-  "Louisiana":     [3, 5],
-  "Mississippi":   [4, 5],
-  "Alabama":       [5, 5],
-  "Georgia":       [6, 5],
-  "Florida":       [7, 5],
-  "Massachusetts": [8, 5],
-
-  // 行6（北東の小さい州）
-  "Vermont":       [6, 6],
-  "New Hampshire": [7, 6],
-  "Connecticut":   [8, 6],
-  "Rhode Island":  [8, 6],  // 同じセル内でオフセット
-};
-
-/* =========================================================
-   グリッド設定
-   ========================================================= */
-const GRID_COLS = 9;
-const GRID_ROWS = 7;      // 行0=カナダ、行1..6=州
-const CELL_MAX = 260;
-const WORLD_W = GRID_COLS * CELL_MAX;   // 2340
-const WORLD_H = GRID_ROWS * CELL_MAX;   // 1820
-
-// カナダは行0を全部使う
-const CANADA_BOX = { x: 0, y: 0, w: WORLD_W, h: CELL_MAX };
-
-/* =========================================================
-   州の home を決定（固定配置）
-   ========================================================= */
-function computeHome(name, col, row) {
-  const cx = col * CELL_MAX + CELL_MAX / 2;
-  const cy = row * CELL_MAX + CELL_MAX / 2;
-
-  // 同じセルに複数ある州の微調整
-  if (name === "Rhode Island") {
-    return [cx + 40, cy + 40];
+  try {
+    const [usRes, caRes] = await Promise.all([
+      fetch("states-10m.json"),
+      fetch("canada-10m.json"),
+    ]);
+    usTopo = await usRes.json();
+    canadaTopo = await caRes.json();
+  } catch (e) {
+    loading.innerHTML = "<p style='color:#ff4d6d'>データの読み込みに失敗しました</p>";
+    console.error(e);
+    return;
   }
-  if (name === "Connecticut") {
-    return [cx - 20, cy - 10];
-  }
-  if (name === "Vermont") {
-    return [cx - 20, cy - 20];
-  }
-  if (name === "New Hampshire") {
-    return [cx + 30, cy + 10];
-  }
-  return [cx, cy];
-}
 
-const STATES = STATE_DATA.map(s => {
-  const pos = FIXED_POSITIONS[s.name];
-  const [cx, cy] = computeHome(s.name, pos[0], pos[1]);
-  const scale = 0.45 + (s.area - 0.04) / (1.0 - 0.04) * 0.55;
-  return {
-    name: s.name,
-    pts: s.pts,
-    area: s.area,
-    home: [cx, cy],
-    scale: scale * CELL_MAX * 0.42,
+  /* =========================================================
+     投影 & path 生成
+     ========================================================= */
+  // Albers USA（アラスカは左下、ハワイはさらに左下）
+  const projection = d3.geoAlbersUsa().scale(1300).translate([487.5, 305]);
+  const pathGen = d3.geoPath(projection);
+
+  // 全州の Feature を取得
+  const statesFeatures = topojson.feature(usTopo, usTopo.objects.states).features;
+
+  // ハワイを除外（FIPS: 15）
+  const EXCLUDE_FIPS = new Set(["15"]); // Hawaii
+  // アラスカ（FIPS: 02）は残す
+  const ALASKA_FIPS = "02";
+
+  // 州名マップ（FIPS → 名前）
+  const FIPS_NAME = {
+    "01":"Alabama","02":"Alaska","04":"Arizona","05":"Arkansas","06":"California",
+    "08":"Colorado","09":"Connecticut","10":"Delaware","12":"Florida","13":"Georgia",
+    "16":"Idaho","17":"Illinois","18":"Indiana","19":"Iowa","20":"Kansas",
+    "21":"Kentucky","22":"Louisiana","23":"Maine","24":"Maryland","25":"Massachusetts",
+    "26":"Michigan","27":"Minnesota","28":"Mississippi","29":"Missouri","30":"Montana",
+    "31":"Nebraska","32":"Nevada","33":"New Hampshire","34":"New Jersey","35":"New Mexico",
+    "36":"New York","37":"North Carolina","38":"North Dakota","39":"Ohio","40":"Oklahoma",
+    "41":"Oregon","42":"Pennsylvania","44":"Rhode Island","45":"South Carolina",
+    "46":"South Dakota","47":"Tennessee","48":"Texas","49":"Utah","50":"Vermont",
+    "51":"Virginia","53":"Washington","54":"West Virginia","55":"Wisconsin","56":"Wyoming"
   };
-});
 
-/* =========================================================
-   セットアップ
-   ========================================================= */
-const mapSvg = document.getElementById("mapSvg");
-const poolEl = document.getElementById("pool");
-const winEl = document.getElementById("win");
-const opening = document.getElementById("opening");
-const game = document.getElementById("game");
+  // 各州の path と bbox を計算
+  const STATES = [];
+  statesFeatures.forEach(f => {
+    const fips = f.id;
+    if (EXCLUDE_FIPS.has(fips)) return;
+    const name = FIPS_NAME[fips];
+    if (!name) return;
 
-const SVG_NS = "http://www.w3.org/2000/svg";
+    const d = pathGen(f);
+    if (!d) return;
 
-const VIEW_W = CELL_MAX * 3;
-const VIEW_H = CELL_MAX * 3;
+    // path の bbox を取得
+    const tempPath = document.createElementNS(SVG_NS, "path");
+    tempPath.setAttribute("d", d);
+    mapSvg.appendChild(tempPath);
+    const bb = tempPath.getBBox();
+    mapSvg.removeChild(tempPath);
 
-let activeStates = [];
-let placedCount = 0;
+    STATES.push({
+      fips,
+      name,
+      d,
+      bbox: { x: bb.x, y: bb.y, w: bb.width, h: bb.height },
+      cx: bb.x + bb.width / 2,
+      cy: bb.y + bb.height / 2,
+    });
+  });
 
-const CAMERA = { x: 0, y: 0, speed: 18 };
-const keys = {};
+  // カナダの path
+  const canadaFeature = topojson.feature(canadaTopo, canadaTopo.objects.countries).features[0];
+  const canadaPath = pathGen(canadaFeature);
 
-/* =========================================================
-   ユーティリティ
-   ========================================================= */
-function pickRandomStates(n) {
-  const arr = [...STATES];
-  const picked = [];
-  while (picked.length < n && arr.length) {
-    const i = Math.floor(Math.random() * arr.length);
-    picked.push(arr.splice(i, 1)[0]);
+  // カナダの bbox（ラベル位置用）
+  const tempCan = document.createElementNS(SVG_NS, "path");
+  tempCan.setAttribute("d", canadaPath);
+  mapSvg.appendChild(tempCan);
+  const canBB = tempCan.getBBox();
+  mapSvg.removeChild(tempCan);
+
+  /* =========================================================
+     全体の bbox から world サイズを決定
+     ========================================================= */
+  const allPaths = STATES.map(s => s.bbox).concat([canBB]);
+  const worldMinX = Math.min(...allPaths.map(b => b.x));
+  const worldMinY = Math.min(...allPaths.map(b => b.y));
+  const worldMaxX = Math.max(...allPaths.map(b => b.x + b.w));
+  const worldMaxY = Math.max(...allPaths.map(b => b.y + b.h));
+
+  // パディング
+  const PAD = 40;
+  const WORLD_W = worldMaxX - worldMinX + PAD * 2;
+  const WORLD_H = worldMaxY - worldMinY + PAD * 2;
+
+  // viewBox オフセット
+  const VB_X = worldMinX - PAD;
+  const VB_Y = worldMinY - PAD;
+
+  // 窓サイズ（3×3 相当）
+  const VIEW_W = WORLD_W / 2.2;
+  const VIEW_H = WORLD_H / 2.2;
+
+  /* =========================================================
+     STATE に home をセット（bbox の中心）
+     ========================================================= */
+  STATES.forEach(s => {
+    s.home = [s.cx, s.cy];
+  });
+
+  /* =========================================================
+     セットアップ
+     ========================================================= */
+  let activeStates = [];
+  let placedCount = 0;
+
+  const CAMERA = { x: 0, y: 0, speed: 18 };
+  const keys = {};
+
+  function pickRandomStates(n) {
+    const arr = [...STATES];
+    const picked = [];
+    while (picked.length < n && arr.length) {
+      const i = Math.floor(Math.random() * arr.length);
+      picked.push(arr.splice(i, 1)[0]);
+    }
+    return picked;
   }
-  return picked;
-}
 
-function statePath(st, cx = null, cy = null) {
-  const c = cx !== null ? cx : st.home[0];
-  const cY = cy !== null ? cy : st.home[1];
-  const pts = st.pts.trim().split(/\s+/).map(p => {
-    const [x, y] = p.split(",").map(Number);
-    return [c + x * st.scale, cY + y * st.scale];
-  });
-  let d = `M ${pts[0][0]} ${pts[0][1]}`;
-  for (let i = 1; i < pts.length; i++) d += ` L ${pts[i][0]} ${pts[i][1]}`;
-  return d + " Z";
-}
+  /* =========================================================
+     マップ描画
+     ========================================================= */
+  function buildMap() {
+    mapSvg.innerHTML = "";
 
-function stateBBox(st, cx = null, cy = null) {
-  const c = cx !== null ? cx : st.home[0];
-  const cY = cy !== null ? cy : st.home[1];
-  const pts = st.pts.trim().split(/\s+/).map(p => {
-    const [x, y] = p.split(",").map(Number);
-    return [c + x * st.scale, cY + y * st.scale];
-  });
-  const xs = pts.map(p => p[0]);
-  const ys = pts.map(p => p[1]);
-  return {
-    minX: Math.min(...xs), maxX: Math.max(...xs),
-    minY: Math.min(...ys), maxY: Math.max(...ys),
-  };
-}
+    // 背景
+    const bg = document.createElementNS(SVG_NS, "rect");
+    bg.setAttribute("x", VB_X);
+    bg.setAttribute("y", VB_Y);
+    bg.setAttribute("width", WORLD_W);
+    bg.setAttribute("height", WORLD_H);
+    bg.setAttribute("fill", "#0b0f14");
+    mapSvg.appendChild(bg);
 
-/* =========================================================
-   マップ描画
-   ========================================================= */
-function buildMap() {
-  mapSvg.innerHTML = "";
+    // カナダ
+    const can = document.createElementNS(SVG_NS, "path");
+    can.setAttribute("d", canadaPath);
+    can.setAttribute("class", "canadaShape");
+    mapSvg.appendChild(can);
 
-  // グリッドパターン
-  const defs = document.createElementNS(SVG_NS, "defs");
-  const pattern = document.createElementNS(SVG_NS, "pattern");
-  pattern.setAttribute("id", "grid");
-  pattern.setAttribute("width", CELL_MAX);
-  pattern.setAttribute("height", CELL_MAX);
-  pattern.setAttribute("patternUnits", "userSpaceOnUse");
-  const pp = document.createElementNS(SVG_NS, "path");
-  pp.setAttribute("d", `M ${CELL_MAX} 0 L 0 0 0 ${CELL_MAX}`);
-  pp.setAttribute("fill", "none");
-  pp.setAttribute("stroke", "rgba(0,230,176,0.08)");
-  pp.setAttribute("stroke-width", "1");
-  pattern.appendChild(pp);
-  defs.appendChild(pattern);
-  mapSvg.appendChild(defs);
+    const canLabel = document.createElementNS(SVG_NS, "text");
+    canLabel.setAttribute("x", canBB.x + canBB.width / 2);
+    canLabel.setAttribute("y", canBB.y + canBB.height / 2);
+    canLabel.setAttribute("class", "canadaLabel");
+    canLabel.textContent = "CANADA";
+    mapSvg.appendChild(canLabel);
 
-  const bg = document.createElementNS(SVG_NS, "rect");
-  bg.setAttribute("x", 0); bg.setAttribute("y", 0);
-  bg.setAttribute("width", WORLD_W); bg.setAttribute("height", WORLD_H);
-  bg.setAttribute("fill", "url(#grid)");
-  mapSvg.appendChild(bg);
+    // 穴の対象名
+    const holeNames = new Set(activeStates.map(s => s.name));
 
-  // カナダ（行0）
-  const canada = document.createElementNS(SVG_NS, "rect");
-  canada.setAttribute("x", CANADA_BOX.x + 4);
-  canada.setAttribute("y", CANADA_BOX.y + 4);
-  canada.setAttribute("width", CANADA_BOX.w - 8);
-  canada.setAttribute("height", CANADA_BOX.h - 8);
-  canada.setAttribute("rx", 16);
-  canada.setAttribute("class", "canadaShape");
-  mapSvg.appendChild(canada);
+    // 全州
+    STATES.forEach(st => {
+      const isAlaska = st.fips === ALASKA_FIPS;
 
-  const canadaLabel = document.createElementNS(SVG_NS, "text");
-  canadaLabel.setAttribute("x", CANADA_BOX.x + CANADA_BOX.w / 2);
-  canadaLabel.setAttribute("y", CANADA_BOX.y + CANADA_BOX.h / 2);
-  canadaLabel.setAttribute("class", "canadaLabel");
-  canadaLabel.textContent = "CANADA";
-  mapSvg.appendChild(canadaLabel);
+      if (holeNames.has(st.name)) {
+        // 穴
+        const hole = document.createElementNS(SVG_NS, "path");
+        hole.setAttribute("d", st.d);
+        hole.setAttribute("class", "stateHole");
+        hole.dataset.stateName = st.name;
+        mapSvg.appendChild(hole);
+      } else {
+        // 背景
+        const ghost = document.createElementNS(SVG_NS, "path");
+        ghost.setAttribute("d", st.d);
+        ghost.setAttribute("class", isAlaska ? "stateGhostAlaska" : "stateGhost");
+        mapSvg.appendChild(ghost);
 
-  // 穴の対象名
-  const holeNames = new Set(activeStates.map(s => s.name));
-
-  // 全州を描画
-  STATES.forEach(st => {
-    const isAlaska = st.name === "Alaska";
-
-    if (holeNames.has(st.name)) {
-      const hole = document.createElementNS(SVG_NS, "path");
-      hole.setAttribute("d", statePath(st));
-      hole.setAttribute("class", "stateHole");
-      hole.dataset.stateName = st.name;
-      mapSvg.appendChild(hole);
-    } else {
-      const ghost = document.createElementNS(SVG_NS, "path");
-      ghost.setAttribute("d", statePath(st));
-      ghost.setAttribute("class", "stateGhost");
-      if (isAlaska) {
-        ghost.setAttribute("style", "fill:rgba(230,57,70,0.35);stroke:rgba(255,180,180,0.5);");
+        // ラベル（小さい州はスキップ）
+        if (st.bbox.w > 15 && st.bbox.h > 15) {
+          const label = document.createElementNS(SVG_NS, "text");
+          label.setAttribute("x", st.cx);
+          label.setAttribute("y", st.cy);
+          label.setAttribute("class", "stateGhostLabel");
+          label.textContent = st.name;
+          mapSvg.appendChild(label);
+        }
       }
-      mapSvg.appendChild(ghost);
+    });
+  }
 
-      const bb = stateBBox(st);
+  /* =========================================================
+     POOL描画
+     ========================================================= */
+  function buildPool() {
+    const slots = poolEl.querySelectorAll(".poolSlot");
+    slots.forEach((slot, i) => {
+      slot.innerHTML = "";
+      slot.classList.remove("filled");
+      delete slot.dataset.stateName;
+      const st = activeStates[i];
+      if (!st) return;
+
+      const isAlaska = st.fips === ALASKA_FIPS;
+
+      // POOL用の小さい SVG（viewBox を州の bbox に合わせる）
+      const svgEl = document.createElementNS(SVG_NS, "svg");
+      const pad = Math.max(st.bbox.w, st.bbox.h) * 0.1;
+      svgEl.setAttribute(
+        "viewBox",
+        `${st.bbox.x - pad} ${st.bbox.y - pad} ${st.bbox.w + pad*2} ${st.bbox.h + pad*2}`
+      );
+      svgEl.setAttribute("width", "100%");
+      svgEl.setAttribute("height", "72%");
+      svgEl.setAttribute("preserveAspectRatio", "xMidYMid meet");
+
+      const path = document.createElementNS(SVG_NS, "path");
+      path.setAttribute("d", st.d);
+      if (isAlaska) {
+        path.setAttribute("style", "fill:rgba(230,57,70,0.85);stroke:#ffd8d8;stroke-width:0.5;");
+      } else {
+        path.setAttribute("style", "fill:rgba(0,230,176,0.7);stroke:#d8ffe8;stroke-width:0.5;");
+      }
+      svgEl.appendChild(path);
+
+      slot.appendChild(svgEl);
+
+      const label = document.createElement("div");
+      label.className = "label";
+      label.textContent = st.name;
+      slot.appendChild(label);
+
+      slot.classList.add("filled");
+      slot.dataset.stateName = st.name;
+
+      attachDrag(slot, st);
+    });
+  }
+
+  /* =========================================================
+     ドラッグ（pointer）
+     ========================================================= */
+  let dragState = null;
+
+  function attachDrag(el, state) {
+    el.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (dragState) return;
+
+      el.setPointerCapture(e.pointerId);
+
+      const worldPt = screenToWorld(e.clientX, e.clientY);
+
+      // ドラッグ中の州（同じ path データを、マウス位置に平行移動して表示）
+      const piece = document.createElementNS(SVG_NS, "path");
+      const dx = worldPt.x - state.cx;
+      const dy = worldPt.y - state.cy;
+      piece.setAttribute("d", state.d);
+      piece.setAttribute(
+        "transform",
+        `translate(${dx} ${dy})`
+      );
+      piece.setAttribute("class", state.fips === ALASKA_FIPS ? "dragPieceAlaska" : "dragPiece");
+      mapSvg.appendChild(piece);
+
+      dragState = {
+        state, el, piece,
+        startX: worldPt.x,
+        startY: worldPt.y,
+        pointerId: e.pointerId,
+      };
+
+      el.style.opacity = "0.3";
+
+      el.addEventListener("pointermove", onDragMove);
+      el.addEventListener("pointerup", onDragEnd);
+      el.addEventListener("pointercancel", onDragEnd);
+    });
+  }
+
+  function onDragMove(e) {
+    if (!dragState || e.pointerId !== dragState.pointerId) return;
+    e.preventDefault();
+    const worldPt = screenToWorld(e.clientX, e.clientY);
+    const dx = worldPt.x - dragState.state.cx;
+    const dy = worldPt.y - dragState.state.cy;
+    dragState.piece.setAttribute("transform", `translate(${dx} ${dy})`);
+  }
+
+  function onDragEnd(e) {
+    if (!dragState || e.pointerId !== dragState.pointerId) return;
+    e.preventDefault();
+
+    const st = dragState.state;
+    const worldPt = screenToWorld(e.clientX, e.clientY);
+
+    const dx = worldPt.x - st.cx;
+    const dy = worldPt.y - st.cy;
+    const dist = Math.hypot(dx, dy);
+    const threshold = Math.max(st.bbox.w, st.bbox.h) * 0.7;
+
+    if (dist < threshold) {
+      placeState(st);
+    } else {
+      dragState.el.style.opacity = "";
+    }
+
+    dragState.piece.remove();
+    dragState = null;
+
+    e.target.removeEventListener("pointermove", onDragMove);
+    e.target.removeEventListener("pointerup", onDragEnd);
+    e.target.removeEventListener("pointercancel", onDragEnd);
+  }
+
+  function placeState(st) {
+    const holes = mapSvg.querySelectorAll(".stateHole");
+    let targetHole = null;
+    holes.forEach(h => {
+      if (h.dataset.stateName === st.name) targetHole = h;
+    });
+    if (!targetHole) return;
+
+    const isAlaska = st.fips === ALASKA_FIPS;
+
+    targetHole.setAttribute("class", isAlaska ? "statePlacedAlaska" : "statePlaced");
+    delete targetHole.dataset.stateName;
+
+    // ラベル
+    if (st.bbox.w > 15 && st.bbox.h > 15) {
       const label = document.createElementNS(SVG_NS, "text");
-      label.setAttribute("x", (bb.minX + bb.maxX) / 2);
-      label.setAttribute("y", (bb.minY + bb.maxY) / 2);
-      label.setAttribute("class", "stateGhostLabel");
-      if (isAlaska) label.setAttribute("style", "fill:rgba(255,200,200,0.6);");
+      label.setAttribute("x", st.cx);
+      label.setAttribute("y", st.cy);
+      label.setAttribute("class", isAlaska ? "statePlacedAlaskaLabel" : "statePlacedLabel");
       label.textContent = st.name;
       mapSvg.appendChild(label);
     }
-  });
-}
 
-/* =========================================================
-   POOL描画
-   ========================================================= */
-function buildPool() {
-  const slots = poolEl.querySelectorAll(".poolSlot");
-  slots.forEach((slot, i) => {
-    slot.innerHTML = "";
-    slot.classList.remove("filled");
-    delete slot.dataset.stateName;
-    const st = activeStates[i];
-    if (!st) return;
-
-    const isAlaska = st.name === "Alaska";
-
-    const svgEl = document.createElementNS(SVG_NS, "svg");
-    svgEl.setAttribute("viewBox", "-1.2 -1.2 2.4 2.4");
-    svgEl.setAttribute("width", "100%");
-    svgEl.setAttribute("height", "72%");
-    svgEl.setAttribute("preserveAspectRatio", "xMidYMid meet");
-
-    const path = document.createElementNS(SVG_NS, "path");
-    path.setAttribute("d", statePath(st, 0, 0));
-    if (isAlaska) {
-      path.setAttribute("style", "fill:rgba(230,57,70,0.85);stroke:#ffd8d8;stroke-width:1.5;");
-    } else {
-      path.setAttribute("style", "fill:rgba(0,230,176,0.7);stroke:#d8ffe8;stroke-width:1.5;");
+    const slot = poolEl.querySelector(`.poolSlot[data-state-name="${st.name}"]`);
+    if (slot) {
+      slot.innerHTML = "";
+      slot.classList.remove("filled");
+      delete slot.dataset.stateName;
+      slot.style.opacity = "";
     }
-    svgEl.appendChild(path);
 
-    slot.appendChild(svgEl);
-
-    const label = document.createElement("div");
-    label.className = "label";
-    label.textContent = st.name;
-    slot.appendChild(label);
-
-    slot.classList.add("filled");
-    slot.dataset.stateName = st.name;
-
-    attachDrag(slot, st);
-  });
-}
-
-/* =========================================================
-   ドラッグ（pointer イベント）
-   ========================================================= */
-let dragState = null;
-
-function attachDrag(el, state) {
-  el.addEventListener("pointerdown", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (dragState) return;
-
-    el.setPointerCapture(e.pointerId);
-
-    const worldPt = screenToWorld(e.clientX, e.clientY);
-
-    const piece = document.createElementNS(SVG_NS, "path");
-    piece.setAttribute("d", statePath(state, worldPt.x, worldPt.y));
-    piece.setAttribute("class", state.name === "Alaska" ? "dragPieceAlaska" : "dragPiece");
-    mapSvg.appendChild(piece);
-
-    dragState = {
-      state, el, piece,
-      pointerId: e.pointerId,
-    };
-
-    el.style.opacity = "0.3";
-
-    el.addEventListener("pointermove", onDragMove);
-    el.addEventListener("pointerup", onDragEnd);
-    el.addEventListener("pointercancel", onDragEnd);
-  });
-}
-
-function onDragMove(e) {
-  if (!dragState || e.pointerId !== dragState.pointerId) return;
-  e.preventDefault();
-  const worldPt = screenToWorld(e.clientX, e.clientY);
-  dragState.piece.setAttribute("d", statePath(dragState.state, worldPt.x, worldPt.y));
-}
-
-function onDragEnd(e) {
-  if (!dragState || e.pointerId !== dragState.pointerId) return;
-  e.preventDefault();
-
-  const st = dragState.state;
-  const worldPt = screenToWorld(e.clientX, e.clientY);
-
-  const dx = worldPt.x - st.home[0];
-  const dy = worldPt.y - st.home[1];
-  const dist = Math.hypot(dx, dy);
-  const threshold = st.scale * 1.4;
-
-  if (dist < threshold) {
-    placeState(st);
-  } else {
-    dragState.el.style.opacity = "";
+    placedCount++;
+    if (placedCount >= activeStates.length) {
+      setTimeout(() => winEl.classList.add("show"), 400);
+    }
   }
 
-  dragState.piece.remove();
-  dragState = null;
+  /* =========================================================
+     カメラ（viewBox 方式）
+     ========================================================= */
+  function clampCamera() {
+    const minX = VB_X;
+    const minY = VB_Y;
+    const maxX = VB_X + WORLD_W - VIEW_W;
+    const maxY = VB_Y + WORLD_H - VIEW_H;
+    CAMERA.x = Math.max(minX, Math.min(maxX, CAMERA.x));
+    CAMERA.y = Math.max(minY, Math.min(maxY, CAMERA.y));
+  }
 
-  e.target.removeEventListener("pointermove", onDragMove);
-  e.target.removeEventListener("pointerup", onDragEnd);
-  e.target.removeEventListener("pointercancel", onDragEnd);
-}
+  function applyCamera() {
+    mapSvg.setAttribute("viewBox", `${CAMERA.x} ${CAMERA.y} ${VIEW_W} ${VIEW_H}`);
+  }
 
-function placeState(st) {
-  const holes = mapSvg.querySelectorAll(".stateHole");
-  let targetHole = null;
-  holes.forEach(h => {
-    if (h.dataset.stateName === st.name) targetHole = h;
+  function screenToWorld(sx, sy) {
+    const pt = mapSvg.createSVGPoint();
+    pt.x = sx; pt.y = sy;
+    const inv = mapSvg.getScreenCTM().inverse();
+    const w = pt.matrixTransform(inv);
+    return { x: w.x, y: w.y };
+  }
+
+  function updateCamera() {
+    let dx = 0, dy = 0;
+    if (keys["ArrowLeft"])  dx -= 1;
+    if (keys["ArrowRight"]) dx += 1;
+    if (keys["ArrowUp"])    dy -= 1;
+    if (keys["ArrowDown"])  dy += 1;
+
+    if (dx || dy) {
+      CAMERA.x += dx * CAMERA.speed;
+      CAMERA.y += dy * CAMERA.speed;
+      clampCamera();
+      applyCamera();
+    }
+    requestAnimationFrame(updateCamera);
+  }
+
+  window.addEventListener("keydown", e => {
+    keys[e.key] = true;
+    if (["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"," "].includes(e.key)) e.preventDefault();
   });
-  if (!targetHole) return;
+  window.addEventListener("keyup", e => { keys[e.key] = false; });
 
-  const isAlaska = st.name === "Alaska";
+  /* =========================================================
+     初期化
+     ========================================================= */
+  function startGame() {
+    activeStates = pickRandomStates(4);
+    placedCount = 0;
 
-  targetHole.setAttribute("class", isAlaska ? "statePlacedAlaska" : "statePlaced");
-  delete targetHole.dataset.stateName;
+    opening.classList.add("hidden-opening");
+    game.style.display = "block";
 
-  const bb = stateBBox(st);
-  const label = document.createElementNS(SVG_NS, "text");
-  label.setAttribute("x", (bb.minX + bb.maxX) / 2);
-  label.setAttribute("y", (bb.minY + bb.maxY) / 2);
-  label.setAttribute("class", isAlaska ? "statePlacedAlaskaLabel" : "statePlacedLabel");
-  label.textContent = st.name;
-  mapSvg.appendChild(label);
-
-  const slot = poolEl.querySelector(`.poolSlot[data-state-name="${st.name}"]`);
-  if (slot) {
-    slot.innerHTML = "";
-    slot.classList.remove("filled");
-    delete slot.dataset.stateName;
-    slot.style.opacity = "";
-  }
-
-  placedCount++;
-  if (placedCount >= activeStates.length) {
-    setTimeout(() => winEl.classList.add("show"), 400);
-  }
-}
-
-/* =========================================================
-   カメラ（viewBox 方式）
-   ========================================================= */
-function clampCamera() {
-  const maxX = Math.max(0, WORLD_W - VIEW_W);
-  const maxY = Math.max(0, WORLD_H - VIEW_H);
-  CAMERA.x = Math.max(0, Math.min(maxX, CAMERA.x));
-  CAMERA.y = Math.max(0, Math.min(maxY, CAMERA.y));
-}
-
-function applyCamera() {
-  mapSvg.setAttribute("viewBox", `${CAMERA.x} ${CAMERA.y} ${VIEW_W} ${VIEW_H}`);
-}
-
-function screenToWorld(sx, sy) {
-  const pt = mapSvg.createSVGPoint();
-  pt.x = sx; pt.y = sy;
-  const inv = mapSvg.getScreenCTM().inverse();
-  const w = pt.matrixTransform(inv);
-  return { x: w.x, y: w.y };
-}
-
-function updateCamera() {
-  let dx = 0, dy = 0;
-  if (keys["ArrowLeft"])  dx -= 1;
-  if (keys["ArrowRight"]) dx += 1;
-  if (keys["ArrowUp"])    dy -= 1;
-  if (keys["ArrowDown"])  dy += 1;
-
-  if (dx || dy) {
-    CAMERA.x += dx * CAMERA.speed;
-    CAMERA.y += dy * CAMERA.speed;
+    // 初期カメラ（中央）
+    CAMERA.x = VB_X + (WORLD_W - VIEW_W) / 2;
+    CAMERA.y = VB_Y + (WORLD_H - VIEW_H) / 2;
     clampCamera();
     applyCamera();
+
+    buildMap();
+    buildPool();
+
+    requestAnimationFrame(updateCamera);
+
+    setTimeout(() => { opening.style.display = "none"; }, 500);
   }
-  requestAnimationFrame(updateCamera);
-}
 
-window.addEventListener("keydown", e => {
-  keys[e.key] = true;
-  if (["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"," "].includes(e.key)) e.preventDefault();
-});
-window.addEventListener("keyup", e => { keys[e.key] = false; });
+  startBtn.addEventListener("click", startGame);
 
-/* =========================================================
-   初期化
-   ========================================================= */
-function startGame() {
-  activeStates = pickRandomStates(4);
-  placedCount = 0;
-
-  opening.classList.add("hidden-opening");
-  game.style.display = "block";
-
-  CAMERA.x = (WORLD_W - VIEW_W) / 2;
-  CAMERA.y = (WORLD_H - VIEW_H) / 2;
-  clampCamera();
-  applyCamera();
-
-  buildMap();
-  buildPool();
-
-  requestAnimationFrame(updateCamera);
-
-  setTimeout(() => { opening.style.display = "none"; }, 500);
-}
-
-document.getElementById("startBtn").addEventListener("click", startGame);
+  /* =========================================================
+     ローディング完了 → オープニング表示
+     ========================================================= */
+  loading.style.display = "none";
+  opening.style.display = "flex";
+})();
 </script>
 </body>
 </html>
