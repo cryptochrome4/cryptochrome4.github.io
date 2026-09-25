@@ -14,6 +14,7 @@
     -webkit-tap-highlight-color:transparent;
   }
 
+  /* ===== Opening ===== */
   #opening {
     position:fixed; inset:0; z-index:1000;
     background-image:url('img40x.jpg');
@@ -52,6 +53,7 @@
   #startBtn:active { transform:scale(0.98); }
   #opening.hidden-opening { opacity:0; pointer-events:none; }
 
+  /* ===== Game ===== */
   #game { display:none; position:fixed; inset:0; }
   #mapSvg {
     position:absolute; inset:0;
@@ -61,6 +63,7 @@
     touch-action:none;
   }
 
+  /* ===== POOL ===== */
   #pool {
     position:fixed;
     left:16px; top:16px;
@@ -160,7 +163,7 @@
     text-anchor:middle;
   }
 
-  /* カナダ */
+  /* ===== カナダ ===== */
   .canadaShape {
     fill:rgba(255,255,255,0.92);
     stroke:rgba(180,200,220,0.7);
@@ -169,7 +172,7 @@
   }
   .canadaLabel {
     fill:#0a0c0f;
-    font-size:64px;
+    font-size:80px;
     font-weight:900;
     letter-spacing:0.4em;
     pointer-events:none;
@@ -177,6 +180,7 @@
     dominant-baseline:middle;
   }
 
+  /* ===== ドラッグ中 ===== */
   .dragPiece {
     fill:rgba(0,230,176,0.95);
     stroke:#e0fff8;
@@ -193,8 +197,6 @@
     filter:drop-shadow(0 6px 14px rgba(230,57,70,0.7));
     pointer-events:none;
   }
-
-  /* ===== 通常 footer は削除 ===== */
 
   /* ===== Win ===== */
   #win {
@@ -219,7 +221,6 @@
   #win p { color:#9fd8ff; font-size:clamp(13px,2.5vw,18px); letter-spacing:0.2em; }
   @keyframes pulse { from{filter:brightness(1)} to{filter:brightness(1.4)} }
 
-  /* 勝利画面の footer */
   #winFooter {
     position:absolute;
     bottom:0; left:0; right:0;
@@ -289,7 +290,8 @@
 
 <script>
 /* =========================================================
-   州データ（簡略多角形 + 面積比）
+   州データ
+   簡略多角形（-1..1 正規化）+ 面積比
    ========================================================= */
 const STATE_DATA = [
   { name:"Alaska",        pts:"-0.7,-0.5 -0.3,-0.7 0.3,-0.5 0.6,-0.1 0.4,0.5 0.0,0.7 -0.5,0.5 -0.7,0.0", area:1.00 },
@@ -344,45 +346,111 @@ const STATE_DATA = [
 ];
 
 /* =========================================================
-   グリッド配置
-   1行目をカナダ、2行目以降を50州に使う
-   8列 × 8行 = 2080 × 2080
+   固定配置（実際の地理に近い）
+   列: 0..8（西→東）
+   行: 1..6（北→南）  行0 はカナダ
    ========================================================= */
-const GRID_COLS = 8;
-const GRID_ROWS = 8;
-const CELL_MAX = 260;
-const WORLD_W = GRID_COLS * CELL_MAX;   // 2080
-const WORLD_H = GRID_ROWS * CELL_MAX;   // 2080
+const FIXED_POSITIONS = {
+  // 行1（最北）
+  "Washington":    [0, 1],
+  "Idaho":         [1, 1],
+  "Montana":       [2, 1],
+  "North Dakota":  [3, 1],
+  "Minnesota":     [4, 1],
+  "Wisconsin":     [5, 1],
+  "Michigan":      [6, 1],
+  "New York":      [7, 1],
+  "Maine":         [8, 1],
 
-// カナダは 1行目（y=0〜260）を 8列分まるまる使う
-const CANADA_BOX = {
-  x: 0, y: 0,
-  w: WORLD_W, h: CELL_MAX
+  // 行2
+  "Oregon":        [0, 2],
+  "Nevada":        [1, 2],
+  "Wyoming":       [2, 2],
+  "South Dakota":  [3, 2],
+  "Iowa":          [4, 2],
+  "Illinois":      [5, 2],
+  "Indiana":       [6, 2],
+  "Ohio":          [7, 2],
+  "Pennsylvania":  [8, 2],
+
+  // 行3
+  "California":    [0, 3],
+  "Utah":          [1, 3],
+  "Colorado":      [2, 3],
+  "Nebraska":      [3, 3],
+  "Missouri":      [4, 3],
+  "Kentucky":      [5, 3],
+  "West Virginia": [6, 3],
+  "Virginia":      [7, 3],
+  "New Jersey":    [8, 3],
+
+  // 行4
+  "Arizona":       [0, 4],
+  "New Mexico":    [1, 4],
+  "Kansas":        [2, 4],
+  "Arkansas":      [3, 4],
+  "Tennessee":     [4, 4],
+  "North Carolina":[5, 4],
+  "South Carolina":[6, 4],
+  "Maryland":      [7, 4],
+  "Delaware":      [8, 4],
+
+  // 行5
+  "Alaska":        [0, 5],
+  "Texas":         [1, 5],
+  "Oklahoma":      [2, 5],
+  "Louisiana":     [3, 5],
+  "Mississippi":   [4, 5],
+  "Alabama":       [5, 5],
+  "Georgia":       [6, 5],
+  "Florida":       [7, 5],
+  "Massachusetts": [8, 5],
+
+  // 行6（北東の小さい州）
+  "Vermont":       [6, 6],
+  "New Hampshire": [7, 6],
+  "Connecticut":   [8, 6],
+  "Rhode Island":  [8, 6],  // 同じセル内でオフセット
 };
 
-function shuffle(arr) {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
+/* =========================================================
+   グリッド設定
+   ========================================================= */
+const GRID_COLS = 9;
+const GRID_ROWS = 7;      // 行0=カナダ、行1..6=州
+const CELL_MAX = 260;
+const WORLD_W = GRID_COLS * CELL_MAX;   // 2340
+const WORLD_H = GRID_ROWS * CELL_MAX;   // 1820
+
+// カナダは行0を全部使う
+const CANADA_BOX = { x: 0, y: 0, w: WORLD_W, h: CELL_MAX };
+
+/* =========================================================
+   州の home を決定（固定配置）
+   ========================================================= */
+function computeHome(name, col, row) {
+  const cx = col * CELL_MAX + CELL_MAX / 2;
+  const cy = row * CELL_MAX + CELL_MAX / 2;
+
+  // 同じセルに複数ある州の微調整
+  if (name === "Rhode Island") {
+    return [cx + 40, cy + 40];
   }
-  return a;
+  if (name === "Connecticut") {
+    return [cx - 20, cy - 10];
+  }
+  if (name === "Vermont") {
+    return [cx - 20, cy - 20];
+  }
+  if (name === "New Hampshire") {
+    return [cx + 30, cy + 10];
+  }
+  return [cx, cy];
 }
 
-// 2行目以降のセル（7行 × 8列 = 56セル）をシャッフル
-const gridCells = [];
-for (let r = 1; r < GRID_ROWS; r++) {
-  for (let c = 0; c < GRID_COLS; c++) {
-    gridCells.push({ r, c });
-  }
-}
-const shuffledCells = shuffle(gridCells);
-
-// 各州に home を割り当て
-const STATES = STATE_DATA.map((s, i) => {
-  const cell = shuffledCells[i];
-  const cx = cell.c * CELL_MAX + CELL_MAX / 2;
-  const cy = cell.r * CELL_MAX + CELL_MAX / 2;
+const STATES = STATE_DATA.map(s => {
+  const pos = FIXED_POSITIONS[s.name];
+  const [cx, cy] = computeHome(s.name, pos[0], pos[1]);
   const scale = 0.45 + (s.area - 0.04) / (1.0 - 0.04) * 0.55;
   return {
     name: s.name,
@@ -459,6 +527,7 @@ function stateBBox(st, cx = null, cy = null) {
 function buildMap() {
   mapSvg.innerHTML = "";
 
+  // グリッドパターン
   const defs = document.createElementNS(SVG_NS, "defs");
   const pattern = document.createElementNS(SVG_NS, "pattern");
   pattern.setAttribute("id", "grid");
@@ -480,7 +549,7 @@ function buildMap() {
   bg.setAttribute("fill", "url(#grid)");
   mapSvg.appendChild(bg);
 
-  // カナダ（最上段、白背景 + 黒文字）
+  // カナダ（行0）
   const canada = document.createElementNS(SVG_NS, "rect");
   canada.setAttribute("x", CANADA_BOX.x + 4);
   canada.setAttribute("y", CANADA_BOX.y + 4);
@@ -575,7 +644,7 @@ function buildPool() {
 }
 
 /* =========================================================
-   ドラッグ
+   ドラッグ（pointer イベント）
    ========================================================= */
 let dragState = null;
 
