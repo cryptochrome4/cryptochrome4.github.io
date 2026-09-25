@@ -2,15 +2,16 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>USA 50 States Puzzle</title>
 <style>
-  * { margin:0; padding:0; box-sizing:border-box; }
+  * { margin:0; padding:0; box-sizing:border-box; user-select:none; -webkit-user-select:none; }
   html,body {
     width:100%; height:100%; overflow:hidden;
     background:#111; color:#fff;
     font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
-    user-select:none; -webkit-user-select:none;
+    touch-action:none;
+    -webkit-tap-highlight-color:transparent;
   }
 
   /* ===== Opening ===== */
@@ -19,7 +20,9 @@
     display:flex; flex-direction:column;
     align-items:center; justify-content:center;
     background:#000;
+    transition:opacity 0.5s ease;
   }
+  #opening.hidden { opacity:0; pointer-events:none; }
   #opening img {
     position:absolute; inset:0;
     width:100%; height:100%;
@@ -49,33 +52,24 @@
     box-shadow:0 8px 32px rgba(0,210,255,0.45);
     transition:transform 0.15s, box-shadow 0.15s;
   }
-  #startBtn:hover {
-    transform:scale(1.06);
-    box-shadow:0 12px 40px rgba(0,210,255,0.7);
-  }
+  #startBtn:hover { transform:scale(1.06); box-shadow:0 12px 40px rgba(0,210,255,0.7); }
   #startBtn:active { transform:scale(0.97); }
 
   /* ===== Game ===== */
   #game { display:none; width:100%; height:100%; position:relative; }
-
-  /* viewport = プレイヤー視点（全体の1/5） */
   #viewport {
     position:absolute; inset:0;
     overflow:hidden;
-    background:
-      radial-gradient(circle at 30% 20%, #1b2735 0%, #090a0f 80%);
+    background:radial-gradient(circle at 30% 20%, #1b2735 0%, #090a0f 80%);
   }
-
-  /* world = 実際の大きなマップ */
   #world {
-    position:absolute;
-    top:0; left:0;
+    position:absolute; top:0; left:0;
     width:5000px; height:3000px;
     transform-origin:0 0;
     will-change:transform;
   }
 
-  /* ===== POOL（州ピース置き場） ===== */
+  /* ===== POOL ===== */
   #pool {
     position:fixed;
     left:0; top:0; bottom:0;
@@ -88,6 +82,7 @@
     gap:10px;
     overflow-y:auto;
     backdrop-filter:blur(6px);
+    touch-action:none;
   }
   #pool h2 {
     font-size:13px; letter-spacing:0.2em;
@@ -103,6 +98,7 @@
     border-radius:8px;
     display:flex; align-items:center; justify-content:center;
     flex-shrink:0;
+    touch-action:none;
   }
   .poolSlot.filled {
     border-style:solid;
@@ -110,7 +106,7 @@
     cursor:grab;
   }
   .poolSlot.filled:active { cursor:grabbing; }
-  .poolSlot svg { pointer-events:none; }
+  .poolSlot svg { pointer-events:none; display:block; }
   .poolSlot .label {
     position:absolute;
     bottom:4px; left:0; right:0;
@@ -169,7 +165,9 @@
   }
   #dragLayer svg {
     position:absolute;
+    left:0; top:0;
     filter:drop-shadow(0 8px 18px rgba(0,180,255,0.7));
+    pointer-events:none;
   }
 
   /* ===== Footer ===== */
@@ -204,6 +202,7 @@
     background:rgba(0,8,18,0.93);
     backdrop-filter:blur(8px);
   }
+  #win.show { display:flex; }
   #win h1 {
     font-size:clamp(32px,7vw,80px);
     letter-spacing:0.15em;
@@ -282,30 +281,20 @@
 
 <script>
 /* =========================================================
-   簡易ポリゴンデータ（図形学で州を表現）
-   実際の座標は簡略化。各州は points 配列で表現。
-   座標系: world 5000x3000
+   州データ（図形学で表現）
    ========================================================= */
-
-// 州データ: name, points(相対), cx,cy(ラベル/穴の中心)
-// 本土48州 + アラスカ を簡略ポリゴンで配置。ハワイ除外。
 const STATES = [
-  // ---- West ----
   { name:"Washington",   pts:"0,0 90,10 100,60 60,90 10,80 -10,40", cx:45, cy:45, home:[300,300] },
   { name:"Oregon",       pts:"0,0 100,10 110,90 60,130 0,120 -20,60", cx:45, cy:60, home:[300,430] },
   { name:"California",   pts:"0,0 90,0 120,60 100,200 40,300 -30,280 -50,120", cx:30, cy:150, home:[280,600] },
   { name:"Nevada",       pts:"0,0 80,0 90,140 20,150 -10,70", cx:40, cy:70, home:[480,560] },
   { name:"Idaho",        pts:"0,0 70,0 80,160 20,170 -10,80", cx:35, cy:85, home:[480,380] },
-
-  // ---- Mountain ----
   { name:"Montana",      pts:"0,0 200,0 210,80 100,100 0,90", cx:100, cy:45, home:[700,320] },
   { name:"Wyoming",      pts:"0,0 120,0 120,90 0,90", cx:60, cy:45, home:[820,470] },
   { name:"Utah",         pts:"0,0 90,0 100,130 20,140 -10,60", cx:45, cy:70, home:[660,600] },
   { name:"Colorado",     pts:"0,0 150,0 150,100 0,100", cx:75, cy:50, home:[900,600] },
   { name:"Arizona",      pts:"0,0 130,0 140,120 60,160 -20,100", cx:60, cy:80, home:[560,760] },
   { name:"New Mexico",   pts:"0,0 120,0 120,140 0,140", cx:60, cy:70, home:[820,780] },
-
-  // ---- Midwest ----
   { name:"North Dakota", pts:"0,0 150,0 150,70 0,70", cx:75, cy:35, home:[1100,300] },
   { name:"South Dakota", pts:"0,0 150,0 150,80 0,80", cx:75, cy:40, home:[1100,420] },
   { name:"Nebraska",     pts:"0,0 180,0 180,90 0,90", cx:90, cy:45, home:[1120,560] },
@@ -322,8 +311,6 @@ const STATES = [
   { name:"Michigan",     pts:"0,0 120,0 130,90 60,110 0,60", cx:55, cy:55, home:[1740,360] },
   { name:"Indiana",      pts:"0,0 80,0 80,140 0,140", cx:40, cy:70, home:[1730,540] },
   { name:"Ohio",         pts:"0,0 100,0 110,110 0,110", cx:50, cy:55, home:[1730,680] },
-
-  // ---- South ----
   { name:"Mississippi",  pts:"0,0 90,0 90,140 0,140", cx:45, cy:70, home:[1560,780] },
   { name:"Alabama",      pts:"0,0 110,0 110,140 0,140", cx:55, cy:70, home:[1560,900] },
   { name:"Tennessee",    pts:"0,0 200,0 200,70 0,70", cx:100, cy:35, home:[1550,680] },
@@ -334,8 +321,6 @@ const STATES = [
   { name:"North Carolina", pts:"0,0 180,0 180,80 0,80", cx:90, cy:40, home:[1850,680] },
   { name:"Virginia",     pts:"0,0 190,0 190,90 0,90", cx:95, cy:45, home:[1880,590] },
   { name:"West Virginia", pts:"0,0 120,0 130,80 0,80", cx:60, cy:40, home:[1830,500] },
-
-  // ---- Northeast ----
   { name:"Maryland",     pts:"0,0 120,0 120,60 0,60", cx:60, cy:30, home:[2000,500] },
   { name:"Delaware",     pts:"0,0 40,0 40,70 0,70", cx:20, cy:35, home:[2100,520] },
   { name:"Pennsylvania", pts:"0,0 160,0 160,100 0,100", cx:80, cy:50, home:[2020,410] },
@@ -347,12 +332,9 @@ const STATES = [
   { name:"Vermont",      pts:"0,0 60,0 60,100 0,100", cx:30, cy:50, home:[2240,280] },
   { name:"New Hampshire",pts:"0,0 60,0 60,100 0,100", cx:30, cy:50, home:[2300,280] },
   { name:"Maine",        pts:"0,0 100,0 120,120 40,140 -20,60", cx:50, cy:70, home:[2380,240] },
-
-  // ---- Alaska (ロシア寄り、カナダの左） ----
   { name:"Alaska",       pts:"0,0 200,0 220,80 160,180 40,200 -60,120 -40,40", cx:90, cy:100, home:[300,1500] },
 ];
 
-// カナダ簡略形（念のため形だけ）
 const CANADA = {
   pts:"0,0 900,0 950,120 800,260 500,300 200,280 0,180",
   cx:450, cy:120,
@@ -373,7 +355,13 @@ const game = document.getElementById("game");
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
-// ランダムに4州を選ぶ
+let activeStates = [];
+let placedCount = 0;
+let gameStarted = false;
+
+/* =========================================================
+   ユーティリティ
+   ========================================================= */
 function pickRandomStates(n) {
   const arr = [...STATES];
   const picked = [];
@@ -384,11 +372,6 @@ function pickRandomStates(n) {
   return picked;
 }
 
-let activeStates = [];   // 今回の4州
-let placedCount = 0;
-let gameStarted = false;
-
-// 州ポリゴンをSVG pathに変換
 function ptsToPath(pts, offsetX=0, offsetY=0) {
   const pairs = pts.trim().split(/\s+/).map(p=>{
     const [x,y] = p.split(",").map(Number);
@@ -400,7 +383,6 @@ function ptsToPath(pts, offsetX=0, offsetY=0) {
   return d;
 }
 
-// バウンディングボックス
 function bbox(pts) {
   const pairs = pts.trim().split(/\s+/).map(p=>p.split(",").map(Number));
   const xs = pairs.map(p=>p[0]), ys = pairs.map(p=>p[1]);
@@ -415,7 +397,6 @@ function bbox(pts) {
 function buildMap() {
   svg.innerHTML = "";
 
-  // 背景グリッド
   const defs = document.createElementNS(SVG_NS,"defs");
   const pattern = document.createElementNS(SVG_NS,"pattern");
   pattern.setAttribute("id","grid");
@@ -435,7 +416,7 @@ function buildMap() {
   bg.setAttribute("fill","url(#grid)");
   svg.appendChild(bg);
 
-  // カナダ（形だけ）
+  // カナダ
   const canG = document.createElementNS(SVG_NS,"g");
   const canPath = document.createElementNS(SVG_NS,"path");
   const [cx,cy] = CANADA.home;
@@ -450,18 +431,16 @@ function buildMap() {
   canG.appendChild(canLabel);
   svg.appendChild(canG);
 
-  // 穴（4州）
+  // 穴
   activeStates.forEach((st, idx) => {
     const g = document.createElementNS(SVG_NS,"g");
     g.dataset.holeIdx = idx;
-
     const [hx,hy] = st.home;
     const hole = document.createElementNS(SVG_NS,"path");
     hole.setAttribute("d", ptsToPath(st.pts, hx, hy));
     hole.setAttribute("class","stateHole");
     hole.dataset.holeIdx = idx;
     g.appendChild(hole);
-
     svg.appendChild(g);
   });
 }
@@ -474,22 +453,16 @@ function buildPool() {
   slots.forEach((slot, i) => {
     slot.innerHTML = "";
     slot.classList.remove("filled");
+    delete slot.dataset.stateName;
     const st = activeStates[i];
     if (!st) return;
 
-    // SVG で州の形
     const bb = bbox(st.pts);
-    const pad = 10;
-    const scale = Math.min(
-      (160 - pad*2) / bb.w,
-      (90 - pad*2) / bb.h,
-      1.2
-    );
     const svgEl = document.createElementNS(SVG_NS,"svg");
     svgEl.setAttribute("viewBox", `${bb.minX-5} ${bb.minY-5} ${bb.w+10} ${bb.h+10}`);
     svgEl.setAttribute("width","100%");
-    svgEl.setAttribute("height","100%");
-    svgEl.style.padding = "8px";
+    svgEl.setAttribute("height","80%");
+    svgEl.setAttribute("preserveAspectRatio","xMidYMid meet");
 
     const path = document.createElementNS(SVG_NS,"path");
     path.setAttribute("d", ptsToPath(st.pts));
@@ -498,7 +471,6 @@ function buildPool() {
 
     slot.appendChild(svgEl);
 
-    // 名前ラベル
     const label = document.createElement("div");
     label.className = "label";
     label.textContent = st.name;
@@ -507,7 +479,6 @@ function buildPool() {
     slot.classList.add("filled");
     slot.dataset.stateName = st.name;
 
-    // 長押しドラッグ開始
     attachDrag(slot, st);
   });
 }
@@ -517,14 +488,17 @@ function buildPool() {
    ========================================================= */
 let dragState = null;
 let holdTimer = null;
-const HOLD_MS = 180;
+const HOLD_MS = 120;
 
 function attachDrag(el, state) {
   const start = (e) => {
     e.preventDefault();
+    e.stopPropagation();
     const point = getPoint(e);
 
+    if (holdTimer) clearTimeout(holdTimer);
     holdTimer = setTimeout(() => {
+      holdTimer = null;
       beginDrag(el, state, point);
     }, HOLD_MS);
   };
@@ -537,33 +511,27 @@ function attachDrag(el, state) {
   el.addEventListener("mouseup", cancel);
   el.addEventListener("mouseleave", cancel);
   el.addEventListener("touchend", cancel);
+  el.addEventListener("touchcancel", cancel);
 }
 
 function getPoint(e) {
   if (e.touches && e.touches[0]) return {x:e.touches[0].clientX, y:e.touches[0].clientY};
+  if (e.changedTouches && e.changedTouches[0]) return {x:e.changedTouches[0].clientX, y:e.changedTouches[0].clientY};
   return {x:e.clientX, y:e.clientY};
 }
 
 function beginDrag(el, state, point) {
   const bb = bbox(state.pts);
-  const rect = el.getBoundingClientRect();
-
-  dragState = {
-    state,
-    el,
-    offsetX: point.x - rect.left,
-    offsetY: point.y - rect.top,
-    bb,
-    ghost: null
-  };
 
   // ゴースト作成
   const ghost = document.createElementNS(SVG_NS,"svg");
-  const w = Math.max(bb.w*1.6, 120);
-  const h = Math.max(bb.h*1.6, 90);
+  const w = Math.max(bb.w, 120);
+  const h = Math.max(bb.h, 90);
   ghost.setAttribute("width", w);
   ghost.setAttribute("height", h);
   ghost.setAttribute("viewBox", `${bb.minX-5} ${bb.minY-5} ${bb.w+10} ${bb.h+10}`);
+  ghost.style.width = w + "px";
+  ghost.style.height = h + "px";
 
   const path = document.createElementNS(SVG_NS,"path");
   path.setAttribute("d", ptsToPath(state.pts));
@@ -572,23 +540,31 @@ function beginDrag(el, state, point) {
   ghost.appendChild(path);
 
   dragLayer.appendChild(ghost);
-  dragState.ghost = ghost;
+
+  dragState = {
+    state,
+    el,
+    ghost,
+    ghostW: w,
+    ghostH: h,
+    bb
+  };
 
   el.style.opacity = "0.3";
-
   moveGhost(point.x, point.y);
 
   window.addEventListener("mousemove", onDragMove);
   window.addEventListener("touchmove", onDragMove, {passive:false});
   window.addEventListener("mouseup", onDragEnd);
   window.addEventListener("touchend", onDragEnd);
+  window.addEventListener("touchcancel", onDragEnd);
 }
 
 function moveGhost(px, py) {
   if (!dragState) return;
   const g = dragState.ghost;
-  g.style.left = (px - g.clientWidth/2) + "px";
-  g.style.top  = (py - g.clientHeight/2) + "px";
+  g.style.left = (px - dragState.ghostW/2) + "px";
+  g.style.top  = (py - dragState.ghostH/2) + "px";
 }
 
 function onDragMove(e) {
@@ -600,16 +576,13 @@ function onDragMove(e) {
 
 function onDragEnd(e) {
   if (!dragState) return;
-  const p = (e.changedTouches && e.changedTouches[0])
-    ? {x:e.changedTouches[0].clientX, y:e.changedTouches[0].clientY}
-    : {x:e.clientX, y:e.clientY};
-
+  const p = getPoint(e);
   const st = dragState.state;
 
-  // ワールド座標に変換
+  // 画面座標 → world座標
   const worldPt = screenToWorld(p.x, p.y);
 
-  // 正解位置
+  // 正解位置（world座標）
   const [hx,hy] = st.home;
   const bb = bbox(st.pts);
   const targetCx = hx + bb.minX + bb.w/2;
@@ -617,25 +590,24 @@ function onDragEnd(e) {
 
   const dist = Math.hypot(worldPt.x - targetCx, worldPt.y - targetCy);
 
-  if (dist < 130) {
-    // 正解 → 穴を埋める
+  if (dist < 200) {
     placeState(st);
+  } else {
+    // 失敗時はPOOLに戻す
+    dragState.el.style.opacity = "";
   }
 
-  // クリーンアップ
   dragState.ghost.remove();
-  dragState.el.style.opacity = "";
   dragState = null;
+
   window.removeEventListener("mousemove", onDragMove);
   window.removeEventListener("touchmove", onDragMove);
   window.removeEventListener("mouseup", onDragEnd);
   window.removeEventListener("touchend", onDragEnd);
+  window.removeEventListener("touchcancel", onDragEnd);
 }
 
 function placeState(st) {
-  // 穴を探して置換
-  const hole = svg.querySelector(`.stateHole[data-hole-idx]`);
-  // 正しい穴を名前で探す
   const groups = svg.querySelectorAll("g[data-hole-idx]");
   let targetHole = null;
   groups.forEach(g => {
@@ -651,7 +623,6 @@ function placeState(st) {
   targetHole.setAttribute("style","fill:rgba(70,200,140,0.9);stroke:#d8ffe8;stroke-width:2;");
   targetHole.removeAttribute("data-hole-idx");
 
-  // 州名をマップに表示
   const bb = bbox(st.pts);
   const label = document.createElementNS(SVG_NS,"text");
   label.setAttribute("x", hx + bb.minX + bb.w/2);
@@ -660,45 +631,69 @@ function placeState(st) {
   label.textContent = st.name;
   svg.appendChild(label);
 
-  // POOLから消す
   const slot = poolEl.querySelector(`.poolSlot[data-state-name="${st.name}"]`);
   if (slot) {
     slot.innerHTML = "";
     slot.classList.remove("filled");
-    slot.removeAttribute("data-state-name");
+    delete slot.dataset.stateName;
+    slot.style.opacity = "";
   }
 
   placedCount++;
   if (placedCount >= activeStates.length) {
-    setTimeout(showWin, 500);
+    setTimeout(showWin, 400);
   }
 }
 
 function showWin() {
-  winEl.style.display = "flex";
+  winEl.classList.add("show");
 }
 
 /* =========================================================
-   座標変換 & スクロール
+   カメラ（上下左右キー / WASD）
    ========================================================= */
-const VIEW_SCALE = 0.2; // プレイヤー視点 = 全体の1/5
+const VIEW_SCALE = 0.2;
+const WORLD_W = 5000;
+const WORLD_H = 3000;
+
+// camX / camY は「world座標」でのカメラ左上位置
 let camX = 0, camY = 0;
-const camSpeed = 24;
+const camSpeed = 60; // world座標/フレーム
 const keys = {};
 
-function applyCamera() {
-  // world を scale して、viewport 内でカメラ移動
-  world.style.transform =
-    `translate(${-camX}px, ${-camY}px) scale(${VIEW_SCALE})`;
+function clampCamera() {
+  // 画面に映る world の幅・高さ
+  const viewW = window.innerWidth / VIEW_SCALE;
+  const viewH = window.innerHeight / VIEW_SCALE;
+
+  const maxX = Math.max(0, WORLD_W - viewW);
+  const maxY = Math.max(0, WORLD_H - viewH);
+
+  camX = Math.max(0, Math.min(maxX, camX));
+  camY = Math.max(0, Math.min(maxY, camY));
 }
 
+function applyCamera() {
+  // world を scale した上で、カメラ位置ぶん translate
+  // 順序: translate(-camX*scale, -camY*scale) scale(scale)
+  const tx = -camX * VIEW_SCALE;
+  const ty = -camY * VIEW_SCALE;
+  world.style.transform = `translate(${tx}px, ${ty}px) scale(${VIEW_SCALE})`;
+}
+
+// 画面座標 → world座標
 function screenToWorld(sx, sy) {
-  // viewport基準 → world座標
-  const vx = sx - 0; // viewport は画面全体
-  const vy = sy - 0;
   return {
-    x: (vx / VIEW_SCALE) + camX / VIEW_SCALE,
-    y: (vy / VIEW_SCALE) + camY / VIEW_SCALE
+    x: sx / VIEW_SCALE + camX,
+    y: sy / VIEW_SCALE + camY
+  };
+}
+
+// world座標 → 画面座標（必要なら）
+function worldToScreen(wx, wy) {
+  return {
+    x: (wx - camX) * VIEW_SCALE,
+    y: (wy - camY) * VIEW_SCALE
   };
 }
 
@@ -712,14 +707,7 @@ function updateCamera() {
   if (dx || dy) {
     camX += dx * camSpeed;
     camY += dy * camSpeed;
-
-    // 範囲制限
-    const scaledW = 5000 * VIEW_SCALE;
-    const scaledH = 3000 * VIEW_SCALE;
-    const maxX = Math.max(0, scaledW - window.innerWidth);
-    const maxY = Math.max(0, scaledH - window.innerHeight);
-    camX = Math.max(0, Math.min(maxX, camX));
-    camY = Math.max(0, Math.min(maxY, camY));
+    clampCamera();
     applyCamera();
   }
   requestAnimationFrame(updateCamera);
@@ -727,7 +715,7 @@ function updateCamera() {
 
 window.addEventListener("keydown", e => {
   keys[e.key] = true;
-  if (["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(e.key)) e.preventDefault();
+  if (["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"," "].includes(e.key)) e.preventDefault();
 });
 window.addEventListener("keyup", e => { keys[e.key] = false; });
 
@@ -738,25 +726,26 @@ function startGame() {
   activeStates = pickRandomStates(4);
   placedCount = 0;
 
-  opening.style.display = "none";
+  opening.classList.add("hidden");
   game.style.display = "block";
   gameStarted = true;
 
   buildMap();
   buildPool();
 
-  // 初期カメラをアラスカ付近に
   camX = 0; camY = 0;
+  clampCamera();
   applyCamera();
   requestAnimationFrame(updateCamera);
 
-  // リサイズ対応
-  window.addEventListener("resize", () => {
-    applyCamera();
-  });
+  setTimeout(() => { opening.style.display = "none"; }, 500);
 }
 
 document.getElementById("startBtn").addEventListener("click", startGame);
+window.addEventListener("resize", () => {
+  clampCamera();
+  applyCamera();
+});
 </script>
 </body>
 </html>
