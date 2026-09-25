@@ -14,7 +14,6 @@
     -webkit-tap-highlight-color:transparent;
   }
 
-  /* ===== Opening ===== */
   #opening {
     position:fixed; inset:0; z-index:1000;
     display:flex; flex-direction:column;
@@ -46,7 +45,6 @@
   #startBtn:hover { transform:scale(1.06); box-shadow:0 12px 40px rgba(0,210,255,0.7); }
   #startBtn:active { transform:scale(0.97); }
 
-  /* ===== Game ===== */
   #game { display:none; width:100%; height:100%; position:relative; }
   #viewport {
     position:absolute; inset:0; overflow:hidden;
@@ -54,18 +52,18 @@
   }
   #world {
     position:absolute; top:0; left:0;
-    width:5000px; height:3000px;
+    width:8000px; height:5000px;
     transform-origin:0 0;
     will-change:transform;
   }
 
-  /* ===== POOL（world内の一区画） ===== */
+  /* POOL：world内の一区画 */
   #pool {
     position:absolute;
-    left:60px; top:60px;
-    width:260px;
+    left:80px; top:80px;
+    width:280px;
     padding:14px;
-    background:rgba(10,14,22,0.85);
+    background:rgba(10,14,22,0.88);
     border:1px solid rgba(80,180,255,0.35);
     border-radius:12px;
     display:flex; flex-direction:column; gap:12px;
@@ -78,7 +76,7 @@
     padding-bottom:8px; border-bottom:1px solid rgba(80,180,255,0.3);
   }
   .poolSlot {
-    position:relative; width:100%; height:110px;
+    position:relative; width:100%; height:120px;
     background:rgba(255,255,255,0.04);
     border:1px dashed rgba(120,180,255,0.35);
     border-radius:8px;
@@ -98,7 +96,7 @@
     color:#9fd8ff; pointer-events:none;
   }
 
-  /* ===== ドラッグ中の州（world内を移動） ===== */
+  /* ドラッグ中の州 */
   .dragPiece {
     position:absolute;
     cursor:grabbing;
@@ -107,16 +105,29 @@
     pointer-events:none;
   }
 
-  /* ===== SVG 州 ===== */
   .stateShape {
     fill:rgba(70,150,230,0.85);
     stroke:#bfe6ff; stroke-width:1.5;
     vector-effect:non-scaling-stroke;
   }
+  /* 背景の他州（薄い） */
+  .stateGhost {
+    fill:rgba(60,110,160,0.30);
+    stroke:rgba(140,190,230,0.35);
+    stroke-width:1;
+    vector-effect:non-scaling-stroke;
+  }
+  .stateGhostLabel {
+    fill:rgba(180,210,235,0.45);
+    font-size:12px; font-weight:500;
+    letter-spacing:0.05em; pointer-events:none;
+    text-anchor:middle;
+  }
+  /* 穴 */
   .stateHole {
     fill:rgba(0,0,0,0.55);
-    stroke:rgba(120,200,255,0.5);
-    stroke-width:1.5; stroke-dasharray:5 4;
+    stroke:rgba(120,200,255,0.6);
+    stroke-width:1.5; stroke-dasharray:6 5;
     vector-effect:non-scaling-stroke;
   }
   .stateLabel {
@@ -135,7 +146,6 @@
     letter-spacing:0.3em; pointer-events:none; text-anchor:middle;
   }
 
-  /* ===== Footer ===== */
   #footer {
     position:fixed; bottom:0; left:0; right:0; height:44px;
     background:rgba(8,12,20,0.85);
@@ -151,7 +161,6 @@
   }
   #footer a:hover { background:rgba(80,180,255,0.18); }
 
-  /* ===== Win ===== */
   #win {
     position:fixed; inset:0; z-index:500;
     display:none; flex-direction:column;
@@ -192,7 +201,7 @@
 <div id="game">
   <div id="viewport">
     <div id="world">
-      <svg id="mapSvg" width="5000" height="3000" viewBox="0 0 5000 3000"></svg>
+      <svg id="mapSvg" width="8000" height="5000" viewBox="0 0 8000 5000"></svg>
       <div id="pool">
         <h2>POOL</h2>
         <div class="poolSlot" data-slot="0"></div>
@@ -220,9 +229,12 @@
 
 <script>
 /* =========================================================
-   州データ
+   州データ（home 座標を 1.6倍 にして 8000x5000 に拡大）
    ========================================================= */
-const STATES = [
+const SCALE = 1.6; // 5000x3000 → 8000x4800相当
+
+// 元データ（5000x3000想定）をそのまま持ち、home だけスケール
+const RAW_STATES = [
   { name:"Washington",   pts:"0,0 90,10 100,60 60,90 10,80 -10,40", cx:45, cy:45, home:[300,300] },
   { name:"Oregon",       pts:"0,0 100,10 110,90 60,130 0,120 -20,60", cx:45, cy:60, home:[300,430] },
   { name:"California",   pts:"0,0 90,0 120,60 100,200 40,300 -30,280 -50,120", cx:30, cy:150, home:[280,600] },
@@ -274,10 +286,16 @@ const STATES = [
   { name:"Alaska",       pts:"0,0 200,0 220,80 160,180 40,200 -60,120 -40,40", cx:90, cy:100, home:[300,1500] },
 ];
 
+// home を 1.6倍して 8000x5000 にフィット
+const STATES = RAW_STATES.map(s => ({
+  ...s,
+  home: [Math.round(s.home[0] * 1.6), Math.round(s.home[1] * 1.6)]
+}));
+
 const CANADA = {
   pts:"0,0 900,0 950,120 800,260 500,300 200,280 0,180",
   cx:450, cy:120,
-  home:[600,1200]
+  home:[960,1920]
 };
 
 /* =========================================================
@@ -328,19 +346,18 @@ function bbox(pts) {
 }
 
 /* =========================================================
-   マップ描画
+   マップ描画（全50州を描画、うち4州は穴）
    ========================================================= */
 function buildMap() {
-  // SVGの中身だけクリア（poolは別要素なので消えない）
   svg.innerHTML = "";
 
   const defs = document.createElementNS(SVG_NS,"defs");
   const pattern = document.createElementNS(SVG_NS,"pattern");
   pattern.setAttribute("id","grid");
-  pattern.setAttribute("width","100"); pattern.setAttribute("height","100");
+  pattern.setAttribute("width","120"); pattern.setAttribute("height","120");
   pattern.setAttribute("patternUnits","userSpaceOnUse");
   const pPath = document.createElementNS(SVG_NS,"path");
-  pPath.setAttribute("d","M 100 0 L 0 0 0 100");
+  pPath.setAttribute("d","M 120 0 L 0 0 0 120");
   pPath.setAttribute("fill","none");
   pPath.setAttribute("stroke","rgba(80,140,200,0.08)");
   pPath.setAttribute("stroke-width","1");
@@ -349,34 +366,54 @@ function buildMap() {
   svg.appendChild(defs);
 
   const bg = document.createElementNS(SVG_NS,"rect");
-  bg.setAttribute("width","5000"); bg.setAttribute("height","3000");
+  bg.setAttribute("width","8000"); bg.setAttribute("height","5000");
   bg.setAttribute("fill","url(#grid)");
   svg.appendChild(bg);
 
+  // カナダ
   const canG = document.createElementNS(SVG_NS,"g");
   const canPath = document.createElementNS(SVG_NS,"path");
-  const [cx,cy] = CANADA.home;
-  canPath.setAttribute("d", ptsToPath(CANADA.pts, cx, cy));
+  const [ccx,ccy] = CANADA.home;
+  canPath.setAttribute("d", ptsToPath(CANADA.pts, ccx, ccy));
   canPath.setAttribute("class","canadaShape");
   canG.appendChild(canPath);
   const canLabel = document.createElementNS(SVG_NS,"text");
-  canLabel.setAttribute("x", cx + CANADA.cx);
-  canLabel.setAttribute("y", cy + CANADA.cy);
+  canLabel.setAttribute("x", ccx + CANADA.cx);
+  canLabel.setAttribute("y", ccy + CANADA.cy);
   canLabel.setAttribute("class","canadaLabel");
   canLabel.textContent = "CANADA";
   canG.appendChild(canLabel);
   svg.appendChild(canG);
 
-  activeStates.forEach((st, idx) => {
-    const g = document.createElementNS(SVG_NS,"g");
-    g.dataset.holeIdx = idx;
+  // 穴の対象名セット
+  const holeNames = new Set(activeStates.map(s => s.name));
+
+  // 全州を描画
+  STATES.forEach(st => {
     const [hx,hy] = st.home;
-    const hole = document.createElementNS(SVG_NS,"path");
-    hole.setAttribute("d", ptsToPath(st.pts, hx, hy));
-    hole.setAttribute("class","stateHole");
-    hole.dataset.holeIdx = idx;
-    g.appendChild(hole);
-    svg.appendChild(g);
+    const bb = bbox(st.pts);
+
+    if (holeNames.has(st.name)) {
+      // 穴
+      const hole = document.createElementNS(SVG_NS,"path");
+      hole.setAttribute("d", ptsToPath(st.pts, hx, hy));
+      hole.setAttribute("class","stateHole");
+      hole.dataset.stateName = st.name;
+      svg.appendChild(hole);
+    } else {
+      // 背景の他州
+      const ghost = document.createElementNS(SVG_NS,"path");
+      ghost.setAttribute("d", ptsToPath(st.pts, hx, hy));
+      ghost.setAttribute("class","stateGhost");
+      svg.appendChild(ghost);
+
+      const label = document.createElementNS(SVG_NS,"text");
+      label.setAttribute("x", hx + bb.minX + bb.w/2);
+      label.setAttribute("y", hy + bb.minY + bb.h/2);
+      label.setAttribute("class","stateGhostLabel");
+      label.textContent = st.name;
+      svg.appendChild(label);
+    }
   });
 }
 
@@ -419,7 +456,7 @@ function buildPool() {
 }
 
 /* =========================================================
-   ドラッグ＆ドロップ（world内を移動）
+   ドラッグ＆ドロップ
    ========================================================= */
 let dragState = null;
 let holdTimer = null;
@@ -458,7 +495,6 @@ function getPoint(e) {
 function beginDrag(el, state, point) {
   const bb = bbox(state.pts);
 
-  // world内にドラッグ要素を作る
   const piece = document.createElementNS(SVG_NS,"svg");
   piece.setAttribute("width", bb.w + 20);
   piece.setAttribute("height", bb.h + 20);
@@ -474,7 +510,6 @@ function beginDrag(el, state, point) {
   path.setAttribute("style","fill:rgba(90,180,255,0.95);stroke:#e0f4ff;stroke-width:2;");
   piece.appendChild(path);
 
-  // 初期位置をworld座標で設定
   const worldPt = screenToWorld(point.x, point.y);
   const px = worldPt.x - (bb.w + 20)/2 - bb.minX;
   const py = worldPt.y - (bb.h + 20)/2 - bb.minY;
@@ -543,20 +578,17 @@ function onDragEnd(e) {
 }
 
 function placeState(st) {
-  const groups = svg.querySelectorAll("g[data-hole-idx]");
+  const holes = svg.querySelectorAll(".stateHole");
   let targetHole = null;
-  groups.forEach(g => {
-    const idx = Number(g.dataset.holeIdx);
-    if (activeStates[idx].name === st.name) {
-      targetHole = g.querySelector(".stateHole");
-    }
+  holes.forEach(h => {
+    if (h.dataset.stateName === st.name) targetHole = h;
   });
   if (!targetHole) return;
 
   const [hx,hy] = st.home;
   targetHole.setAttribute("class","stateShape");
   targetHole.setAttribute("style","fill:rgba(70,200,140,0.9);stroke:#d8ffe8;stroke-width:2;");
-  targetHole.removeAttribute("data-hole-idx");
+  delete targetHole.dataset.stateName;
 
   const bb = bbox(st.pts);
   const label = document.createElementNS(SVG_NS,"text");
@@ -590,11 +622,11 @@ function showWin() {
 const CAMERA = {
   scale: 0.2,
   x: 0, y: 0,
-  speed: 10
+  speed: 14
 };
 
-const WORLD_W = 5000;
-const WORLD_H = 3000;
+const WORLD_W = 8000;
+const WORLD_H = 5000;
 
 const keys = {};
 
