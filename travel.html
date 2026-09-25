@@ -304,15 +304,11 @@
   </div>
 </div>
 
-<!-- ライブラリ -->
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
 <script src="https://cdn.jsdelivr.net/npm/d3-geo@3"></script>
 
 <script>
 (async function () {
-  /* =========================================================
-     データ読み込み
-     ========================================================= */
   const loading = document.getElementById("loading");
   const opening = document.getElementById("opening");
   const startBtn = document.getElementById("startBtn");
@@ -323,37 +319,33 @@
 
   const SVG_NS = "http://www.w3.org/2000/svg";
 
-  let usTopo, canadaTopo;
+  let usTopo, worldTopo;
 
   try {
-    const [usRes, caRes] = await Promise.all([
-      fetch("states-10m.json"),
-      fetch("canada-10m.json"),
+    const [usRes, worldRes] = await Promise.all([
+      fetch("https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json"),
+      fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json"),
     ]);
+    if (!usRes.ok) throw new Error("us-atlas fetch failed: " + usRes.status);
+    if (!worldRes.ok) throw new Error("world-atlas fetch failed: " + worldRes.status);
     usTopo = await usRes.json();
-    canadaTopo = await caRes.json();
+    worldTopo = await worldRes.json();
   } catch (e) {
-    loading.innerHTML = "<p style='color:#ff4d6d'>データの読み込みに失敗しました</p>";
+    loading.innerHTML = "<p style='color:#ff4d6d;text-align:center;padding:20px'>データの読み込みに失敗しました<br><small style='color:#7a8b9b'>" + e.message + "</small></p>";
     console.error(e);
     return;
   }
 
-  /* =========================================================
-     投影 & path 生成
-     ========================================================= */
-  // Albers USA（アラスカは左下、ハワイはさらに左下）
+  // 投影
   const projection = d3.geoAlbersUsa().scale(1300).translate([487.5, 305]);
   const pathGen = d3.geoPath(projection);
 
-  // 全州の Feature を取得
+  // 全州
   const statesFeatures = topojson.feature(usTopo, usTopo.objects.states).features;
 
-  // ハワイを除外（FIPS: 15）
   const EXCLUDE_FIPS = new Set(["15"]); // Hawaii
-  // アラスカ（FIPS: 02）は残す
   const ALASKA_FIPS = "02";
 
-  // 州名マップ（FIPS → 名前）
   const FIPS_NAME = {
     "01":"Alabama","02":"Alaska","04":"Arizona","05":"Arkansas","06":"California",
     "08":"Colorado","09":"Connecticut","10":"Delaware","12":"Florida","13":"Georgia",
@@ -367,7 +359,6 @@
     "51":"Virginia","53":"Washington","54":"West Virginia","55":"Wisconsin","56":"Wyoming"
   };
 
-  // 各州の path と bbox を計算
   const STATES = [];
   statesFeatures.forEach(f => {
     const fips = f.id;
@@ -378,7 +369,6 @@
     const d = pathGen(f);
     if (!d) return;
 
-    // path の bbox を取得
     const tempPath = document.createElementNS(SVG_NS, "path");
     tempPath.setAttribute("d", d);
     mapSvg.appendChild(tempPath);
@@ -386,61 +376,44 @@
     mapSvg.removeChild(tempPath);
 
     STATES.push({
-      fips,
-      name,
-      d,
+      fips, name, d,
       bbox: { x: bb.x, y: bb.y, w: bb.width, h: bb.height },
       cx: bb.x + bb.width / 2,
       cy: bb.y + bb.height / 2,
     });
   });
 
-  // カナダの path
-  const canadaFeature = topojson.feature(canadaTopo, canadaTopo.objects.countries).features[0];
+  // カナダ
+  const canadaFeature = topojson.feature(worldTopo, worldTopo.objects.countries)
+    .features.find(f => f.properties.name === "Canada");
   const canadaPath = pathGen(canadaFeature);
 
-  // カナダの bbox（ラベル位置用）
   const tempCan = document.createElementNS(SVG_NS, "path");
   tempCan.setAttribute("d", canadaPath);
   mapSvg.appendChild(tempCan);
   const canBB = tempCan.getBBox();
   mapSvg.removeChild(tempCan);
 
-  /* =========================================================
-     全体の bbox から world サイズを決定
-     ========================================================= */
-  const allPaths = STATES.map(s => s.bbox).concat([canBB]);
-  const worldMinX = Math.min(...allPaths.map(b => b.x));
-  const worldMinY = Math.min(...allPaths.map(b => b.y));
-  const worldMaxX = Math.max(...allPaths.map(b => b.x + b.w));
-  const worldMaxY = Math.max(...allPaths.map(b => b.y + b.h));
+  // world サイズ
+  const allBoxes = STATES.map(s => s.bbox).concat([canBB]);
+  const worldMinX = Math.min(...allBoxes.map(b => b.x));
+  const worldMinY = Math.min(...allBoxes.map(b => b.y));
+  const worldMaxX = Math.max(...allBoxes.map(b => b.x + b.w));
+  const worldMaxY = Math.max(...allBoxes.map(b => b.y + b.h));
 
-  // パディング
   const PAD = 40;
   const WORLD_W = worldMaxX - worldMinX + PAD * 2;
   const WORLD_H = worldMaxY - worldMinY + PAD * 2;
-
-  // viewBox オフセット
   const VB_X = worldMinX - PAD;
   const VB_Y = worldMinY - PAD;
 
-  // 窓サイズ（3×3 相当）
   const VIEW_W = WORLD_W / 2.2;
   const VIEW_H = WORLD_H / 2.2;
 
-  /* =========================================================
-     STATE に home をセット（bbox の中心）
-     ========================================================= */
-  STATES.forEach(s => {
-    s.home = [s.cx, s.cy];
-  });
+  STATES.forEach(s => { s.home = [s.cx, s.cy]; });
 
-  /* =========================================================
-     セットアップ
-     ========================================================= */
   let activeStates = [];
   let placedCount = 0;
-
   const CAMERA = { x: 0, y: 0, speed: 18 };
   const keys = {};
 
@@ -454,22 +427,15 @@
     return picked;
   }
 
-  /* =========================================================
-     マップ描画
-     ========================================================= */
   function buildMap() {
     mapSvg.innerHTML = "";
 
-    // 背景
     const bg = document.createElementNS(SVG_NS, "rect");
-    bg.setAttribute("x", VB_X);
-    bg.setAttribute("y", VB_Y);
-    bg.setAttribute("width", WORLD_W);
-    bg.setAttribute("height", WORLD_H);
+    bg.setAttribute("x", VB_X); bg.setAttribute("y", VB_Y);
+    bg.setAttribute("width", WORLD_W); bg.setAttribute("height", WORLD_H);
     bg.setAttribute("fill", "#0b0f14");
     mapSvg.appendChild(bg);
 
-    // カナダ
     const can = document.createElementNS(SVG_NS, "path");
     can.setAttribute("d", canadaPath);
     can.setAttribute("class", "canadaShape");
@@ -482,28 +448,23 @@
     canLabel.textContent = "CANADA";
     mapSvg.appendChild(canLabel);
 
-    // 穴の対象名
     const holeNames = new Set(activeStates.map(s => s.name));
 
-    // 全州
     STATES.forEach(st => {
       const isAlaska = st.fips === ALASKA_FIPS;
 
       if (holeNames.has(st.name)) {
-        // 穴
         const hole = document.createElementNS(SVG_NS, "path");
         hole.setAttribute("d", st.d);
         hole.setAttribute("class", "stateHole");
         hole.dataset.stateName = st.name;
         mapSvg.appendChild(hole);
       } else {
-        // 背景
         const ghost = document.createElementNS(SVG_NS, "path");
         ghost.setAttribute("d", st.d);
         ghost.setAttribute("class", isAlaska ? "stateGhostAlaska" : "stateGhost");
         mapSvg.appendChild(ghost);
 
-        // ラベル（小さい州はスキップ）
         if (st.bbox.w > 15 && st.bbox.h > 15) {
           const label = document.createElementNS(SVG_NS, "text");
           label.setAttribute("x", st.cx);
@@ -516,9 +477,6 @@
     });
   }
 
-  /* =========================================================
-     POOL描画
-     ========================================================= */
   function buildPool() {
     const slots = poolEl.querySelectorAll(".poolSlot");
     slots.forEach((slot, i) => {
@@ -530,13 +488,10 @@
 
       const isAlaska = st.fips === ALASKA_FIPS;
 
-      // POOL用の小さい SVG（viewBox を州の bbox に合わせる）
       const svgEl = document.createElementNS(SVG_NS, "svg");
       const pad = Math.max(st.bbox.w, st.bbox.h) * 0.1;
-      svgEl.setAttribute(
-        "viewBox",
-        `${st.bbox.x - pad} ${st.bbox.y - pad} ${st.bbox.w + pad*2} ${st.bbox.h + pad*2}`
-      );
+      svgEl.setAttribute("viewBox",
+        `${st.bbox.x - pad} ${st.bbox.y - pad} ${st.bbox.w + pad*2} ${st.bbox.h + pad*2}`);
       svgEl.setAttribute("width", "100%");
       svgEl.setAttribute("height", "72%");
       svgEl.setAttribute("preserveAspectRatio", "xMidYMid meet");
@@ -549,7 +504,6 @@
         path.setAttribute("style", "fill:rgba(0,230,176,0.7);stroke:#d8ffe8;stroke-width:0.5;");
       }
       svgEl.appendChild(path);
-
       slot.appendChild(svgEl);
 
       const label = document.createElement("div");
@@ -559,14 +513,10 @@
 
       slot.classList.add("filled");
       slot.dataset.stateName = st.name;
-
       attachDrag(slot, st);
     });
   }
 
-  /* =========================================================
-     ドラッグ（pointer）
-     ========================================================= */
   let dragState = null;
 
   function attachDrag(el, state) {
@@ -578,28 +528,18 @@
       el.setPointerCapture(e.pointerId);
 
       const worldPt = screenToWorld(e.clientX, e.clientY);
-
-      // ドラッグ中の州（同じ path データを、マウス位置に平行移動して表示）
-      const piece = document.createElementNS(SVG_NS, "path");
       const dx = worldPt.x - state.cx;
       const dy = worldPt.y - state.cy;
+
+      const piece = document.createElementNS(SVG_NS, "path");
       piece.setAttribute("d", state.d);
-      piece.setAttribute(
-        "transform",
-        `translate(${dx} ${dy})`
-      );
+      piece.setAttribute("transform", `translate(${dx} ${dy})`);
       piece.setAttribute("class", state.fips === ALASKA_FIPS ? "dragPieceAlaska" : "dragPiece");
       mapSvg.appendChild(piece);
 
-      dragState = {
-        state, el, piece,
-        startX: worldPt.x,
-        startY: worldPt.y,
-        pointerId: e.pointerId,
-      };
+      dragState = { state, el, piece, pointerId: e.pointerId };
 
       el.style.opacity = "0.3";
-
       el.addEventListener("pointermove", onDragMove);
       el.addEventListener("pointerup", onDragEnd);
       el.addEventListener("pointercancel", onDragEnd);
@@ -621,7 +561,6 @@
 
     const st = dragState.state;
     const worldPt = screenToWorld(e.clientX, e.clientY);
-
     const dx = worldPt.x - st.cx;
     const dy = worldPt.y - st.cy;
     const dist = Math.hypot(dx, dy);
@@ -650,11 +589,9 @@
     if (!targetHole) return;
 
     const isAlaska = st.fips === ALASKA_FIPS;
-
     targetHole.setAttribute("class", isAlaska ? "statePlacedAlaska" : "statePlaced");
     delete targetHole.dataset.stateName;
 
-    // ラベル
     if (st.bbox.w > 15 && st.bbox.h > 15) {
       const label = document.createElementNS(SVG_NS, "text");
       label.setAttribute("x", st.cx);
@@ -678,9 +615,6 @@
     }
   }
 
-  /* =========================================================
-     カメラ（viewBox 方式）
-     ========================================================= */
   function clampCamera() {
     const minX = VB_X;
     const minY = VB_Y;
@@ -724,9 +658,6 @@
   });
   window.addEventListener("keyup", e => { keys[e.key] = false; });
 
-  /* =========================================================
-     初期化
-     ========================================================= */
   function startGame() {
     activeStates = pickRandomStates(4);
     placedCount = 0;
@@ -734,7 +665,6 @@
     opening.classList.add("hidden-opening");
     game.style.display = "block";
 
-    // 初期カメラ（中央）
     CAMERA.x = VB_X + (WORLD_W - VIEW_W) / 2;
     CAMERA.y = VB_Y + (WORLD_H - VIEW_H) / 2;
     clampCamera();
@@ -750,9 +680,6 @@
 
   startBtn.addEventListener("click", startGame);
 
-  /* =========================================================
-     ローディング完了 → オープニング表示
-     ========================================================= */
   loading.style.display = "none";
   opening.style.display = "flex";
 })();
