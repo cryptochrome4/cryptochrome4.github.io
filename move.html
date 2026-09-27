@@ -47,7 +47,7 @@
   }
   .main-row { display:flex; gap:12px; align-items:flex-start; }
   .canvas-wrapper { position:relative; flex:1 1 auto; min-width:0; }
-  canvas {
+  canvas#mainCanvas {
     display:block; width:100%; height:auto;
     image-rendering:crisp-edges;
     image-rendering:pixelated;
@@ -106,7 +106,7 @@
   .log-panel {
     flex:0 0 320px;
     display:none; flex-direction:column;
-    height:100%; max-height:520px;
+    max-height:360px;
     background:rgba(6,18,12,0.92);
     border:4px solid #3f6b3f; border-radius:12px;
     box-shadow:0 0 0 2px #1d331d, inset 0 0 20px #00000080;
@@ -149,6 +149,48 @@
     to   { opacity:1; transform:translateY(0); }
   }
 
+  /* ===== ペット部屋（ロバ部屋） ===== */
+  .pet-room {
+    flex:0 0 320px;
+    display:none;
+    flex-direction:column;
+    max-height:260px;
+    margin-top:12px;
+    background:rgba(6,18,12,0.92);
+    border:4px solid #6b4a2b;
+    border-radius:12px;
+    box-shadow:0 0 0 2px #3a2a1a, inset 0 0 20px #00000080;
+    overflow:hidden;
+  }
+  .pet-room.visible { display:flex; }
+  .pet-header {
+    padding:6px 12px;
+    background:#3a2a1a;
+    color:#e8d0a0;
+    font-weight:bold;
+    font-size:0.85rem;
+    letter-spacing:1px;
+    border-bottom:2px solid #6b4a2b;
+    display:flex; justify-content:space-between; align-items:center;
+  }
+  .pet-header .hint { font-size:0.72rem; color:#b09060; font-weight:normal; }
+  canvas#petCanvas {
+    display:block;
+    width:100%;
+    height:180px;
+    background:#1a2a1a;
+    image-rendering:pixelated;
+    cursor:pointer;
+  }
+  .pet-footer {
+    padding:4px 10px;
+    background:#1d2a1d;
+    color:#c0d0c0;
+    font-size:0.75rem;
+    display:flex; justify-content:space-between;
+    border-top:2px solid #3a2a1a;
+  }
+
   .footer {
     position:relative; z-index:1;
     margin-top:16px;
@@ -165,9 +207,7 @@
     font-size:1.0rem;
     display:flex; flex-direction:column; gap:4px;
   }
-  .footer-left .title-row {
-    display:flex; gap:12px; align-items:center;
-  }
+  .footer-left .title-row { display:flex; gap:12px; align-items:center; }
   .footer-left .dot {
     width:12px; height:12px;
     background:#f0c45a; border-radius:50%;
@@ -209,9 +249,47 @@
   .vertical-link:active {
     transform:translateY(4px); box-shadow:0 0 0 #0b1b12;
   }
+
+  /* ロバのセリフ（画面上部） */
+  .donkey-speech {
+    position:absolute;
+    top:14px; left:50%;
+    transform:translateX(-50%);
+    z-index:30;
+    background:rgba(255,254,240,0.96);
+    color:#1a2e1a;
+    padding:10px 22px;
+    border-radius:14px;
+    border:3px solid #6b4a2b;
+    box-shadow:0 6px 0 rgba(0,0,0,0.4);
+    font-size:1.0rem;
+    font-weight:bold;
+    max-width:80%;
+    text-align:center;
+    display:none;
+    pointer-events:none;
+    line-height:1.4;
+  }
+  .donkey-speech.visible { display:block; animation:speechPop .3s ease; }
+  .donkey-speech::after {
+    content:"";
+    position:absolute;
+    bottom:-14px; left:50%;
+    transform:translateX(-50%);
+    width:0; height:0;
+    border-left:12px solid transparent;
+    border-right:12px solid transparent;
+    border-top:14px solid #6b4a2b;
+  }
+  @keyframes speechPop {
+    from { transform:translateX(-50%) scale(0.8); opacity:0; }
+    to   { transform:translateX(-50%) scale(1); opacity:1; }
+  }
+
   @media (max-width:820px) {
     .main-row { flex-direction:column; }
-    .log-panel { flex:0 0 auto; width:100%; max-height:300px; }
+    .log-panel { flex:0 0 auto; width:100%; max-height:240px; }
+    .pet-room { flex:0 0 auto; width:100%; max-height:240px; }
   }
 </style>
 </head>
@@ -228,6 +306,7 @@
             <button id="asinusBtn">Asinus</button>
           </div>
         </div>
+        <div class="donkey-speech" id="donkeySpeech"></div>
       </div>
       <aside class="log-panel" id="logPanel">
         <div class="log-header">
@@ -236,6 +315,18 @@
         </div>
         <div class="log-body" id="logBody"></div>
       </aside>
+    </div>
+    <!-- ペット部屋（ロバ部屋） -->
+    <div class="pet-room" id="petRoom">
+      <div class="pet-header">
+        <span>🐴 ロバ部屋</span>
+        <span class="hint">餌箱・水場・頭をクリック</span>
+      </div>
+      <canvas id="petCanvas" width="320" height="180"></canvas>
+      <div class="pet-footer">
+        <span id="petStatus">餌:0 / 水:なし / なで:0</span>
+        <span id="petMood">ロバはのんびりしている</span>
+      </div>
     </div>
   </div>
   <div class="footer" id="footer">
@@ -253,9 +344,18 @@
 </div>
 <script>
 (function(){
+  'use strict';
+
+  /* ============================================================
+     基本セットアップ
+     ============================================================ */
   const canvas = document.getElementById('mainCanvas');
   const ctx = canvas.getContext('2d');
   ctx.imageSmoothingEnabled = false;
+
+  const petCanvas = document.getElementById('petCanvas');
+  const petCtx = petCanvas.getContext('2d');
+  petCtx.imageSmoothingEnabled = false;
 
   const openingOverlay = document.getElementById('openingOverlay');
   const derivativeBtn = document.getElementById('derivativeBtn');
@@ -266,6 +366,10 @@
   const footerSub = document.getElementById('footerSub');
   const logPanel = document.getElementById('logPanel');
   const logBody = document.getElementById('logBody');
+  const petRoom = document.getElementById('petRoom');
+  const petStatus = document.getElementById('petStatus');
+  const petMood = document.getElementById('petMood');
+  const donkeySpeech = document.getElementById('donkeySpeech');
 
   let animationId = null;
   let startTime = null;
@@ -275,24 +379,813 @@
   let phase = 'opening';
   let intermissionStart = 0;
 
-  // 会議の進行管理
-  let confLines = [];
-  let confIndex = 0;            // 現在発言中のインデックス
-  let confTyping = '';          // 現在画面に出ている字幕（タイピング済み）
-  let confFull = '';            // 現在発言の全文
-  let confSpeaker = null;       // 現在発言の話者オブジェクト
-  let confLastTick = 0;         // 最後に1文字出した時刻
-  let confCharDelay = 90;       // 1文字あたりの基本ミリ秒
-  let confPauseUntil = 0;       // 句読点などの待ち
-  let confEndTime = 0;          // 現在発言の字幕が全部出た時刻
-  let confNextStart = 0;        // 次発言の開始予定時刻
-  let confStarted = false;
-
   const STORIES = {
-    derivative: { duration: 14000, footerStart: 6000, label: 'タレスの圧搾機 · デリバティブの嚆矢' },
-    asinus:     { duration: 16000, footerStart: 6500, label: 'Asinus · 塩を運ぶろばとタレス' }
+    derivative: { duration: 14000, label: 'タレスの圧搾機 · デリバティブの嚆矢' },
+    asinus:     { duration: 16000, label: 'Asinus · 塩を運ぶろばとタレス' }
   };
 
+  /* ============================================================
+     後編との接続口（フック）
+     ============================================================ */
+  window.__PHASE2__ = {
+    onEvent: null,     // イベント発生時に呼ぶ (targetKey, eventType, data)
+    tickPetRoom: null, // ペット部屋の毎フレーム追加描画（後編で使うかも）
+    onDonkeyMounted: null, // 知識マウント時 (targetKey, knowledgeText)
+    getEventFor: null  // ターゲットに応じたイベント名を返す（後編で差し替え可）
+  };
+
+  /* ============================================================
+     ユーティリティ
+     ============================================================ */
+  function px(c, x, y, w, h, color) {
+    c.fillStyle = color;
+    c.fillRect(Math.floor(x), Math.floor(y), Math.floor(w), Math.floor(h));
+  }
+  function pixelText(c, text, x, y, size, color, align) {
+    align = align || 'left';
+    c.font = 'bold ' + size + 'px "Courier New", monospace';
+    c.textAlign = align; c.textBaseline = 'middle';
+    c.lineWidth = 6; c.strokeStyle = '#0b1b12';
+    c.strokeText(text, x, y);
+    c.fillStyle = color; c.fillText(text, x, y);
+  }
+  if (!CanvasRenderingContext2D.prototype.roundRect) {
+    CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+      if (w < 2*r) r = w/2; if (h < 2*r) r = h/2;
+      this.beginPath();
+      this.moveTo(x+r, y);
+      this.arcTo(x+w, y, x+w, y+h, r);
+      this.arcTo(x+w, y+h, x, y+h, r);
+      this.arcTo(x, y+h, x, y, r);
+      this.arcTo(x, y, x+w, y, r);
+      this.closePath(); return this;
+    };
+  }
+  function drawSpeechBubble(c, x, y, w, h, text, tailDir) {
+    c.fillStyle = 'rgba(0,0,0,0.3)';
+    c.beginPath(); c.roundRect(x+3, y+3, w, h, 10); c.fill();
+    c.fillStyle = '#fffef0';
+    c.beginPath(); c.roundRect(x, y, w, h, 10); c.fill();
+    c.strokeStyle = '#3d5e3d'; c.lineWidth = 3; c.stroke();
+    c.fillStyle = '#fffef0';
+    c.beginPath();
+    if (tailDir === 'left') {
+      c.moveTo(x, y+h*0.5); c.lineTo(x-14, y+h*0.5+10); c.lineTo(x, y+h*0.5+18);
+    } else {
+      c.moveTo(x+w, y+h*0.5); c.lineTo(x+w+14, y+h*0.5+10); c.lineTo(x+w, y+h*0.5+18);
+    }
+    c.closePath(); c.fill();
+    c.strokeStyle = '#3d5e3d'; c.stroke();
+    c.font = 'bold 15px "Courier New", monospace';
+    c.fillStyle = '#1a2e1a';
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    const lines = text.split('\n');
+    lines.forEach(function(line, i){
+      c.fillText(line, x + w/2, y + h/2 + (i - (lines.length-1)/2) * 20);
+    });
+  }
+  function getSpeakerColor(key) {
+    switch(key) {
+      case 'bunseki':   return '#ff5555';
+      case 'butsuri':   return '#55dd55';
+      case 'tetsugaku': return '#bbbbbb';
+      case 'senmon':    return '#c77dff';
+      case 'gendai':    return '#ffd93d';
+      case 'sugaku':    return '#5aa9ff';
+      default:          return '#ffffff';
+    }
+  }
+  function randPick(arr) { return arr[Math.floor(Math.random()*arr.length)]; }
+
+  /* ============================================================
+     背景・キャラ描画（前編と同じ）
+     ============================================================ */
+  function drawSkyBase(progress, palette) {
+    const g = ctx.createLinearGradient(0, 0, 0, 400);
+    let c0, c1, c2;
+    if (progress < 0.35) { c0 = palette.spring[0]; c1 = palette.spring[1]; c2 = palette.spring[2]; }
+    else if (progress < 0.7) { c0 = palette.summer[0]; c1 = palette.summer[1]; c2 = palette.summer[2]; }
+    else { c0 = palette.autumn[0]; c1 = palette.autumn[1]; c2 = palette.autumn[2]; }
+    g.addColorStop(0, c0); g.addColorStop(0.55, c1); g.addColorStop(1, c2);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, 800, 400);
+  }
+  function drawSun(progress, yBase) {
+    const sunX = 700 - progress * 500;
+    const sunY = (yBase || 80) + Math.sin(progress * Math.PI) * 40;
+    ctx.fillStyle = progress < 0.5 ? '#fff9c4' : '#ffd966';
+    ctx.beginPath(); ctx.arc(sunX, sunY, 28, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,200,0.30)';
+    ctx.beginPath(); ctx.arc(sunX, sunY, 44, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,200,0.15)';
+    ctx.beginPath(); ctx.arc(sunX, sunY, 62, 0, Math.PI*2); ctx.fill();
+  }
+  function drawClouds(progress, alpha) {
+    ctx.fillStyle = 'rgba(255,255,255,' + (alpha || 0.7) + ')';
+    for (let i=0;i<5;i++){
+      const cx = ((i*190 + progress*130) % 950) - 80;
+      const cy = 40 + i*22 + Math.sin(i*1.7)*8;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 22, 0, Math.PI*2);
+      ctx.arc(cx+22, cy-6, 18, 0, Math.PI*2);
+      ctx.arc(cx+42, cy, 20, 0, Math.PI*2);
+      ctx.arc(cx+18, cy+8, 16, 0, Math.PI*2);
+      ctx.fill();
+    }
+  }
+  function drawMountains(progress, colorSpring, colorAutumn) {
+    ctx.fillStyle = progress < 0.6 ? colorSpring : colorAutumn;
+    ctx.beginPath();
+    ctx.moveTo(0, 260); ctx.lineTo(120, 160); ctx.lineTo(260, 230);
+    ctx.lineTo(420, 130); ctx.lineTo(600, 220); ctx.lineTo(740, 150);
+    ctx.lineTo(800, 200); ctx.lineTo(800, 400); ctx.lineTo(0, 400);
+    ctx.closePath(); ctx.fill();
+    if (progress < 0.25) {
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      [[120,160],[420,130],[740,150]].forEach(function(p){
+        ctx.beginPath();
+        ctx.moveTo(p[0], p[1]); ctx.lineTo(p[0]+20, p[1]+22); ctx.lineTo(p[0]-20, p[1]+22);
+        ctx.closePath(); ctx.fill();
+      });
+    }
+  }
+  function drawGround(progress, springColor, autumnColor) {
+    ctx.fillStyle = progress < 0.65 ? springColor : autumnColor;
+    ctx.fillRect(0, 340, 800, 60);
+    for (let i=0;i<80;i++){
+      const gx = (i*13) % 800;
+      const gh = 3 + (i%4)*3;
+      ctx.fillStyle = progress < 0.65 ? '#3a7a3a' : '#8a6a2a';
+      px(ctx, gx, 340 - gh, 2, gh, ctx.fillStyle);
+    }
+    if (progress < 0.35) {
+      for (let i=0;i<14;i++){
+        const fx = (i*57 + 20) % 800;
+        const fy = 332 + (i%3)*3;
+        ctx.fillStyle = ['#ffb6c1','#fffacd','#e6e6fa'][i%3];
+        px(ctx, fx, fy, 3, 3, ctx.fillStyle);
+      }
+    }
+  }
+  function drawProgressBar(progress) {
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.fillRect(30, 95, 200, 10);
+    ctx.fillStyle = '#f0c45a';
+    ctx.fillRect(30, 95, 200 * progress, 10);
+  }
+
+  /* ============================================================
+     話1: derivative
+     ============================================================ */
+  function drawOliveTree(c, baseX, baseY, scale, ripeness, sway) {
+    const trunkColor = '#6b4e3a';
+    const leafColor = ripeness > 0.7 ? '#2d6a2d' : '#3a8a3a';
+    const oliveColor = ripeness > 0.8 ? '#2f2f1f' : '#7aa05a';
+    px(c, baseX - 6*scale, baseY - 40*scale, 12*scale, 40*scale, trunkColor);
+    c.fillStyle = leafColor;
+    for (let i = 0; i < 8; i++) {
+      const angle = (i / 8) * Math.PI * 2 + sway;
+      const rx = baseX + Math.cos(angle) * (28 + Math.sin(sway*2 + i)) * scale;
+      const ry = baseY - 50*scale + Math.sin(angle) * 18 * scale;
+      c.beginPath(); c.arc(rx, ry, 12*scale, 0, Math.PI*2); c.fill();
+    }
+    px(c, baseX - 2*scale, baseY - 38*scale, 3*scale, 34*scale, '#8b6a4a');
+    if (ripeness > 0.3) {
+      c.fillStyle = oliveColor;
+      for (let i = 0; i < 7; i++) {
+        const ox = baseX - 22*scale + i * 8 * scale;
+        const oy = baseY - 60*scale + (i%3)*6*scale + Math.sin(sway + i)*2;
+        c.beginPath(); c.arc(ox, oy, 3.5*scale, 0, Math.PI*2); c.fill();
+        if (ripeness > 0.8) px(c, ox - 1*scale, oy - 1*scale, 1.5*scale, 1.5*scale, '#5a5a3a');
+      }
+    }
+  }
+  function drawPressMachine(c, x, y, scale, isRented) {
+    const machineColor = isRented ? '#b8860b' : '#5a5a5a';
+    const accentColor = isRented ? '#d4a017' : '#3a3a3a';
+    c.fillStyle = 'rgba(0,0,0,0.25)';
+    c.beginPath(); c.ellipse(x, y + 10*scale, 28*scale, 6*scale, 0, 0, Math.PI*2); c.fill();
+    px(c, x - 25*scale, y - 10*scale, 50*scale, 20*scale, machineColor);
+    px(c, x - 25*scale, y - 10*scale, 50*scale, 4*scale, isRented ? '#e0b030' : '#6a6a6a');
+    px(c, x - 20*scale, y - 40*scale, 8*scale, 30*scale, accentColor);
+    px(c, x + 12*scale, y - 40*scale, 8*scale, 30*scale, accentColor);
+    px(c, x - 20*scale, y - 40*scale, 40*scale, 8*scale, accentColor);
+    px(c, x - 6*scale, y - 50*scale, 12*scale, 10*scale, '#c0c0c0');
+    if (isRented) px(c, x - 26*scale, y - 12*scale, 6*scale, 6*scale, '#ffd700');
+  }
+  function drawThalesOlive(c, x, y, scale, phase, mood) {
+    c.fillStyle = 'rgba(0,0,0,0.25)';
+    c.beginPath(); c.ellipse(x, y + 22*scale, 16*scale, 5*scale, 0, 0, Math.PI*2); c.fill();
+    c.fillStyle = '#f5deb3';
+    c.beginPath(); c.arc(x, y - 20*scale, 10*scale, 0, Math.PI*2); c.fill();
+    c.fillStyle = '#d2b48c';
+    c.beginPath(); c.ellipse(x, y - 10*scale, 7*scale, 4*scale, 0, 0, Math.PI*2); c.fill();
+    px(c, x - 4*scale, y - 24*scale, 2*scale, 2*scale, '#000');
+    px(c, x + 2*scale, y - 24*scale, 2*scale, 2*scale, '#000');
+    c.fillStyle = '#4a6b8a';
+    c.beginPath(); c.ellipse(x, y, 14*scale, 18*scale, 0, 0, Math.PI*2); c.fill();
+    c.fillStyle = '#e8e8d8';
+    c.fillRect(x - 14*scale, y + 4*scale, 28*scale, 4*scale);
+    c.strokeStyle = '#4a6b8a'; c.lineWidth = 5*scale; c.lineCap = 'round';
+    const armSwing = Math.sin(phase) * 0.3;
+    c.beginPath(); c.moveTo(x - 12*scale, y - 6*scale); c.lineTo(x - 24*scale, y - 2*scale + armSwing*10*scale); c.stroke();
+    c.beginPath(); c.moveTo(x + 12*scale, y - 6*scale); c.lineTo(x + 24*scale, y - 2*scale - armSwing*10*scale); c.stroke();
+    c.strokeStyle = '#8b5a2b'; c.lineWidth = 4*scale;
+    c.beginPath(); c.moveTo(x + 24*scale, y - 2*scale - armSwing*10*scale); c.lineTo(x + 28*scale, y + 26*scale); c.stroke();
+  }
+  function drawStarsAndTelescope(c, progress) {
+    for (let i = 0; i < 30; i++) {
+      const sx = (i * 47 + 13) % 750 + 20;
+      const sy = (i * 29) % 200 + 20;
+      const size = 1 + (i % 3);
+      const twinkle = 0.6 + 0.4 * Math.sin(progress*20 + i*3);
+      c.fillStyle = 'rgba(255,249,196,' + twinkle + ')';
+      c.fillRect(sx, sy, size, size);
+    }
+    c.fillStyle = '#f0e68c';
+    c.beginPath(); c.arc(700, 60, 22, 0, Math.PI*2); c.fill();
+    c.fillStyle = 'rgba(240,230,140,0.25)';
+    c.beginPath(); c.arc(700, 60, 36, 0, Math.PI*2); c.fill();
+    px(c, 120, 180, 40, 8, '#8b5a2b');
+    px(c, 140, 160, 8, 40, '#8b5a2b');
+    c.fillStyle = '#708090';
+    c.beginPath();
+    c.moveTo(160, 180); c.lineTo(200, 140); c.lineTo(210, 150); c.lineTo(170, 190);
+    c.fill();
+    c.strokeStyle = '#5a3a1a'; c.lineWidth = 3;
+    c.beginPath(); c.moveTo(150, 200); c.lineTo(130, 230); c.stroke();
+    c.beginPath(); c.moveTo(150, 200); c.lineTo(170, 230); c.stroke();
+  }
+  function drawDerivativeScene(progress) {
+    const skyGradient = ctx.createLinearGradient(0, 0, 0, 400);
+    if (progress < 0.3) {
+      skyGradient.addColorStop(0, '#0a1f2a');
+      skyGradient.addColorStop(0.55, '#1a3a4a');
+      skyGradient.addColorStop(1, '#2a4a3a');
+    } else if (progress < 0.65) {
+      skyGradient.addColorStop(0, '#3a6b8a');
+      skyGradient.addColorStop(0.55, '#7aa87a');
+      skyGradient.addColorStop(1, '#a8c88a');
+    } else {
+      skyGradient.addColorStop(0, '#b87c4b');
+      skyGradient.addColorStop(0.55, '#dbb87c');
+      skyGradient.addColorStop(1, '#e8c89a');
+    }
+    ctx.fillStyle = skyGradient; ctx.fillRect(0, 0, 800, 400);
+    if (progress < 0.4) drawStarsAndTelescope(ctx, progress);
+    if (progress > 0.25) drawSun(progress, 70);
+    if (progress > 0.3) drawClouds(progress, 0.55);
+    ctx.fillStyle = progress < 0.65 ? '#6b8e6b' : '#8b7d4b';
+    ctx.beginPath();
+    ctx.moveTo(0, 260); ctx.lineTo(120, 160); ctx.lineTo(260, 230);
+    ctx.lineTo(420, 130); ctx.lineTo(600, 220); ctx.lineTo(740, 150);
+    ctx.lineTo(800, 200); ctx.lineTo(800, 400); ctx.lineTo(0, 400);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = progress < 0.65 ? '#3a5a3a' : '#8b7d4b';
+    ctx.fillRect(0, 280, 800, 120);
+    for (let i=0;i<70;i++){
+      const gx = (i*15) % 800;
+      const gh = 3 + (i%4)*3;
+      ctx.fillStyle = progress < 0.65 ? '#2a6a2a' : '#7a5a2a';
+      px(ctx, gx, 280 - gh, 2, gh, ctx.fillStyle);
+    }
+    const sway = Math.sin(progress * Math.PI * 4) * 0.15;
+    [100, 260, 460, 640].forEach(function(x){
+      const ripeness = Math.min(1, Math.max(0, (progress - 0.45) * 2.2));
+      drawOliveTree(ctx, x, 280, 0.9, ripeness, sway);
+    });
+    [90, 210, 380, 520, 660].forEach(function(x, idx){
+      drawPressMachine(ctx, x, 260, 0.8, idx < 3);
+    });
+    let thalesX = 200 + progress * 400;
+    if (progress < 0.2) thalesX = 180;
+    else if (progress > 0.8) thalesX = 600 - (progress - 0.8) * 100;
+    drawThalesOlive(ctx, thalesX, 250, 1.2, progress * Math.PI * 4, progress);
+    if (progress > 0.55) {
+      const crowdAlpha = Math.min(1, (progress - 0.55) * 3);
+      ctx.globalAlpha = crowdAlpha;
+      for (let i = 0; i < 6; i++) {
+        const cx = 480 + i * 55;
+        const cy = 260 + Math.sin(i*1.3) * 8;
+        ctx.fillStyle = ['#4a6b8a','#6b4a3a','#3a6b4a','#6b3a5a','#5a5a8a','#8a6a3a'][i%6];
+        ctx.beginPath(); ctx.arc(cx, cy - 20, 8, 0, Math.PI*2); ctx.fill();
+        ctx.fillRect(cx - 8, cy - 12, 16, 20);
+        ctx.fillStyle = '#f5deb3';
+        ctx.beginPath(); ctx.arc(cx, cy - 24, 6, 0, Math.PI*2); ctx.fill();
+      }
+      ctx.globalAlpha = 1.0;
+    }
+    if (progress > 0.78) {
+      const goldAlpha = Math.min(1, (progress - 0.78) * 4);
+      for (let i = 0; i < 20; i++) {
+        const gx = 580 + Math.sin(i * 1.5 + progress * 12) * 100;
+        const gy = 200 + Math.cos(i * 2.3 + progress * 8) * 60;
+        ctx.fillStyle = 'rgba(255,215,0,' + goldAlpha + ')';
+        ctx.beginPath(); ctx.arc(gx, gy, 4 + (i % 3), 0, Math.PI*2); ctx.fill();
+        if (i % 4 === 0) {
+          ctx.fillStyle = 'rgba(255,255,255,' + goldAlpha*0.8 + ')';
+          px(ctx, gx - 1, gy - 8, 2, 16, ctx.fillStyle);
+          px(ctx, gx - 8, gy - 1, 16, 2, ctx.fillStyle);
+        }
+      }
+    }
+    pixelText(ctx, 'DERIVATIVE', 30, 40, 28, '#f0e6b0');
+    pixelText(ctx, '— タレスのオリーブ圧搾機 —', 40, 72, 14, '#cfe8cf');
+    let chapter = '', chapterColor = '#fff9e6';
+    if (progress < 0.18) chapter = '第一章：冬 — 天文学の観測';
+    else if (progress < 0.4) chapter = '第二章：圧搾機を借り占める';
+    else if (progress < 0.65) chapter = '第三章：豊作の予感';
+    else if (progress < 0.85) chapter = '第四章：莫大な利益';
+    else { chapter = '終章：欲すれば富は可能、されど関心なし'; chapterColor = '#ffe0a0'; }
+    pixelText(ctx, chapter, 40, 110, 18, chapterColor);
+    drawProgressBar(progress);
+    if (progress > 0.1 && progress < 0.28) drawSpeechBubble(ctx, 80, 180, 250, 60, 'タレス「来年は豊作だ」', 'left');
+    else if (progress > 0.35 && progress < 0.5) drawSpeechBubble(ctx, 80, 180, 270, 70, 'タレス「全ての圧搾機を\n借りておこう」', 'left');
+    else if (progress > 0.7 && progress < 0.82) drawSpeechBubble(ctx, 80, 180, 280, 80, '人々「圧搾機を貸してくれ！」\nタレス「さあ、どうぞ」', 'left');
+    else if (progress > 0.88) drawSpeechBubble(ctx, 80, 180, 300, 80, 'タレス「欲すれば富は可能。\nされど我が関心は別にあり」', 'left');
+  }
+
+  /* ============================================================
+     話2: asinus
+     ============================================================ */
+  function drawBackgroundAsinus(progress) {
+    drawSkyBase(progress, {
+      spring: ['#87ceeb', '#b0e0e6', '#98fb98'],
+      summer: ['#4a90d9', '#87ceeb', '#7ccd7c'],
+      autumn: ['#dda15e', '#e9c46a', '#bc6c25']
+    });
+    drawSun(progress, 80);
+    drawClouds(progress, 0.7);
+    drawMountains(progress, '#6b8e6b', '#8b7d4b');
+    ctx.fillStyle = progress < 0.7 ? '#5b9bd5' : '#4a7a9a';
+    ctx.beginPath();
+    ctx.moveTo(0, 300);
+    ctx.quadraticCurveTo(200, 290, 400, 305);
+    ctx.quadraticCurveTo(600, 320, 800, 300);
+    ctx.lineTo(800, 340);
+    ctx.quadraticCurveTo(600, 360, 400, 345);
+    ctx.quadraticCurveTo(200, 330, 0, 340);
+    ctx.closePath(); ctx.fill();
+    for (let i=0;i<24;i++){
+      const wx = (i*71 + progress*200) % 800;
+      const wy = 310 + Math.sin(i*2 + progress*6)*8;
+      px(ctx, wx, wy, 6, 2, 'rgba(255,255,255,0.5)');
+    }
+    drawGround(progress, '#7cba7c', '#b08a4a');
+  }
+  function drawMarketStall(c, x, y, s, color) {
+    c.fillStyle = 'rgba(0,0,0,0.2)';
+    c.beginPath(); c.ellipse(x, y + 2*s, 34*s, 6*s, 0, 0, Math.PI*2); c.fill();
+    c.fillStyle = color;
+    c.beginPath();
+    c.moveTo(x-30*s, y-30*s); c.lineTo(x+30*s, y-30*s);
+    c.lineTo(x+20*s, y-45*s); c.lineTo(x-20*s, y-45*s);
+    c.closePath(); c.fill();
+    c.fillStyle = 'rgba(255,255,255,0.3)';
+    for (let i=0;i<5;i++){
+      c.beginPath();
+      c.moveTo(x-26*s + i*12*s, y-30*s);
+      c.lineTo(x-22*s + i*12*s, y-30*s);
+      c.lineTo(x-18*s + i*12*s, y-45*s);
+      c.lineTo(x-22*s + i*12*s, y-45*s);
+      c.closePath(); c.fill();
+    }
+    px(c, x-22*s, y-30*s, 5*s, 30*s, '#8b5a2b');
+    px(c, x+17*s, y-30*s, 5*s, 30*s, '#8b5a2b');
+    c.fillStyle = '#d4a017';
+    c.beginPath(); c.ellipse(x, y-5*s, 18*s, 8*s, 0, 0, Math.PI*2); c.fill();
+    c.fillStyle = '#e8c050';
+    for (let i=0;i<4;i++){ c.beginPath(); c.arc(x-12*s + i*8*s, y-8*s, 3*s, 0, Math.PI*2); c.fill(); }
+  }
+  function drawThalesAsinus(c, x, y, s, phase, walking) {
+    const bob = walking ? Math.sin(phase*2)*2 : 0;
+    y += bob;
+    c.fillStyle = 'rgba(0,0,0,0.2)';
+    c.beginPath(); c.ellipse(x, y + 22*s, 15*s, 5*s, 0, 0, Math.PI*2); c.fill();
+    c.fillStyle = '#f5deb3';
+    c.beginPath(); c.arc(x, y-22*s, 11*s, 0, Math.PI*2); c.fill();
+    c.fillStyle = '#d2b48c';
+    c.beginPath(); c.ellipse(x, y-10*s, 8*s, 5*s, 0, 0, Math.PI*2); c.fill();
+    px(c, x-5*s, y-26*s, 3*s, 3*s, '#000');
+    px(c, x+2*s, y-26*s, 3*s, 3*s, '#000');
+    c.fillStyle = '#f0f0e0';
+    c.beginPath(); c.ellipse(x, y, 15*s, 20*s, 0, 0, Math.PI*2); c.fill();
+    c.fillStyle = '#4a6b8a';
+    c.fillRect(x-15*s, y+2*s, 30*s, 6*s);
+    c.strokeStyle = '#f5deb3'; c.lineWidth = 5*s; c.lineCap = 'round';
+    const armSwing = walking ? Math.sin(phase*2)*0.5 : 0.2;
+    c.beginPath(); c.moveTo(x-12*s, y-8*s); c.lineTo(x-26*s, y-2*s + armSwing*14*s); c.stroke();
+    c.beginPath(); c.moveTo(x+12*s, y-8*s); c.lineTo(x+26*s, y-2*s - armSwing*14*s); c.stroke();
+    c.strokeStyle = '#8b5a2b'; c.lineWidth = 4*s;
+    c.beginPath(); c.moveTo(x+26*s, y-2*s - armSwing*14*s); c.lineTo(x+30*s, y+30*s); c.stroke();
+  }
+  function drawDonkey(c, x, y, s, phase, walking, burden, burdenType) {
+    const bob = walking ? Math.sin(phase*2)*2 : 0;
+    y += bob;
+    c.fillStyle = 'rgba(0,0,0,0.2)';
+    c.beginPath(); c.ellipse(x, y + 30*s, 26*s, 6*s, 0, 0, Math.PI*2); c.fill();
+    c.strokeStyle = '#6b5a4a'; c.lineWidth = 4*s; c.lineCap = 'round';
+    const legSwing = walking ? Math.sin(phase*2)*0.6 : 0;
+    c.beginPath(); c.moveTo(x-14*s, y+10*s); c.lineTo(x-16*s + legSwing*8*s, y+28*s); c.stroke();
+    c.beginPath(); c.moveTo(x-6*s, y+10*s); c.lineTo(x-4*s - legSwing*8*s, y+28*s); c.stroke();
+    c.beginPath(); c.moveTo(x+6*s, y+10*s); c.lineTo(x+8*s + legSwing*8*s, y+28*s); c.stroke();
+    c.beginPath(); c.moveTo(x+14*s, y+10*s); c.lineTo(x+16*s - legSwing*8*s, y+28*s); c.stroke();
+    px(c, x-17*s + legSwing*8*s, y+28*s, 4*s, 3*s, '#3a2a1a');
+    px(c, x-5*s - legSwing*8*s, y+28*s, 4*s, 3*s, '#3a2a1a');
+    px(c, x+7*s + legSwing*8*s, y+28*s, 4*s, 3*s, '#3a2a1a');
+    px(c, x+15*s - legSwing*8*s, y+28*s, 4*s, 3*s, '#3a2a1a');
+    c.fillStyle = '#8b7355';
+    c.beginPath(); c.ellipse(x, y, 22*s, 13*s, 0, 0, Math.PI*2); c.fill();
+    c.fillStyle = '#a08a6a';
+    c.beginPath(); c.ellipse(x, y+3*s, 18*s, 8*s, 0, 0, Math.PI*2); c.fill();
+    c.fillStyle = '#8b7355';
+    c.beginPath(); c.ellipse(x-18*s, y-10*s, 9*s, 16*s, -0.4, 0, Math.PI*2); c.fill();
+    c.beginPath(); c.ellipse(x-26*s, y-22*s, 10*s, 9*s, 0, 0, Math.PI*2); c.fill();
+    c.fillStyle = '#7a6345';
+    c.beginPath(); c.ellipse(x-33*s, y-20*s, 4*s, 3*s, 0, 0, Math.PI*2); c.fill();
+    c.fillStyle = '#8b7355';
+    c.beginPath(); c.ellipse(x-30*s, y-32*s, 3*s, 8*s, -0.2, 0, Math.PI*2); c.fill();
+    c.beginPath(); c.ellipse(x-24*s, y-33*s, 3*s, 8*s, 0.2, 0, Math.PI*2); c.fill();
+    c.fillStyle = '#c0a080';
+    c.beginPath(); c.ellipse(x-30*s, y-32*s, 1.5*s, 5*s, -0.2, 0, Math.PI*2); c.fill();
+    c.beginPath(); c.ellipse(x-24*s, y-33*s, 1.5*s, 5*s, 0.2, 0, Math.PI*2); c.fill();
+    px(c, x-30*s, y-24*s, 2.5*s, 2.5*s, '#000');
+    px(c, x-34*s, y-20*s, 3*s, 2*s, '#4a3a2a');
+    c.strokeStyle = '#6b5a4a'; c.lineWidth = 3*s;
+    c.beginPath();
+    c.moveTo(x+22*s, y-4*s);
+    c.quadraticCurveTo(x+30*s, y-8*s + Math.sin(phase*3)*4*s, x+28*s, y+2*s);
+    c.stroke();
+    c.fillStyle = '#4a3a2a';
+    c.beginPath(); c.arc(x+28*s, y+2*s, 3*s, 0, Math.PI*2); c.fill();
+    if (burdenType === 'salt' && burden) {
+      c.fillStyle = '#f5f5f0';
+      c.beginPath(); c.ellipse(x+2*s, y-16*s, 14*s, 9*s, 0, 0, Math.PI*2); c.fill();
+      c.fillStyle = '#dcdcd0';
+      c.beginPath(); c.ellipse(x+2*s, y-18*s, 10*s, 6*s, 0, 0, Math.PI*2); c.fill();
+      c.strokeStyle = '#8b6a4a'; c.lineWidth = 2*s;
+      c.beginPath(); c.moveTo(x-4*s, y-24*s); c.lineTo(x+8*s, y-24*s); c.stroke();
+      c.fillStyle = '#ffffff';
+      for (let i=0;i<5;i++) px(c, x-8*s + i*5*s, y-22*s - (i%2)*3*s, 2*s, 2*s, '#fff');
+    } else if (burdenType === 'sponge' && burden) {
+      c.fillStyle = '#d4b86a';
+      for (let i=0;i<4;i++){ c.beginPath(); c.arc(x-10*s + i*8*s, y-18*s + (i%2)*3*s, 8*s, 0, Math.PI*2); c.fill(); }
+      c.fillStyle = '#a08040';
+      for (let i=0;i<8;i++) px(c, x-14*s + i*5*s, y-22*s + (i%4)*4*s, 2*s, 2*s, '#a08040');
+    }
+  }
+  function drawAsinusScene(progress) {
+    drawBackgroundAsinus(progress);
+    drawMarketStall(ctx, 720, 320, 1.2, '#c0392b');
+    pixelText(ctx, 'ASINUS', 30, 380, 28, '#f0e6b0');
+    pixelText(ctx, '— The Salt-Laden Donkey & Thales —', 140, 382, 14, '#b8d9b8');
+    let seasonText = '', seasonColor = '#fff';
+    if (progress < 0.35) { seasonText = '春 — 塩を運ぶ'; seasonColor = '#e0ffe0'; }
+    else if (progress < 0.7) { seasonText = '夏 — 繰り返される転倒'; seasonColor = '#fff9c4'; }
+    else { seasonText = '秋 — 海綿の教訓'; seasonColor = '#ffe0b0'; }
+    pixelText(ctx, seasonText, 30, 40, 26, seasonColor);
+    let subText = '';
+    if (progress < 0.2) subText = '第一章：最初の転倒';
+    else if (progress < 0.4) subText = '第二章：学習するろば';
+    else if (progress < 0.6) subText = '第三章：タレスの一計';
+    else if (progress < 0.8) subText = '第四章：海綿の重み';
+    else subText = '終章：それ以後、転ばなくなる';
+    pixelText(ctx, subText, 30, 75, 16, '#cfe8cf');
+    drawProgressBar(progress);
+    const walkPhase = progress * Math.PI * 6;
+    const thalesX = 150 + Math.sin(progress * Math.PI * 2) * 80;
+    drawThalesAsinus(ctx, thalesX, 320, 1.0, walkPhase, true);
+    let donkeyX = 250 + progress * 350;
+    if (donkeyX > 620) donkeyX = 620;
+    const donkeyY = 320;
+    let burdenType = 'salt', hasBurden = true;
+    if (progress > 0.72) burdenType = 'sponge';
+    const fallMoment = Math.abs(Math.sin(progress * Math.PI * 6)) > 0.9;
+    if (fallMoment && progress < 0.7) hasBurden = false;
+    drawDonkey(ctx, donkeyX, donkeyY, 1.0, walkPhase, true, hasBurden, burdenType);
+    if (fallMoment && progress < 0.7) {
+      ctx.fillStyle = 'rgba(200,230,255,0.7)';
+      for (let i=0;i<14;i++){
+        const sx = donkeyX + (Math.random()-0.5)*70;
+        const sy = 310 + (Math.random()-0.5)*24;
+        ctx.beginPath(); ctx.arc(sx, sy, 3 + Math.random()*5, 0, Math.PI*2); ctx.fill();
+      }
+      pixelText(ctx, 'ドボン！', donkeyX-30, donkeyY-60, 20, '#a0d8ff');
+    }
+    if (progress > 0.15 && progress < 0.35 && fallMoment) {
+      for (let i=0;i<8;i++) px(ctx, donkeyX-20+i*8, 330 + i*3, 4, 4, 'rgba(255,255,255,0.7)');
+    }
+    if (progress < 0.15) drawSpeechBubble(ctx, 80, 130, 200, 60, '塩を市場へ運ぼう', 'left');
+    else if (progress < 0.3) drawSpeechBubble(ctx, donkeyX-60, 180, 220, 70, '転んだら…\n荷が軽くなった！', 'right');
+    else if (progress < 0.45) drawSpeechBubble(ctx, donkeyX-80, 160, 240, 70, 'わざと転べば\n楽できるぞ', 'right');
+    else if (progress < 0.6) drawSpeechBubble(ctx, 80, 140, 230, 80, 'タレス「このろば、\n学習してしまったか」', 'left');
+    else if (progress < 0.75) drawSpeechBubble(ctx, 80, 130, 240, 80, 'タレス「ならば\n海綿を積もう」', 'left');
+    else if (progress < 0.9) drawSpeechBubble(ctx, donkeyX-80, 150, 260, 90, 'ろば「転んだら…\n重くなった！？」', 'right');
+    else drawSpeechBubble(ctx, 200, 140, 280, 70, 'それ以後、ろばは\nつまずかなくなった', 'left');
+    if (progress > 0.78 && progress < 0.92) {
+      ctx.fillStyle = 'rgba(100,150,255,0.5)';
+      for (let i=0;i<10;i++){
+        const wx = donkeyX - 20 + i*8;
+        const wy = 300 - Math.sin(progress*20 + i)*10;
+        ctx.beginPath(); ctx.arc(wx, wy, 4, 0, Math.PI*2); ctx.fill();
+      }
+      pixelText(ctx, 'ずっしり…', donkeyX-20, donkeyY-70, 18, '#a0c0ff');
+    }
+    if (progress > 0.92) {
+      ctx.fillStyle = '#ffd700';
+      for (let i=0;i<20;i++){
+        const sx = (i*97 + progress*300) % 800;
+        const sy = (i*53) % 200 + 50;
+        ctx.beginPath(); ctx.arc(sx, sy, 2 + (i%3), 0, Math.PI*2); ctx.fill();
+      }
+    }
+  }
+
+  /* ============================================================
+     会議シーン
+     ============================================================ */
+  function drawConferenceScene() {
+    ctx.fillStyle = '#2a3a2a'; ctx.fillRect(0, 0, 800, 400);
+    for (let i=0;i<30;i++){ ctx.fillStyle = 'rgba(0,0,0,0.1)'; px(ctx, 0, i*14, 800, 3, 'rgba(0,0,0,0.1)'); }
+    ctx.fillStyle = '#5a3a1a';
+    ctx.beginPath();
+    ctx.moveTo(0, 340); ctx.lineTo(800, 340); ctx.lineTo(800, 400); ctx.lineTo(0, 400);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#7a5a2a'; ctx.fillRect(0, 340, 800, 6);
+
+    const screenX = 180, screenY = 40, screenW = 440, screenH = 260;
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(screenX - 6, screenY - 6, screenW + 12, screenH + 12);
+    ctx.fillStyle = '#e8e8e0';
+    ctx.fillRect(screenX, screenY, screenW, screenH);
+
+    ctx.save();
+    ctx.beginPath(); ctx.rect(screenX, screenY, screenW, screenH); ctx.clip();
+    const sx = screenW / 800, sy = screenH / 400;
+    ctx.translate(screenX, screenY); ctx.scale(sx, sy);
+    if (currentStory === 'derivative') {
+      const g = ctx.createLinearGradient(0, 0, 0, 400);
+      g.addColorStop(0, '#b87c4b'); g.addColorStop(0.55, '#dbb87c'); g.addColorStop(1, '#e8c89a');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, 800, 400);
+      ctx.fillStyle = '#8b7d4b';
+      ctx.beginPath();
+      ctx.moveTo(0, 260); ctx.lineTo(120, 160); ctx.lineTo(260, 230);
+      ctx.lineTo(420, 130); ctx.lineTo(600, 220); ctx.lineTo(740, 150);
+      ctx.lineTo(800, 200); ctx.lineTo(800, 400); ctx.lineTo(0, 400);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#8b7d4b'; ctx.fillRect(0, 280, 800, 120);
+      [100, 260, 460, 640].forEach(function(x){ drawOliveTree(ctx, x, 280, 0.9, 1.0, 0.1); });
+      [90, 210, 380, 520, 660].forEach(function(x, idx){ drawPressMachine(ctx, x, 260, 0.8, idx < 3); });
+      drawThalesOlive(ctx, 500, 250, 1.2, 1.5, 1);
+      for (let i = 0; i < 6; i++) {
+        const cx = 480 + i * 55;
+        const cy = 260 + Math.sin(i*1.3) * 8;
+        ctx.fillStyle = ['#4a6b8a','#6b4a3a','#3a6b4a','#6b3a5a','#5a5a8a','#8a6a3a'][i%6];
+        ctx.beginPath(); ctx.arc(cx, cy - 20, 8, 0, Math.PI*2); ctx.fill();
+        ctx.fillRect(cx - 8, cy - 12, 16, 20);
+        ctx.fillStyle = '#f5deb3';
+        ctx.beginPath(); ctx.arc(cx, cy - 24, 6, 0, Math.PI*2); ctx.fill();
+      }
+      for (let i = 0; i < 20; i++) {
+        const gx = 580 + Math.sin(i * 1.5 + 12) * 100;
+        const gy = 200 + Math.cos(i * 2.3 + 8) * 60;
+        ctx.fillStyle = 'rgba(255,215,0,1)';
+        ctx.beginPath(); ctx.arc(gx, gy, 4 + (i % 3), 0, Math.PI*2); ctx.fill();
+      }
+      ctx.font = 'bold 28px "Courier New", monospace';
+      ctx.fillStyle = '#f0e6b0'; ctx.textAlign = 'left';
+      ctx.fillText('DERIVATIVE', 30, 50);
+      ctx.font = 'bold 18px "Courier New", monospace';
+      ctx.fillStyle = '#fff9e6'; ctx.fillText('第四章：莫大な利益', 40, 120);
+    } else {
+      const g = ctx.createLinearGradient(0, 0, 0, 400);
+      g.addColorStop(0, '#dda15e'); g.addColorStop(0.6, '#e9c46a'); g.addColorStop(1, '#bc6c25');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, 800, 400);
+      ctx.fillStyle = '#8b7d4b';
+      ctx.beginPath();
+      ctx.moveTo(0, 260); ctx.lineTo(150, 170); ctx.lineTo(300, 230);
+      ctx.lineTo(500, 140); ctx.lineTo(700, 220); ctx.lineTo(800, 180);
+      ctx.lineTo(800, 400); ctx.lineTo(0, 400); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#4a7a9a';
+      ctx.beginPath();
+      ctx.moveTo(0, 300);
+      ctx.quadraticCurveTo(200, 290, 400, 305);
+      ctx.quadraticCurveTo(600, 320, 800, 300);
+      ctx.lineTo(800, 340);
+      ctx.quadraticCurveTo(600, 360, 400, 345);
+      ctx.quadraticCurveTo(200, 330, 0, 340);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#b08a4a'; ctx.fillRect(0, 340, 800, 60);
+      drawMarketStall(ctx, 720, 320, 1.2, '#c0392b');
+      drawThalesAsinus(ctx, 200, 320, 1.0, 1.5, false);
+      drawDonkey(ctx, 480, 320, 1.0, 1.5, false, true, 'sponge');
+      ctx.fillStyle = 'rgba(100,150,255,0.5)';
+      for (let i=0;i<10;i++){
+        const wx = 480 - 20 + i*8;
+        const wy = 300 - Math.sin(12 + i)*10;
+        ctx.beginPath(); ctx.arc(wx, wy, 4, 0, Math.PI*2); ctx.fill();
+      }
+      ctx.font = 'bold 28px "Courier New", monospace';
+      ctx.fillStyle = '#f0e6b0'; ctx.textAlign = 'left';
+      ctx.fillText('ASINUS', 30, 50);
+      ctx.font = 'bold 18px "Courier New", monospace';
+      ctx.fillStyle = '#fff9e6'; ctx.fillText('第四章：海綿の重み', 40, 120);
+    }
+    ctx.restore();
+
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    ctx.beginPath();
+    ctx.moveTo(screenX, screenY); ctx.lineTo(screenX + 120, screenY);
+    ctx.lineTo(screenX, screenY + 120); ctx.closePath(); ctx.fill();
+
+    ctx.fillStyle = '#333'; ctx.fillRect(370, 0, 60, 20);
+    ctx.fillStyle = '#555'; ctx.fillRect(375, 20, 50, 8);
+    ctx.fillStyle = 'rgba(255,255,200,0.06)';
+    ctx.beginPath();
+    ctx.moveTo(390, 28); ctx.lineTo(screenX - 20, screenY + 40);
+    ctx.lineTo(screenX + screenW + 20, screenY + 40); ctx.lineTo(410, 28);
+    ctx.closePath(); ctx.fill();
+
+    const speakers = getSpeakers();
+    speakers.forEach(function(sp, i){
+      const px0 = 60 + i * 120;
+      const py0 = 300;
+      ctx.fillStyle = '#2a2a2a';
+      ctx.fillRect(px0 - 14, py0 - 30, 28, 30);
+      ctx.fillStyle = '#f5deb3';
+      ctx.beginPath(); ctx.arc(px0, py0 - 40, 10, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#3a2a1a';
+      ctx.beginPath(); ctx.arc(px0, py0 - 44, 10, Math.PI, 0); ctx.fill();
+      ctx.fillStyle = sp.color;
+      ctx.fillRect(px0 - 30, py0 + 4, 60, 16);
+      ctx.font = 'bold 12px "Courier New", monospace';
+      ctx.fillStyle = '#111'; ctx.textAlign = 'center';
+      ctx.fillText(sp.name, px0, py0 + 16);
+      if (confSpeaker && confSpeaker.key === sp.key) {
+        ctx.strokeStyle = sp.color;
+        ctx.lineWidth = 3;
+        ctx.strokeRect(px0 - 34, py0 - 56, 68, 80);
+      }
+    });
+
+    // ロバの乱入描画（学者の後ろ、スクリーンと学者の間）
+    drawDonkeyIntrusion();
+
+    if (confSpeaker && confTyping.length > 0) {
+      const spColor = getSpeakerColor(confSpeaker.key);
+      ctx.fillStyle = 'rgba(0,0,0,0.75)';
+      ctx.fillRect(40, 305, 720, 58);
+      ctx.fillStyle = spColor;
+      ctx.fillRect(40, 305, 720, 4);
+      ctx.font = 'bold 16px "Courier New", monospace';
+      ctx.textAlign = 'left';
+      ctx.fillStyle = spColor;
+      ctx.fillText(confSpeaker.name + '：', 50, 330);
+      ctx.fillStyle = '#f0f0e0';
+      const maxWidth = 620;
+      const prefixWidth = ctx.measureText(confSpeaker.name + '：').width;
+      const text = confTyping;
+      let line1 = text, line2 = '';
+      if (ctx.measureText(text).width > maxWidth - prefixWidth) {
+        let cut = Math.floor(text.length * (maxWidth - prefixWidth) / ctx.measureText(text).width);
+        if (cut < 4) cut = 4;
+        line1 = text.substring(0, cut);
+        line2 = text.substring(cut);
+      }
+      ctx.fillText(line1, 50 + prefixWidth, 330);
+      if (line2) ctx.fillText(line2, 50, 354);
+      const cursorX = 50 + prefixWidth + ctx.measureText(line1).width;
+      if (line2 === '') {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(cursorX + 2, 322, 3, 16);
+      }
+    }
+  }
+
+  function getSpeakers() {
+    return [
+      { key:'bunseki',   name:'分析学者', color:'#ff5555' },
+      { key:'butsuri',   name:'物理学者', color:'#55dd55' },
+      { key:'tetsugaku', name:'哲学者',   color:'#bbbbbb' },
+      { key:'senmon',    name:'専門学者', color:'#c77dff' },
+      { key:'gendai',    name:'現代学者', color:'#ffd93d' },
+      { key:'sugaku',    name:'数学者',   color:'#5aa9ff' }
+    ];
+  }
+
+  /* ============================================================
+     ロバの乱入描画（会議シーン内）
+     ============================================================ */
+  let donkeyIntrusion = {
+    active: false,
+    targetKey: null,
+    x: 0, y: 0,
+    targetX: 0, targetY: 0,
+    state: 'idle', // 'entering' | 'mounted' | 'leaving' | 'idle'
+    timer: 0,
+    knowledgeText: ''
+  };
+
+  function drawDonkeyIntrusion() {
+    if (!donkeyIntrusion.active) return;
+    const d = donkeyIntrusion;
+    // 学者の後ろ（y=270 くらい）に小さめロバを描く
+    drawDonkey(ctx, d.x, d.y, 0.6, 0, false, false, 'none');
+    // マウント中はセリフ風吹き出し
+    if (d.state === 'mounted' && d.knowledgeText) {
+      ctx.font = 'bold 12px "Courier New", monospace';
+      ctx.textAlign = 'left';
+      const tw = ctx.measureText(d.knowledgeText).width;
+      ctx.fillStyle = 'rgba(255,254,240,0.95)';
+      ctx.beginPath();
+      ctx.roundRect(d.x - 10, d.y - 70, Math.max(tw + 20, 100), 30, 8);
+      ctx.fill();
+      ctx.strokeStyle = '#6b4a2b'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = '#1a2e1a';
+      ctx.fillText(d.knowledgeText, d.x, d.y - 52);
+    }
+  }
+
+  /* ============================================================
+     知識マウントのセリフ（各分野10個）
+     ============================================================ */
+  const KNOWLEDGE = {
+    bunseki: [
+      'その構造、再帰的定義になってない？',
+      '交絡因子を統制してから言って。',
+      '標本サイズ、n=1でしょ。',
+      'その因果、相関と区別ついてる？',
+      '分散分析やった？',
+      'ベイズ更新、尤度比で書いて。',
+      'その分類、排他性が破綻してる。',
+      '操作化定義、曖昧すぎ。',
+      '内的妥当性、犠牲にしてない？',
+      'その主張、反証可能性ある？'
+    ],
+    butsuri: [
+      'その系、エルゴード性仮定してる？',
+      'ハミルトニアン、書ける？',
+      'エントロピー、増えてる？',
+      'その対称性、自発的に破れてる？',
+      '経路積分で書いてみて。',
+      'その相互作用、ゲージ不変？',
+      '境界条件、無視してない？',
+      'その近似、断熱定理の範囲内？',
+      '散乱断面積、計算した？',
+      'その保存則、ネーター対応してる？'
+    ],
+    tetsugaku: [
+      'その存在論、基礎づけ主義？',
+      'ア・プリオリとア・ポステリオリ、混同してる。',
+      'その規範、自然主義的誤謬では？',
+      '現象学的還元、してないでしょ。',
+      'その言語ゲーム、文脈依存だよ。',
+      '可謬主義、読んだ？',
+      'その主観、間主観性に還元できる？',
+      '存在論的差異、無視してる。',
+      'その因果、ヒューム的因果？',
+      '超越論的、使ってる？'
+    ],
+    senmon: [
+      'その文献、1823年の写本と一致しないよ。',
+      'その用語、当時は別の意味だった。',
+      'その地名、19世紀に改称されてる。',
+      'その人物、実在が疑われてるよ。',
+      'その貨幣、当時流通してない。',
+      'その儀礼、ミレトスでは行われてない。',
+      'その植物、地中海原産じゃないよ。',
+      'その年号、ディオドロスと矛盾する。',
+      'その慣習、ヘロドトスが記録してない。',
+      'その巻物、アレクサンドリアでは分類が違う。'
+    ],
+    gendai: [
+      'それ、2024年のTransformerで解決済み。',
+      'そのモデル、RLHFで崩壊するよ。',
+      'その指標、F1スコアで測れない。',
+      'その市場、規制裁定が効いてる。',
+      'そのデータ、生存バイアスかかってる。',
+      'その相関、p-hackingでしょ。',
+      'そのネットワーク、スケールフリーじゃない。',
+      'その因果、操作変数法で識別して。',
+      'そのナラティブ、2015年に流行った。',
+      'その最適化、局所解に落ちてる。'
+    ],
+    sugaku: [
+      'その集合、濃度は？',
+      'その写像、全単射？',
+      'その空間、完備？',
+      'その演算、結合法則満たす？',
+      'その列、コーシー列？',
+      'その不等式、等号成立条件は？',
+      'その極限、一様収束？',
+      'その群、可換？',
+      'その多様体、コンパクト？',
+      'その圏、始対象ある？'
+    ]
+  };
+
+  /* ============================================================
+     会議の進行（タイピング方式）
+     ============================================================ */
   const CONF_DERIVATIVE = [
     { speaker:'bunseki',   name:'分析学者', text:'まずこの物語の構造を整理しましょう。タレスは「冬の観測」から「圧搾機の借り占め」、そして「収穫期の独占」、最後に「利益」という四段階を踏んでいます。これは典型的な先物取引の構造です。' },
     { speaker:'sugaku',    name:'数学者',   text:'補足します。彼が支払ったのは圧搾機のレンタル料、すなわちプレミアムです。冬の時点では、まだ誰も豊作を確信していない。だからこそ安く借りられた。これがオプションの本質です。' },
@@ -351,676 +1244,18 @@
     { speaker:'sugaku',    name:'数学者',   text:'数学的には、これは性質の差を利用した制御です。塩は溶け、海綿は吸う。その差を利用して、行動を制御した。これもまた、現代の制御理論に通じます。' }
   ];
 
-  function px(x, y, w, h, color) { ctx.fillStyle = color; ctx.fillRect(Math.floor(x), Math.floor(y), Math.floor(w), Math.floor(h)); }
-  function pixelText(text, x, y, size, color, align) {
-    align = align || 'left';
-    ctx.font = 'bold ' + size + 'px "Courier New", monospace';
-    ctx.textAlign = align; ctx.textBaseline = 'middle';
-    ctx.lineWidth = 6; ctx.strokeStyle = '#0b1b12';
-    ctx.strokeText(text, x, y);
-    ctx.fillStyle = color; ctx.fillText(text, x, y);
-  }
-  if (!CanvasRenderingContext2D.prototype.roundRect) {
-    CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
-      if (w < 2*r) r = w/2; if (h < 2*r) r = h/2;
-      this.beginPath();
-      this.moveTo(x+r, y);
-      this.arcTo(x+w, y, x+w, y+h, r);
-      this.arcTo(x+w, y+h, x, y+h, r);
-      this.arcTo(x, y+h, x, y, r);
-      this.arcTo(x, y, x+w, y, r);
-      this.closePath(); return this;
-    };
-  }
-  function drawSpeechBubble(x, y, w, h, text, tailDir) {
-    ctx.fillStyle = 'rgba(0,0,0,0.3)';
-    ctx.beginPath(); ctx.roundRect(x+3, y+3, w, h, 10); ctx.fill();
-    ctx.fillStyle = '#fffef0';
-    ctx.beginPath(); ctx.roundRect(x, y, w, h, 10); ctx.fill();
-    ctx.strokeStyle = '#3d5e3d'; ctx.lineWidth = 3; ctx.stroke();
-    ctx.fillStyle = '#fffef0';
-    ctx.beginPath();
-    if (tailDir === 'left') {
-      ctx.moveTo(x, y+h*0.5); ctx.lineTo(x-14, y+h*0.5+10); ctx.lineTo(x, y+h*0.5+18);
-    } else {
-      ctx.moveTo(x+w, y+h*0.5); ctx.lineTo(x+w+14, y+h*0.5+10); ctx.lineTo(x+w, y+h*0.5+18);
-    }
-    ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = '#3d5e3d'; ctx.stroke();
-    ctx.font = 'bold 15px "Courier New", monospace';
-    ctx.fillStyle = '#1a2e1a';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    const lines = text.split('\n');
-    lines.forEach(function(line, i){
-      ctx.fillText(line, x + w/2, y + h/2 + (i - (lines.length-1)/2) * 20);
-    });
-  }
+  let confLines = [];
+  let confIndex = 0;
+  let confTyping = '';
+  let confFull = '';
+  let confSpeaker = null;
+  let confLastTick = 0;
+  let confCharDelay = 90;
+  let confPauseUntil = 0;
+  let confEndTime = 0;
+  let confNextStart = 0;
+  let confStarted = false;
 
-  function drawSkyBase(progress, palette) {
-    const g = ctx.createLinearGradient(0, 0, 0, 400);
-    let c0, c1, c2;
-    if (progress < 0.35) { c0 = palette.spring[0]; c1 = palette.spring[1]; c2 = palette.spring[2]; }
-    else if (progress < 0.7) { c0 = palette.summer[0]; c1 = palette.summer[1]; c2 = palette.summer[2]; }
-    else { c0 = palette.autumn[0]; c1 = palette.autumn[1]; c2 = palette.autumn[2]; }
-    g.addColorStop(0, c0); g.addColorStop(0.55, c1); g.addColorStop(1, c2);
-    ctx.fillStyle = g; ctx.fillRect(0, 0, 800, 400);
-  }
-  function drawSun(progress, yBase) {
-    const sunX = 700 - progress * 500;
-    const sunY = (yBase || 80) + Math.sin(progress * Math.PI) * 40;
-    ctx.fillStyle = progress < 0.5 ? '#fff9c4' : '#ffd966';
-    ctx.beginPath(); ctx.arc(sunX, sunY, 28, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,200,0.30)';
-    ctx.beginPath(); ctx.arc(sunX, sunY, 44, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,200,0.15)';
-    ctx.beginPath(); ctx.arc(sunX, sunY, 62, 0, Math.PI*2); ctx.fill();
-  }
-  function drawClouds(progress, alpha) {
-    ctx.fillStyle = 'rgba(255,255,255,' + (alpha || 0.7) + ')';
-    for (let i=0;i<5;i++){
-      const cx = ((i*190 + progress*130) % 950) - 80;
-      const cy = 40 + i*22 + Math.sin(i*1.7)*8;
-      ctx.beginPath();
-      ctx.arc(cx, cy, 22, 0, Math.PI*2);
-      ctx.arc(cx+22, cy-6, 18, 0, Math.PI*2);
-      ctx.arc(cx+42, cy, 20, 0, Math.PI*2);
-      ctx.arc(cx+18, cy+8, 16, 0, Math.PI*2);
-      ctx.fill();
-    }
-  }
-  function drawMountains(progress, colorSpring, colorAutumn) {
-    ctx.fillStyle = progress < 0.6 ? colorSpring : colorAutumn;
-    ctx.beginPath();
-    ctx.moveTo(0, 260); ctx.lineTo(120, 160); ctx.lineTo(260, 230);
-    ctx.lineTo(420, 130); ctx.lineTo(600, 220); ctx.lineTo(740, 150);
-    ctx.lineTo(800, 200); ctx.lineTo(800, 400); ctx.lineTo(0, 400);
-    ctx.closePath(); ctx.fill();
-    if (progress < 0.25) {
-      ctx.fillStyle = 'rgba(255,255,255,0.55)';
-      [[120,160],[420,130],[740,150]].forEach(function(p){
-        ctx.beginPath();
-        ctx.moveTo(p[0], p[1]); ctx.lineTo(p[0]+20, p[1]+22); ctx.lineTo(p[0]-20, p[1]+22);
-        ctx.closePath(); ctx.fill();
-      });
-    }
-  }
-  function drawGround(progress, springColor, autumnColor) {
-    ctx.fillStyle = progress < 0.65 ? springColor : autumnColor;
-    ctx.fillRect(0, 340, 800, 60);
-    for (let i=0;i<80;i++){
-      const gx = (i*13) % 800;
-      const gh = 3 + (i%4)*3;
-      ctx.fillStyle = progress < 0.65 ? '#3a7a3a' : '#8a6a2a';
-      px(gx, 340 - gh, 2, gh, ctx.fillStyle);
-    }
-    if (progress < 0.35) {
-      for (let i=0;i<14;i++){
-        const fx = (i*57 + 20) % 800;
-        const fy = 332 + (i%3)*3;
-        ctx.fillStyle = ['#ffb6c1','#fffacd','#e6e6fa'][i%3];
-        px(fx, fy, 3, 3, ctx.fillStyle);
-      }
-    }
-  }
-  function drawProgressBar(progress) {
-    ctx.fillStyle = 'rgba(0,0,0,0.4)';
-    ctx.fillRect(30, 95, 200, 10);
-    ctx.fillStyle = '#f0c45a';
-    ctx.fillRect(30, 95, 200 * progress, 10);
-  }
-
-  function drawOliveTree(baseX, baseY, scale, ripeness, sway) {
-    const trunkColor = '#6b4e3a';
-    const leafColor = ripeness > 0.7 ? '#2d6a2d' : '#3a8a3a';
-    const oliveColor = ripeness > 0.8 ? '#2f2f1f' : '#7aa05a';
-    px(baseX - 6*scale, baseY - 40*scale, 12*scale, 40*scale, trunkColor);
-    ctx.fillStyle = leafColor;
-    for (let i = 0; i < 8; i++) {
-      const angle = (i / 8) * Math.PI * 2 + sway;
-      const rx = baseX + Math.cos(angle) * (28 + Math.sin(sway*2 + i)) * scale;
-      const ry = baseY - 50*scale + Math.sin(angle) * 18 * scale;
-      ctx.beginPath(); ctx.arc(rx, ry, 12*scale, 0, Math.PI*2); ctx.fill();
-    }
-    px(baseX - 2*scale, baseY - 38*scale, 3*scale, 34*scale, '#8b6a4a');
-    if (ripeness > 0.3) {
-      ctx.fillStyle = oliveColor;
-      for (let i = 0; i < 7; i++) {
-        const ox = baseX - 22*scale + i * 8 * scale;
-        const oy = baseY - 60*scale + (i%3)*6*scale + Math.sin(sway + i)*2;
-        ctx.beginPath(); ctx.arc(ox, oy, 3.5*scale, 0, Math.PI*2); ctx.fill();
-        if (ripeness > 0.8) px(ox - 1*scale, oy - 1*scale, 1.5*scale, 1.5*scale, '#5a5a3a');
-      }
-    }
-  }
-  function drawPressMachine(x, y, scale, isRented) {
-    const machineColor = isRented ? '#b8860b' : '#5a5a5a';
-    const accentColor = isRented ? '#d4a017' : '#3a3a3a';
-    ctx.fillStyle = 'rgba(0,0,0,0.25)';
-    ctx.beginPath(); ctx.ellipse(x, y + 10*scale, 28*scale, 6*scale, 0, 0, Math.PI*2); ctx.fill();
-    px(x - 25*scale, y - 10*scale, 50*scale, 20*scale, machineColor);
-    px(x - 25*scale, y - 10*scale, 50*scale, 4*scale, isRented ? '#e0b030' : '#6a6a6a');
-    px(x - 20*scale, y - 40*scale, 8*scale, 30*scale, accentColor);
-    px(x + 12*scale, y - 40*scale, 8*scale, 30*scale, accentColor);
-    px(x - 20*scale, y - 40*scale, 40*scale, 8*scale, accentColor);
-    px(x - 6*scale, y - 50*scale, 12*scale, 10*scale, '#c0c0c0');
-    if (isRented) px(x - 26*scale, y - 12*scale, 6*scale, 6*scale, '#ffd700');
-  }
-  function drawThalesOlive(x, y, scale, phase, mood) {
-    ctx.fillStyle = 'rgba(0,0,0,0.25)';
-    ctx.beginPath(); ctx.ellipse(x, y + 22*scale, 16*scale, 5*scale, 0, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#f5deb3';
-    ctx.beginPath(); ctx.arc(x, y - 20*scale, 10*scale, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#d2b48c';
-    ctx.beginPath(); ctx.ellipse(x, y - 10*scale, 7*scale, 4*scale, 0, 0, Math.PI*2); ctx.fill();
-    px(x - 4*scale, y - 24*scale, 2*scale, 2*scale, '#000');
-    px(x + 2*scale, y - 24*scale, 2*scale, 2*scale, '#000');
-    ctx.fillStyle = '#4a6b8a';
-    ctx.beginPath(); ctx.ellipse(x, y, 14*scale, 18*scale, 0, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#e8e8d8';
-    ctx.fillRect(x - 14*scale, y + 4*scale, 28*scale, 4*scale);
-    ctx.strokeStyle = '#4a6b8a'; ctx.lineWidth = 5*scale; ctx.lineCap = 'round';
-    const armSwing = Math.sin(phase) * 0.3;
-    ctx.beginPath(); ctx.moveTo(x - 12*scale, y - 6*scale); ctx.lineTo(x - 24*scale, y - 2*scale + armSwing*10*scale); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(x + 12*scale, y - 6*scale); ctx.lineTo(x + 24*scale, y - 2*scale - armSwing*10*scale); ctx.stroke();
-    ctx.strokeStyle = '#8b5a2b'; ctx.lineWidth = 4*scale;
-    ctx.beginPath(); ctx.moveTo(x + 24*scale, y - 2*scale - armSwing*10*scale); ctx.lineTo(x + 28*scale, y + 26*scale); ctx.stroke();
-  }
-  function drawStarsAndTelescope(progress) {
-    for (let i = 0; i < 30; i++) {
-      const sx = (i * 47 + 13) % 750 + 20;
-      const sy = (i * 29) % 200 + 20;
-      const size = 1 + (i % 3);
-      const twinkle = 0.6 + 0.4 * Math.sin(progress*20 + i*3);
-      ctx.fillStyle = 'rgba(255,249,196,' + twinkle + ')';
-      ctx.fillRect(sx, sy, size, size);
-    }
-    ctx.fillStyle = '#f0e68c';
-    ctx.beginPath(); ctx.arc(700, 60, 22, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = 'rgba(240,230,140,0.25)';
-    ctx.beginPath(); ctx.arc(700, 60, 36, 0, Math.PI*2); ctx.fill();
-    px(120, 180, 40, 8, '#8b5a2b');
-    px(140, 160, 8, 40, '#8b5a2b');
-    ctx.fillStyle = '#708090';
-    ctx.beginPath();
-    ctx.moveTo(160, 180); ctx.lineTo(200, 140); ctx.lineTo(210, 150); ctx.lineTo(170, 190);
-    ctx.fill();
-    ctx.strokeStyle = '#5a3a1a'; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.moveTo(150, 200); ctx.lineTo(130, 230); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(150, 200); ctx.lineTo(170, 230); ctx.stroke();
-  }
-  function drawDerivativeScene(progress) {
-    const skyGradient = ctx.createLinearGradient(0, 0, 0, 400);
-    if (progress < 0.3) {
-      skyGradient.addColorStop(0, '#0a1f2a');
-      skyGradient.addColorStop(0.55, '#1a3a4a');
-      skyGradient.addColorStop(1, '#2a4a3a');
-    } else if (progress < 0.65) {
-      skyGradient.addColorStop(0, '#3a6b8a');
-      skyGradient.addColorStop(0.55, '#7aa87a');
-      skyGradient.addColorStop(1, '#a8c88a');
-    } else {
-      skyGradient.addColorStop(0, '#b87c4b');
-      skyGradient.addColorStop(0.55, '#dbb87c');
-      skyGradient.addColorStop(1, '#e8c89a');
-    }
-    ctx.fillStyle = skyGradient; ctx.fillRect(0, 0, 800, 400);
-    if (progress < 0.4) drawStarsAndTelescope(progress);
-    if (progress > 0.25) drawSun(progress, 70);
-    if (progress > 0.3) drawClouds(progress, 0.55);
-    ctx.fillStyle = progress < 0.65 ? '#6b8e6b' : '#8b7d4b';
-    ctx.beginPath();
-    ctx.moveTo(0, 260); ctx.lineTo(120, 160); ctx.lineTo(260, 230);
-    ctx.lineTo(420, 130); ctx.lineTo(600, 220); ctx.lineTo(740, 150);
-    ctx.lineTo(800, 200); ctx.lineTo(800, 400); ctx.lineTo(0, 400);
-    ctx.closePath(); ctx.fill();
-    ctx.fillStyle = progress < 0.65 ? '#3a5a3a' : '#8b7d4b';
-    ctx.fillRect(0, 280, 800, 120);
-    for (let i=0;i<70;i++){
-      const gx = (i*15) % 800;
-      const gh = 3 + (i%4)*3;
-      ctx.fillStyle = progress < 0.65 ? '#2a6a2a' : '#7a5a2a';
-      px(gx, 280 - gh, 2, gh, ctx.fillStyle);
-    }
-    const sway = Math.sin(progress * Math.PI * 4) * 0.15;
-    [100, 260, 460, 640].forEach(function(x){
-      const ripeness = Math.min(1, Math.max(0, (progress - 0.45) * 2.2));
-      drawOliveTree(x, 280, 0.9, ripeness, sway);
-    });
-    [90, 210, 380, 520, 660].forEach(function(x, idx){
-      drawPressMachine(x, 260, 0.8, idx < 3);
-    });
-    let thalesX = 200 + progress * 400;
-    if (progress < 0.2) thalesX = 180;
-    else if (progress > 0.8) thalesX = 600 - (progress - 0.8) * 100;
-    drawThalesOlive(thalesX, 250, 1.2, progress * Math.PI * 4, progress);
-    if (progress > 0.55) {
-      const crowdAlpha = Math.min(1, (progress - 0.55) * 3);
-      ctx.globalAlpha = crowdAlpha;
-      for (let i = 0; i < 6; i++) {
-        const cx = 480 + i * 55;
-        const cy = 260 + Math.sin(i*1.3) * 8;
-        ctx.fillStyle = ['#4a6b8a','#6b4a3a','#3a6b4a','#6b3a5a','#5a5a8a','#8a6a3a'][i%6];
-        ctx.beginPath(); ctx.arc(cx, cy - 20, 8, 0, Math.PI*2); ctx.fill();
-        ctx.fillRect(cx - 8, cy - 12, 16, 20);
-        ctx.fillStyle = '#f5deb3';
-        ctx.beginPath(); ctx.arc(cx, cy - 24, 6, 0, Math.PI*2); ctx.fill();
-      }
-      ctx.globalAlpha = 1.0;
-    }
-    if (progress > 0.78) {
-      const goldAlpha = Math.min(1, (progress - 0.78) * 4);
-      for (let i = 0; i < 20; i++) {
-        const gx = 580 + Math.sin(i * 1.5 + progress * 12) * 100;
-        const gy = 200 + Math.cos(i * 2.3 + progress * 8) * 60;
-        ctx.fillStyle = 'rgba(255,215,0,' + goldAlpha + ')';
-        ctx.beginPath(); ctx.arc(gx, gy, 4 + (i % 3), 0, Math.PI*2); ctx.fill();
-        if (i % 4 === 0) {
-          ctx.fillStyle = 'rgba(255,255,255,' + goldAlpha*0.8 + ')';
-          px(gx - 1, gy - 8, 2, 16, ctx.fillStyle);
-          px(gx - 8, gy - 1, 16, 2, ctx.fillStyle);
-        }
-      }
-    }
-    pixelText('DERIVATIVE', 30, 40, 28, '#f0e6b0');
-    pixelText('— タレスのオリーブ圧搾機 —', 40, 72, 14, '#cfe8cf');
-    let chapter = '', chapterColor = '#fff9e6';
-    if (progress < 0.18) chapter = '第一章：冬 — 天文学の観測';
-    else if (progress < 0.4) chapter = '第二章：圧搾機を借り占める';
-    else if (progress < 0.65) chapter = '第三章：豊作の予感';
-    else if (progress < 0.85) chapter = '第四章：莫大な利益';
-    else { chapter = '終章：欲すれば富は可能、されど関心なし'; chapterColor = '#ffe0a0'; }
-    pixelText(chapter, 40, 110, 18, chapterColor);
-    drawProgressBar(progress);
-    if (progress > 0.1 && progress < 0.28) drawSpeechBubble(80, 180, 250, 60, 'タレス「来年は豊作だ」', 'left');
-    else if (progress > 0.35 && progress < 0.5) drawSpeechBubble(80, 180, 270, 70, 'タレス「全ての圧搾機を\n借りておこう」', 'left');
-    else if (progress > 0.7 && progress < 0.82) drawSpeechBubble(80, 180, 280, 80, '人々「圧搾機を貸してくれ！」\nタレス「さあ、どうぞ」', 'left');
-    else if (progress > 0.88) drawSpeechBubble(80, 180, 300, 80, 'タレス「欲すれば富は可能。\nされど我が関心は別にあり」', 'left');
-  }
-  function drawBackgroundAsinus(progress) {
-    drawSkyBase(progress, {
-      spring: ['#87ceeb', '#b0e0e6', '#98fb98'],
-      summer: ['#4a90d9', '#87ceeb', '#7ccd7c'],
-      autumn: ['#dda15e', '#e9c46a', '#bc6c25']
-    });
-    drawSun(progress, 80);
-    drawClouds(progress, 0.7);
-    drawMountains(progress, '#6b8e6b', '#8b7d4b');
-    ctx.fillStyle = progress < 0.7 ? '#5b9bd5' : '#4a7a9a';
-    ctx.beginPath();
-    ctx.moveTo(0, 300);
-    ctx.quadraticCurveTo(200, 290, 400, 305);
-    ctx.quadraticCurveTo(600, 320, 800, 300);
-    ctx.lineTo(800, 340);
-    ctx.quadraticCurveTo(600, 360, 400, 345);
-    ctx.quadraticCurveTo(200, 330, 0, 340);
-    ctx.closePath(); ctx.fill();
-    for (let i=0;i<24;i++){
-      const wx = (i*71 + progress*200) % 800;
-      const wy = 310 + Math.sin(i*2 + progress*6)*8;
-      px(wx, wy, 6, 2, 'rgba(255,255,255,0.5)');
-    }
-    drawGround(progress, '#7cba7c', '#b08a4a');
-  }
-  function drawMarketStall(x, y, s, color) {
-    ctx.fillStyle = 'rgba(0,0,0,0.2)';
-    ctx.beginPath(); ctx.ellipse(x, y + 2*s, 34*s, 6*s, 0, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.moveTo(x-30*s, y-30*s); ctx.lineTo(x+30*s, y-30*s);
-    ctx.lineTo(x+20*s, y-45*s); ctx.lineTo(x-20*s, y-45*s);
-    ctx.closePath(); ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.3)';
-    for (let i=0;i<5;i++){
-      ctx.beginPath();
-      ctx.moveTo(x-26*s + i*12*s, y-30*s);
-      ctx.lineTo(x-22*s + i*12*s, y-30*s);
-      ctx.lineTo(x-18*s + i*12*s, y-45*s);
-      ctx.lineTo(x-22*s + i*12*s, y-45*s);
-      ctx.closePath(); ctx.fill();
-    }
-    px(x-22*s, y-30*s, 5*s, 30*s, '#8b5a2b');
-    px(x+17*s, y-30*s, 5*s, 30*s, '#8b5a2b');
-    ctx.fillStyle = '#d4a017';
-    ctx.beginPath(); ctx.ellipse(x, y-5*s, 18*s, 8*s, 0, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#e8c050';
-    for (let i=0;i<4;i++){ ctx.beginPath(); ctx.arc(x-12*s + i*8*s, y-8*s, 3*s, 0, Math.PI*2); ctx.fill(); }
-  }
-  function drawThalesAsinus(x, y, s, phase, walking) {
-    const bob = walking ? Math.sin(phase*2)*2 : 0;
-    y += bob;
-    ctx.fillStyle = 'rgba(0,0,0,0.2)';
-    ctx.beginPath(); ctx.ellipse(x, y + 22*s, 15*s, 5*s, 0, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#f5deb3';
-    ctx.beginPath(); ctx.arc(x, y-22*s, 11*s, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#d2b48c';
-    ctx.beginPath(); ctx.ellipse(x, y-10*s, 8*s, 5*s, 0, 0, Math.PI*2); ctx.fill();
-    px(x-5*s, y-26*s, 3*s, 3*s, '#000');
-    px(x+2*s, y-26*s, 3*s, 3*s, '#000');
-    ctx.fillStyle = '#f0f0e0';
-    ctx.beginPath(); ctx.ellipse(x, y, 15*s, 20*s, 0, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#4a6b8a';
-    ctx.fillRect(x-15*s, y+2*s, 30*s, 6*s);
-    ctx.strokeStyle = '#f5deb3'; ctx.lineWidth = 5*s; ctx.lineCap = 'round';
-    const armSwing = walking ? Math.sin(phase*2)*0.5 : 0.2;
-    ctx.beginPath(); ctx.moveTo(x-12*s, y-8*s); ctx.lineTo(x-26*s, y-2*s + armSwing*14*s); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(x+12*s, y-8*s); ctx.lineTo(x+26*s, y-2*s - armSwing*14*s); ctx.stroke();
-    ctx.strokeStyle = '#8b5a2b'; ctx.lineWidth = 4*s;
-    ctx.beginPath(); ctx.moveTo(x+26*s, y-2*s - armSwing*14*s); ctx.lineTo(x+30*s, y+30*s); ctx.stroke();
-  }
-  function drawDonkey(x, y, s, phase, walking, burden, burdenType) {
-    const bob = walking ? Math.sin(phase*2)*2 : 0;
-    y += bob;
-    ctx.fillStyle = 'rgba(0,0,0,0.2)';
-    ctx.beginPath(); ctx.ellipse(x, y + 30*s, 26*s, 6*s, 0, 0, Math.PI*2); ctx.fill();
-    ctx.strokeStyle = '#6b5a4a'; ctx.lineWidth = 4*s; ctx.lineCap = 'round';
-    const legSwing = walking ? Math.sin(phase*2)*0.6 : 0;
-    ctx.beginPath(); ctx.moveTo(x-14*s, y+10*s); ctx.lineTo(x-16*s + legSwing*8*s, y+28*s); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(x-6*s, y+10*s); ctx.lineTo(x-4*s - legSwing*8*s, y+28*s); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(x+6*s, y+10*s); ctx.lineTo(x+8*s + legSwing*8*s, y+28*s); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(x+14*s, y+10*s); ctx.lineTo(x+16*s - legSwing*8*s, y+28*s); ctx.stroke();
-    px(x-17*s + legSwing*8*s, y+28*s, 4*s, 3*s, '#3a2a1a');
-    px(x-5*s - legSwing*8*s, y+28*s, 4*s, 3*s, '#3a2a1a');
-    px(x+7*s + legSwing*8*s, y+28*s, 4*s, 3*s, '#3a2a1a');
-    px(x+15*s - legSwing*8*s, y+28*s, 4*s, 3*s, '#3a2a1a');
-    ctx.fillStyle = '#8b7355';
-    ctx.beginPath(); ctx.ellipse(x, y, 22*s, 13*s, 0, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#a08a6a';
-    ctx.beginPath(); ctx.ellipse(x, y+3*s, 18*s, 8*s, 0, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#8b7355';
-    ctx.beginPath(); ctx.ellipse(x-18*s, y-10*s, 9*s, 16*s, -0.4, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(x-26*s, y-22*s, 10*s, 9*s, 0, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#7a6345';
-    ctx.beginPath(); ctx.ellipse(x-33*s, y-20*s, 4*s, 3*s, 0, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#8b7355';
-    ctx.beginPath(); ctx.ellipse(x-30*s, y-32*s, 3*s, 8*s, -0.2, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(x-24*s, y-33*s, 3*s, 8*s, 0.2, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#c0a080';
-    ctx.beginPath(); ctx.ellipse(x-30*s, y-32*s, 1.5*s, 5*s, -0.2, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(x-24*s, y-33*s, 1.5*s, 5*s, 0.2, 0, Math.PI*2); ctx.fill();
-    px(x-30*s, y-24*s, 2.5*s, 2.5*s, '#000');
-    px(x-34*s, y-20*s, 3*s, 2*s, '#4a3a2a');
-    ctx.strokeStyle = '#6b5a4a'; ctx.lineWidth = 3*s;
-    ctx.beginPath();
-    ctx.moveTo(x+22*s, y-4*s);
-    ctx.quadraticCurveTo(x+30*s, y-8*s + Math.sin(phase*3)*4*s, x+28*s, y+2*s);
-    ctx.stroke();
-    ctx.fillStyle = '#4a3a2a';
-    ctx.beginPath(); ctx.arc(x+28*s, y+2*s, 3*s, 0, Math.PI*2); ctx.fill();
-    if (burdenType === 'salt' && burden) {
-      ctx.fillStyle = '#f5f5f0';
-      ctx.beginPath(); ctx.ellipse(x+2*s, y-16*s, 14*s, 9*s, 0, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle = '#dcdcd0';
-      ctx.beginPath(); ctx.ellipse(x+2*s, y-18*s, 10*s, 6*s, 0, 0, Math.PI*2); ctx.fill();
-      ctx.strokeStyle = '#8b6a4a'; ctx.lineWidth = 2*s;
-      ctx.beginPath(); ctx.moveTo(x-4*s, y-24*s); ctx.lineTo(x+8*s, y-24*s); ctx.stroke();
-      ctx.fillStyle = '#ffffff';
-      for (let i=0;i<5;i++) px(x-8*s + i*5*s, y-22*s - (i%2)*3*s, 2*s, 2*s, '#fff');
-    } else if (burdenType === 'sponge' && burden) {
-      ctx.fillStyle = '#d4b86a';
-      for (let i=0;i<4;i++){ ctx.beginPath(); ctx.arc(x-10*s + i*8*s, y-18*s + (i%2)*3*s, 8*s, 0, Math.PI*2); ctx.fill(); }
-      ctx.fillStyle = '#a08040';
-      for (let i=0;i<8;i++) px(x-14*s + i*5*s, y-22*s + (i%4)*4*s, 2*s, 2*s, '#a08040');
-    }
-  }
-  function drawAsinusScene(progress) {
-    drawBackgroundAsinus(progress);
-    drawMarketStall(720, 320, 1.2, '#c0392b');
-    pixelText('ASINUS', 30, 380, 28, '#f0e6b0');
-    pixelText('— The Salt-Laden Donkey & Thales —', 140, 382, 14, '#b8d9b8');
-    let seasonText = '', seasonColor = '#fff';
-    if (progress < 0.35) { seasonText = '春 — 塩を運ぶ'; seasonColor = '#e0ffe0'; }
-    else if (progress < 0.7) { seasonText = '夏 — 繰り返される転倒'; seasonColor = '#fff9c4'; }
-    else { seasonText = '秋 — 海綿の教訓'; seasonColor = '#ffe0b0'; }
-    pixelText(seasonText, 30, 40, 26, seasonColor);
-    let subText = '';
-    if (progress < 0.2) subText = '第一章：最初の転倒';
-    else if (progress < 0.4) subText = '第二章：学習するろば';
-    else if (progress < 0.6) subText = '第三章：タレスの一計';
-    else if (progress < 0.8) subText = '第四章：海綿の重み';
-    else subText = '終章：それ以後、転ばなくなる';
-    pixelText(subText, 30, 75, 16, '#cfe8cf');
-    drawProgressBar(progress);
-    const walkPhase = progress * Math.PI * 6;
-    const thalesX = 150 + Math.sin(progress * Math.PI * 2) * 80;
-    drawThalesAsinus(thalesX, 320, 1.0, walkPhase, true);
-    let donkeyX = 250 + progress * 350;
-    if (donkeyX > 620) donkeyX = 620;
-    const donkeyY = 320;
-    let burdenType = 'salt', hasBurden = true;
-    if (progress > 0.72) burdenType = 'sponge';
-    const fallMoment = Math.abs(Math.sin(progress * Math.PI * 6)) > 0.9;
-    if (fallMoment && progress < 0.7) hasBurden = false;
-    drawDonkey(donkeyX, donkeyY, 1.0, walkPhase, true, hasBurden, burdenType);
-    if (fallMoment && progress < 0.7) {
-      ctx.fillStyle = 'rgba(200,230,255,0.7)';
-      for (let i=0;i<14;i++){
-        const sx = donkeyX + (Math.random()-0.5)*70;
-        const sy = 310 + (Math.random()-0.5)*24;
-        ctx.beginPath(); ctx.arc(sx, sy, 3 + Math.random()*5, 0, Math.PI*2); ctx.fill();
-      }
-      pixelText('ドボン！', donkeyX-30, donkeyY-60, 20, '#a0d8ff');
-    }
-    if (progress > 0.15 && progress < 0.35 && fallMoment) {
-      for (let i=0;i<8;i++) px(donkeyX-20+i*8, 330 + i*3, 4, 4, 'rgba(255,255,255,0.7)');
-    }
-    if (progress < 0.15) drawSpeechBubble(80, 130, 200, 60, '塩を市場へ運ぼう', 'left');
-    else if (progress < 0.3) drawSpeechBubble(donkeyX-60, 180, 220, 70, '転んだら…\n荷が軽くなった！', 'right');
-    else if (progress < 0.45) drawSpeechBubble(donkeyX-80, 160, 240, 70, 'わざと転べば\n楽できるぞ', 'right');
-    else if (progress < 0.6) drawSpeechBubble(80, 140, 230, 80, 'タレス「このろば、\n学習してしまったか」', 'left');
-    else if (progress < 0.75) drawSpeechBubble(80, 130, 240, 80, 'タレス「ならば\n海綿を積もう」', 'left');
-    else if (progress < 0.9) drawSpeechBubble(donkeyX-80, 150, 260, 90, 'ろば「転んだら…\n重くなった！？」', 'right');
-    else drawSpeechBubble(200, 140, 280, 70, 'それ以後、ろばは\nつまずかなくなった', 'left');
-    if (progress > 0.78 && progress < 0.92) {
-      ctx.fillStyle = 'rgba(100,150,255,0.5)';
-      for (let i=0;i<10;i++){
-        const wx = donkeyX - 20 + i*8;
-        const wy = 300 - Math.sin(progress*20 + i)*10;
-        ctx.beginPath(); ctx.arc(wx, wy, 4, 0, Math.PI*2); ctx.fill();
-      }
-      pixelText('ずっしり…', donkeyX-20, donkeyY-70, 18, '#a0c0ff');
-    }
-    if (progress > 0.92) {
-      ctx.fillStyle = '#ffd700';
-      for (let i=0;i<20;i++){
-        const sx = (i*97 + progress*300) % 800;
-        const sy = (i*53) % 200 + 50;
-        ctx.beginPath(); ctx.arc(sx, sy, 2 + (i%3), 0, Math.PI*2); ctx.fill();
-      }
-    }
-  }
-
-  function getSpeakerColor(key) {
-    switch(key) {
-      case 'bunseki':   return '#ff5555';
-      case 'butsuri':   return '#55dd55';
-      case 'tetsugaku': return '#bbbbbb';
-      case 'senmon':    return '#c77dff';
-      case 'gendai':    return '#ffd93d';
-      case 'sugaku':    return '#5aa9ff';
-      default:          return '#ffffff';
-    }
-  }
-
-  /* =========================================================
-     解説会議シーン描画
-     ========================================================= */
-  function drawConferenceScene() {
-    // 背景（会議室）
-    ctx.fillStyle = '#2a3a2a'; ctx.fillRect(0, 0, 800, 400);
-    for (let i=0;i<30;i++){ ctx.fillStyle = 'rgba(0,0,0,0.1)'; px(0, i*14, 800, 3, 'rgba(0,0,0,0.1)'); }
-    ctx.fillStyle = '#5a3a1a';
-    ctx.beginPath();
-    ctx.moveTo(0, 340); ctx.lineTo(800, 340); ctx.lineTo(800, 400); ctx.lineTo(0, 400);
-    ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#7a5a2a'; ctx.fillRect(0, 340, 800, 6);
-
-    // プロジェクタースクリーン
-    const screenX = 180, screenY = 40, screenW = 440, screenH = 260;
-    ctx.fillStyle = '#1a1a1a';
-    ctx.fillRect(screenX - 6, screenY - 6, screenW + 12, screenH + 12);
-    ctx.fillStyle = '#e8e8e0';
-    ctx.fillRect(screenX, screenY, screenW, screenH);
-
-    ctx.save();
-    ctx.beginPath(); ctx.rect(screenX, screenY, screenW, screenH); ctx.clip();
-    const sx = screenW / 800, sy = screenH / 400;
-    ctx.translate(screenX, screenY); ctx.scale(sx, sy);
-
-    if (currentStory === 'derivative') {
-      // derivative 静止画
-      const g = ctx.createLinearGradient(0, 0, 0, 400);
-      g.addColorStop(0, '#b87c4b'); g.addColorStop(0.55, '#dbb87c'); g.addColorStop(1, '#e8c89a');
-      ctx.fillStyle = g; ctx.fillRect(0, 0, 800, 400);
-      ctx.fillStyle = '#8b7d4b';
-      ctx.beginPath();
-      ctx.moveTo(0, 260); ctx.lineTo(120, 160); ctx.lineTo(260, 230);
-      ctx.lineTo(420, 130); ctx.lineTo(600, 220); ctx.lineTo(740, 150);
-      ctx.lineTo(800, 200); ctx.lineTo(800, 400); ctx.lineTo(0, 400);
-      ctx.closePath(); ctx.fill();
-      ctx.fillStyle = '#8b7d4b'; ctx.fillRect(0, 280, 800, 120);
-      [100, 260, 460, 640].forEach(function(x){ drawOliveTree(x, 280, 0.9, 1.0, 0.1); });
-      [90, 210, 380, 520, 660].forEach(function(x, idx){ drawPressMachine(x, 260, 0.8, idx < 3); });
-      drawThalesOlive(500, 250, 1.2, 1.5, 1);
-      for (let i = 0; i < 6; i++) {
-        const cx = 480 + i * 55;
-        const cy = 260 + Math.sin(i*1.3) * 8;
-        ctx.fillStyle = ['#4a6b8a','#6b4a3a','#3a6b4a','#6b3a5a','#5a5a8a','#8a6a3a'][i%6];
-        ctx.beginPath(); ctx.arc(cx, cy - 20, 8, 0, Math.PI*2); ctx.fill();
-        ctx.fillRect(cx - 8, cy - 12, 16, 20);
-        ctx.fillStyle = '#f5deb3';
-        ctx.beginPath(); ctx.arc(cx, cy - 24, 6, 0, Math.PI*2); ctx.fill();
-      }
-      for (let i = 0; i < 20; i++) {
-        const gx = 580 + Math.sin(i * 1.5 + 12) * 100;
-        const gy = 200 + Math.cos(i * 2.3 + 8) * 60;
-        ctx.fillStyle = 'rgba(255,215,0,1)';
-        ctx.beginPath(); ctx.arc(gx, gy, 4 + (i % 3), 0, Math.PI*2); ctx.fill();
-      }
-      ctx.font = 'bold 28px "Courier New", monospace';
-      ctx.fillStyle = '#f0e6b0'; ctx.textAlign = 'left';
-      ctx.fillText('DERIVATIVE', 30, 50);
-      ctx.font = 'bold 18px "Courier New", monospace';
-      ctx.fillStyle = '#fff9e6'; ctx.fillText('第四章：莫大な利益', 40, 120);
-    } else {
-      // asinus 静止画
-      const g = ctx.createLinearGradient(0, 0, 0, 400);
-      g.addColorStop(0, '#dda15e'); g.addColorStop(0.6, '#e9c46a'); g.addColorStop(1, '#bc6c25');
-      ctx.fillStyle = g; ctx.fillRect(0, 0, 800, 400);
-      ctx.fillStyle = '#8b7d4b';
-      ctx.beginPath();
-      ctx.moveTo(0, 260); ctx.lineTo(150, 170); ctx.lineTo(300, 230);
-      ctx.lineTo(500, 140); ctx.lineTo(700, 220); ctx.lineTo(800, 180);
-      ctx.lineTo(800, 400); ctx.lineTo(0, 400); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = '#4a7a9a';
-      ctx.beginPath();
-      ctx.moveTo(0, 300);
-      ctx.quadraticCurveTo(200, 290, 400, 305);
-      ctx.quadraticCurveTo(600, 320, 800, 300);
-      ctx.lineTo(800, 340);
-      ctx.quadraticCurveTo(600, 360, 400, 345);
-      ctx.quadraticCurveTo(200, 330, 0, 340);
-      ctx.closePath(); ctx.fill();
-      ctx.fillStyle = '#b08a4a'; ctx.fillRect(0, 340, 800, 60);
-      drawMarketStall(720, 320, 1.2, '#c0392b');
-      drawThalesAsinus(200, 320, 1.0, 1.5, false);
-      drawDonkey(480, 320, 1.0, 1.5, false, true, 'sponge');
-      ctx.fillStyle = 'rgba(100,150,255,0.5)';
-      for (let i=0;i<10;i++){
-        const wx = 480 - 20 + i*8;
-        const wy = 300 - Math.sin(12 + i)*10;
-        ctx.beginPath(); ctx.arc(wx, wy, 4, 0, Math.PI*2); ctx.fill();
-      }
-      ctx.font = 'bold 28px "Courier New", monospace';
-      ctx.fillStyle = '#f0e6b0'; ctx.textAlign = 'left';
-      ctx.fillText('ASINUS', 30, 50);
-      ctx.font = 'bold 18px "Courier New", monospace';
-      ctx.fillStyle = '#fff9e6'; ctx.fillText('第四章：海綿の重み', 40, 120);
-    }
-    ctx.restore();
-
-    // スクリーン反射
-    ctx.fillStyle = 'rgba(255,255,255,0.08)';
-    ctx.beginPath();
-    ctx.moveTo(screenX, screenY); ctx.lineTo(screenX + 120, screenY);
-    ctx.lineTo(screenX, screenY + 120); ctx.closePath(); ctx.fill();
-
-    // プロジェクター
-    ctx.fillStyle = '#333'; ctx.fillRect(370, 0, 60, 20);
-    ctx.fillStyle = '#555'; ctx.fillRect(375, 20, 50, 8);
-    ctx.fillStyle = 'rgba(255,255,200,0.06)';
-    ctx.beginPath();
-    ctx.moveTo(390, 28); ctx.lineTo(screenX - 20, screenY + 40);
-    ctx.lineTo(screenX + screenW + 20, screenY + 40); ctx.lineTo(410, 28);
-    ctx.closePath(); ctx.fill();
-
-    // 演者6人
-    const speakers = [
-      { key:'bunseki',   name:'分析学者', color:'#ff5555' },
-      { key:'butsuri',   name:'物理学者', color:'#55dd55' },
-      { key:'tetsugaku', name:'哲学者',   color:'#bbbbbb' },
-      { key:'senmon',    name:'専門学者', color:'#c77dff' },
-      { key:'gendai',    name:'現代学者', color:'#ffd93d' },
-      { key:'sugaku',    name:'数学者',   color:'#5aa9ff' }
-    ];
-    speakers.forEach(function(sp, i){
-      const px0 = 60 + i * 120;
-      const py0 = 300;
-      ctx.fillStyle = '#2a2a2a';
-      ctx.fillRect(px0 - 14, py0 - 30, 28, 30);
-      ctx.fillStyle = '#f5deb3';
-      ctx.beginPath(); ctx.arc(px0, py0 - 40, 10, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle = '#3a2a1a';
-      ctx.beginPath(); ctx.arc(px0, py0 - 44, 10, Math.PI, 0); ctx.fill();
-      ctx.fillStyle = sp.color;
-      ctx.fillRect(px0 - 30, py0 + 4, 60, 16);
-      ctx.font = 'bold 12px "Courier New", monospace';
-      ctx.fillStyle = '#111'; ctx.textAlign = 'center';
-      ctx.fillText(sp.name, px0, py0 + 16);
-      // 発言中のハイライト
-      if (confSpeaker && confSpeaker.key === sp.key) {
-        ctx.strokeStyle = sp.color;
-        ctx.lineWidth = 3;
-        ctx.strokeRect(px0 - 34, py0 - 56, 68, 80);
-      }
-    });
-
-    // 字幕（タイピング中）
-    if (confSpeaker && confTyping.length > 0) {
-      const spColor = getSpeakerColor(confSpeaker.key);
-      ctx.fillStyle = 'rgba(0,0,0,0.75)';
-      ctx.fillRect(40, 305, 720, 58);
-      ctx.fillStyle = spColor;
-      ctx.fillRect(40, 305, 720, 4);
-      ctx.font = 'bold 16px "Courier New", monospace';
-      ctx.textAlign = 'left';
-      ctx.fillStyle = spColor;
-      ctx.fillText(confSpeaker.name + '：', 50, 330);
-      ctx.fillStyle = '#f0f0e0';
-      const maxWidth = 620;
-      const prefixWidth = ctx.measureText(confSpeaker.name + '：').width;
-      // 改行処理（タイピング途中でも動く）
-      const text = confTyping;
-      let line1 = text, line2 = '';
-      if (ctx.measureText(text).width > maxWidth - prefixWidth) {
-        let cut = Math.floor(text.length * (maxWidth - prefixWidth) / ctx.measureText(text).width);
-        if (cut < 4) cut = 4;
-        line1 = text.substring(0, cut);
-        line2 = text.substring(cut);
-      }
-      ctx.fillText(line1, 50 + prefixWidth, 330);
-      if (line2) ctx.fillText(line2, 50, 354);
-      // カーソル
-      const cursorX = 50 + prefixWidth + ctx.measureText(line1).width;
-      if (line2 === '') {
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(cursorX + 2, 322, 3, 16);
-      }
-    }
-  }
-
-  /* =========================================================
-     会議の進行（タイピング方式）
-     ========================================================= */
   function startConference(storyKey) {
     phase = 'conference';
     confLines = (storyKey === 'derivative') ? CONF_DERIVATIVE : CONF_ASINUS;
@@ -1032,9 +1267,11 @@
     confLastTick = performance.now();
     confPauseUntil = 0;
     confEndTime = 0;
-    confNextStart = performance.now() + 800; // 最初は少し間
+    confNextStart = performance.now() + 800;
     logBody.innerHTML = '';
     logPanel.classList.add('visible');
+    petRoom.classList.add('visible');
+    startDonkeyGame();
   }
 
   function stopConference() {
@@ -1046,19 +1283,13 @@
     confSpeaker = null;
     confPauseUntil = 0;
     confEndTime = 0;
+    stopDonkeyGame();
   }
 
-  // 会議の進行を毎フレーム更新
   function updateConference(now) {
     if (!confStarted) return;
-
-    // 次の発言開始タイミング
     if (confSpeaker === null && now >= confNextStart) {
-      if (confIndex >= confLines.length) {
-        // 全部終了
-        phase = 'end';
-        return;
-      }
+      if (confIndex >= confLines.length) { phase = 'end'; return; }
       const line = confLines[confIndex];
       confSpeaker = { key: line.speaker, name: line.name };
       confFull = line.text;
@@ -1066,7 +1297,6 @@
       confLastTick = now;
       confPauseUntil = 0;
       confEndTime = 0;
-      // ログに全文を即追加
       const entry = document.createElement('div');
       entry.className = 'log-entry';
       const spColor = getSpeakerColor(line.speaker);
@@ -1074,25 +1304,19 @@
       logBody.appendChild(entry);
       logBody.scrollTop = logBody.scrollHeight;
     }
-
     if (confSpeaker !== null) {
-      // タイピング中
       if (confTyping.length < confFull.length) {
         if (now >= confPauseUntil && now - confLastTick >= confCharDelay) {
           const ch = confFull.charAt(confTyping.length);
           confTyping += ch;
           confLastTick = now;
-          // 句読点で間
           if (ch === '、') confPauseUntil = now + 260;
           else if (ch === '。') confPauseUntil = now + 420;
           else if (ch === '！' || ch === '？') confPauseUntil = now + 420;
         }
       } else {
-        // 字幕完了
-        if (confEndTime === 0) {
-          confEndTime = now;
-        } else if (now - confEndTime >= 1400) {
-          // 次の発言へ
+        if (confEndTime === 0) { confEndTime = now; }
+        else if (now - confEndTime >= 1400) {
           confSpeaker = null;
           confIndex++;
           confNextStart = now + 500;
@@ -1101,12 +1325,425 @@
     }
   }
 
-  /* ---------- メインループ ---------- */
+  /* ============================================================
+     ペット部屋（ロバゲーム）
+     ============================================================ */
+  let petGame = {
+    // ロバの位置（ペット部屋キャンバス内 320x180）
+    x: 160, y: 130,
+    vx: 0, vy: 0,
+    targetX: 160, targetY: 130,
+    phase: 0,
+    // 餌・水・撫で
+    food: 0,        // 0〜4
+    water: false,
+    petCount: 0,
+    // 食べ/飲み行動
+    eatingTimer: 0,
+    drinkingTimer: 0,
+    eating: false,
+    drinking: false,
+    // 会議室への乱入
+    intrusionCooldown: 0,
+    // 餌・水・撫での確率補正
+    bias: { bunseki:0, butsuri:0, sugaku:0, tetsugaku:0, senmon:0, gendai:0 },
+    running: false,
+    lastAction: '' // 'food' | 'water' | 'pet' | ''
+  };
+
+  function startDonkeyGame() {
+    petGame.running = true;
+    petGame.food = 0;
+    petGame.water = false;
+    petGame.petCount = 0;
+    petGame.bias = { bunseki:0, butsuri:0, sugaku:0, tetsugaku:0, senmon:0, gendai:0 };
+    petGame.intrusionCooldown = 0;
+    petGame.targetX = 60 + Math.random() * 200;
+    petGame.targetY = 90 + Math.random() * 50;
+    updatePetStatus();
+    petMood.textContent = 'ロバはのんびりしている';
+  }
+  function stopDonkeyGame() {
+    petGame.running = false;
+    donkeyIntrusion.active = false;
+  }
+  function updatePetStatus() {
+    petStatus.textContent = '餌:' + petGame.food + ' / 水:' + (petGame.water ? 'あり' : 'なし') + ' / なで:' + petGame.petCount;
+  }
+
+  function petCanvasPos(evt) {
+    const rect = petCanvas.getBoundingClientRect();
+    const scaleX = petCanvas.width / rect.width;
+    const scaleY = petCanvas.height / rect.height;
+    return {
+      x: (evt.clientX - rect.left) * scaleX,
+      y: (evt.clientY - rect.top) * scaleY
+    };
+  }
+
+  petCanvas.addEventListener('click', function(evt){
+    if (!petGame.running) return;
+    const p = petCanvasPos(evt);
+    // 餌箱の位置（左端）
+    const foodBox = { x: 30, y: 130, w: 40, h: 30 };
+    // 水場の位置（右端）
+    const waterSpot = { x: 250, y: 130, w: 40, h: 30 };
+    // ロバの頭（当たり判定大きめ）
+    const donkeyHead = { x: petGame.x - 22, y: petGame.y - 30, w: 44, h: 40 };
+
+    if (p.x >= foodBox.x && p.x <= foodBox.x + foodBox.w &&
+        p.y >= foodBox.y && p.y <= foodBox.y + foodBox.h) {
+      if (petGame.food < 4) {
+        petGame.food++;
+        petGame.lastAction = 'food';
+        petGame.bias.bunseki += 0.15;
+        petMood.textContent = 'ロバ「お、餌だ」';
+      } else {
+        petMood.textContent = '餌箱はいっぱいだ';
+      }
+      updatePetStatus();
+      return;
+    }
+    if (p.x >= waterSpot.x && p.x <= waterSpot.x + waterSpot.w &&
+        p.y >= waterSpot.y && p.y <= waterSpot.y + waterSpot.h) {
+      if (!petGame.water) {
+        petGame.water = true;
+        petGame.lastAction = 'water';
+        petGame.bias.sugaku += 0.15;
+        petMood.textContent = '水が張られた';
+      } else {
+        petMood.textContent = '水はもうある';
+      }
+      updatePetStatus();
+      return;
+    }
+    if (p.x >= donkeyHead.x && p.x <= donkeyHead.x + donkeyHead.w &&
+        p.y >= donkeyHead.y && p.y <= donkeyHead.y + donkeyHead.h) {
+      petGame.petCount++;
+      petGame.lastAction = 'pet';
+      petGame.bias.senmon += 0.15;
+      petMood.textContent = 'ロバ「……（撫でられた）」';
+      // なでるとターゲットが変わるかも
+      updatePetStatus();
+      return;
+    }
+    // それ以外をクリック → ロバがそっちに行く
+    petGame.targetX = Math.max(50, Math.min(270, p.x));
+    petGame.targetY = Math.max(90, Math.min(150, p.y));
+  });
+
+  /* ============================================================
+     ロバの乱入（会議シーン）
+     ============================================================ */
+  function scheduleDonkeyIntrusion(now) {
+    if (donkeyIntrusion.active) return;
+    if (petGame.intrusionCooldown > now) return;
+    // 12〜22秒ごとに乱入
+    const interval = 12000 + Math.random() * 10000;
+    petGame.intrusionCooldown = now + interval;
+    // ターゲット決定
+    const targetKey = pickDonkeyTarget();
+    // 学者の後ろ、スクリーンと学者の間の座標
+    const speakers = getSpeakers();
+    let targetX = 400;
+    speakers.forEach(function(sp, i){
+      if (sp.key === targetKey) targetX = 60 + i * 120;
+    });
+    donkeyIntrusion.active = true;
+    donkeyIntrusion.targetKey = targetKey;
+    donkeyIntrusion.x = 800;
+    donkeyIntrusion.y = 265;
+    donkeyIntrusion.targetX = targetX;
+    donkeyIntrusion.targetY = 265;
+    donkeyIntrusion.state = 'entering';
+    donkeyIntrusion.timer = 0;
+    donkeyIntrusion.knowledgeText = '';
+  }
+
+  function pickDonkeyTarget() {
+    // 基本確率（均等）
+    const w = {
+      bunseki: 1,
+      butsuri: 1,
+      sugaku: 1,
+      tetsugaku: 1,
+      senmon: 1,
+      gendai: 1
+    };
+    // 餌をやった → 分析学者UP / やらない → 物理学者UP
+    if (petGame.food > 0) w.bunseki += petGame.food * 0.8;
+    else w.butsuri += 1.5;
+    // 水 → 数学者UP / ない → 哲学者UP
+    if (petGame.water) w.sugaku += 1.5;
+    else w.tetsugaku += 1.5;
+    // 撫でた → 専門学者UP / ない → 現代学者UP
+    if (petGame.petCount > 0) w.senmon += petGame.petCount * 0.8;
+    else w.gendai += 1.5;
+    // bias 加算
+    Object.keys(w).forEach(function(k){
+      w[k] += petGame.bias[k] || 0;
+    });
+    // 重み付き抽選
+    const keys = Object.keys(w);
+    let total = 0;
+    keys.forEach(function(k){ total += w[k]; });
+    let r = Math.random() * total;
+    for (let i = 0; i < keys.length; i++) {
+      r -= w[keys[i]];
+      if (r <= 0) return keys[i];
+    }
+    return keys[0];
+  }
+
+  function updateDonkeyIntrusion(now) {
+    if (!donkeyIntrusion.active) return;
+    const d = donkeyIntrusion;
+    d.timer += 16; // 約60fps想定
+    if (d.state === 'entering') {
+      // 右からターゲット位置へ
+      if (d.x > d.targetX) {
+        d.x -= 4;
+      } else {
+        d.x = d.targetX;
+        // 到着 → マウント or イベント
+        d.state = 'mounted';
+        d.timer = 0;
+        onDonkeyArrived(d.targetKey);
+      }
+    } else if (d.state === 'mounted') {
+      // 3秒間マウントして帰る
+      if (d.timer > 3000) {
+        d.state = 'leaving';
+        d.timer = 0;
+      }
+    } else if (d.state === 'leaving') {
+      d.x += 4;
+      if (d.x > 820) {
+        d.active = false;
+        d.state = 'idle';
+      }
+    }
+  }
+
+  function onDonkeyArrived(targetKey) {
+    // 知識マウント or イベント（ランダム）
+    const isEvent = Math.random() < 0.35;
+    if (isEvent) {
+      // イベントは後編で実装。前編では分析学者のfooter表示のみ。
+      const evt = (window.__PHASE2__ && window.__PHASE2__.getEventFor)
+        ? window.__PHASE2__.getEventFor(targetKey)
+        : defaultEventFor(targetKey);
+      if (window.__PHASE2__ && window.__PHASE2__.onEvent) {
+        window.__PHASE2__.onEvent(targetKey, evt);
+      } else {
+        defaultOnEvent(targetKey, evt);
+      }
+    } else {
+      // 知識マウント
+      const list = KNOWLEDGE[targetKey] || KNOWLEDGE.bunseki;
+      const text = randPick(list);
+      donkeyIntrusion.knowledgeText = text;
+      showDonkeySpeech(text);
+      if (window.__PHASE2__ && window.__PHASE2__.onDonkeyMounted) {
+        window.__PHASE2__.onDonkeyMounted(targetKey, text);
+      }
+    }
+  }
+
+  function defaultEventFor(targetKey) {
+    switch(targetKey) {
+      case 'bunseki':   return 'footerVertical';
+      case 'butsuri':   return 'weather';
+      case 'senmon':    return 'rainAndDrops';
+      case 'gendai':    return 'img41x';
+      case 'sugaku':    return 'formula';
+      case 'tetsugaku': return 'ranking';
+      default: return 'none';
+    }
+  }
+
+  // 前編で実装するのは footerVertical のみ
+  function defaultOnEvent(targetKey, eventType) {
+    if (eventType === 'footerVertical') {
+      showFooterVertical();
+    } else {
+      // 後編未実装 → とりあえずログに出すだけ
+      const entry = document.createElement('div');
+      entry.className = 'log-entry';
+      const spColor = getSpeakerColor(targetKey);
+      const name = getSpeakerName(targetKey);
+      entry.innerHTML = '<span class="log-speaker" style="color:' + spColor + '">🐴 ' + name + ' に何かが起きた（' + eventType + '）</span>';
+      logBody.appendChild(entry);
+      logBody.scrollTop = logBody.scrollHeight;
+    }
+  }
+
+  function getSpeakerName(key) {
+    const map = {
+      bunseki:'分析学者', butsuri:'物理学者', tetsugaku:'哲学者',
+      senmon:'専門学者', gendai:'現代学者', sugaku:'数学者'
+    };
+    return map[key] || '学者';
+  }
+
+  function showDonkeySpeech(text) {
+    donkeySpeech.textContent = '🐴 ' + text;
+    donkeySpeech.classList.add('visible');
+    clearTimeout(showDonkeySpeech._t);
+    showDonkeySpeech._t = setTimeout(function(){
+      donkeySpeech.classList.remove('visible');
+    }, 3500);
+    // ログにも追加
+    const entry = document.createElement('div');
+    entry.className = 'log-entry';
+    entry.innerHTML = '<span class="log-speaker" style="color:#e0a060">🐴 ロバ：</span><span class="log-text">' + text + '</span>';
+    logBody.appendChild(entry);
+    logBody.scrollTop = logBody.scrollHeight;
+  }
+
+  function showFooterVertical() {
+    // footer に vertical.html を表示（隠し要素）
+    verticalLink.classList.add('visible');
+    footerSub.innerHTML = '↕ <a href="vertical.html" target="_self">vertical.html へ</a>';
+    footerLinkVisible = true;
+    // ログにも
+    const entry = document.createElement('div');
+    entry.className = 'log-entry';
+    entry.innerHTML = '<span class="log-speaker" style="color:#ff5555">分析学者：</span><span class="log-text">「……まさか、この構造に気づくとは。footer を見てみろ。」</span>';
+    logBody.appendChild(entry);
+    logBody.scrollTop = logBody.scrollHeight;
+  }
+
+  /* ============================================================
+     ペット部屋の描画（毎フレーム）
+     ============================================================ */
+  function drawPetRoom(now) {
+    if (!petGame.running) return;
+    const c = petCtx;
+    c.clearRect(0, 0, 320, 180);
+    // 床
+    c.fillStyle = '#2a3a2a';
+    c.fillRect(0, 0, 320, 180);
+    c.fillStyle = '#3a4a3a';
+    c.fillRect(0, 140, 320, 40);
+    // わらの散らばり（ドット）
+    for (let i = 0; i < 30; i++) {
+      const wx = (i * 47 + 13) % 320;
+      const wy = 140 + (i * 7) % 35;
+      c.fillStyle = '#8a7a3a';
+      c.fillRect(wx, wy, 2, 1);
+    }
+    // 餌箱（左）
+    c.fillStyle = '#6b4a2b';
+    c.fillRect(30, 130, 40, 30);
+    c.fillStyle = '#8b6a4b';
+    c.fillRect(33, 133, 34, 24);
+    // 餌
+    if (petGame.food > 0) {
+      c.fillStyle = '#d4a017';
+      for (let i = 0; i < petGame.food; i++) {
+        c.beginPath();
+        c.arc(40 + i * 8, 145, 4, 0, Math.PI*2);
+        c.fill();
+        c.fillStyle = '#e8c050';
+        c.beginPath();
+        c.arc(40 + i * 8, 143, 2, 0, Math.PI*2);
+        c.fill();
+        c.fillStyle = '#d4a017';
+      }
+    }
+    // 水場（右）
+    c.fillStyle = '#6b4a2b';
+    c.fillRect(250, 130, 40, 30);
+    c.fillStyle = '#8b6a4b';
+    c.fillRect(253, 133, 34, 24);
+    if (petGame.water) {
+      c.fillStyle = '#5b9bd5';
+      c.fillRect(256, 138, 28, 16);
+      c.fillStyle = 'rgba(255,255,255,0.3)';
+      c.fillRect(256, 138, 28, 4);
+    }
+
+    // ロバの移動ロジック
+    const dx = petGame.targetX - petGame.x;
+    const dy = petGame.targetY - petGame.y;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    if (dist > 3) {
+      petGame.x += dx * 0.02;
+      petGame.y += dy * 0.02;
+      petGame.phase += 0.15;
+    } else {
+      petGame.phase += 0.05;
+      // たまに新しい目標地点
+      if (Math.random() < 0.005) {
+        // 餌があれば食べに行く、水があれば飲みに行く
+        const r = Math.random();
+        if (petGame.food > 0 && r < 0.3) {
+          petGame.targetX = 50;
+          petGame.targetY = 125;
+        } else if (petGame.water && r < 0.5) {
+          petGame.targetX = 270;
+          petGame.targetY = 125;
+        } else {
+          petGame.targetX = 60 + Math.random() * 200;
+          petGame.targetY = 90 + Math.random() * 50;
+        }
+      }
+    }
+
+    // 餌箱のそばに来たら食べる
+    if (petGame.food > 0 && Math.abs(petGame.x - 50) < 15 && Math.abs(petGame.y - 125) < 15) {
+      if (!petGame.eating) {
+        petGame.eating = true;
+        petGame.eatingTimer = now;
+      }
+      if (now - petGame.eatingTimer > 1500) {
+        petGame.food--;
+        petGame.eating = false;
+        updatePetStatus();
+        petMood.textContent = 'ロバ「むしゃむしゃ……」';
+      }
+    }
+    if (petGame.water && Math.abs(petGame.x - 270) < 15 && Math.abs(petGame.y - 125) < 15) {
+      if (!petGame.drinking) {
+        petGame.drinking = true;
+        petGame.drinkingTimer = now;
+      }
+      if (now - petGame.drinkingTimer > 1500) {
+        petGame.water = false;
+        petGame.drinking = false;
+        updatePetStatus();
+        petMood.textContent = 'ロバ「ごくごく……」';
+      }
+    }
+
+    // ロバを描く（小さめ）
+    drawDonkey(c, petGame.x, petGame.y, 0.7, petGame.phase, dist > 3, false, 'none');
+    // 頭の上にハート（撫でられたら）
+    if (petGame.petCount > 0 && now - (petGame._lastPet || 0) < 3000) {
+      c.fillStyle = '#ff6b8a';
+      c.font = '16px sans-serif';
+      c.fillText('♥', petGame.x - 8, petGame.y - 40);
+    }
+
+    // ヒント
+    c.font = '9px "Courier New", monospace';
+    c.fillStyle = '#8a9a8a';
+    c.textAlign = 'center';
+    c.fillText('餌箱', 50, 175);
+    c.fillText('水場', 270, 175);
+  }
+
+  /* ============================================================
+     メインループ
+     ============================================================ */
+  let lastNow = 0;
   function animate(timestamp) {
     const now = timestamp;
+    lastNow = now;
     if (!startTime) startTime = timestamp;
     const elapsed = timestamp - startTime;
-    const story = STORIES[currentStory];
+    const story = STORIES[currentStory] || STORIES.derivative;
     const progress = Math.min(elapsed / story.duration, 1.0);
 
     if (phase === 'animation') {
@@ -1117,26 +1754,33 @@
       else drawAsinusScene(1.0);
     } else if (phase === 'conference' || phase === 'end') {
       updateConference(now);
+      updateDonkeyIntrusion(now);
+      if (petGame.running && now - (petGame._lastIntrusionCheck || 0) > 1000) {
+        petGame._lastIntrusionCheck = now;
+        scheduleDonkeyIntrusion(now);
+      }
       drawConferenceScene();
     }
 
-    // 進行
+    // ペット部屋は常時描画（running のとき）
+    if (petGame.running) {
+      drawPetRoom(now);
+      // 後編フック
+      if (window.__PHASE2__ && window.__PHASE2__.tickPetRoom) {
+        window.__PHASE2__.tickPetRoom(petCtx, petGame, now);
+      }
+    }
+
     if (phase === 'animation') {
       if (progress >= 1.0) {
         phase = 'intermission';
         intermissionStart = now;
-        if (!footerLinkVisible) {
-          verticalLink.classList.add('visible');
-          footerSub.innerHTML = '↕ <a href="vertical.html" target="_self">vertical.html へ</a>';
-          footerLinkVisible = true;
-        }
       }
     } else if (phase === 'intermission') {
       if (now - intermissionStart >= 3000) {
         startConference(currentStory);
       }
     }
-    // conference, end は updateConference 内で進行
 
     animationId = requestAnimationFrame(animate);
   }
@@ -1154,6 +1798,7 @@
     footerSub.innerHTML = '';
     footerTitle.textContent = STORIES[storyKey].label;
     logPanel.classList.remove('visible');
+    petRoom.classList.remove('visible');
     logBody.innerHTML = '';
     phase = 'animation';
     if (storyKey === 'derivative') drawDerivativeScene(0);
@@ -1176,6 +1821,7 @@
     footerSub.innerHTML = '';
     footerTitle.textContent = 'タレスの2つの物語';
     logPanel.classList.remove('visible');
+    petRoom.classList.remove('visible');
     logBody.innerHTML = '';
   }
 
@@ -1184,6 +1830,665 @@
   backBtn.addEventListener('click', function(e){ e.stopPropagation(); showOpening(); });
 
   showOpening();
+
+  // ============================================================
+  // ▼▼▼ 第2段階（後編）はここに貼ってください ▼▼▼
+  // ============================================================
+  // 後編でやること：
+  //   window.__PHASE2__.onEvent = function(targetKey, eventType) { ... }
+  //   window.__PHASE2__.tickPetRoom = function(petCtx, petGame, now) { ... }
+  //   window.__PHASE2__.getEventFor = function(targetKey) { ... }
+  //   window.__PHASE2__.onDonkeyMounted = function(targetKey, text) { ... }
+  // ============================================================
+  // ▲▲▲ 第2段階（後編）はここまで ▲▲▲
+  // ============================================================
+   // ============================================================
+  // ▼▼▼ 第2段階（後編）はここに貼ってください ▼▼▼
+  // ============================================================
+
+  /* ============================================================
+     第2段階：イベント実装
+     ============================================================ */
+
+  // 画面全体に降る雨・雪・雷（サイト全体）
+  let siteWeather = {
+    active: false,
+    type: 'rain', // 'rain' | 'snow' | 'thunder' | 'rainThunder'
+    particles: [],
+    timer: 0,
+    duration: 8000,
+    lightningTimer: 0,
+    lightningFlash: 0,
+    overlayEl: null
+  };
+
+  // 画面に水滴がつく演出
+  let screenDrops = {
+    active: false,
+    drops: [],
+    timer: 0,
+    duration: 7000
+  };
+
+  // スクリーンに数式を出す
+  let screenFormula = {
+    active: false,
+    lines: [],
+    timer: 0,
+    duration: 10000,
+    progress: 0
+  };
+
+  // スクリーンが img41x.jpg になる
+  let screenImage = {
+    active: false,
+    timer: 0,
+    duration: 10000,
+    alpha: 0
+  };
+
+  // 哲学者のランキング
+  let rankingDisplay = {
+    active: false,
+    ranks: [],
+    timer: 0,
+    duration: 12000,
+    progress: 0
+  };
+
+  // サイト全体の天候オーバーレイを作る
+  function ensureWeatherOverlay() {
+    if (siteWeather.overlayEl) return siteWeather.overlayEl;
+    const el = document.createElement('div');
+    el.id = 'siteWeatherOverlay';
+    el.style.position = 'fixed';
+    el.style.top = '0';
+    el.style.left = '0';
+    el.style.width = '100vw';
+    el.style.height = '100vh';
+    el.style.pointerEvents = 'none';
+    el.style.zIndex = '9999';
+    el.style.overflow = 'hidden';
+    document.body.appendChild(el);
+    siteWeather.overlayEl = el;
+    return el;
+  }
+
+  function startSiteWeather(type) {
+    siteWeather.active = true;
+    siteWeather.type = type || 'rain';
+    siteWeather.particles = [];
+    siteWeather.timer = 0;
+    siteWeather.lightningTimer = 0;
+    siteWeather.lightningFlash = 0;
+    const count = (siteWeather.type === 'snow') ? 80 : 120;
+    for (let i = 0; i < count; i++) {
+      siteWeather.particles.push({
+        x: Math.random() * window.innerWidth,
+        y: Math.random() * window.innerHeight,
+        vx: (Math.random() - 0.5) * 1.5,
+        vy: (siteWeather.type === 'snow') ? (0.5 + Math.random() * 1.5) : (4 + Math.random() * 6),
+        size: (siteWeather.type === 'snow') ? (2 + Math.random() * 4) : (1 + Math.random() * 2),
+        life: 1
+      });
+    }
+    // 雷鳴用のオーバーレイ（フラッシュ）
+    if (siteWeather.type === 'thunder' || siteWeather.type === 'rainThunder') {
+      ensureWeatherOverlay();
+    }
+  }
+
+  function stopSiteWeather() {
+    siteWeather.active = false;
+    if (siteWeather.overlayEl) {
+      siteWeather.overlayEl.innerHTML = '';
+    }
+  }
+
+  function updateSiteWeather(dt) {
+    if (!siteWeather.active) return;
+    siteWeather.timer += dt;
+    if (siteWeather.timer > siteWeather.duration) {
+      stopSiteWeather();
+      return;
+    }
+    const el = ensureWeatherOverlay();
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    const isSnow = siteWeather.type === 'snow';
+    const isRain = siteWeather.type === 'rain' || siteWeather.type === 'rainThunder';
+    const isThunder = siteWeather.type === 'thunder' || siteWeather.type === 'rainThunder';
+    // パーティクル更新
+    siteWeather.particles.forEach(function(p) {
+      p.x += p.vx;
+      p.y += p.vy;
+      if (p.y > h) { p.y = -10; p.x = Math.random() * w; }
+      if (p.x < -10) p.x = w + 10;
+      if (p.x > w + 10) p.x = -10;
+    });
+    // HTML で描画（軽量のため div を大量に作らないよう innerHTML 再構築）
+    let html = '';
+    if (isRain) {
+      siteWeather.particles.forEach(function(p) {
+        html += '<div style="position:absolute;left:' + p.x + 'px;top:' + p.y + 'px;width:' + p.size + 'px;height:' + (p.size * 8) + 'px;background:rgba(150,200,255,0.7);border-radius:1px;"></div>';
+      });
+    } else if (isSnow) {
+      siteWeather.particles.forEach(function(p) {
+        html += '<div style="position:absolute;left:' + p.x + 'px;top:' + p.y + 'px;width:' + p.size + 'px;height:' + p.size + 'px;background:rgba(255,255,255,0.9);border-radius:50%;"></div>';
+      });
+    }
+    // 雷
+    if (isThunder) {
+      siteWeather.lightningTimer += dt;
+      if (siteWeather.lightningTimer > 1800 + Math.random() * 2000) {
+        siteWeather.lightningTimer = 0;
+        siteWeather.lightningFlash = 1;
+      }
+      if (siteWeather.lightningFlash > 0) {
+        siteWeather.lightningFlash -= dt * 0.008;
+        if (siteWeather.lightningFlash < 0) siteWeather.lightningFlash = 0;
+        const alpha = siteWeather.lightningFlash * 0.7;
+        html += '<div style="position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(255,255,255,' + alpha + ');"></div>';
+      }
+    }
+    el.innerHTML = html;
+  }
+
+  /* ============================================================
+     スクリーン内イベント（キャンバス上）
+     ============================================================ */
+  // スクリーン内に雨を降らせる（会議シーンのスクリーン領域にのみ）
+  let screenRain = {
+    active: false,
+    particles: [],
+    timer: 0,
+    duration: 7000,
+    type: 'rain' // 'rain' | 'snow' | 'thunder' | 'rainThunder'
+  };
+
+  function startScreenWeather(type) {
+    screenRain.active = true;
+    screenRain.type = type || 'rain';
+    screenRain.particles = [];
+    screenRain.timer = 0;
+    const count = (screenRain.type === 'snow') ? 40 : 60;
+    for (let i = 0; i < count; i++) {
+      screenRain.particles.push({
+        x: 180 + Math.random() * 440,
+        y: 40 + Math.random() * 260,
+        vy: (screenRain.type === 'snow') ? (0.4 + Math.random() * 1.2) : (3 + Math.random() * 4),
+        size: (screenRain.type === 'snow') ? (2 + Math.random() * 3) : (1 + Math.random() * 2)
+      });
+    }
+  }
+
+  function stopScreenWeather() {
+    screenRain.active = false;
+  }
+
+  function drawScreenWeather() {
+    if (!screenRain.active) return;
+    // スクリーン領域のみクリップ
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(180, 40, 440, 260);
+    ctx.clip();
+    const isSnow = screenRain.type === 'snow';
+    const isRain = screenRain.type === 'rain' || screenRain.type === 'rainThunder';
+    const isThunder = screenRain.type === 'thunder' || screenRain.type === 'rainThunder';
+    // 雷フラッシュ
+    if (isThunder) {
+      const flash = Math.sin(screenRain.timer * 0.02);
+      if (flash > 0.7) {
+        ctx.fillStyle = 'rgba(255,255,255,' + ((flash - 0.7) * 2) + ')';
+        ctx.fillRect(180, 40, 440, 260);
+      }
+    }
+    if (isRain) {
+      ctx.fillStyle = 'rgba(150,200,255,0.75)';
+      screenRain.particles.forEach(function(p) {
+        ctx.fillRect(p.x, p.y, p.size, p.size * 8);
+      });
+    } else if (isSnow) {
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      screenRain.particles.forEach(function(p) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+        ctx.fill();
+      });
+    }
+    ctx.restore();
+  }
+
+  function updateScreenWeather(dt) {
+    if (!screenRain.active) return;
+    screenRain.timer += dt;
+    if (screenRain.timer > screenRain.duration) {
+      stopScreenWeather();
+      return;
+    }
+    screenRain.particles.forEach(function(p) {
+      p.y += p.vy;
+      if (p.y > 300) { p.y = 40; p.x = 180 + Math.random() * 440; }
+    });
+  }
+
+  /* ============================================================
+     サイト全体の雨＋画面に水滴
+     ============================================================ */
+  function startScreenDrops() {
+    screenDrops.active = true;
+    screenDrops.drops = [];
+    screenDrops.timer = 0;
+    for (let i = 0; i < 40; i++) {
+      screenDrops.drops.push({
+        x: Math.random() * window.innerWidth,
+        y: Math.random() * window.innerHeight,
+        r: 3 + Math.random() * 8,
+        life: 0.5 + Math.random() * 0.5
+      });
+    }
+    ensureScreenDropsOverlay();
+  }
+
+  function stopScreenDrops() {
+    screenDrops.active = false;
+    if (screenDrops._el) {
+      screenDrops._el.innerHTML = '';
+    }
+  }
+
+  function ensureScreenDropsOverlay() {
+    if (screenDrops._el) return screenDrops._el;
+    const el = document.createElement('div');
+    el.id = 'screenDropsOverlay';
+    el.style.position = 'fixed';
+    el.style.top = '0';
+    el.style.left = '0';
+    el.style.width = '100vw';
+    el.style.height = '100vh';
+    el.style.pointerEvents = 'none';
+    el.style.zIndex = '9998';
+    el.style.overflow = 'hidden';
+    document.body.appendChild(el);
+    screenDrops._el = el;
+    return el;
+  }
+
+  function updateScreenDrops(dt) {
+    if (!screenDrops.active) return;
+    screenDrops.timer += dt;
+    if (screenDrops.timer > screenDrops.duration) {
+      stopScreenDrops();
+      return;
+    }
+    const el = ensureScreenDropsOverlay();
+    let html = '';
+    screenDrops.drops.forEach(function(d) {
+      html += '<div style="position:absolute;left:' + d.x + 'px;top:' + d.y + 'px;width:' + (d.r*2) + 'px;height:' + (d.r*2) + 'px;border-radius:50%;background:radial-gradient(circle at 30% 30%, rgba(255,255,255,0.7), rgba(180,220,255,0.4) 60%, rgba(100,150,200,0.1));box-shadow:0 0 4px rgba(200,230,255,0.6);"></div>';
+    });
+    el.innerHTML = html;
+  }
+
+  /* ============================================================
+     スクリーンに数式を出す
+     ============================================================ */
+  const FORMULA_LINES = [
+    { text: 'm + w > m', sub: '海綿の総重量' },
+    { text: 'm - w < m', sub: '塩の総重量' },
+    { text: 'dW/dt = φ·V·ρ_water', sub: '吸水速度' },
+    { text: 'ΔS > 0', sub: 'エントロピー増大' },
+    { text: 'E = mc²', sub: '質量とエネルギーの等価性' },
+    { text: '∇·E = ρ/ε₀', sub: 'ガウスの法則' },
+    { text: 'iħ ∂ψ/∂t = Ĥψ', sub: 'シュレーディンガー方程式' },
+    { text: '∮ F·ds = 0', sub: '保存場の線積分' },
+    { text: 'P(A|B) = P(B|A)P(A)/P(B)', sub: 'ベイズの定理' },
+    { text: 'e^{iπ} + 1 = 0', sub: 'オイラーの等式' }
+  ];
+
+  function startScreenFormula() {
+    screenFormula.active = true;
+    screenFormula.lines = [];
+    screenFormula.timer = 0;
+    screenFormula.progress = 0;
+    // ランダムに5行選ぶ
+    const shuffled = FORMULA_LINES.slice().sort(function(){ return Math.random() - 0.5; });
+    screenFormula.lines = shuffled.slice(0, 5);
+  }
+
+  function stopScreenFormula() {
+    screenFormula.active = false;
+  }
+
+  function drawScreenFormula(dt) {
+    if (!screenFormula.active) return;
+    screenFormula.timer += dt;
+    screenFormula.progress = Math.min(1, screenFormula.timer / 2500);
+    if (screenFormula.timer > screenFormula.duration) {
+      stopScreenFormula();
+      return;
+    }
+    // スクリーン領域に黒背景 + 数式
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(180, 40, 440, 260);
+    ctx.clip();
+    // 黒板風
+    ctx.fillStyle = '#0a1a0a';
+    ctx.fillRect(180, 40, 440, 260);
+    ctx.fillStyle = 'rgba(255,255,255,0.05)';
+    for (let i = 0; i < 20; i++) {
+      ctx.fillRect(180, 40 + i * 13, 440, 1);
+    }
+    // 数式
+    ctx.textAlign = 'left';
+    const visible = Math.floor(screenFormula.progress * screenFormula.lines.length);
+    screenFormula.lines.forEach(function(line, i) {
+      if (i > visible) return;
+      const alpha = (i < visible) ? 1 : (screenFormula.progress * screenFormula.lines.length - i);
+      ctx.globalAlpha = Math.min(1, Math.max(0, alpha));
+      ctx.font = 'bold 22px "Courier New", monospace';
+      ctx.fillStyle = '#7fffa0';
+      ctx.fillText(line.text, 200, 80 + i * 42);
+      ctx.font = '13px "Courier New", monospace';
+      ctx.fillStyle = '#a0d0a0';
+      ctx.fillText(line.sub, 200, 100 + i * 42);
+    });
+    ctx.globalAlpha = 1;
+    // カーソル点滅
+    if (visible < screenFormula.lines.length) {
+      const blink = Math.floor(screenFormula.timer / 400) % 2;
+      if (blink) {
+        ctx.fillStyle = '#7fffa0';
+        ctx.fillRect(200, 80 + visible * 42 + 8, 12, 22);
+      }
+    }
+    ctx.restore();
+  }
+
+  /* ============================================================
+     スクリーンが img41x.jpg になる
+     ============================================================ */
+  let img41xElement = null;
+
+  function startScreenImage() {
+    screenImage.active = true;
+    screenImage.timer = 0;
+    screenImage.alpha = 0;
+    if (!img41xElement) {
+      img41xElement = new Image();
+      img41xElement.src = 'img41x.jpg';
+      img41xElement.onload = function() {
+        // 読み込み完了
+      };
+    }
+  }
+
+  function stopScreenImage() {
+    screenImage.active = false;
+  }
+
+  function drawScreenImage(dt) {
+    if (!screenImage.active) return;
+    screenImage.timer += dt;
+    screenImage.alpha = Math.min(1, screenImage.timer / 1200);
+    if (screenImage.timer > screenImage.duration) {
+      stopScreenImage();
+      return;
+    }
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(180, 40, 440, 260);
+    ctx.clip();
+    ctx.globalAlpha = screenImage.alpha;
+    if (img41xElement && img41xElement.complete && img41xElement.naturalWidth > 0) {
+      // fill または 100% 100% で敷く
+      ctx.drawImage(img41xElement, 180, 40, 440, 260);
+    } else {
+      // 画像が読めない場合のフォールバック
+      ctx.fillStyle = '#2a4a6a';
+      ctx.fillRect(180, 40, 440, 260);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 16px "Courier New", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('img41x.jpg', 400, 170);
+    }
+    // フェード終盤で減衰
+    if (screenImage.timer > screenImage.duration - 1500) {
+      const fade = (screenImage.duration - screenImage.timer) / 1500;
+      ctx.globalAlpha = screenImage.alpha * fade;
+      ctx.fillStyle = '#e8e8e0';
+      ctx.fillRect(180, 40, 440, 260);
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  /* ============================================================
+     哲学者のランキング表示
+     ============================================================ */
+  // 会議の解説内容の良さでランキング（私が決めた固定値）
+  const RANKING_DATA = [
+    { key:'bunseki',   name:'分析学者', score: 92, comment:'構造分析が明快。全体の骨格を最初に示した。' },
+    { key:'sugaku',    name:'数学者',   score: 88, comment:'数式と符号の反転で本質を突いた。' },
+    { key:'butsuri',   name:'物理学者', score: 85, comment:'毛細管現象と溶解度の違いを的確に説明。' },
+    { key:'tetsugaku', name:'哲学者',   score: 83, comment:'学習と経験の修正という哲学的視点を提供。' },
+    { key:'senmon',    name:'専門学者', score: 78, comment:'文献的・歴史的補足が豊富。' },
+    { key:'gendai',    name:'現代学者', score: 76, comment:'現代語への翻訳が鮮やか。' }
+  ];
+
+  function startRanking() {
+    rankingDisplay.active = true;
+    rankingDisplay.ranks = RANKING_DATA.slice().sort(function(a, b){ return b.score - a.score; });
+    rankingDisplay.timer = 0;
+    rankingDisplay.progress = 0;
+  }
+
+  function stopRanking() {
+    rankingDisplay.active = false;
+  }
+
+  function drawRanking(dt) {
+    if (!rankingDisplay.active) return;
+    rankingDisplay.timer += dt;
+    rankingDisplay.progress = Math.min(1, rankingDisplay.timer / 2000);
+    if (rankingDisplay.timer > rankingDisplay.duration) {
+      stopRanking();
+      return;
+    }
+    // 半透明のパネルを canvas 上に表示
+    ctx.fillStyle = 'rgba(0,0,0,0.75)';
+    ctx.fillRect(100, 40, 600, 300);
+    ctx.strokeStyle = '#bbbbbb';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(100, 40, 600, 300);
+    ctx.font = 'bold 22px "Courier New", monospace';
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.fillText('— 解説ランキング —', 400, 75);
+    const visible = Math.floor(rankingDisplay.progress * rankingDisplay.ranks.length);
+    rankingDisplay.ranks.forEach(function(r, i) {
+      if (i > visible) return;
+      const alpha = (i < visible) ? 1 : (rankingDisplay.progress * rankingDisplay.ranks.length - i);
+      ctx.globalAlpha = Math.min(1, Math.max(0, alpha));
+      const y = 115 + i * 38;
+      // 順位
+      ctx.font = 'bold 20px "Courier New", monospace';
+      ctx.fillStyle = '#ffd700';
+      ctx.textAlign = 'left';
+      ctx.fillText((i + 1) + '位', 130, y);
+      // 名前（色付き）
+      ctx.fillStyle = getSpeakerColor(r.key);
+      ctx.font = 'bold 20px "Courier New", monospace';
+      ctx.fillText(r.name, 210, y);
+      // スコア
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '16px "Courier New", monospace';
+      ctx.fillText(r.score + '点', 360, y);
+      // コメント
+      ctx.fillStyle = '#c0d0c0';
+      ctx.font = '12px "Courier New", monospace';
+      ctx.fillText(r.comment, 430, y);
+    });
+    ctx.globalAlpha = 1;
+  }
+
+  /* ============================================================
+     ペット部屋の追加描画（後編フック）
+     ============================================================ */
+  window.__PHASE2__.tickPetRoom = function(c, game, now) {
+    // ロバの状態に応じた追加描画
+    // 天候イベント中はロバがびっくり
+    if (siteWeather.active) {
+      c.fillStyle = '#ffe0a0';
+      c.font = '10px "Courier New", monospace';
+      c.textAlign = 'center';
+      c.fillText('！', game.x, game.y - 45);
+    }
+    // なでられた直後はハート
+    if (game.petCount > 0 && now - (game._lastPet || 0) < 3000) {
+      c.fillStyle = '#ff6b8a';
+      c.font = '14px sans-serif';
+      c.fillText('♥', game.x + 5, game.y - 35);
+    }
+  };
+
+  /* ============================================================
+     ターゲット→イベント名
+     ============================================================ */
+  window.__PHASE2__.getEventFor = function(targetKey) {
+    switch(targetKey) {
+      case 'bunseki':   return 'footerVertical';
+      case 'butsuri':   return 'weather';
+      case 'senmon':    return 'rainAndDrops';
+      case 'gendai':    return 'img41x';
+      case 'sugaku':    return 'formula';
+      case 'tetsugaku': return 'ranking';
+      default: return 'none';
+    }
+  };
+
+  /* ============================================================
+     イベント発生時の処理
+     ============================================================ */
+  window.__PHASE2__.onEvent = function(targetKey, eventType) {
+    switch(eventType) {
+      case 'footerVertical':
+        // 分析学者 → footer に vertical.html（前編と同じ）
+        verticalLink.classList.add('visible');
+        footerSub.innerHTML = '↕ <a href="vertical.html" target="_self">vertical.html へ</a>';
+        footerLinkVisible = true;
+        addConferenceLog('bunseki', '「……まさか、この構造に気づくとは。footer を見てみろ。」');
+        break;
+
+      case 'weather':
+        // 物理学者 → サイト全体 or スクリーンに雨/雪/雷/雨+雷
+        var wtypes = ['rain', 'snow', 'thunder', 'rainThunder'];
+        var wtype = wtypes[Math.floor(Math.random() * wtypes.length)];
+        var scope = Math.random() < 0.5 ? 'site' : 'screen';
+        if (scope === 'site') {
+          startSiteWeather(wtype);
+          addConferenceLog('butsuri', '「外で天気が変わったぞ。' + wtypeName(wtype) + 'だ。」');
+        } else {
+          startScreenWeather(wtype);
+          addConferenceLog('butsuri', '「スクリーンの中で' + wtypeName(wtype) + 'が降っている。」');
+        }
+        break;
+
+      case 'rainAndDrops':
+        // 専門学者 → サイト全体に雨 + 画面に水滴
+        startSiteWeather('rain');
+        startScreenDrops();
+        addConferenceLog('senmon', '「雨だ。そして画面に水滴がついた。……これは古文書の保存状態に似ている。」');
+        break;
+
+      case 'img41x':
+        // 現代学者 → スクリーンが img41x.jpg になる
+        startScreenImage();
+        addConferenceLog('gendai', '「スクリーンが img41x.jpg に切り替わった。現代のプレゼンだ。」');
+        break;
+
+      case 'formula':
+        // 数学者 → スクリーンに数式
+        startScreenFormula();
+        addConferenceLog('sugaku', '「私がこれから言おうとした数式を、先に出しておいた。」');
+        break;
+
+      case 'ranking':
+        // 哲学者 → 会議参加者のランキング
+        startRanking();
+        addConferenceLog('tetsugaku', '「今回の解説の良さをランキングしてみた。……私も含めて、だ。」');
+        break;
+
+      default:
+        addConferenceLog(targetKey, '（何かが起きた）');
+    }
+  };
+
+  function wtypeName(t) {
+    switch(t) {
+      case 'rain': return '雨';
+      case 'snow': return '雪';
+      case 'thunder': return '雷';
+      case 'rainThunder': return '雨と雷';
+      default: return t;
+    }
+  }
+
+  function addConferenceLog(speakerKey, text) {
+    const entry = document.createElement('div');
+    entry.className = 'log-entry';
+    const spColor = getSpeakerColor(speakerKey);
+    const name = getSpeakerName(speakerKey);
+    entry.innerHTML = '<span class="log-speaker" style="color:' + spColor + '">🐴 ' + name + '：</span><span class="log-text">' + text + '</span>';
+    logBody.appendChild(entry);
+    logBody.scrollTop = logBody.scrollHeight;
+  }
+
+  /* ============================================================
+     知識マウント時の追加処理（後編フック）
+     ============================================================ */
+  window.__PHASE2__.onDonkeyMounted = function(targetKey, text) {
+    // 既に前編で showDonkeySpeech されているので、ここでは追加のログだけ
+    // 何もしない（前編の showDonkeySpeech でログに出ている）
+  };
+
+  /* ============================================================
+     毎フレームの更新（後編）
+     ============================================================ */
+  let lastPhase2Tick = 0;
+  function phase2Tick(now) {
+    if (!lastPhase2Tick) lastPhase2Tick = now;
+    const dt = now - lastPhase2Tick;
+    lastPhase2Tick = now;
+    // サイト天候
+    updateSiteWeather(dt);
+    // スクリーン天候
+    updateScreenWeather(dt);
+    drawScreenWeather();
+    // 水滴
+    updateScreenDrops(dt);
+    // 数式
+    drawScreenFormula(dt);
+    // img41x
+    drawScreenImage(dt);
+    // ランキング
+    drawRanking(dt);
+  }
+
+  // メインループに後編の更新を差し込む
+  // 既存の animate は requestAnimationFrame を回しているので、
+  // ここで独立した rAF を回す
+  function phase2Loop(ts) {
+    phase2Tick(ts);
+    requestAnimationFrame(phase2Loop);
+  }
+  requestAnimationFrame(phase2Loop);
+
+  // ============================================================
+  // ▲▲▲ 第2段階（後編）はここまで ▲▲▲
+  // ============================================================
+
 })();
 </script>
 </body>
