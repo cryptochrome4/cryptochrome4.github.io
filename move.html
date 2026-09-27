@@ -114,7 +114,7 @@
   }
   .log-panel.visible { display:flex; }
   .log-header {
-    padding:8px 12px; background:#1d331d;
+    padding:6px 12px; background:#1d331d;
     color:#f0e6b0; font-weight:bold;
     font-size:0.95rem; letter-spacing:1px;
     border-bottom:2px solid #3f6b3f;
@@ -125,6 +125,19 @@
     background:#ff4444; box-shadow:0 0 8px #ff4444;
     animation:pulse 1.2s infinite;
   }
+  .log-header .reset-btn {
+    background:#5a2a2a;
+    color:#ffd0d0;
+    border:2px solid #8f4a4a;
+    border-radius:20px;
+    padding:2px 10px;
+    font-family:'Courier New', monospace;
+    font-size:0.72rem;
+    cursor:pointer;
+    box-shadow:0 2px 0 #2a1a1a;
+  }
+  .log-header .reset-btn:hover { background:#7a3a3a; color:#fff; }
+  .log-header .reset-btn:active { transform:translateY(2px); box-shadow:0 0 0 #2a1a1a; }
   .log-body {
     flex:1 1 auto; overflow-y:auto;
     padding:10px 12px;
@@ -172,7 +185,6 @@
     border-bottom:2px solid #6b4a2b;
     display:flex; justify-content:space-between; align-items:center;
   }
-  .pet-header .hint { font-size:0.72rem; color:#b09060; font-weight:normal; }
   canvas#petCanvas {
     display:block;
     width:100%;
@@ -214,6 +226,13 @@
   .pet-gauge-fill.water { background:linear-gradient(90deg,#3a7a9a,#5b9bd5); }
   .pet-gauge-fill.love { background:linear-gradient(90deg,#c04060,#ff6b8a); }
   .pet-gauge-val { font-size:0.65rem; color:#8090a0; width:26px; text-align:right; }
+  .pet-mood-row {
+    display:flex; justify-content:space-between;
+    padding-top:2px;
+    font-size:0.7rem;
+  }
+  .pet-mood-row #petStatus { color:#a0b0a0; }
+  .pet-mood-row #petMood { color:#c0d0a0; }
 
   .footer {
     position:relative; z-index:1;
@@ -334,7 +353,7 @@
       <aside class="log-panel" id="logPanel">
         <div class="log-header">
           <span>解説会議 — LIVE</span>
-          <span class="live"></span>
+          <button class="reset-btn" id="resetLogBtn">ログリセット</button>
         </div>
         <div class="log-body" id="logBody"></div>
       </aside>
@@ -342,7 +361,6 @@
     <div class="pet-room" id="petRoom">
       <div class="pet-header">
         <span>🐴 ロバ部屋</span>
-        <span class="hint">餌箱・水場・頭をクリック</span>
       </div>
       <canvas id="petCanvas" width="320" height="180"></canvas>
       <div class="pet-footer">
@@ -361,9 +379,9 @@
           <div class="pet-gauge-bar"><div class="pet-gauge-fill love" id="gaugeLove"></div></div>
           <span class="pet-gauge-val" id="gaugeLoveVal">0</span>
         </div>
-        <div style="display:flex; justify-content:space-between; padding-top:2px;">
-          <span id="petStatus" style="font-size:0.7rem; color:#a0b0a0;">ロバはのんびりしている</span>
-          <span id="petMood" style="font-size:0.7rem; color:#c0d0a0;"></span>
+        <div class="pet-mood-row">
+          <span id="petStatus">ロバはのんびりしている</span>
+          <span id="petMood"></span>
         </div>
       </div>
     </div>
@@ -405,6 +423,7 @@
   const footerSub = document.getElementById('footerSub');
   const logPanel = document.getElementById('logPanel');
   const logBody = document.getElementById('logBody');
+  const resetLogBtn = document.getElementById('resetLogBtn');
   const petRoom = document.getElementById('petRoom');
   const petStatus = document.getElementById('petStatus');
   const petMood = document.getElementById('petMood');
@@ -575,7 +594,6 @@
       }
     }
   }
-  // ★ drawProgressBar は削除（章ゲージ不要）
 
   /* ============================================================
      話1: derivative
@@ -741,7 +759,6 @@
     else if (progress < 0.85) chapter = '第四章：莫大な利益';
     else { chapter = '終章：欲すれば富は可能、されど関心なし'; chapterColor = '#ffe0a0'; }
     pixelText(ctx, chapter, 40, 110, 18, chapterColor);
-    // ★ drawProgressBar 削除
     if (progress > 0.1 && progress < 0.28) drawSpeechBubble(ctx, 80, 180, 250, 60, 'タレス「来年は豊作だ」', 'left');
     else if (progress > 0.35 && progress < 0.5) drawSpeechBubble(ctx, 80, 180, 270, 70, 'タレス「全ての圧搾機を\n借りておこう」', 'left');
     else if (progress > 0.7 && progress < 0.82) drawSpeechBubble(ctx, 80, 180, 280, 80, '人々「圧搾機を貸してくれ！」\nタレス「さあ、どうぞ」', 'left');
@@ -894,7 +911,6 @@
     else if (progress < 0.8) subText = '第四章：海綿の重み';
     else subText = '終章：それ以後、転ばなくなる';
     pixelText(ctx, subText, 30, 75, 16, '#cfe8cf');
-    // ★ drawProgressBar 削除
     const walkPhase = progress * Math.PI * 6;
     const thalesX = 150 + Math.sin(progress * Math.PI * 2) * 80;
     drawThalesAsinus(ctx, thalesX, 320, 1.0, walkPhase, true);
@@ -948,8 +964,10 @@
      会議シーン
      ============================================================ */
   function drawConferenceScene() {
+    // 壁
     ctx.fillStyle = '#2a3a2a'; ctx.fillRect(0, 0, 800, 400);
     for (let i=0;i<30;i++){ ctx.fillStyle = 'rgba(0,0,0,0.1)'; px(ctx, 0, i*14, 800, 3, 'rgba(0,0,0,0.1)'); }
+    // 机
     ctx.fillStyle = '#5a3a1a';
     ctx.beginPath();
     ctx.moveTo(0, 340); ctx.lineTo(800, 340); ctx.lineTo(800, 400); ctx.lineTo(0, 400);
@@ -957,15 +975,19 @@
     ctx.fillStyle = '#7a5a2a'; ctx.fillRect(0, 340, 800, 6);
 
     const screenX = 180, screenY = 40, screenW = 440, screenH = 260;
+    // スクリーン枠
     ctx.fillStyle = '#1a1a1a';
     ctx.fillRect(screenX - 6, screenY - 6, screenW + 12, screenH + 12);
     ctx.fillStyle = '#e8e8e0';
     ctx.fillRect(screenX, screenY, screenW, screenH);
 
+    // スクリーン内容
     ctx.save();
     ctx.beginPath(); ctx.rect(screenX, screenY, screenW, screenH); ctx.clip();
     const sx = screenW / 800, sy = screenH / 400;
     ctx.translate(screenX, screenY); ctx.scale(sx, sy);
+
+    // スクリーン内の背景シーン
     if (currentStory === 'derivative') {
       const g = ctx.createLinearGradient(0, 0, 0, 400);
       g.addColorStop(0, '#b87c4b'); g.addColorStop(0.55, '#dbb87c'); g.addColorStop(1, '#e8c89a');
@@ -1034,13 +1056,21 @@
       ctx.font = 'bold 18px "Courier New", monospace';
       ctx.fillStyle = '#fff9e6'; ctx.fillText('第四章：海綿の重み', 40, 120);
     }
+
+    // スクリーン内イベント（雨・数式・img41x など）はここで重ねる
+    if (window.__PHASE2__ && window.__PHASE2__.drawScreenEvents) {
+      window.__PHASE2__.drawScreenEvents(ctx);
+    }
+
     ctx.restore();
 
+    // スクリーン反射
     ctx.fillStyle = 'rgba(255,255,255,0.08)';
     ctx.beginPath();
     ctx.moveTo(screenX, screenY); ctx.lineTo(screenX + 120, screenY);
     ctx.lineTo(screenX, screenY + 120); ctx.closePath(); ctx.fill();
 
+    // プロジェクター
     ctx.fillStyle = '#333'; ctx.fillRect(370, 0, 60, 20);
     ctx.fillStyle = '#555'; ctx.fillRect(375, 20, 50, 8);
     ctx.fillStyle = 'rgba(255,255,200,0.06)';
@@ -1049,6 +1079,7 @@
     ctx.lineTo(screenX + screenW + 20, screenY + 40); ctx.lineTo(410, 28);
     ctx.closePath(); ctx.fill();
 
+    // 学者6人
     const speakers = getSpeakers();
     speakers.forEach(function(sp, i){
       const px0 = 60 + i * 120;
@@ -1071,8 +1102,10 @@
       }
     });
 
+    // ロバの乱入
     drawDonkeyIntrusion();
 
+    // 字幕
     if (confSpeaker && confTyping.length > 0) {
       const spColor = getSpeakerColor(confSpeaker.key);
       ctx.fillStyle = 'rgba(0,0,0,0.75)';
@@ -1102,6 +1135,11 @@
         ctx.fillRect(cursorX + 2, 322, 3, 16);
       }
     }
+
+    // ランキング表示（哲学者イベント）
+    if (window.__PHASE2__ && window.__PHASE2__.drawRankingOnWall) {
+      window.__PHASE2__.drawRankingOnWall(ctx);
+    }
   }
 
   function getSpeakers() {
@@ -1116,7 +1154,7 @@
   }
 
   /* ============================================================
-     ロバの乱入（会議シーン内、小さめ）
+     ロバの乱入
      ============================================================ */
   let donkeyIntrusion = {
     active: false,
@@ -1297,7 +1335,7 @@
   let confNextStart = 0;
   let confStarted = false;
 
-  function startConference(storyKey) {
+  function startConference(storyKey, resetLog) {
     phase = 'conference';
     confLines = (storyKey === 'derivative') ? CONF_DERIVATIVE : CONF_ASINUS;
     confIndex = 0;
@@ -1309,10 +1347,10 @@
     confPauseUntil = 0;
     confEndTime = 0;
     confNextStart = performance.now() + 800;
-    logBody.innerHTML = '';
+    if (resetLog) logBody.innerHTML = '';
     logPanel.classList.add('visible');
     petRoom.classList.add('visible');
-    startDonkeyGame();
+    if (!petGame.running) startDonkeyGame();
   }
 
   function stopConference() {
@@ -1367,36 +1405,34 @@
   }
 
   /* ============================================================
-     ペット部屋（ゲージ化・ロバ1匹）
+     ペット部屋（ゲージ・ロバ1匹）
      ============================================================ */
   let petGame = {
     x: 160, y: 130,
     targetX: 160, targetY: 130,
     phase: 0,
-    // ゲージ (0〜100)
-    foodGauge: 0,
-    waterGauge: 0,
-    loveGauge: 0,
-    // 餌箱・水場の残量
-    foodInBox: 0,    // 0〜4
+    foodGauge: 20,
+    waterGauge: 20,
+    loveGauge: 20,
+    foodInBox: 0,
     waterInBowl: false,
-    // 行動
     eatingTimer: 0,
     drinkingTimer: 0,
     eating: false,
     drinking: false,
+    // だらだら行動
+    idleTimer: 0,
+    idleDuration: 0,
     // 乱入管理
     intrusionCooldown: 0,
-    // ロバが会議室にいるか
     inConference: false,
     running: false
   };
 
-  // ゲージの減衰速度（1秒あたり）
   const GAUGE_DECAY = {
-    food: 0.6,   // 満腹度
-    water: 0.8,  // 水分度
-    love: 0.5    // 愛され度
+    food: 0.6,
+    water: 0.8,
+    love: 0.5
   };
 
   function startDonkeyGame() {
@@ -1410,9 +1446,11 @@
     petGame.intrusionCooldown = 0;
     petGame.targetX = 60 + Math.random() * 200;
     petGame.targetY = 90 + Math.random() * 50;
+    petGame.idleTimer = 0;
+    petGame.idleDuration = 0;
     updatePetGauges();
     petMood.textContent = '';
-    petStatus.textContent = 'ロバはのんびりしている';
+    petStatus.textContent = 'のんびりしている';
   }
   function stopDonkeyGame() {
     petGame.running = false;
@@ -1439,10 +1477,6 @@
 
   petCanvas.addEventListener('click', function(evt){
     if (!petGame.running) return;
-    if (petGame.inConference) {
-      petStatus.textContent = 'ロバは会議室にいる';
-      return;
-    }
     const p = petCanvasPos(evt);
     const foodBox = { x: 30, y: 130, w: 40, h: 30 };
     const waterSpot = { x: 250, y: 130, w: 40, h: 30 };
@@ -1454,7 +1488,7 @@
         petGame.foodInBox++;
         petStatus.textContent = '餌箱に餌を入れた';
       } else {
-        petStatus.textContent = '餌箱はいっぱいだ';
+        petStatus.textContent = '餌箱はいっぱい';
       }
       return;
     }
@@ -1468,31 +1502,32 @@
       }
       return;
     }
-    if (p.x >= donkeyHead.x && p.x <= donkeyHead.x + donkeyHead.w &&
+    if (!petGame.inConference &&
+        p.x >= donkeyHead.x && p.x <= donkeyHead.x + donkeyHead.w &&
         p.y >= donkeyHead.y && p.y <= donkeyHead.y + donkeyHead.h) {
       petGame.loveGauge = Math.min(100, petGame.loveGauge + 20);
       petGame._lastPet = performance.now();
       petStatus.textContent = 'ロバを撫でた';
-      petMood.textContent = 'ロバ「……（満足げ）」';
+      petMood.textContent = '満足げ';
       updatePetGauges();
       return;
     }
-    // それ以外をクリック → ロバがそっちに行く
-    petGame.targetX = Math.max(50, Math.min(270, p.x));
-    petGame.targetY = Math.max(90, Math.min(150, p.y));
+    if (!petGame.inConference) {
+      petGame.targetX = Math.max(50, Math.min(270, p.x));
+      petGame.targetY = Math.max(90, Math.min(150, p.y));
+    }
   });
 
   /* ============================================================
-     乱入スケジューラ
+     乱入スケジューラ（会議中のみ、短時間）
      ============================================================ */
   function scheduleDonkeyIntrusion(now) {
     if (donkeyIntrusion.active) return;
     if (petGame.inConference) return;
     if (petGame.intrusionCooldown > now) return;
-    // 乱入間隔
-    const interval = 14000 + Math.random() * 12000;
+    // 乱入間隔（前より長め：25〜45秒）
+    const interval = 25000 + Math.random() * 20000;
     petGame.intrusionCooldown = now + interval;
-    // ゲージが高いほど行きやすい学者を決める
     const targetKey = pickDonkeyTarget();
     const speakers = getSpeakers();
     let targetX = 400;
@@ -1513,24 +1548,16 @@
   }
 
   function pickDonkeyTarget() {
-    // 基本確率
     const w = {
       bunseki: 1, butsuri: 1, sugaku: 1,
       tetsugaku: 1, senmon: 1, gendai: 1
     };
-    // 満腹度が高い → 分析学者UP
-    // 満腹度が低い → 物理学者UP
     if (petGame.foodGauge > 50) w.bunseki += (petGame.foodGauge - 50) * 0.06;
     else w.butsuri += (50 - petGame.foodGauge) * 0.06;
-    // 水分度が高い → 数学者UP
-    // 水分度が低い → 哲学者UP
     if (petGame.waterGauge > 50) w.sugaku += (petGame.waterGauge - 50) * 0.06;
     else w.tetsugaku += (50 - petGame.waterGauge) * 0.06;
-    // 愛され度が高い → 専門学者UP
-    // 愛され度が低い → 現代学者UP
     if (petGame.loveGauge > 50) w.senmon += (petGame.loveGauge - 50) * 0.06;
     else w.gendai += (50 - petGame.loveGauge) * 0.06;
-    // 重み付き抽選
     const keys = Object.keys(w);
     let total = 0;
     keys.forEach(function(k){ total += w[k]; });
@@ -1556,22 +1583,26 @@
         onDonkeyArrived(d.targetKey);
       }
     } else if (d.state === 'mounted') {
-      if (d.timer > 3000) {
+      // 滞在時間を短く（1.8秒）
+      if (d.timer > 1800) {
         d.state = 'leaving';
         d.timer = 0;
       }
     } else if (d.state === 'leaving') {
-      d.x += 4;
+      d.x += 6;
       if (d.x > 820) {
         d.active = false;
         d.state = 'idle';
         petGame.inConference = false;
         petStatus.textContent = 'ロバが戻ってきた';
-        // 戻ったら少しゲージが回復（満たされた感）
         petGame.foodGauge = Math.max(0, petGame.foodGauge - 5);
         petGame.waterGauge = Math.max(0, petGame.waterGauge - 5);
         petGame.loveGauge = Math.max(0, petGame.loveGauge - 5);
         updatePetGauges();
+        // 戻ったらイベント停止
+        if (window.__PHASE2__ && window.__PHASE2__.stopEvents) {
+          window.__PHASE2__.stopEvents();
+        }
       }
     }
   }
@@ -1696,30 +1727,43 @@
       c.fillRect(256, 138, 28, 4);
     }
 
-    // ロバが会議室にいるときはペット部屋に描かない
     if (!petGame.inConference) {
-      const dx = petGame.targetX - petGame.x;
-      const dy = petGame.targetY - petGame.y;
-      const dist = Math.sqrt(dx*dx + dy*dy);
-      if (dist > 3) {
-        petGame.x += dx * 0.02;
-        petGame.y += dy * 0.02;
-        petGame.phase += 0.15;
-      } else {
-        petGame.phase += 0.05;
-        if (Math.random() < 0.005) {
-          const r = Math.random();
-          if (petGame.foodInBox > 0 && r < 0.3) {
-            petGame.targetX = 50;
-            petGame.targetY = 125;
-          } else if (petGame.waterInBowl && r < 0.5) {
-            petGame.targetX = 270;
-            petGame.targetY = 125;
-          } else {
-            petGame.targetX = 60 + Math.random() * 200;
-            petGame.targetY = 90 + Math.random() * 50;
+      // だらだらタイマー
+      if (petGame.idleTimer === 0) {
+        petGame.idleTimer = now;
+        petGame.idleDuration = 2000 + Math.random() * 4000;
+      }
+      const idleElapsed = now - petGame.idleTimer;
+      const isIdle = idleElapsed < petGame.idleDuration;
+
+      if (!isIdle) {
+        const dx = petGame.targetX - petGame.x;
+        const dy = petGame.targetY - petGame.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist > 3) {
+          petGame.x += dx * 0.02;
+          petGame.y += dy * 0.02;
+          petGame.phase += 0.15;
+        } else {
+          petGame.phase += 0.05;
+          if (Math.random() < 0.02) {
+            petGame.idleTimer = 0; // 新しい目標地点へ
+            const r = Math.random();
+            if (petGame.foodInBox > 0 && r < 0.3) {
+              petGame.targetX = 50;
+              petGame.targetY = 125;
+            } else if (petGame.waterInBowl && r < 0.5) {
+              petGame.targetX = 270;
+              petGame.targetY = 125;
+            } else {
+              petGame.targetX = 60 + Math.random() * 200;
+              petGame.targetY = 90 + Math.random() * 50;
+            }
           }
         }
+      } else {
+        // だらだら中はその場でのんびり
+        petGame.phase += 0.02;
       }
 
       // 餌を食べる
@@ -1732,7 +1776,7 @@
           petGame.foodInBox--;
           petGame.foodGauge = Math.min(100, petGame.foodGauge + 25);
           petGame.eating = false;
-          petMood.textContent = 'ロバ「むしゃむしゃ……」';
+          petMood.textContent = 'むしゃむしゃ';
           updatePetGauges();
         }
       }
@@ -1746,20 +1790,19 @@
           petGame.waterInBowl = false;
           petGame.waterGauge = Math.min(100, petGame.waterGauge + 25);
           petGame.drinking = false;
-          petMood.textContent = 'ロバ「ごくごく……」';
+          petMood.textContent = 'ごくごく';
           updatePetGauges();
         }
       }
 
-      drawDonkey(c, petGame.x, petGame.y, 0.7, petGame.phase, dist > 3, false, 'none');
+      drawDonkey(c, petGame.x, petGame.y, 0.7, petGame.phase, !isIdle, false, 'none');
 
-      // なでられたハート
       if (petGame.loveGauge > 50 && now - (petGame._lastPet || 0) < 3000) {
         c.fillStyle = '#ff6b8a';
         c.font = '16px sans-serif';
-        c.fillText('♥', petGame.x - 8, petGame.y - 40);
+        c.textAlign = 'center';
+        c.fillText('♥', petGame.x, petGame.y - 40);
       }
-      // お腹が減ってるサイン
       if (petGame.foodGauge < 20) {
         c.fillStyle = '#ffcc00';
         c.font = '12px "Courier New", monospace';
@@ -1767,23 +1810,16 @@
         c.fillText('…', petGame.x, petGame.y - 45);
       }
     } else {
-      // 会議室に行っている間はメッセージ
+      // 会議室にいる間、ペット部屋は空
       c.fillStyle = '#6a7a6a';
-      c.font = '14px "Courier New", monospace';
+      c.font = '13px "Courier New", monospace';
       c.textAlign = 'center';
-      c.fillText('（ロバは会議室にいる）', 160, 90);
+      c.fillText('ロバは留守', 160, 90);
     }
-
-    // ヒント
-    c.font = '9px "Courier New", monospace';
-    c.fillStyle = '#8a9a8a';
-    c.textAlign = 'center';
-    c.fillText('餌箱', 50, 175);
-    c.fillText('水場', 270, 175);
   }
 
   /* ============================================================
-     ゲージの減衰（毎フレーム）
+     ゲージの減衰
      ============================================================ */
   let lastGaugeUpdate = 0;
   function updateGauges(now) {
@@ -1796,9 +1832,8 @@
     petGame.waterGauge = Math.max(0, petGame.waterGauge - GAUGE_DECAY.water * dt);
     petGame.loveGauge = Math.max(0, petGame.loveGauge - GAUGE_DECAY.love * dt);
     updatePetGauges();
-    // ムード表示
     if (petGame.inConference) {
-      // 何もしない
+      // 会議室にいるときは状態を出さない
     } else if (petGame.foodGauge < 20) {
       petMood.textContent = 'お腹が空いている';
     } else if (petGame.waterGauge < 20) {
@@ -1811,6 +1846,54 @@
       petMood.textContent = '';
     }
   }
+
+  /* ============================================================
+     ログリセットボタン（2回確認）
+     ============================================================ */
+  let resetConfirmStage = 0;
+  let resetConfirmTimer = null;
+  resetLogBtn.addEventListener('click', function(){
+    if (resetConfirmStage === 0) {
+      resetConfirmStage = 1;
+      resetLogBtn.textContent = '本当にリセット？';
+      resetLogBtn.style.background = '#7a3a3a';
+      resetLogBtn.style.color = '#fff';
+      clearTimeout(resetConfirmTimer);
+      resetConfirmTimer = setTimeout(function(){
+        resetConfirmStage = 0;
+        resetLogBtn.textContent = 'ログリセット';
+        resetLogBtn.style.background = '#5a2a2a';
+        resetLogBtn.style.color = '#ffd0d0';
+      }, 3000);
+    } else if (resetConfirmStage === 1) {
+      resetConfirmStage = 2;
+      resetLogBtn.textContent = '本当に本当に？';
+      resetLogBtn.style.background = '#9a2a2a';
+      resetLogBtn.style.color = '#fff';
+      clearTimeout(resetConfirmTimer);
+      resetConfirmTimer = setTimeout(function(){
+        resetConfirmStage = 0;
+        resetLogBtn.textContent = 'ログリセット';
+        resetLogBtn.style.background = '#5a2a2a';
+        resetLogBtn.style.color = '#ffd0d0';
+      }, 3000);
+    } else {
+      // リセット実行
+      resetConfirmStage = 0;
+      clearTimeout(resetConfirmTimer);
+      resetLogBtn.textContent = 'ログリセット';
+      resetLogBtn.style.background = '#5a2a2a';
+      resetLogBtn.style.color = '#ffd0d0';
+      // 会議を最初から
+      if (currentStory) {
+        stopDonkeyGame();
+        donkeyIntrusion.active = false;
+        // ロバを戻す
+        petGame.inConference = false;
+        startConference(currentStory, true);
+      }
+    }
+  });
 
   /* ============================================================
      メインループ
@@ -1836,12 +1919,16 @@
         scheduleDonkeyIntrusion(now);
       }
       drawConferenceScene();
+    } else if (phase === 'petroom') {
+      // ペット部屋のみ表示（起動直後）
+      ctx.fillStyle = '#0a1f1a';
+      ctx.fillRect(0, 0, 800, 400);
+      pixelText(ctx, 'ロバ部屋', 400, 180, 32, '#e8d0a0', 'center');
+      pixelText(ctx, '下のロバ部屋で遊んでください', 400, 230, 16, '#a0b0a0', 'center');
     }
 
-    // ゲージ減衰
     updateGauges(now);
 
-    // ペット部屋描画
     if (petGame.running) {
       drawPetRoom(now);
       if (window.__PHASE2__ && window.__PHASE2__.tickPetRoom) {
@@ -1856,7 +1943,7 @@
       }
     } else if (phase === 'intermission') {
       if (now - intermissionStart >= 3000) {
-        startConference(currentStory);
+        startConference(currentStory, false);
       }
     }
 
@@ -1876,9 +1963,10 @@
     footerSub.innerHTML = '';
     footerTitle.textContent = STORIES[storyKey].label;
     logPanel.classList.remove('visible');
-    petRoom.classList.remove('visible');
+    petRoom.classList.add('visible');
     logBody.innerHTML = '';
     phase = 'animation';
+    if (!petGame.running) startDonkeyGame();
     if (storyKey === 'derivative') drawDerivativeScene(0);
     else drawAsinusScene(0);
     animationId = requestAnimationFrame(animate);
@@ -1899,8 +1987,13 @@
     footerSub.innerHTML = '';
     footerTitle.textContent = 'タレスの2つの物語';
     logPanel.classList.remove('visible');
-    petRoom.classList.remove('visible');
+    // ペット部屋は最初から表示
+    petRoom.classList.add('visible');
     logBody.innerHTML = '';
+    if (!petGame.running) startDonkeyGame();
+    phase = 'petroom';
+    // ループ再開
+    animationId = requestAnimationFrame(animate);
   }
 
   derivativeBtn.addEventListener('click', function(e){ e.stopPropagation(); startStory('derivative'); });
@@ -1917,6 +2010,9 @@
   //   window.__PHASE2__.tickPetRoom = function(petCtx, petGame, now) { ... }
   //   window.__PHASE2__.getEventFor = function(targetKey) { ... }
   //   window.__PHASE2__.onDonkeyMounted = function(targetKey, text) { ... }
+  //   window.__PHASE2__.stopEvents = function() { ... }
+  //   window.__PHASE2__.drawScreenEvents = function(ctx) { ... }
+  //   window.__PHASE2__.drawRankingOnWall = function(ctx) { ... }
   // ============================================================
   // ▲▲▲ 第2段階（後編）はここまで ▲▲▲
   // ============================================================
@@ -1931,8 +2027,6 @@
     active: false,
     type: 'rain',
     particles: [],
-    timer: 0,
-    duration: 8000,
     lightningTimer: 0,
     lightningFlash: 0,
     overlayEl: null
@@ -1941,8 +2035,6 @@
   let screenDrops = {
     active: false,
     drops: [],
-    timer: 0,
-    duration: 7000,
     _el: null
   };
 
@@ -1950,14 +2042,12 @@
     active: false,
     lines: [],
     timer: 0,
-    duration: 10000,
     progress: 0
   };
 
   let screenImage = {
     active: false,
     timer: 0,
-    duration: 10000,
     alpha: 0
   };
 
@@ -1965,19 +2055,19 @@
     active: false,
     ranks: [],
     timer: 0,
-    duration: 12000,
     progress: 0
   };
 
   let screenRain = {
     active: false,
     particles: [],
-    timer: 0,
-    duration: 7000,
     type: 'rain'
   };
 
   let img41xElement = null;
+
+  // イベントはロバが会議室を去るまで継続するので、
+  // duration による自動停止はしない。stopEvents() で止める。
 
   /* ------------------------------------------------------------
      サイト全体の天候オーバーレイ
@@ -2003,7 +2093,6 @@
     siteWeather.active = true;
     siteWeather.type = type || 'rain';
     siteWeather.particles = [];
-    siteWeather.timer = 0;
     siteWeather.lightningTimer = 0;
     siteWeather.lightningFlash = 0;
     const count = (siteWeather.type === 'snow') ? 80 : 120;
@@ -2013,13 +2102,10 @@
         y: Math.random() * window.innerHeight,
         vx: (Math.random() - 0.5) * 1.5,
         vy: (siteWeather.type === 'snow') ? (0.5 + Math.random() * 1.5) : (4 + Math.random() * 6),
-        size: (siteWeather.type === 'snow') ? (2 + Math.random() * 4) : (1 + Math.random() * 2),
-        life: 1
+        size: (siteWeather.type === 'snow') ? (2 + Math.random() * 4) : (1 + Math.random() * 2)
       });
     }
-    if (siteWeather.type === 'thunder' || siteWeather.type === 'rainThunder') {
-      ensureWeatherOverlay();
-    }
+    ensureWeatherOverlay();
   }
 
   function stopSiteWeather() {
@@ -2031,11 +2117,6 @@
 
   function updateSiteWeather(dt) {
     if (!siteWeather.active) return;
-    siteWeather.timer += dt;
-    if (siteWeather.timer > siteWeather.duration) {
-      stopSiteWeather();
-      return;
-    }
     const el = ensureWeatherOverlay();
     const w = window.innerWidth;
     const h = window.innerHeight;
@@ -2082,7 +2163,6 @@
     screenRain.active = true;
     screenRain.type = type || 'rain';
     screenRain.particles = [];
-    screenRain.timer = 0;
     const count = (screenRain.type === 'snow') ? 40 : 60;
     for (let i = 0; i < count; i++) {
       screenRain.particles.push({
@@ -2098,50 +2178,106 @@
     screenRain.active = false;
   }
 
-  function drawScreenWeather() {
+  function updateScreenWeather() {
     if (!screenRain.active) return;
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(180, 40, 440, 260);
-    ctx.clip();
-    const isSnow = screenRain.type === 'snow';
-    const isRain = screenRain.type === 'rain' || screenRain.type === 'rainThunder';
-    const isThunder = screenRain.type === 'thunder' || screenRain.type === 'rainThunder';
-    if (isThunder) {
-      const flash = Math.sin(screenRain.timer * 0.02);
-      if (flash > 0.7) {
-        ctx.fillStyle = 'rgba(255,255,255,' + ((flash - 0.7) * 2) + ')';
-        ctx.fillRect(180, 40, 440, 260);
-      }
-    }
-    if (isRain) {
-      ctx.fillStyle = 'rgba(150,200,255,0.75)';
-      screenRain.particles.forEach(function(p) {
-        ctx.fillRect(p.x, p.y, p.size, p.size * 8);
-      });
-    } else if (isSnow) {
-      ctx.fillStyle = 'rgba(255,255,255,0.9)';
-      screenRain.particles.forEach(function(p) {
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
-        ctx.fill();
-      });
-    }
-    ctx.restore();
-  }
-
-  function updateScreenWeather(dt) {
-    if (!screenRain.active) return;
-    screenRain.timer += dt;
-    if (screenRain.timer > screenRain.duration) {
-      stopScreenWeather();
-      return;
-    }
     screenRain.particles.forEach(function(p) {
       p.y += p.vy;
       if (p.y > 300) { p.y = 40; p.x = 180 + Math.random() * 440; }
     });
   }
+
+  // スクリーン内イベントを上から重ねて描画（前編から呼ばれる）
+  window.__PHASE2__.drawScreenEvents = function(c) {
+    // スクリーン座標系は既に translate+scale 済み（800x400 スケール）
+    // ここでは 800x400 座標で描く
+    // ただしスクリーン領域は 180,40,440,260 → 800x400 内では
+    // スケール後の座標で描画されるので、ここでは元の 800x400 座標で OK
+    // ↑ 実際には呼び出し元で clip+translate+scale 済みなので、
+    //    ここでは「800x400 の座標系」で描けば良い。
+
+    // スクリーン内雨
+    if (screenRain.active) {
+      const isSnow = screenRain.type === 'snow';
+      const isRain = screenRain.type === 'rain' || screenRain.type === 'rainThunder';
+      const isThunder = screenRain.type === 'thunder' || screenRain.type === 'rainThunder';
+      if (isThunder) {
+        const flash = Math.sin(performance.now() * 0.02);
+        if (flash > 0.7) {
+          c.fillStyle = 'rgba(255,255,255,' + ((flash - 0.7) * 2) + ')';
+          c.fillRect(0, 0, 800, 400);
+        }
+      }
+      if (isRain) {
+        c.fillStyle = 'rgba(150,200,255,0.75)';
+        screenRain.particles.forEach(function(p) {
+          // スクリーン座標(180-620, 40-300)を 800x400 に変換
+          const sx = (p.x - 180) * (800 / 440);
+          const sy = (p.y - 40) * (400 / 260);
+          c.fillRect(sx, sy, p.size * 1.8, p.size * 12);
+        });
+      } else if (isSnow) {
+        c.fillStyle = 'rgba(255,255,255,0.9)';
+        screenRain.particles.forEach(function(p) {
+          const sx = (p.x - 180) * (800 / 440);
+          const sy = (p.y - 40) * (400 / 260);
+          c.beginPath();
+          c.arc(sx, sy, p.size * 1.8, 0, Math.PI*2);
+          c.fill();
+        });
+      }
+    }
+
+    // スクリーン数式
+    if (screenFormula.active) {
+      screenFormula.timer += 16;
+      screenFormula.progress = Math.min(1, screenFormula.timer / 2500);
+      c.fillStyle = '#0a1a0a';
+      c.fillRect(0, 0, 800, 400);
+      c.fillStyle = 'rgba(255,255,255,0.05)';
+      for (let i = 0; i < 30; i++) {
+        c.fillRect(0, i * 13, 800, 1);
+      }
+      c.textAlign = 'left';
+      const visible = Math.floor(screenFormula.progress * screenFormula.lines.length);
+      screenFormula.lines.forEach(function(line, i) {
+        if (i > visible) return;
+        const alpha = (i < visible) ? 1 : (screenFormula.progress * screenFormula.lines.length - i);
+        c.globalAlpha = Math.min(1, Math.max(0, alpha));
+        c.font = 'bold 40px "Courier New", monospace';
+        c.fillStyle = '#7fffa0';
+        c.fillText(line.text, 40, 80 + i * 60);
+        c.font = '20px "Courier New", monospace';
+        c.fillStyle = '#a0d0a0';
+        c.fillText(line.sub, 40, 105 + i * 60);
+      });
+      c.globalAlpha = 1;
+      if (visible < screenFormula.lines.length) {
+        const blink = Math.floor(screenFormula.timer / 400) % 2;
+        if (blink) {
+          c.fillStyle = '#7fffa0';
+          c.fillRect(40, 80 + visible * 60 + 12, 20, 40);
+        }
+      }
+    }
+
+    // スクリーン img41x.jpg
+    if (screenImage.active) {
+      screenImage.timer += 16;
+      screenImage.alpha = Math.min(1, screenImage.timer / 1200);
+      c.globalAlpha = screenImage.alpha;
+      if (img41xElement && img41xElement.complete && img41xElement.naturalWidth > 0) {
+        c.drawImage(img41xElement, 0, 0, 800, 400);
+      } else {
+        c.fillStyle = '#2a4a6a';
+        c.fillRect(0, 0, 800, 400);
+        c.fillStyle = '#ffffff';
+        c.font = 'bold 32px "Courier New", monospace';
+        c.textAlign = 'center';
+        c.fillText('img41x.jpg', 400, 200);
+      }
+      c.globalAlpha = 1;
+    }
+  };
 
   /* ------------------------------------------------------------
      画面に水滴（専門学者用）
@@ -2166,32 +2302,24 @@
   function startScreenDrops() {
     screenDrops.active = true;
     screenDrops.drops = [];
-    screenDrops.timer = 0;
     for (let i = 0; i < 40; i++) {
       screenDrops.drops.push({
         x: Math.random() * window.innerWidth,
         y: Math.random() * window.innerHeight,
-        r: 3 + Math.random() * 8,
-        life: 0.5 + Math.random() * 0.5
+        r: 3 + Math.random() * 8
       });
     }
     ensureScreenDropsOverlay();
+    updateScreenDrops();
   }
 
   function stopScreenDrops() {
     screenDrops.active = false;
-    if (screenDrops._el) {
-      screenDrops._el.innerHTML = '';
-    }
+    if (screenDrops._el) screenDrops._el.innerHTML = '';
   }
 
-  function updateScreenDrops(dt) {
+  function updateScreenDrops() {
     if (!screenDrops.active) return;
-    screenDrops.timer += dt;
-    if (screenDrops.timer > screenDrops.duration) {
-      stopScreenDrops();
-      return;
-    }
     const el = ensureScreenDropsOverlay();
     let html = '';
     screenDrops.drops.forEach(function(d) {
@@ -2229,48 +2357,6 @@
     screenFormula.active = false;
   }
 
-  function drawScreenFormula(dt) {
-    if (!screenFormula.active) return;
-    screenFormula.timer += dt;
-    screenFormula.progress = Math.min(1, screenFormula.timer / 2500);
-    if (screenFormula.timer > screenFormula.duration) {
-      stopScreenFormula();
-      return;
-    }
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(180, 40, 440, 260);
-    ctx.clip();
-    ctx.fillStyle = '#0a1a0a';
-    ctx.fillRect(180, 40, 440, 260);
-    ctx.fillStyle = 'rgba(255,255,255,0.05)';
-    for (let i = 0; i < 20; i++) {
-      ctx.fillRect(180, 40 + i * 13, 440, 1);
-    }
-    ctx.textAlign = 'left';
-    const visible = Math.floor(screenFormula.progress * screenFormula.lines.length);
-    screenFormula.lines.forEach(function(line, i) {
-      if (i > visible) return;
-      const alpha = (i < visible) ? 1 : (screenFormula.progress * screenFormula.lines.length - i);
-      ctx.globalAlpha = Math.min(1, Math.max(0, alpha));
-      ctx.font = 'bold 22px "Courier New", monospace';
-      ctx.fillStyle = '#7fffa0';
-      ctx.fillText(line.text, 200, 80 + i * 42);
-      ctx.font = '13px "Courier New", monospace';
-      ctx.fillStyle = '#a0d0a0';
-      ctx.fillText(line.sub, 200, 100 + i * 42);
-    });
-    ctx.globalAlpha = 1;
-    if (visible < screenFormula.lines.length) {
-      const blink = Math.floor(screenFormula.timer / 400) % 2;
-      if (blink) {
-        ctx.fillStyle = '#7fffa0';
-        ctx.fillRect(200, 80 + visible * 42 + 8, 12, 22);
-      }
-    }
-    ctx.restore();
-  }
-
   /* ------------------------------------------------------------
      スクリーンが img41x.jpg に（現代学者用）
      ------------------------------------------------------------ */
@@ -2288,47 +2374,14 @@
     screenImage.active = false;
   }
 
-  function drawScreenImage(dt) {
-    if (!screenImage.active) return;
-    screenImage.timer += dt;
-    screenImage.alpha = Math.min(1, screenImage.timer / 1200);
-    if (screenImage.timer > screenImage.duration) {
-      stopScreenImage();
-      return;
-    }
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(180, 40, 440, 260);
-    ctx.clip();
-    ctx.globalAlpha = screenImage.alpha;
-    if (img41xElement && img41xElement.complete && img41xElement.naturalWidth > 0) {
-      ctx.drawImage(img41xElement, 180, 40, 440, 260);
-    } else {
-      ctx.fillStyle = '#2a4a6a';
-      ctx.fillRect(180, 40, 440, 260);
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 16px "Courier New", monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText('img41x.jpg', 400, 170);
-    }
-    if (screenImage.timer > screenImage.duration - 1500) {
-      const fade = (screenImage.duration - screenImage.timer) / 1500;
-      ctx.globalAlpha = screenImage.alpha * fade;
-      ctx.fillStyle = '#e8e8e0';
-      ctx.fillRect(180, 40, 440, 260);
-    }
-    ctx.globalAlpha = 1;
-    ctx.restore();
-  }
-
   /* ------------------------------------------------------------
-     ランキング（哲学者用）
+     ランキング（哲学者用、テーブルの壁に表示）
      ------------------------------------------------------------ */
   const RANKING_DATA = [
-    { key:'bunseki',   name:'分析学者', score: 92, comment:'構造分析が明快。全体の骨格を最初に示した。' },
+    { key:'bunseki',   name:'分析学者', score: 92, comment:'構造分析が明快。骨格を最初に示した。' },
     { key:'sugaku',    name:'数学者',   score: 88, comment:'数式と符号の反転で本質を突いた。' },
-    { key:'butsuri',   name:'物理学者', score: 85, comment:'毛細管現象と溶解度の違いを的確に説明。' },
-    { key:'tetsugaku', name:'哲学者',   score: 83, comment:'学習と経験の修正という哲学的視点を提供。' },
+    { key:'butsuri',   name:'物理学者', score: 85, comment:'毛細管現象と溶解度の違いを的確に。' },
+    { key:'tetsugaku', name:'哲学者',   score: 83, comment:'学習と経験の修正という視点を提供。' },
     { key:'senmon',    name:'専門学者', score: 78, comment:'文献的・歴史的補足が豊富。' },
     { key:'gendai',    name:'現代学者', score: 76, comment:'現代語への翻訳が鮮やか。' }
   ];
@@ -2344,51 +2397,55 @@
     rankingDisplay.active = false;
   }
 
-  function drawRanking(dt) {
+  // 会議シーンの机（茶色）の壁面にランキングを書く
+  window.__PHASE2__.drawRankingOnWall = function(c) {
     if (!rankingDisplay.active) return;
-    rankingDisplay.timer += dt;
+    rankingDisplay.timer += 16;
     rankingDisplay.progress = Math.min(1, rankingDisplay.timer / 2000);
-    if (rankingDisplay.timer > rankingDisplay.duration) {
-      stopRanking();
-      return;
-    }
-    ctx.fillStyle = 'rgba(0,0,0,0.75)';
-    ctx.fillRect(100, 40, 600, 300);
-    ctx.strokeStyle = '#bbbbbb';
-    ctx.lineWidth = 3;
-    ctx.strokeRect(100, 40, 600, 300);
-    ctx.font = 'bold 22px "Courier New", monospace';
-    ctx.fillStyle = '#ffffff';
-    ctx.textAlign = 'center';
-    ctx.fillText('— 解説ランキング —', 400, 75);
+    // 机の壁面は y=340 から y=400 の帯
+    // そこに横一列でランキングを書く
+    const wallY = 342;
+    const wallH = 58;
+    // 背景
+    c.fillStyle = 'rgba(20,10,5,0.85)';
+    c.fillRect(0, wallY, 800, wallH);
+    c.strokeStyle = '#c0a060';
+    c.lineWidth = 2;
+    c.strokeRect(2, wallY + 2, 796, wallH - 4);
+    // タイトル
+    c.font = 'bold 11px "Courier New", monospace';
+    c.fillStyle = '#ffe0a0';
+    c.textAlign = 'center';
+    c.fillText('— 解説ランキング（哲学者調べ） —', 400, wallY + 12);
+    // ランキング（横並び）
     const visible = Math.floor(rankingDisplay.progress * rankingDisplay.ranks.length);
     rankingDisplay.ranks.forEach(function(r, i) {
       if (i > visible) return;
       const alpha = (i < visible) ? 1 : (rankingDisplay.progress * rankingDisplay.ranks.length - i);
-      ctx.globalAlpha = Math.min(1, Math.max(0, alpha));
-      const y = 115 + i * 38;
-      ctx.font = 'bold 20px "Courier New", monospace';
-      ctx.fillStyle = '#ffd700';
-      ctx.textAlign = 'left';
-      ctx.fillText((i + 1) + '位', 130, y);
-      ctx.fillStyle = getSpeakerColor(r.key);
-      ctx.font = 'bold 20px "Courier New", monospace';
-      ctx.fillText(r.name, 210, y);
-      ctx.fillStyle = '#ffffff';
-      ctx.font = '16px "Courier New", monospace';
-      ctx.fillText(r.score + '点', 360, y);
-      ctx.fillStyle = '#c0d0c0';
-      ctx.font = '12px "Courier New", monospace';
-      ctx.fillText(r.comment, 430, y);
+      c.globalAlpha = Math.min(1, Math.max(0, alpha));
+      const colX = 30 + i * 130;
+      // 順位
+      c.font = 'bold 14px "Courier New", monospace';
+      c.fillStyle = '#ffd700';
+      c.textAlign = 'left';
+      c.fillText((i + 1) + '位', colX, wallY + 28);
+      // 名前
+      c.fillStyle = getSpeakerColor(r.key);
+      c.font = 'bold 13px "Courier New", monospace';
+      c.fillText(r.name, colX + 30, wallY + 28);
+      // スコア
+      c.fillStyle = '#ffffff';
+      c.font = '12px "Courier New", monospace';
+      c.fillText(r.score + '点', colX + 30, wallY + 45);
     });
-    ctx.globalAlpha = 1;
-  }
+    c.globalAlpha = 1;
+  };
 
   /* ------------------------------------------------------------
-     ペット部屋の追加描画（後編フック）
+     ペット部屋の追加描画
      ------------------------------------------------------------ */
   window.__PHASE2__.tickPetRoom = function(c, game, now) {
-    if (siteWeather.active) {
+    if (siteWeather.active && !game.inConference) {
       c.fillStyle = '#ffe0a0';
       c.font = '10px "Courier New", monospace';
       c.textAlign = 'center';
@@ -2439,7 +2496,7 @@
       case 'rainAndDrops':
         startSiteWeather('rain');
         startScreenDrops();
-        addConferenceLog('senmon', '「雨だ。そして画面に水滴がついた。……これは古文書の保存状態に似ている。」');
+        addConferenceLog('senmon', '「雨だ。そして画面に水滴がついた。……古文書の保存状態に似ている。」');
         break;
 
       case 'img41x':
@@ -2460,6 +2517,16 @@
       default:
         addConferenceLog(targetKey, '（何かが起きた）');
     }
+  };
+
+  // ロバが会議室を去ったときにイベント停止
+  window.__PHASE2__.stopEvents = function() {
+    stopSiteWeather();
+    stopScreenWeather();
+    stopScreenDrops();
+    stopScreenFormula();
+    stopScreenImage();
+    stopRanking();
   };
 
   function wtypeName(t) {
@@ -2483,14 +2550,14 @@
   }
 
   /* ------------------------------------------------------------
-     知識マウント時の追加処理（後編フック）
+     知識マウント時の追加処理
      ------------------------------------------------------------ */
   window.__PHASE2__.onDonkeyMounted = function(targetKey, text) {
-    // 前編の showDonkeySpeech で既にログに出ているので何もしない
+    // 前編でログに追加済み
   };
 
   /* ------------------------------------------------------------
-     毎フレームの更新（後編）
+     毎フレームの更新
      ------------------------------------------------------------ */
   let lastPhase2Tick = 0;
   function phase2Tick(now) {
@@ -2498,12 +2565,8 @@
     const dt = now - lastPhase2Tick;
     lastPhase2Tick = now;
     updateSiteWeather(dt);
-    updateScreenWeather(dt);
-    drawScreenWeather();
-    updateScreenDrops(dt);
-    drawScreenFormula(dt);
-    drawScreenImage(dt);
-    drawRanking(dt);
+    updateScreenWeather();
+    updateScreenDrops();
   }
 
   function phase2Loop(ts) {
