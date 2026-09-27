@@ -23,15 +23,15 @@
     position:relative;
     overflow:hidden;
   }
+  /* オープニング背景はJSでランダムに設定 */
   .container::before {
     content:"";
     position:absolute; inset:0;
-    background-image:url('img41x.jpg');
+    background-image:url('img197q.jpg');
     background-size:100% 100%;
     background-position:center;
     background-repeat:no-repeat;
-    opacity:0.15;
-    filter:saturate(0.7) brightness(0.7);
+    opacity:1;
     z-index:0;
     pointer-events:none;
   }
@@ -66,7 +66,16 @@
     transition:opacity .5s;
   }
   .opening-overlay.hidden { display:none; }
-  .opening-buttons { display:flex; flex-direction:column; gap:28px; z-index:10; }
+  .opening-buttons {
+    display:flex; flex-direction:column; gap:28px; z-index:10;
+    opacity: 0;
+    transition: opacity 1.2s ease;
+    pointer-events: none;
+  }
+  .opening-buttons.show {
+    opacity: 1;
+    pointer-events: auto;
+  }
   .opening-buttons button {
     background:#1d331d;
     border:5px solid #8fbc8f;
@@ -331,7 +340,7 @@
         <canvas id="mainCanvas" width="800" height="400"></canvas>
         <button class="back-btn" id="backBtn">← 戻る</button>
         <div class="opening-overlay" id="openingOverlay">
-          <div class="opening-buttons">
+          <div class="opening-buttons" id="openingButtons">
             <button id="derivativeBtn">derivative</button>
             <button id="asinusBtn">Asinus</button>
           </div>
@@ -399,6 +408,7 @@
   petCtx.imageSmoothingEnabled = false;
 
   const openingOverlay = document.getElementById('openingOverlay');
+  const openingButtons = document.getElementById('openingButtons');
   const derivativeBtn = document.getElementById('derivativeBtn');
   const asinusBtn = document.getElementById('asinusBtn');
   const backBtn = document.getElementById('backBtn');
@@ -429,6 +439,9 @@
     derivative: { duration: 14000, label: 'タレスの圧搾機 · デリバティブの嚆矢' },
     asinus:     { duration: 16000, label: 'Asinus · 塩を運ぶろばとタレス' }
   };
+
+  // オープニング背景（3枚からランダム）
+  const OPENING_IMAGES = ['img197q.jpg', 'img198q.jpg', 'img199q.jpg'];
 
   window.__PHASE2__ = {
     onEvent: null,
@@ -509,6 +522,20 @@
     return map[key] || '学者';
   }
   function randPick(arr) { return arr[Math.floor(Math.random()*arr.length)]; }
+
+  /* ============================================================
+     オープニング背景のランダム設定
+     ============================================================ */
+  function setOpeningBackground() {
+    const img = randPick(OPENING_IMAGES);
+    let styleEl = document.getElementById('openingBgStyle');
+    if (!styleEl) {
+      styleEl = document.createElement('style');
+      styleEl.id = 'openingBgStyle';
+      document.head.appendChild(styleEl);
+    }
+    styleEl.textContent = '.container::before { background-image: url("' + img + '") !important; background-size: 100% 100% !important; opacity: 1 !important; filter: none !important; }';
+  }
 
   /* ============================================================
      背景・キャラ描画
@@ -1035,7 +1062,6 @@
       ctx.font = 'bold 18px "Courier New", monospace';
       ctx.fillStyle = '#fff9e6'; ctx.fillText('第四章：海綿の重み', 40, 120);
     }
-    // スクリーン内イベント（後編フック）
     if (window.__PHASE2__ && window.__PHASE2__.drawScreenEvents) {
       window.__PHASE2__.drawScreenEvents(ctx);
     }
@@ -1108,7 +1134,6 @@
       }
     }
 
-    // ランキング（後編フック）
     if (window.__PHASE2__ && window.__PHASE2__.drawRankingOnWall) {
       window.__PHASE2__.drawRankingOnWall(ctx);
     }
@@ -1401,7 +1426,7 @@
 
   const GAUGE_DECAY = {
     food: 0.6,
-    water: 0.8,
+    water: 0.2,   // ★ 0.8 → 0.2 に変更（水分だけ遅く）
     love: 0.5
   };
 
@@ -1471,7 +1496,6 @@
     if (!petGame.inConference) {
       petGame.targetX = Math.max(50, Math.min(270, p.x));
       petGame.targetY = Math.max(90, Math.min(150, p.y));
-      // クリックしたらだらだら終了して向かう
       petGame.idleTimer = 0;
       petGame.idleDuration = 0;
     }
@@ -1554,7 +1578,6 @@
         petGame.waterGauge = Math.max(0, petGame.waterGauge - 5);
         petGame.loveGauge = Math.max(0, petGame.loveGauge - 5);
         updatePetGauges();
-        // 次回乱入まで待機
         petGame.intrusionCooldown = now + (25000 + Math.random() * 20000);
         if (window.__PHASE2__ && window.__PHASE2__.stopEvents) {
           window.__PHASE2__.stopEvents();
@@ -1564,7 +1587,8 @@
   }
 
   function onDonkeyArrived(targetKey) {
-    const isEvent = Math.random() < 0.35;
+    // ★ 0.35 → 0.5 に変更（イベント50% / 知識マウント50%）
+    const isEvent = Math.random() < 0.5;
     if (isEvent) {
       const evt = (window.__PHASE2__ && window.__PHASE2__.getEventFor)
         ? window.__PHASE2__.getEventFor(targetKey)
@@ -1684,7 +1708,6 @@
     }
 
     if (!petGame.inConference) {
-      // だらだらタイマー
       if (!petGame.idleTimer) {
         petGame.idleTimer = now;
         petGame.idleDuration = 1500 + Math.random() * 3000;
@@ -1701,7 +1724,6 @@
           petGame.y += dy * 0.02;
           petGame.phase += 0.15;
         } else {
-          // 到着 → 次のだらだら
           petGame.idleTimer = 0;
           const r = Math.random();
           if (petGame.foodInBox > 0 && r < 0.4) {
@@ -1716,7 +1738,6 @@
           }
         }
       } else {
-        // だらだら中
         petGame.phase += 0.02;
       }
 
@@ -1762,7 +1783,6 @@
         c.fillText('…', petGame.x, petGame.y - 45);
       }
     }
-    // 会議室にいる間は、ペット部屋には何も描かない（空の部屋）
   }
 
   /* ============================================================
@@ -1818,7 +1838,6 @@
       resetLogBtn.style.background = '#5a2a2a';
       resetLogBtn.style.color = '#ffd0d0';
       if (currentStory) {
-        // 会議を最初から、ログもクリア
         stopDonkeyGame();
         donkeyIntrusion.active = false;
         petGame.inConference = false;
@@ -1897,13 +1916,21 @@
     footerSub.innerHTML = '';
     footerTitle.textContent = STORIES[storyKey].label;
     logPanel.classList.remove('visible');
-    petRoom.classList.remove('visible');  // アニメ中はペット部屋非表示
+    petRoom.classList.remove('visible');
     logBody.innerHTML = '';
     phase = 'animation';
     if (!petGame.running) startDonkeyGame();
     if (storyKey === 'derivative') drawDerivativeScene(0);
     else drawAsinusScene(0);
     animationId = requestAnimationFrame(animate);
+  }
+
+  function revealOpeningButtons() {
+    if (!openingButtons) return;
+    openingButtons.classList.remove('show');
+    setTimeout(function(){
+      openingButtons.classList.add('show');
+    }, 5000);  // 5秒後
   }
 
   function showOpening() {
@@ -1921,13 +1948,16 @@
     footerSub.innerHTML = '';
     footerTitle.textContent = 'タレスの2つの物語';
     logPanel.classList.remove('visible');
-    petRoom.classList.remove('visible');  // ★ オープニングではペット部屋を出さない
+    petRoom.classList.remove('visible');
     logBody.innerHTML = '';
     if (window.__PHASE2__ && window.__PHASE2__.stopEvents) {
       window.__PHASE2__.stopEvents();
     }
-    // ペット部屋の初期化だけしておく（表示はしない）
     startDonkeyGame();
+    // オープニング背景をランダムに
+    setOpeningBackground();
+    // 5秒後にボタンを出す
+    revealOpeningButtons();
     animationId = requestAnimationFrame(animate);
   }
 
@@ -1999,9 +2029,14 @@
     type: 'rain'
   };
 
-  let img41xElement = null;
+  let screenImgElement = null;
 
-  // イベントはロバが会議室を去るまで継続（stopEvents で停止）
+  // ★ スクリーンに映す11枚の画像
+  const SCREEN_IMAGES = [
+    'img82h.jpg', 'img84h.jpg', 'img200h.jpg', 'img201h.jpg',
+    'img204h.jpg', 'img205h.jpg', 'img209h.jpg', 'img210h.jpg',
+    'img211h.jpg', 'img214h.jpg', 'img215h.jpg'
+  ];
 
   /* ------------------------------------------------------------
      サイト全体の天候オーバーレイ
@@ -2121,7 +2156,6 @@
   }
 
   // スクリーン内イベントを上から重ねて描画（前編から呼ばれる）
-  // 呼び出し時は clip+translate+scale 済み、800x400 座標系
   window.__PHASE2__.drawScreenEvents = function(c) {
     // スクリーン内雨
     if (screenRain.active) {
@@ -2187,20 +2221,20 @@
       }
     }
 
-    // スクリーン img41x.jpg
+    // スクリーン画像（11枚からランダム）
     if (screenImage.active) {
       screenImage.timer += 16;
       screenImage.alpha = Math.min(1, screenImage.timer / 1200);
       c.globalAlpha = screenImage.alpha;
-      if (img41xElement && img41xElement.complete && img41xElement.naturalWidth > 0) {
-        c.drawImage(img41xElement, 0, 0, 800, 400);
+      if (screenImgElement && screenImgElement.complete && screenImgElement.naturalWidth > 0) {
+        c.drawImage(screenImgElement, 0, 0, 800, 400);
       } else {
         c.fillStyle = '#2a4a6a';
         c.fillRect(0, 0, 800, 400);
         c.fillStyle = '#ffffff';
-        c.font = 'bold 32px "Courier New", monospace';
+        c.font = 'bold 28px "Courier New", monospace';
         c.textAlign = 'center';
-        c.fillText('img41x.jpg', 400, 200);
+        c.fillText('スクリーン画像', 400, 200);
       }
       c.globalAlpha = 1;
     }
@@ -2285,16 +2319,17 @@
   }
 
   /* ------------------------------------------------------------
-     スクリーンが img41x.jpg に（現代学者用）
+     スクリーン画像（現代学者用）— 11枚からランダム
      ------------------------------------------------------------ */
   function startScreenImage() {
     screenImage.active = true;
     screenImage.timer = 0;
     screenImage.alpha = 0;
-    if (!img41xElement) {
-      img41xElement = new Image();
-      img41xElement.src = 'img41x.jpg';
-    }
+    const src = SCREEN_IMAGES[Math.floor(Math.random() * SCREEN_IMAGES.length)];
+    screenImgElement = new Image();
+    screenImgElement.src = src;
+    // コンソールにどれを選んだか表示（デバッグ用）
+    console.log('スクリーン画像:', src);
   }
 
   function stopScreenImage() {
@@ -2420,7 +2455,7 @@
 
       case 'img41x':
         startScreenImage();
-        addConferenceLog('gendai', '「スクリーンが img41x.jpg に切り替わった。現代のプレゼンだ。」');
+        addConferenceLog('gendai', '「スクリーンに画像が映った。現代のプレゼンだ。」');
         break;
 
       case 'formula':
