@@ -120,11 +120,6 @@
     border-bottom:2px solid #3f6b3f;
     display:flex; justify-content:space-between; align-items:center;
   }
-  .log-header .live {
-    width:10px; height:10px; border-radius:50%;
-    background:#ff4444; box-shadow:0 0 8px #ff4444;
-    animation:pulse 1.2s infinite;
-  }
   .log-header .reset-btn {
     background:#5a2a2a;
     color:#ffd0d0;
@@ -226,13 +221,6 @@
   .pet-gauge-fill.water { background:linear-gradient(90deg,#3a7a9a,#5b9bd5); }
   .pet-gauge-fill.love { background:linear-gradient(90deg,#c04060,#ff6b8a); }
   .pet-gauge-val { font-size:0.65rem; color:#8090a0; width:26px; text-align:right; }
-  .pet-mood-row {
-    display:flex; justify-content:space-between;
-    padding-top:2px;
-    font-size:0.7rem;
-  }
-  .pet-mood-row #petStatus { color:#a0b0a0; }
-  .pet-mood-row #petMood { color:#c0d0a0; }
 
   .footer {
     position:relative; z-index:1;
@@ -379,10 +367,6 @@
           <div class="pet-gauge-bar"><div class="pet-gauge-fill love" id="gaugeLove"></div></div>
           <span class="pet-gauge-val" id="gaugeLoveVal">0</span>
         </div>
-        <div class="pet-mood-row">
-          <span id="petStatus">ロバはのんびりしている</span>
-          <span id="petMood"></span>
-        </div>
       </div>
     </div>
   </div>
@@ -425,8 +409,6 @@
   const logBody = document.getElementById('logBody');
   const resetLogBtn = document.getElementById('resetLogBtn');
   const petRoom = document.getElementById('petRoom');
-  const petStatus = document.getElementById('petStatus');
-  const petMood = document.getElementById('petMood');
   const donkeySpeech = document.getElementById('donkeySpeech');
   const gaugeFood = document.getElementById('gaugeFood');
   const gaugeWater = document.getElementById('gaugeWater');
@@ -452,7 +434,10 @@
     onEvent: null,
     tickPetRoom: null,
     onDonkeyMounted: null,
-    getEventFor: null
+    getEventFor: null,
+    stopEvents: null,
+    drawScreenEvents: null,
+    drawRankingOnWall: null
   };
 
   /* ============================================================
@@ -964,10 +949,8 @@
      会議シーン
      ============================================================ */
   function drawConferenceScene() {
-    // 壁
     ctx.fillStyle = '#2a3a2a'; ctx.fillRect(0, 0, 800, 400);
     for (let i=0;i<30;i++){ ctx.fillStyle = 'rgba(0,0,0,0.1)'; px(ctx, 0, i*14, 800, 3, 'rgba(0,0,0,0.1)'); }
-    // 机
     ctx.fillStyle = '#5a3a1a';
     ctx.beginPath();
     ctx.moveTo(0, 340); ctx.lineTo(800, 340); ctx.lineTo(800, 400); ctx.lineTo(0, 400);
@@ -975,19 +958,15 @@
     ctx.fillStyle = '#7a5a2a'; ctx.fillRect(0, 340, 800, 6);
 
     const screenX = 180, screenY = 40, screenW = 440, screenH = 260;
-    // スクリーン枠
     ctx.fillStyle = '#1a1a1a';
     ctx.fillRect(screenX - 6, screenY - 6, screenW + 12, screenH + 12);
     ctx.fillStyle = '#e8e8e0';
     ctx.fillRect(screenX, screenY, screenW, screenH);
 
-    // スクリーン内容
     ctx.save();
     ctx.beginPath(); ctx.rect(screenX, screenY, screenW, screenH); ctx.clip();
     const sx = screenW / 800, sy = screenH / 400;
     ctx.translate(screenX, screenY); ctx.scale(sx, sy);
-
-    // スクリーン内の背景シーン
     if (currentStory === 'derivative') {
       const g = ctx.createLinearGradient(0, 0, 0, 400);
       g.addColorStop(0, '#b87c4b'); g.addColorStop(0.55, '#dbb87c'); g.addColorStop(1, '#e8c89a');
@@ -1056,21 +1035,17 @@
       ctx.font = 'bold 18px "Courier New", monospace';
       ctx.fillStyle = '#fff9e6'; ctx.fillText('第四章：海綿の重み', 40, 120);
     }
-
-    // スクリーン内イベント（雨・数式・img41x など）はここで重ねる
+    // スクリーン内イベント（後編フック）
     if (window.__PHASE2__ && window.__PHASE2__.drawScreenEvents) {
       window.__PHASE2__.drawScreenEvents(ctx);
     }
-
     ctx.restore();
 
-    // スクリーン反射
     ctx.fillStyle = 'rgba(255,255,255,0.08)';
     ctx.beginPath();
     ctx.moveTo(screenX, screenY); ctx.lineTo(screenX + 120, screenY);
     ctx.lineTo(screenX, screenY + 120); ctx.closePath(); ctx.fill();
 
-    // プロジェクター
     ctx.fillStyle = '#333'; ctx.fillRect(370, 0, 60, 20);
     ctx.fillStyle = '#555'; ctx.fillRect(375, 20, 50, 8);
     ctx.fillStyle = 'rgba(255,255,200,0.06)';
@@ -1079,7 +1054,6 @@
     ctx.lineTo(screenX + screenW + 20, screenY + 40); ctx.lineTo(410, 28);
     ctx.closePath(); ctx.fill();
 
-    // 学者6人
     const speakers = getSpeakers();
     speakers.forEach(function(sp, i){
       const px0 = 60 + i * 120;
@@ -1102,10 +1076,8 @@
       }
     });
 
-    // ロバの乱入
     drawDonkeyIntrusion();
 
-    // 字幕
     if (confSpeaker && confTyping.length > 0) {
       const spColor = getSpeakerColor(confSpeaker.key);
       ctx.fillStyle = 'rgba(0,0,0,0.75)';
@@ -1136,7 +1108,7 @@
       }
     }
 
-    // ランキング表示（哲学者イベント）
+    // ランキング（後編フック）
     if (window.__PHASE2__ && window.__PHASE2__.drawRankingOnWall) {
       window.__PHASE2__.drawRankingOnWall(ctx);
     }
@@ -1420,10 +1392,8 @@
     drinkingTimer: 0,
     eating: false,
     drinking: false,
-    // だらだら行動
     idleTimer: 0,
     idleDuration: 0,
-    // 乱入管理
     intrusionCooldown: 0,
     inConference: false,
     running: false
@@ -1449,8 +1419,6 @@
     petGame.idleTimer = 0;
     petGame.idleDuration = 0;
     updatePetGauges();
-    petMood.textContent = '';
-    petStatus.textContent = 'のんびりしている';
   }
   function stopDonkeyGame() {
     petGame.running = false;
@@ -1484,22 +1452,12 @@
 
     if (p.x >= foodBox.x && p.x <= foodBox.x + foodBox.w &&
         p.y >= foodBox.y && p.y <= foodBox.y + foodBox.h) {
-      if (petGame.foodInBox < 4) {
-        petGame.foodInBox++;
-        petStatus.textContent = '餌箱に餌を入れた';
-      } else {
-        petStatus.textContent = '餌箱はいっぱい';
-      }
+      if (petGame.foodInBox < 4) petGame.foodInBox++;
       return;
     }
     if (p.x >= waterSpot.x && p.x <= waterSpot.x + waterSpot.w &&
         p.y >= waterSpot.y && p.y <= waterSpot.y + waterSpot.h) {
-      if (!petGame.waterInBowl) {
-        petGame.waterInBowl = true;
-        petStatus.textContent = '水を張った';
-      } else {
-        petStatus.textContent = '水はもうある';
-      }
+      if (!petGame.waterInBowl) petGame.waterInBowl = true;
       return;
     }
     if (!petGame.inConference &&
@@ -1507,25 +1465,25 @@
         p.y >= donkeyHead.y && p.y <= donkeyHead.y + donkeyHead.h) {
       petGame.loveGauge = Math.min(100, petGame.loveGauge + 20);
       petGame._lastPet = performance.now();
-      petStatus.textContent = 'ロバを撫でた';
-      petMood.textContent = '満足げ';
       updatePetGauges();
       return;
     }
     if (!petGame.inConference) {
       petGame.targetX = Math.max(50, Math.min(270, p.x));
       petGame.targetY = Math.max(90, Math.min(150, p.y));
+      // クリックしたらだらだら終了して向かう
+      petGame.idleTimer = 0;
+      petGame.idleDuration = 0;
     }
   });
 
   /* ============================================================
-     乱入スケジューラ（会議中のみ、短時間）
+     乱入スケジューラ
      ============================================================ */
   function scheduleDonkeyIntrusion(now) {
     if (donkeyIntrusion.active) return;
     if (petGame.inConference) return;
     if (petGame.intrusionCooldown > now) return;
-    // 乱入間隔（前より長め：25〜45秒）
     const interval = 25000 + Math.random() * 20000;
     petGame.intrusionCooldown = now + interval;
     const targetKey = pickDonkeyTarget();
@@ -1544,7 +1502,6 @@
     donkeyIntrusion.timer = 0;
     donkeyIntrusion.knowledgeText = '';
     petGame.inConference = true;
-    petStatus.textContent = 'ロバは会議室へ……';
   }
 
   function pickDonkeyTarget() {
@@ -1583,7 +1540,6 @@
         onDonkeyArrived(d.targetKey);
       }
     } else if (d.state === 'mounted') {
-      // 滞在時間を短く（1.8秒）
       if (d.timer > 1800) {
         d.state = 'leaving';
         d.timer = 0;
@@ -1594,12 +1550,12 @@
         d.active = false;
         d.state = 'idle';
         petGame.inConference = false;
-        petStatus.textContent = 'ロバが戻ってきた';
         petGame.foodGauge = Math.max(0, petGame.foodGauge - 5);
         petGame.waterGauge = Math.max(0, petGame.waterGauge - 5);
         petGame.loveGauge = Math.max(0, petGame.loveGauge - 5);
         updatePetGauges();
-        // 戻ったらイベント停止
+        // 次回乱入まで待機
+        petGame.intrusionCooldown = now + (25000 + Math.random() * 20000);
         if (window.__PHASE2__ && window.__PHASE2__.stopEvents) {
           window.__PHASE2__.stopEvents();
         }
@@ -1729,9 +1685,9 @@
 
     if (!petGame.inConference) {
       // だらだらタイマー
-      if (petGame.idleTimer === 0) {
+      if (!petGame.idleTimer) {
         petGame.idleTimer = now;
-        petGame.idleDuration = 2000 + Math.random() * 4000;
+        petGame.idleDuration = 1500 + Math.random() * 3000;
       }
       const idleElapsed = now - petGame.idleTimer;
       const isIdle = idleElapsed < petGame.idleDuration;
@@ -1745,24 +1701,22 @@
           petGame.y += dy * 0.02;
           petGame.phase += 0.15;
         } else {
-          petGame.phase += 0.05;
-          if (Math.random() < 0.02) {
-            petGame.idleTimer = 0; // 新しい目標地点へ
-            const r = Math.random();
-            if (petGame.foodInBox > 0 && r < 0.3) {
-              petGame.targetX = 50;
-              petGame.targetY = 125;
-            } else if (petGame.waterInBowl && r < 0.5) {
-              petGame.targetX = 270;
-              petGame.targetY = 125;
-            } else {
-              petGame.targetX = 60 + Math.random() * 200;
-              petGame.targetY = 90 + Math.random() * 50;
-            }
+          // 到着 → 次のだらだら
+          petGame.idleTimer = 0;
+          const r = Math.random();
+          if (petGame.foodInBox > 0 && r < 0.4) {
+            petGame.targetX = 50;
+            petGame.targetY = 125;
+          } else if (petGame.waterInBowl && r < 0.6) {
+            petGame.targetX = 270;
+            petGame.targetY = 125;
+          } else {
+            petGame.targetX = 60 + Math.random() * 200;
+            petGame.targetY = 90 + Math.random() * 50;
           }
         }
       } else {
-        // だらだら中はその場でのんびり
+        // だらだら中
         petGame.phase += 0.02;
       }
 
@@ -1776,7 +1730,6 @@
           petGame.foodInBox--;
           petGame.foodGauge = Math.min(100, petGame.foodGauge + 25);
           petGame.eating = false;
-          petMood.textContent = 'むしゃむしゃ';
           updatePetGauges();
         }
       }
@@ -1790,7 +1743,6 @@
           petGame.waterInBowl = false;
           petGame.waterGauge = Math.min(100, petGame.waterGauge + 25);
           petGame.drinking = false;
-          petMood.textContent = 'ごくごく';
           updatePetGauges();
         }
       }
@@ -1809,13 +1761,8 @@
         c.textAlign = 'center';
         c.fillText('…', petGame.x, petGame.y - 45);
       }
-    } else {
-      // 会議室にいる間、ペット部屋は空
-      c.fillStyle = '#6a7a6a';
-      c.font = '13px "Courier New", monospace';
-      c.textAlign = 'center';
-      c.fillText('ロバは留守', 160, 90);
     }
+    // 会議室にいる間は、ペット部屋には何も描かない（空の部屋）
   }
 
   /* ============================================================
@@ -1832,19 +1779,6 @@
     petGame.waterGauge = Math.max(0, petGame.waterGauge - GAUGE_DECAY.water * dt);
     petGame.loveGauge = Math.max(0, petGame.loveGauge - GAUGE_DECAY.love * dt);
     updatePetGauges();
-    if (petGame.inConference) {
-      // 会議室にいるときは状態を出さない
-    } else if (petGame.foodGauge < 20) {
-      petMood.textContent = 'お腹が空いている';
-    } else if (petGame.waterGauge < 20) {
-      petMood.textContent = '喉が渇いている';
-    } else if (petGame.loveGauge < 20) {
-      petMood.textContent = '構ってほしそう';
-    } else if (petGame.foodGauge > 80 && petGame.waterGauge > 80 && petGame.loveGauge > 80) {
-      petMood.textContent = 'ご満悦';
-    } else {
-      petMood.textContent = '';
-    }
   }
 
   /* ============================================================
@@ -1878,18 +1812,19 @@
         resetLogBtn.style.color = '#ffd0d0';
       }, 3000);
     } else {
-      // リセット実行
       resetConfirmStage = 0;
       clearTimeout(resetConfirmTimer);
       resetLogBtn.textContent = 'ログリセット';
       resetLogBtn.style.background = '#5a2a2a';
       resetLogBtn.style.color = '#ffd0d0';
-      // 会議を最初から
       if (currentStory) {
+        // 会議を最初から、ログもクリア
         stopDonkeyGame();
         donkeyIntrusion.active = false;
-        // ロバを戻す
         petGame.inConference = false;
+        if (window.__PHASE2__ && window.__PHASE2__.stopEvents) {
+          window.__PHASE2__.stopEvents();
+        }
         startConference(currentStory, true);
       }
     }
@@ -1920,7 +1855,6 @@
       }
       drawConferenceScene();
     } else if (phase === 'petroom') {
-      // ペット部屋のみ表示（起動直後）
       ctx.fillStyle = '#0a1f1a';
       ctx.fillRect(0, 0, 800, 400);
       pixelText(ctx, 'ロバ部屋', 400, 180, 32, '#e8d0a0', 'center');
@@ -1963,7 +1897,7 @@
     footerSub.innerHTML = '';
     footerTitle.textContent = STORIES[storyKey].label;
     logPanel.classList.remove('visible');
-    petRoom.classList.add('visible');
+    petRoom.classList.remove('visible');  // アニメ中はペット部屋非表示
     logBody.innerHTML = '';
     phase = 'animation';
     if (!petGame.running) startDonkeyGame();
@@ -1987,12 +1921,13 @@
     footerSub.innerHTML = '';
     footerTitle.textContent = 'タレスの2つの物語';
     logPanel.classList.remove('visible');
-    // ペット部屋は最初から表示
-    petRoom.classList.add('visible');
+    petRoom.classList.remove('visible');  // ★ オープニングではペット部屋を出さない
     logBody.innerHTML = '';
-    if (!petGame.running) startDonkeyGame();
-    phase = 'petroom';
-    // ループ再開
+    if (window.__PHASE2__ && window.__PHASE2__.stopEvents) {
+      window.__PHASE2__.stopEvents();
+    }
+    // ペット部屋の初期化だけしておく（表示はしない）
+    startDonkeyGame();
     animationId = requestAnimationFrame(animate);
   }
 
@@ -2066,8 +2001,7 @@
 
   let img41xElement = null;
 
-  // イベントはロバが会議室を去るまで継続するので、
-  // duration による自動停止はしない。stopEvents() で止める。
+  // イベントはロバが会議室を去るまで継続（stopEvents で停止）
 
   /* ------------------------------------------------------------
      サイト全体の天候オーバーレイ
@@ -2187,14 +2121,8 @@
   }
 
   // スクリーン内イベントを上から重ねて描画（前編から呼ばれる）
+  // 呼び出し時は clip+translate+scale 済み、800x400 座標系
   window.__PHASE2__.drawScreenEvents = function(c) {
-    // スクリーン座標系は既に translate+scale 済み（800x400 スケール）
-    // ここでは 800x400 座標で描く
-    // ただしスクリーン領域は 180,40,440,260 → 800x400 内では
-    // スケール後の座標で描画されるので、ここでは元の 800x400 座標で OK
-    // ↑ 実際には呼び出し元で clip+translate+scale 済みなので、
-    //    ここでは「800x400 の座標系」で描けば良い。
-
     // スクリーン内雨
     if (screenRain.active) {
       const isSnow = screenRain.type === 'snow';
@@ -2210,7 +2138,6 @@
       if (isRain) {
         c.fillStyle = 'rgba(150,200,255,0.75)';
         screenRain.particles.forEach(function(p) {
-          // スクリーン座標(180-620, 40-300)を 800x400 に変換
           const sx = (p.x - 180) * (800 / 440);
           const sy = (p.y - 40) * (400 / 260);
           c.fillRect(sx, sy, p.size * 1.8, p.size * 12);
@@ -2402,38 +2329,30 @@
     if (!rankingDisplay.active) return;
     rankingDisplay.timer += 16;
     rankingDisplay.progress = Math.min(1, rankingDisplay.timer / 2000);
-    // 机の壁面は y=340 から y=400 の帯
-    // そこに横一列でランキングを書く
     const wallY = 342;
     const wallH = 58;
-    // 背景
     c.fillStyle = 'rgba(20,10,5,0.85)';
     c.fillRect(0, wallY, 800, wallH);
     c.strokeStyle = '#c0a060';
     c.lineWidth = 2;
     c.strokeRect(2, wallY + 2, 796, wallH - 4);
-    // タイトル
     c.font = 'bold 11px "Courier New", monospace';
     c.fillStyle = '#ffe0a0';
     c.textAlign = 'center';
     c.fillText('— 解説ランキング（哲学者調べ） —', 400, wallY + 12);
-    // ランキング（横並び）
     const visible = Math.floor(rankingDisplay.progress * rankingDisplay.ranks.length);
     rankingDisplay.ranks.forEach(function(r, i) {
       if (i > visible) return;
       const alpha = (i < visible) ? 1 : (rankingDisplay.progress * rankingDisplay.ranks.length - i);
       c.globalAlpha = Math.min(1, Math.max(0, alpha));
       const colX = 30 + i * 130;
-      // 順位
       c.font = 'bold 14px "Courier New", monospace';
       c.fillStyle = '#ffd700';
       c.textAlign = 'left';
       c.fillText((i + 1) + '位', colX, wallY + 28);
-      // 名前
       c.fillStyle = getSpeakerColor(r.key);
       c.font = 'bold 13px "Courier New", monospace';
       c.fillText(r.name, colX + 30, wallY + 28);
-      // スコア
       c.fillStyle = '#ffffff';
       c.font = '12px "Courier New", monospace';
       c.fillText(r.score + '点', colX + 30, wallY + 45);
