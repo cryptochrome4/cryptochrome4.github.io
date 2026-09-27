@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>お前だって論法（トゥ・クオケ） — 墨絵風</title>
+<style>
+  /* 墨絵風ベース */
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  body {
+    background: #1a1a1a;
+    font-family: "Yu Mincho", "Hiragino Mincho ProN", "Noto Serif JP", serif;
+    color: #e0e0e0;
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+    cursor: crosshair;
+  }
+  /* 和紙風ノイズ */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 1;
+  }
+  /* 墨の滲み */
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 20% 30%, rgba(0,0,0,0.5) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 70%, rgba(0,0,0,0.4) 0%, transparent 50%),
+      radial-gradient(ellipse at 50% 50%, rgba(30,30,30,0.3) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 2;
+  }
+  /* メインコンテンツ */
+  .container {
+    position: relative;
+    z-index: 10;
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 48px 24px 120px;
+    background: rgba(20,20,20,0.55);
+    backdrop-filter: blur(1px);
+    border-left: 1px solid rgba(200,200,200,0.08);
+    border-right: 1px solid rgba(200,200,200,0.08);
+    box-shadow: 0 0 80px rgba(0,0,0,0.8);
+    min-height: 100vh;
+  }
+  h1 {
+    font-size: 2.4rem;
+    font-weight: 400;
+    letter-spacing: 0.12em;
+    text-align: center;
+    margin-bottom: 8px;
+    text-shadow: 0 0 20px rgba(255,255,255,0.1);
+    border-bottom: 2px solid rgba(200,200,200,0.15);
+    padding-bottom: 16px;
+  }
+  h1 small {
+    display: block;
+    font-size: 0.9rem;
+    letter-spacing: 0.3em;
+    color: #999;
+    margin-top: 8px;
+  }
+  h2 {
+    font-size: 1.4rem;
+    font-weight: 400;
+    margin: 40px 0 16px;
+    padding-left: 12px;
+    border-left: 3px solid #888;
+    letter-spacing: 0.08em;
+    color: #ccc;
+  }
+  h2:first-of-type {
+    margin-top: 24px;
+  }
+  h3 {
+    font-size: 1.05rem;
+    font-weight: 400;
+    margin: 24px 0 8px;
+    color: #bbb;
+    letter-spacing: 0.06em;
+  }
+  p, li {
+    line-height: 1.9;
+    font-size: 1rem;
+    color: #c8c8c8;
+    margin-bottom: 12px;
+    text-align: justify;
+  }
+  ul, ol {
+    padding-left: 1.6em;
+    margin-bottom: 16px;
+  }
+  li {
+    margin-bottom: 6px;
+  }
+  .highlight {
+    color: #e8e8e8;
+    border-bottom: 1px dotted #666;
+  }
+  .quote {
+    background: rgba(255,255,255,0.03);
+    border-left: 2px solid #555;
+    padding: 12px 20px;
+    margin: 16px 0;
+    font-style: italic;
+    color: #aaa;
+  }
+  .qa-block {
+    margin: 32px 0;
+    padding: 16px 0;
+    border-top: 1px solid rgba(255,255,255,0.06);
+  }
+  .qa-block .q {
+    font-weight: 400;
+    color: #ddd;
+    margin-bottom: 6px;
+    font-size: 1.05rem;
+  }
+  .qa-block .q::before {
+    content: "問 ";
+    color: #888;
+    font-size: 0.85rem;
+    letter-spacing: 0.1em;
+  }
+  .qa-block .a {
+    color: #aaa;
+    padding-left: 1.2em;
+    border-left: 1px solid rgba(255,255,255,0.08);
+    margin-left: 0.4em;
+  }
+  .qa-block .a::before {
+    content: "答 ";
+    color: #777;
+    font-size: 0.85rem;
+    letter-spacing: 0.1em;
+  }
+
+  /* ===== 光のエフェクト ===== */
+  .light-overlay {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 100;
+    transition: background 0.15s ease-out;
+    mix-blend-mode: screen;
+  }
+  /* サイト外枠を暗くするデフォルト（ライトレベル 50 相当） */
+  .light-overlay {
+    background: radial-gradient(
+      circle var(--light-radius, 400px) at var(--lx, 50%) var(--ly, 50%),
+      var(--light-color, rgba(255,255,255,0.0)) 0%,
+      transparent 100%
+    );
+  }
+  /* 暗闇レイヤー */
+  .dark-overlay {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 99;
+    background: rgba(0,0,0, var(--darkness, 0.55));
+    transition: background 0.15s ease-out;
+  }
+
+  /* ===== コントロールパネル ===== */
+  .controls {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 200;
+    background: rgba(20,20,20,0.85);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 12px;
+    padding: 14px 20px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 18px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.7);
+    max-width: 96vw;
+    font-family: "Yu Gothic", "Hiragino Sans", sans-serif;
+  }
+  .ctrl-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .ctrl-group label {
+    font-size: 0.75rem;
+    color: #999;
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+  }
+  /* 明るさバー */
+  .brightness-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .brightness-track {
+    width: 180px;
+    height: 8px;
+    background: rgba(255,255,255,0.12);
+    border-radius: 4px;
+    position: relative;
+    cursor: pointer;
+    overflow: hidden;
+  }
+  .brightness-fill {
+    height: 100%;
+    width: 50%;
+    background: linear-gradient(90deg, #444, #ccc);
+    border-radius: 4px;
+    transition: width 0.05s linear;
+  }
+  .brightness-thumb {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 14px;
+    height: 14px;
+    background: #ddd;
+    border-radius: 50%;
+    box-shadow: 0 0 6px rgba(255,255,255,0.5);
+    pointer-events: none;
+  }
+  .brightness-val {
+    font-size: 0.75rem;
+    color: #aaa;
+    min-width: 28px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+  /* 矢印ボタン */
+  .arrow-btn {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: #ccc;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+    transition: background 0.15s;
+    flex-shrink: 0;
+  }
+  .arrow-btn:hover {
+    background: rgba(255,255,255,0.18);
+  }
+  .arrow-btn:active {
+    background: rgba(255,255,255,0.3);
+  }
+  /* 色ボタン */
+  .color-dots {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+  }
+  .color-dot {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.2);
+    cursor: pointer;
+    transition: transform 0.15s, border-color 0.15s;
+    flex-shrink: 0;
+  }
+  .color-dot:hover {
+    transform: scale(1.2);
+    border-color: rgba(255,255,255,0.6);
+  }
+  .color-dot.active {
+    border-color: #fff;
+    box-shadow: 0 0 8px rgba(255,255,255,0.6);
+  }
+
+  @media (max-width: 600px) {
+    h1 { font-size: 1.6rem; }
+    .container { padding: 24px 14px 160px; }
+    .controls { padding: 10px 12px; gap: 8px 10px; bottom: 10px; }
+    .brightness-track { width: 110px; }
+    .color-dot { width: 18px; height: 18px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 暗闇レイヤー -->
+<div class="dark-overlay" id="darkOverlay"></div>
+<!-- 光レイヤー -->
+<div class="light-overlay" id="lightOverlay"></div>
+
+<div class="container">
+  <h1>お前だって論法<small>トゥ・クオケ / Tu Quoque</small></h1>
+
+  <p>「お前だって論法（トゥ・クオケ）」は、相手の主張を批判する代わりに、相手自身も同じことをしている（または過去にした）と指摘して、主張そのものを否定しようとする論法です。ラテン語の <span class="highlight">tu quoque</span>（「お前もな」）に由来し、<span class="highlight">人身攻撃論法</span>の一種、あるいは<span class="highlight">論点先取</span>の変種とされます。</p>
+
+  <div class="quote">
+    「タバコは体に悪いからやめるべきだ」<br>
+    「お前だって昔は吸ってたじゃないか」
+  </div>
+
+  <p>この反論は、喫煙が健康に悪いという主張の真偽には一切触れていません。しかし、あたかも「お前も吸っていたのだから、その主張は間違いだ」という印象を与えます。ここにトゥ・クオケの欺瞞性があります。</p>
+
+  <h2>トゥ・クオケはどういう意味？</h2>
+  <p>直訳は「お前もまた」（tu = お前、quoque = もまた）。相手の言行不一致を突くことで、相手の主張に説得力をなくさせようとするレトリックです。しかし、言行不一致それ自体は、主張の論理的な正しさを否定する理由にはなりません。</p>
+
+  <h2>お前だってと反論するのに、相手の落ち度は弱いことに気づかれるよね？どうごまかす？</h2>
+  <p>トゥ・クオケを使う側は、往々にして「相手も完璧ではない」という事実を盾にします。しかし、相手の落ち度が弱い（些細である、すでに反省している、状況が違う）場合、その反論はすぐに崩れます。ごまかす方法としては、以下のようなものが考えられます。</p>
+  <ul>
+    <li><span class="highlight">話題をすり替える</span>：「でもお前のその態度はどうなんだ」と、相手の態度や人格へ焦点を移す。</li>
+    <li><span class="highlight">一般化する</span>：「人間なんてみんなそうだ」と、個別の落ち度を普遍的な人間性に溶かす。</li>
+    <li><span class="highlight">過去と現在を混同する</span>：「昔やったことは今も同じだ」と時間軸を無視する。</li>
+    <li><span class="highlight">感情的に責める</span>：「お前だって」を連発し、相手に自己防衛をさせる。</li>
+  </ul>
+  <p>ただし、これらは論理的なごまかしであり、本質的な議論から逃げているにすぎません。</p>
+
+  <h2>自分の落ち度はどこで、忘れさせる？</h2>
+  <p>トゥ・クオケを使う人は、自分の落ち度を相手に指摘される前に、相手の落ち度を先に攻めることで、自分の弱みを隠そうとします。典型的には、</p>
+  <ul>
+    <li>相手が批判してきた瞬間に、「お前だって」と即座に返す。</li>
+    <li>自分の落ち度を「昔の話」「みんなやってる」「大したことじゃない」と矮小化する。</li>
+    <li>相手の落ち度を誇張し、相対的に自分の落ち度を目立たなくする。</li>
+  </ul>
+  <p>しかし、聞き手が冷静であれば、「で、あなたの落ち度は？」という問いから逃げていることが見抜かれます。</p>
+
+  <h2>お前だって、が思いつく方法は？</h2>
+  <p>「お前だって」を思いつく背景には、いくつかの心理的・社会的要因があります。</p>
+  <ol>
+    <li><span class="highlight">自己防衛</span>：批判されて自尊心が傷つき、反射的に反撃する。</li>
+    <li><span class="highlight">公平さへの欲求</span>：自分だけが責められるのは不当だという感覚。</li>
+    <li><span class="highlight">権威への挑戦</span>：相手を権威と見なし、その権威を引きずり下ろそうとする。</li>
+    <li><span class="highlight">議論のすり替え</span>：本題から逃れるための便利な道具。</li>
+    <li><span class="highlight">文化的背景</span>：「水に流す」「お互い様」といった文化が影響することも。</li>
+  </ol>
+
+  <h2>追加の疑問点 14個と回答</h2>
+
+  <div class="qa-block">
+    <div class="q">トゥ・クオケは常に誤りなのか？</div>
+    <div class="a">主張の真偽を直接否定するものではないため、論証としては誤りです。ただし、相手の信頼性を問う文脈では一定の意味を持つことがあります（例：医者が喫煙しながら禁煙を説く場合）。</div>
+  </div>
+
+  <div class="qa-block">
+    <div class="q">トゥ・クオケと人身攻撃の違いは？</div>
+    <div class="a">人身攻撃は相手の人格・背景・能力を攻撃します。トゥ・クオケは特に「相手も同じことをしている」という偽善性を突く点で、人身攻撃の一種です。</div>
+  </div>
+
+  <div class="qa-block">
+    <div class="q">「お前だって」と言われたらどう返せばいい？</div>
+    <div class="a">「私の行動と、この主張が正しいかどうかは別問題です。まず主張の内容を議論しましょう」と、論点を戻すのが有効です。</div>
+  </div>
+
+  <div class="qa-block">
+    <div class="q">トゥ・クオケが有効に機能する場面はある？</div>
+    <div class="a">相手が「自分は完璧だ」と主張している場合や、道徳的権威を盾にしている場合、偽善を指摘することは説得力を減じます。ただし、それでも主張の真偽とは別です。</div>
+  </div>
+
+  <div class="qa-block">
+    <div class="q">なぜ人は「お前だって」と言いたくなるのか？</div>
+    <div class="a">不公平感、自己防衛、羞恥心、そして「自分だけが責められたくない」という感情が主な原因です。</div>
+  </div>
+
+  <div class="qa-block">
+    <div class="q">トゥ・クオケは子供にも見られる？</div>
+    <div class="a">はい。「だって兄ちゃんもやってるもん」は典型的なトゥ・クオケです。子供は公平さに敏感で、自己防衛のために使いがちです。</div>
+  </div>
+
+  <div class="qa-block">
+    <div class="q">ネット上でトゥ・クオケはよく使われる？</div>
+    <div class="a">非常に多いです。「お前の過去のツイートはどうなんだ」など、言行不一致を暴こうとするリプライは典型的です。</div>
+  </div>
+
+  <div class="qa-block">
+    <div class="q">トゥ・クオケを見破るには？</div>
+    <div class="a">「今議論しているのは私の行動ではなく、この主張の正しさです」と切り分ける。相手が本題から逸れていないか確認する。</div>
+  </div>
+
+  <div class="qa-block">
+    <div class="q">トゥ・クオケと「あなたもね」は同じ？</div>
+    <div class="a">ほぼ同じです。英語圏では "You too" や "Pot calling the kettle black" に近い表現があります。</div>
+  </div>
+
+  <div class="qa-block">
+    <div class="q">トゥ・クオケを使うとどんな印象を与える？</div>
+    <div class="a">議論を避けている、感情的、幼稚、あるいは狡猾という印象を与えかねません。信頼を失う可能性があります。</div>
+  </div>
+
+  <div class="qa-block">
+    <div class="q">トゥ・クオケが正当化されるケースは？</div>
+    <div class="a">相手の主張が「自分はしていない」という前提に依存している場合、その前提を崩すことは重要です。ただし、主張の内容そのものの真偽とは別です。</div>
+  </div>
+
+  <div class="qa-block">
+    <div class="q">トゥ・クオケを避けるには？</div>
+    <div class="a">批判されたら、まず主張の内容を検討する。自分の行動と主張を切り離して考える。感情的反応を抑える。</div>
+  </div>
+
+  <div class="qa-block">
+    <div class="q">トゥ・クオケは論理学で何と呼ばれる？</div>
+    <div class="a">非形式的誤謬の一つで、人身攻撃論法（ad hominem）の一種、特に「偽善の誤謬」とも呼ばれます。</div>
+  </div>
+
+  <div class="qa-block">
+    <div class="q">トゥ・クオケを文化的に許容する社会はある？</div>
+    <div class="a">「お互い様」を重んじる文化では、直接的な批判よりもトゥ・クオケが好まれることがあります。しかし、それは論理的な解決を遅らせる要因にもなります。</div>
+  </div>
+
+</div>
+
+<!-- コントロールパネル -->
+<div class="controls" id="controls">
+  <div class="ctrl-group">
+    <label>明るさ</label>
+    <div class="brightness-wrap">
+      <button class="arrow-btn" id="btnDown">◀</button>
+      <div class="brightness-track" id="brightnessTrack">
+        <div class="brightness-fill" id="brightnessFill"></div>
+        <div class="brightness-thumb" id="brightnessThumb"></div>
+      </div>
+      <button class="arrow-btn" id="btnUp">▶</button>
+      <span class="brightness-val" id="brightnessVal">50</span>
+    </div>
+  </div>
+  <div class="ctrl-group">
+    <label>色</label>
+    <div class="color-dots" id="colorDots"></div>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ===== 状態 =====
+  let brightness = 50;      // 1〜100
+  let lightColor = '#ffffff'; // デフォルト白
+  const minBrightness = 1;
+  const maxBrightness = 100;
+
+  // DOM
+  const darkOverlay = document.getElementById('darkOverlay');
+  const lightOverlay = document.getElementById('lightOverlay');
+  const brightnessFill = document.getElementById('brightnessFill');
+  const brightnessThumb = document.getElementById('brightnessThumb');
+  const brightnessVal = document.getElementById('brightnessVal');
+  const brightnessTrack = document.getElementById('brightnessTrack');
+  const btnUp = document.getElementById('btnUp');
+  const btnDown = document.getElementById('btnDown');
+  const colorDots = document.getElementById('colorDots');
+
+  // ===== 光の更新 =====
+  function updateLight() {
+    // 明るさ 1〜100 を 0〜1 の暗さに変換（明るいほど暗闇が薄い）
+    const t = (brightness - 1) / 99; // 0〜1
+    // 暗闇の不透明度：明るさ最大で0.15、最小で0.98
+    const darkness = 0.98 - t * 0.83;
+    darkOverlay.style.setProperty('--darkness', darkness);
+
+    // 光の半径：明るさに応じて変化（小さいほど狭い）
+    // 1→ほぼ点、100→画面全体
+    const radius = 20 + t * 780; // px
+    lightOverlay.style.setProperty('--light-radius', radius + 'px');
+
+    // 光の色（透明度も明るさに連動）
+    const alpha = 0.08 + t * 0.55;
+    const rgb = hexToRgb(lightColor);
+    if (rgb) {
+      lightOverlay.style.setProperty('--light-color', `rgba(${rgb.r},${rgb.g},${rgb.b},${alpha})`);
+    } else {
+      lightOverlay.style.setProperty('--light-color', `rgba(255,255,255,${alpha})`);
+    }
+
+    // UI更新
+    brightnessFill.style.width = brightness + '%';
+    brightnessThumb.style.left = brightness + '%';
+    brightnessVal.textContent = brightness;
+  }
+
+  // HEX → RGB
+  function hexToRgb(hex) {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {
+      r: parseInt(result[1], 16),
+      g: parseInt(result[2], 16),
+      b: parseInt(result[3], 16)
+    } : null;
+  }
+
+  // ===== マウス位置 =====
+  document.addEventListener('mousemove', function(e) {
+    const x = (e.clientX / window.innerWidth) * 100;
+    const y = (e.clientY / window.innerHeight) * 100;
+    lightOverlay.style.setProperty('--lx', x + '%');
+    lightOverlay.style.setProperty('--ly', y + '%');
+  });
+
+  // タッチ対応
+  document.addEventListener('touchmove', function(e) {
+    if (e.touches.length > 0) {
+      const touch = e.touches[0];
+      const x = (touch.clientX / window.innerWidth) * 100;
+      const y = (touch.clientY / window.innerHeight) * 100;
+      lightOverlay.style.setProperty('--lx', x + '%');
+      lightOverlay.style.setProperty('--ly', y + '%');
+    }
+  }, { passive: true });
+
+  // ===== 明るさ調整 =====
+  function setBrightness(val) {
+    brightness = Math.max(minBrightness, Math.min(maxBrightness, Math.round(val)));
+    updateLight();
+  }
+
+  // バークリック
+  brightnessTrack.addEventListener('click', function(e) {
+    const rect = this.getBoundingClientRect();
+    const ratio = (e.clientX - rect.left) / rect.width;
+    setBrightness(minBrightness + ratio * (maxBrightness - minBrightness));
+  });
+
+  // 長押しで加速
+  let holdTimer = null;
+  let holdInterval = null;
+  let holdSpeed = 1;
+  let holdDirection = 0;
+
+  function startHold(dir) {
+    holdDirection = dir;
+    holdSpeed = 1;
+    // 初回
+    setBrightness(brightness + dir * holdSpeed);
+    // 長押しタイマー：200ms後から連続
+    holdTimer = setTimeout(function() {
+      holdInterval = setInterval(function() {
+        holdSpeed = Math.min(holdSpeed * 1.35, 12);
+        setBrightness(brightness + dir * Math.round(holdSpeed));
+      }, 40);
+    }, 200);
+  }
+
+  function stopHold() {
+    if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+    if (holdInterval) { clearInterval(holdInterval); holdInterval = null; }
+    holdSpeed = 1;
+  }
+
+  btnUp.addEventListener('mousedown', function(e) { e.preventDefault(); startHold(1); });
+  btnDown.addEventListener('mousedown', function(e) { e.preventDefault(); startHold(-1); });
+  btnUp.addEventListener('touchstart', function(e) { e.preventDefault(); startHold(1); }, { passive: false });
+  btnDown.addEventListener('touchstart', function(e) { e.preventDefault(); startHold(-1); }, { passive: false });
+
+  document.addEventListener('mouseup', stopHold);
+  document.addEventListener('touchend', stopHold);
+  document.addEventListener('mouseleave', stopHold);
+
+  // キーボード対応
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      setBrightness(brightness + 2);
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      setBrightness(brightness - 2);
+    }
+  });
+
+  // ===== 色 =====
+  const colors = [
+    { name: '白', hex: '#ffffff' },
+    { name: '赤', hex: '#ff4444' },
+    { name: '水色', hex: '#44ccff' },
+    { name: '黃色', hex: '#ffdd44' },
+    { name: 'ピンク', hex: '#ff88cc' },
+    { name: '青', hex: '#4466ff' },
+    { name: '茶色', hex: '#aa7744' },
+    { name: '橙', hex: '#ff8833' },
+    { name: '紫', hex: '#aa66ff' },
+    { name: '黒', hex: '#222222' },
+    { name: '灰色', hex: '#888888' },
+    { name: '緑', hex: '#44bb66' },
+    { name: '黄緑', hex: '#aadd44' },
+  ];
+
+  colors.forEach(function(c) {
+    const dot = document.createElement('div');
+    dot.className = 'color-dot';
+    dot.style.background = c.hex;
+    dot.title = c.name;
+    if (c.hex === lightColor) dot.classList.add('active');
+    dot.addEventListener('click', function() {
+      lightColor = c.hex;
+      document.querySelectorAll('.color-dot').forEach(function(d) { d.classList.remove('active'); });
+      dot.classList.add('active');
+      updateLight();
+    });
+    colorDots.appendChild(dot);
+  });
+
+  // ===== 初期化 =====
+  // マウス位置初期値：中央
+  lightOverlay.style.setProperty('--lx', '50%');
+  lightOverlay.style.setProperty('--ly', '50%');
+  updateLight();
+
+})();
+</script>
+</body>
+</html>
