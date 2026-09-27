@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>周期表ピース運び</title>
+<style>
+  :root{
+    --bg-overlay: rgba(0,0,0,0.55);
+    --panel-bg: rgba(20,20,30,0.92);
+    --panel-border: #4a4a6a;
+    --text: #eaeaf0;
+    --accent: #7fd1ff;
+    --dish: #3a3a4a;
+    --dish-inner: #2a2a38;
+    --shadow: 0 8px 24px rgba(0,0,0,0.5);
+  }
+
+  /* テーマ：シンプル */
+  body.theme-simple{
+    --bg-overlay: rgba(0,0,0,0.55);
+    --panel-bg: rgba(20,20,30,0.92);
+    --panel-border: #4a4a6a;
+    --text: #eaeaf0;
+    --accent: #7fd1ff;
+    --dish: #3a3a4a;
+    --dish-inner: #2a2a38;
+  }
+
+  /* テーマ：鉱物風 */
+  body.theme-mineral{
+    --bg-overlay: rgba(10,20,20,0.65);
+    --panel-bg: rgba(30,40,38,0.94);
+    --panel-border: #6a8a7a;
+    --text: #e8f0e8;
+    --accent: #a8e6cf;
+    --dish: #4a5a52;
+    --dish-inner: #2e3a34;
+  }
+
+  /* テーマ：純和風 */
+  body.theme-wafu{
+    --bg-overlay: rgba(30,10,10,0.6);
+    --panel-bg: rgba(45,30,25,0.94);
+    --panel-border: #a06050;
+    --text: #f5e6d8;
+    --accent: #e8b87a;
+    --dish: #5a4038;
+    --dish-inner: #3a2822;
+  }
+
+  /* テーマ：ブティック風 */
+  body.theme-boutique{
+    --bg-overlay: rgba(40,20,40,0.55);
+    --panel-bg: rgba(50,35,50,0.94);
+    --panel-border: #c090b0;
+    --text: #f8e8f4;
+    --accent: #f0a8d0;
+    --dish: #6a4a60;
+    --dish-inner: #4a3040;
+  }
+
+  *{ box-sizing: border-box; margin: 0; padding: 0; }
+
+  html,body{
+    width: 100%; height: 100%;
+    overflow: hidden;
+    font-family: "Segoe UI", "Hiragino Sans", "Yu Gothic", sans-serif;
+    color: var(--text);
+    background: #000;
+  }
+
+  /* 背景画像 */
+  #bg{
+    position: fixed;
+    inset: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    z-index: 0;
+  }
+
+  #bg-overlay{
+    position: fixed;
+    inset: 0;
+    background: var(--bg-overlay);
+    z-index: 1;
+    transition: background 0.4s;
+  }
+
+  /* 画面共通 */
+  .screen{
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .screen.active{ display: flex; }
+
+  /* オープニング */
+  #opening .title{
+    font-size: clamp(28px, 6vw, 56px);
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-shadow: 0 4px 20px rgba(0,0,0,0.8);
+    margin-bottom: 12px;
+    text-align: center;
+  }
+  #opening .subtitle{
+    font-size: clamp(14px, 2.5vw, 20px);
+    opacity: 0.85;
+    margin-bottom: 40px;
+    text-align: center;
+  }
+
+  .btn{
+    display: inline-block;
+    padding: 14px 36px;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: var(--text);
+    background: var(--panel-bg);
+    border: 2px solid var(--panel-border);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s, background 0.2s;
+    box-shadow: var(--shadow);
+    user-select: none;
+  }
+  .btn:hover{
+    transform: translateY(-2px) scale(1.03);
+    box-shadow: 0 12px 32px rgba(0,0,0,0.6);
+    border-color: var(--accent);
+  }
+  .btn:active{ transform: scale(0.97); }
+
+  /* 設定画面 */
+  #settings .panel{
+    background: var(--panel-bg);
+    border: 2px solid var(--panel-border);
+    border-radius: 20px;
+    padding: 28px 32px;
+    max-width: 520px;
+    width: 100%;
+    box-shadow: var(--shadow);
+  }
+  #settings h2{
+    font-size: 24px;
+    margin-bottom: 20px;
+    text-align: center;
+    letter-spacing: 0.05em;
+  }
+  .theme-list{
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .theme-option{
+    padding: 14px 10px;
+    border: 2px solid var(--panel-border);
+    border-radius: 12px;
+    text-align: center;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 15px;
+    transition: all 0.15s;
+    background: rgba(255,255,255,0.04);
+  }
+  .theme-option:hover{ border-color: var(--accent); }
+  .theme-option.selected{
+    border-color: var(--accent);
+    background: rgba(127,209,255,0.15);
+    box-shadow: 0 0 0 2px var(--accent) inset;
+  }
+  .settings-actions{
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+  }
+  .settings-actions .btn{ flex: 1; padding: 12px 16px; font-size: 16px; }
+
+  /* ゲーム画面 */
+  #game{
+    justify-content: flex-start;
+    padding: 0;
+  }
+
+  #game-header{
+    width: 100%;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(0,0,0,0.35);
+    backdrop-filter: blur(4px);
+    z-index: 20;
+    flex-shrink: 0;
+  }
+  #game-header .info{
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+  #game-header .info span{ color: var(--accent); }
+
+  #play-area{
+    position: relative;
+    flex: 1;
+    width: 100%;
+    overflow: hidden;
+  }
+
+  /* 元素ピース */
+  .piece{
+    position: absolute;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    cursor: grab;
+    user-select: none;
+    touch-action: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 800;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+    box-shadow: inset -3px -3px 6px rgba(0,0,0,0.4), inset 3px 3px 6px rgba(255,255,255,0.25), 0 4px 10px rgba(0,0,0,0.5);
+    transition: transform 0.1s;
+    z-index: 5;
+  }
+  .piece:active{ cursor: grabbing; }
+  .piece.dragging{
+    z-index: 999;
+    transform: scale(1.25);
+    box-shadow: 0 0 0 3px var(--accent), 0 8px 24px rgba(0,0,0,0.7);
+  }
+  .piece.lifted{
+    animation: float 2.2s ease-in-out infinite;
+  }
+  @keyframes float{
+    0%,100%{ transform: translateY(0) rotate(0deg); }
+    50%{ transform: translateY(-6px) rotate(6deg); }
+  }
+  .piece.liquid{
+    animation: wobble 1.6s ease-in-out infinite;
+    border-radius: 40% 60% 55% 45% / 50% 45% 55% 50%;
+  }
+  @keyframes wobble{
+    0%,100%{ border-radius: 40% 60% 55% 45% / 50% 45% 55% 50%; transform: rotate(-4deg); }
+    50%{ border-radius: 55% 45% 40% 60% / 45% 55% 45% 55%; transform: rotate(4deg); }
+  }
+
+  /* ドット絵風の模様（CSSグラデーション） */
+  .piece .dot{
+    position: absolute;
+    inset: 6px;
+    border-radius: 50%;
+    opacity: 0.5;
+    background-image: radial-gradient(circle, rgba(255,255,255,0.6) 1px, transparent 1px);
+    background-size: 6px 6px;
+    pointer-events: none;
+  }
+
+  /* 皿 */
+  .dish{
+    position: absolute;
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 40%, var(--dish) 0%, var(--dish-inner) 70%);
+    border: 4px solid var(--panel-border);
+    box-shadow: inset 0 6px 16px rgba(0,0,0,0.6), 0 8px 24px rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 2px;
+    padding: 8px;
+    z-index: 2;
+    transition: box-shadow 0.2s;
+  }
+  .dish.highlight{
+    box-shadow: inset 0 6px 16px rgba(0,0,0,0.6), 0 0 0 4px var(--accent), 0 8px 24px rgba(0,0,0,0.5);
+  }
+  .dish .mini{
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    box-shadow: inset -1px -1px 2px rgba(0,0,0,0.5);
+  }
+
+  /* 勝利画面 */
+  #victory .panel{
+    background: var(--panel-bg);
+    border: 2px solid var(--panel-border);
+    border-radius: 24px;
+    padding: 40px 48px;
+    text-align: center;
+    box-shadow: var(--shadow);
+    max-width: 520px;
+  }
+  #victory h1{
+    font-size: clamp(28px, 5vw, 44px);
+    margin-bottom: 12px;
+    color: var(--accent);
+    text-shadow: 0 0 20px rgba(127,209,255,0.6);
+  }
+  #victory p{ margin-bottom: 24px; opacity: 0.9; line-height: 1.7; }
+
+  #victory footer{
+    margin-top: 32px;
+    padding-top: 20px;
+    border-top: 1px solid var(--panel-border);
+  }
+  #victory footer a{
+    color: var(--accent);
+    font-weight: 700;
+    text-decoration: none;
+    font-size: 16px;
+    letter-spacing: 0.05em;
+  }
+  #victory footer a:hover{ text-decoration: underline; }
+
+  /* ドット絵風の装飾 */
+  .pixel-deco{
+    image-rendering: pixelated;
+    display: inline-block;
+    width: 16px; height: 16px;
+    background: var(--accent);
+    box-shadow:
+      0 0 0 2px rgba(0,0,0,0.4),
+      4px 0 0 var(--accent),
+      8px 0 0 var(--accent),
+      0 4px 0 var(--accent),
+      4px 4px 0 var(--accent);
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+
+  @media (max-width: 600px){
+    .theme-list{ grid-template-columns: 1fr; }
+    .piece{ width: 38px; height: 38px; font-size: 10px; }
+  }
+</style>
+</head>
+<body class="theme-simple">
+
+<img id="bg" src="img209h.jpg" alt="">
+<div id="bg-overlay"></div>
+
+<!-- オープニング -->
+<div id="opening" class="screen active">
+  <div class="title">周期表ピース運び</div>
+  <div class="subtitle">118の元素を、色ごとの皿に運ぼう。<br>重い・軽い・液体、それぞれの個性を感じながら。</div>
+  <button class="btn" id="btn-start">はじめる</button>
+</div>
+
+<!-- 設定 -->
+<div id="settings" class="screen">
+  <div class="panel">
+    <h2>設定</h2>
+    <div class="theme-list">
+      <div class="theme-option selected" data-theme="theme-simple">シンプル</div>
+      <div class="theme-option" data-theme="theme-mineral">鉱物風</div>
+      <div class="theme-option" data-theme="theme-wafu">純和風</div>
+      <div class="theme-option" data-theme="theme-boutique">ブティック風</div>
+    </div>
+    <div class="settings-actions">
+      <button class="btn" id="btn-back">戻る</button>
+      <button class="btn" id="btn-play">プレイ</button>
+    </div>
+  </div>
+</div>
+
+<!-- ゲーム -->
+<div id="game" class="screen">
+  <div id="game-header">
+    <div class="info">集めた色：<span id="count-colors">0</span> / <span id="total-colors">0</span></div>
+    <div class="info">皿に乗った元素：<span id="count-elements">0</span> / 118</div>
+  </div>
+  <div id="play-area"></div>
+</div>
+
+<!-- 勝利 -->
+<div id="victory" class="screen">
+  <div class="panel">
+    <h1>勝利！</h1>
+    <p>すべての色の元素を、それぞれの皿に乗せることができました。<br>周期表の仲間分け、お見事です。</p>
+    <button class="btn" id="btn-again">もう一度</button>
+    <footer>
+      <a href="study.html">study.html で復習する</a>
+    </footer>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   元素データ（118個）
+   一般的な分類に基づく色分け
+   category:
+     alkali       アルカリ金属
+     alkaline     アルカリ土類金属
+     transition   遷移元素
+     post         典型金属（13-16族の金属）
+     metalloid    半金属
+     nonmetal     非金属
+     halogen      ハロゲン
+     noble        貴ガス
+   state: solid / liquid / gas
+   mass: 原子量（軽い/重いの判定に使用）
+   ========================================================= */
+const ELEMENTS = [
+  {z:1,  sym:"H",  name:"水素",   cat:"nonmetal",   state:"gas",    mass:1.008},
+  {z:2,  sym:"He", name:"ヘリウム", cat:"noble",      state:"gas",    mass:4.003},
+  {z:3,  sym:"Li", name:"リチウム", cat:"alkali",     state:"solid",  mass:6.94},
+  {z:4,  sym:"Be", name:"ベリリウム",cat:"alkaline",   state:"solid",  mass:9.012},
+  {z:5,  sym:"B",  name:"ホウ素",   cat:"metalloid",  state:"solid",  mass:10.81},
+  {z:6,  sym:"C",  name:"炭素",     cat:"nonmetal",   state:"solid",  mass:12.011},
+  {z:7,  sym:"N",  name:"窒素",     cat:"nonmetal",   state:"gas",    mass:14.007},
+  {z:8,  sym:"O",  name:"酸素",     cat:"nonmetal",   state:"gas",    mass:15.999},
+  {z:9,  sym:"F",  name:"フッ素",   cat:"halogen",    state:"gas",    mass:18.998},
+  {z:10, sym:"Ne", name:"ネオン",   cat:"noble",      state:"gas",    mass:20.180},
+  {z:11, sym:"Na", name:"ナトリウム",cat:"alkali",     state:"solid",  mass:22.990},
+  {z:12, sym:"Mg", name:"マグネシウム",cat:"alkaline", state:"solid",  mass:24.305},
+  {z:13, sym:"Al", name:"アルミニウム",cat:"post",    state:"solid",  mass:26.982},
+  {z:14, sym:"Si", name:"ケイ素",   cat:"metalloid",  state:"solid",  mass:28.085},
+  {z:15, sym:"P",  name:"リン",     cat:"nonmetal",   state:"solid",  mass:30.974},
+  {z:16, sym:"S",  name:"硫黄",     cat:"nonmetal",   state:"solid",  mass:32.06},
+  {z:17, sym:"Cl", name:"塩素",     cat:"halogen",    state:"gas",    mass:35.45},
+  {z:18, sym:"Ar", name:"アルゴン", cat:"noble",      state:"gas",    mass:39.948},
+  {z:19, sym:"K",  name:"カリウム", cat:"alkali",     state:"solid",  mass:39.098},
+  {z:20, sym:"Ca", name:"カルシウム",cat:"alkaline",   state:"solid",  mass:40.078},
+  {z:21, sym:"Sc", name:"スカンジウム",cat:"transition",state:"solid", mass:44.956},
+  {z:22, sym:"Ti", name:"チタン",   cat:"transition", state:"solid",  mass:47.867},
+  {z:23, sym:"V",  name:"バナジウム",cat:"transition", state:"solid",  mass:50.942},
+  {z:24, sym:"Cr", name:"クロム",   cat:"transition", state:"solid",  mass:51.996},
+  {z:25, sym:"Mn", name:"マンガン", cat:"transition", state:"solid",  mass:54.938},
+  {z:26, sym:"Fe", name:"鉄",       cat:"transition", state:"solid",  mass:55.845},
+  {z:27, sym:"Co", name:"コバルト", cat:"transition", state:"solid",  mass:58.933},
+  {z:28, sym:"Ni", name:"ニッケル", cat:"transition", state:"solid",  mass:58.693},
+  {z:29, sym:"Cu", name:"銅",       cat:"transition", state:"solid",  mass:63.546},
+  {z:30, sym:"Zn", name:"亜鉛",     cat:"transition", state:"solid",  mass:65.38},
+  {z:31, sym:"Ga", name:"ガリウム", cat:"post",       state:"solid",  mass:69.723},
+  {z:32, sym:"Ge", name:"ゲルマニウム",cat:"metalloid",state:"solid", mass:72.630},
+  {z:33, sym:"As", name:"ヒ素",     cat:"metalloid",  state:"solid",  mass:74.922},
+  {z:34, sym:"Se", name:"セレン",   cat:"nonmetal",   state:"solid",  mass:78.971},
+  {z:35, sym:"Br", name:"臭素",     cat:"halogen",    state:"liquid", mass:79.904},
+  {z:36, sym:"Kr", name:"クリプトン",cat:"noble",      state:"gas",    mass:83.798},
+  {z:37, sym:"Rb", name:"ルビジウム",cat:"alkali",     state:"solid",  mass:85.468},
+  {z:38, sym:"Sr", name:"ストロンチウム",cat:"alkaline",state:"solid", mass:87.62},
+  {z:39, sym:"Y",  name:"イットリウム",cat:"transition",state:"solid", mass:88.906},
+  {z:40, sym:"Zr", name:"ジルコニウム",cat:"transition",state:"solid", mass:91.224},
+  {z:41, sym:"Nb", name:"ニオブ",   cat:"transition", state:"solid",  mass:92.906},
+  {z:42, sym:"Mo", name:"モリブデン",cat:"transition", state:"solid",  mass:95.95},
+  {z:43, sym:"Tc", name:"テクネチウム",cat:"transition",state:"solid", mass:98},
+  {z:44, sym:"Ru", name:"ルテニウム",cat:"transition", state:"solid",  mass:101.07},
+  {z:45, sym:"Rh", name:"ロジウム", cat:"transition", state:"solid",  mass:102.91},
+  {z:46, sym:"Pd", name:"パラジウム",cat:"transition", state:"solid",  mass:106.42},
+  {z:47, sym:"Ag", name:"銀",       cat:"transition", state:"solid",  mass:107.87},
+  {z:48, sym:"Cd", name:"カドミウム",cat:"transition", state:"solid",  mass:112.41},
+  {z:49, sym:"In", name:"インジウム",cat:"post",       state:"solid",  mass:114.82},
+  {z:50, sym:"Sn", name:"スズ",     cat:"post",       state:"solid",  mass:118.71},
+  {z:51, sym:"Sb", name:"アンチモン",cat:"metalloid",  state:"solid",  mass:121.76},
+  {z:52, sym:"Te", name:"テルル",   cat:"metalloid",  state:"solid",  mass:127.60},
+  {z:53, sym:"I",  name:"ヨウ素",   cat:"halogen",    state:"solid",  mass:126.90},
+  {z:54, sym:"Xe", name:"キセノン", cat:"noble",      state:"gas",    mass:131.29},
+  {z:55, sym:"Cs", name:"セシウム", cat:"alkali",     state:"solid",  mass:132.91},
+  {z:56, sym:"Ba", name:"バリウム", cat:"alkaline",   state:"solid",  mass:137.33},
+  {z:57, sym:"La", name:"ランタン", cat:"transition", state:"solid",  mass:138.91},
+  {z:58, sym:"Ce", name:"セリウム", cat:"transition", state:"solid",  mass:140.12},
+  {z:59, sym:"Pr", name:"プラセオジム",cat:"transition",state:"solid",mass:140.91},
+  {z:60, sym:"Nd", name:"ネオジム", cat:"transition", state:"solid",  mass:144.24},
+  {z:61, sym:"Pm", name:"プロメチウム",cat:"transition",state:"solid",mass:145},
+  {z:62, sym:"Sm", name:"サマリウム",cat:"transition", state:"solid",  mass:150.36},
+  {z:63, sym:"Eu", name:"ユウロピウム",cat:"transition",state:"solid",mass:151.96},
+  {z:64, sym:"Gd", name:"ガドリニウム",cat:"transition",state:"solid",mass:157.25},
+  {z:65, sym:"Tb", name:"テルビウム",cat:"transition", state:"solid",  mass:158.93},
+  {z:66, sym:"Dy", name:"ジスプロシウム",cat:"transition",state:"solid",mass:162.50},
+  {z:67, sym:"Ho", name:"ホルミウム",cat:"transition", state:"solid",  mass:164.93},
+  {z:68, sym:"Er", name:"エルビウム",cat:"transition", state:"solid",  mass:167.26},
+  {z:69, sym:"Tm", name:"ツリウム", cat:"transition", state:"solid",  mass:168.93},
+  {z:70, sym:"Yb", name:"イッテルビウム",cat:"transition",state:"solid",mass:173.05},
+  {z:71, sym:"Lu", name:"ルテチウム",cat:"transition", state:"solid",  mass:174.97},
+  {z:72, sym:"Hf", name:"ハフニウム",cat:"transition", state:"solid",  mass:178.49},
+  {z:73, sym:"Ta", name:"タンタル", cat:"transition", state:"solid",  mass:180.95},
+  {z:74, sym:"W",  name:"タングステン",cat:"transition",state:"solid", mass:183.84},
+  {z:75, sym:"Re", name:"レニウム", cat:"transition", state:"solid",  mass:186.21},
+  {z:76, sym:"Os", name:"オスミウム",cat:"transition", state:"solid",  mass:190.23},
+  {z:77, sym:"Ir", name:"イリジウム",cat:"transition", state:"solid",  mass:192.22},
+  {z:78, sym:"Pt", name:"白金",     cat:"transition", state:"solid",  mass:195.08},
+  {z:79, sym:"Au", name:"金",       cat:"transition", state:"solid",  mass:196.97},
+  {z:80, sym:"Hg", name:"水銀",     cat:"transition", state:"liquid", mass:200.59},
+  {z:81, sym:"Tl", name:"タリウム", cat:"post",       state:"solid",  mass:204.38},
+  {z:82, sym:"Pb", name:"鉛",       cat:"post",       state:"solid",  mass:207.2},
+  {z:83, sym:"Bi", name:"ビスマス", cat:"post",       state:"solid",  mass:208.98},
+  {z:84, sym:"Po", name:"ポロニウム",cat:"post",      state:"solid",  mass:209},
+  {z:85, sym:"At", name:"アスタチン",cat:"halogen",   state:"solid",  mass:210},
+  {z:86, sym:"Rn", name:"ラドン",   cat:"noble",      state:"gas",    mass:222},
+  {z:87, sym:"Fr", name:"フランシウム",cat:"alkali",   state:"solid",  mass:223},
+  {z:88, sym:"Ra", name:"ラジウム", cat:"alkaline",   state:"solid",  mass:226},
+  {z:89, sym:"Ac", name:"アクチニウム",cat:"transition",state:"solid", mass:227},
+  {z:90, sym:"Th", name:"トリウム", cat:"transition", state:"solid",  mass:232.04},
+  {z:91, sym:"Pa", name:"プロトアクチニウム",cat:"transition",state:"solid",mass:231.04},
+  {z:92, sym:"U",  name:"ウラン",   cat:"transition", state:"solid",  mass:238.03},
+  {z:93, sym:"Np", name:"ネプツニウム",cat:"transition",state:"solid", mass:237},
+  {z:94, sym:"Pu", name:"プルトニウム",cat:"transition",state:"solid", mass:244},
+  {z:95, sym:"Am", name:"アメリシウム",cat:"transition",state:"solid", mass:243},
+  {z:96, sym:"Cm", name:"キュリウム",cat:"transition", state:"solid",  mass:247},
+  {z:97, sym:"Bk", name:"バークリウム",cat:"transition",state:"solid", mass:247},
+  {z:98, sym:"Cf", name:"カリホルニウム",cat:"transition",state:"solid",mass:251},
+  {z:99, sym:"Es", name:"アインスタイニウム",cat:"transition",state:"solid",mass:252},
+  {z:100,sym:"Fm", name:"フェルミウム",cat:"transition",state:"solid", mass:257},
+  {z:101,sym:"Md", name:"メンデレビウム",cat:"transition",state:"solid",mass:258},
+  {z:102,sym:"No", name:"ノーベリウム",cat:"transition",state:"solid", mass:259},
+  {z:103,sym:"Lr", name:"ローレンシウム",cat:"transition",state:"solid",mass:266},
+  {z:104,sym:"Rf", name:"ラザホージウム",cat:"transition",state:"solid",mass:267},
+  {z:105,sym:"Db", name:"ドブニウム",cat:"transition",state:"solid",  mass:268},
+  {z:106,sym:"Sg", name:"シーボーギウム",cat:"transition",state:"solid",mass:269},
+  {z:107,sym:"Bh", name:"ボーリウム",cat:"transition",state:"solid",  mass:270},
+  {z:108,sym:"Hs", name:"ハッシウム",cat:"transition",state:"solid",  mass:269},
+  {z:109,sym:"Mt", name:"マイトネリウム",cat:"transition",state:"solid",mass:278},
+  {z:110,sym:"Ds", name:"ダームスタチウム",cat:"transition",state:"solid",mass:281},
+  {z:111,sym:"Rg", name:"レントゲニウム",cat:"transition",state:"solid",mass:282},
+  {z:112,sym:"Cn", name:"コペルニシウム",cat:"transition",state:"solid",mass:285},
+  {z:113,sym:"Nh", name:"ニホニウム",cat:"post",      state:"solid",  mass:286},
+  {z:114,sym:"Fl", name:"フレロビウム",cat:"post",     state:"solid",  mass:289},
+  {z:115,sym:"Mc", name:"モスコビウム",cat:"post",     state:"solid",  mass:290},
+  {z:116,sym:"Lv", name:"リバモリウム",cat:"post",     state:"solid",  mass:293},
+  {z:117,sym:"Ts", name:"テネシン", cat:"halogen",    state:"solid",  mass:294},
+  {z:118,sym:"Og", name:"オガネソン",cat:"noble",      state:"gas",    mass:294}
+];
+
+/* 分類ごとの色（一般的な分け方に基づく） */
+const CAT_COLORS = {
+  alkali:     "#ff6b6b", // 赤系
+  alkaline:   "#ffa94d", // 橙系
+  transition: "#4dabf7", // 青系
+  post:       "#9775fa", // 紫系
+  metalloid:  "#38d9a9", // 緑系
+  nonmetal:   "#ffd43b", // 黄系
+  halogen:    "#f783ac", // ピンク系
+  noble:      "#ced4da"  // 灰系
+};
+
+const CAT_NAMES = {
+  alkali:     "アルカリ金属",
+  alkaline:   "アルカリ土類金属",
+  transition: "遷移元素",
+  post:       "典型金属",
+  metalloid:  "半金属",
+  nonmetal:   "非金属",
+  halogen:    "ハロゲン",
+  noble:      "貴ガス"
+};
+
+/* =========================================================
+   状態
+   ========================================================= */
+const state = {
+  theme: "theme-simple",
+  pieces: [],
+  dishes: [],
+  placed: {},       // dishId -> Set of z
+  totalColors: 0,
+  placedElements: 0,
+  gameArea: null,
+  dragging: null,
+  dragOffset: {x:0, y:0},
+  animFrame: null
+};
+
+/* =========================================================
+   画面切り替え
+   ========================================================= */
+function showScreen(id){
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+}
+
+/* =========================================================
+   テーマ
+   ========================================================= */
+function applyTheme(theme){
+  state.theme = theme;
+  document.body.className = theme;
+  document.querySelectorAll(".theme-option").forEach(el => {
+    el.classList.toggle("selected", el.dataset.theme === theme);
+  });
+}
+
+/* =========================================================
+   ゲーム初期化
+   ========================================================= */
+function initGame(){
+  const area = document.getElementById("play-area");
+  area.innerHTML = "";
+  state.pieces = [];
+  state.dishes = [];
+  state.placed = {};
+  state.placedElements = 0;
+
+  const cats = Object.keys(CAT_COLORS);
+  state.totalColors = cats.length;
+
+  // 皿を配置（画面下部に横並び）
+  const areaRect = area.getBoundingClientRect();
+  const dishCount = cats.length;
+  const dishSize = Math.min(90, (areaRect.width - 40) / dishCount - 8);
+  const dishGap = (areaRect.width - dishSize * dishCount) / (dishCount + 1);
+
+  cats.forEach((cat, i) => {
+    const dish = document.createElement("div");
+    dish.className = "dish";
+    dish.dataset.cat = cat;
+    dish.style.width = dishSize + "px";
+    dish.style.height = dishSize + "px";
+    dish.style.left = (dishGap + i * (dishSize + dishGap)) + "px";
+    dish.style.bottom = "16px";
+    dish.title = CAT_NAMES[cat];
+
+    // 皿のラベル（ドット絵風の小さな色ブロック）
+    const label = document.createElement("div");
+    label.style.position = "absolute";
+    label.style.top = "-22px";
+    label.style.left = "50%";
+    label.style.transform = "translateX(-50%)";
+    label.style.fontSize = "10px";
+    label.style.fontWeight = "800";
+    label.style.color = CAT_COLORS[cat];
+    label.style.textShadow = "0 1px 3px rgba(0,0,0,0.9)";
+    label.style.whiteSpace = "nowrap";
+    label.textContent = CAT_NAMES[cat];
+    dish.appendChild(label);
+
+    area.appendChild(dish);
+    state.dishes.push({el: dish, cat: cat, x: dishGap + i*(dishSize+dishGap), y: areaRect.height - 16 - dishSize, size: dishSize});
+    state.placed[cat] = new Set();
+  });
+
+  // 元素ピースを配置
+  const margin = 60;
+  const topMargin = 50;
+  const bottomLimit = areaRect.height - 140;
+
+  ELEMENTS.forEach((el, idx) => {
+    const piece = document.createElement("div");
+    piece.className = "piece";
+    piece.dataset.z = el.z;
+    piece.dataset.cat = el.cat;
+    piece.dataset.state = el.state;
+    piece.dataset.mass = el.mass;
+    piece.textContent = el.sym;
+    piece.style.background = CAT_COLORS[el.cat];
+    piece.title = `${el.z} ${el.name}（${CAT_NAMES[el.cat]}）`;
+
+    // ドット絵風の模様
+    const dot = document.createElement("div");
+    dot.className = "dot";
+    piece.appendChild(dot);
+
+    // 初期位置：ランダム
+    const x = margin + Math.random() * (areaRect.width - margin * 2);
+    const y = topMargin + Math.random() * (bottomLimit - topMargin);
+    piece.style.left = x + "px";
+    piece.style.top = y + "px";
+
+    // 物理的特性
+    if(el.state === "liquid"){
+      piece.classList.add("liquid");
+    } else if(el.mass < 40){
+      piece.classList.add("lifted");
+    }
+
+    // ドラッグイベント
+    piece.addEventListener("pointerdown", onPointerDown);
+
+    area.appendChild(piece);
+    state.pieces.push({
+      el: piece,
+      data: el,
+      x: x, y: y,
+      vx: 0, vy: 0,
+      dragging: false,
+      placed: false
+    });
+  });
+
+  updateHUD();
+  startAnimation();
+}
+
+/* =========================================================
+   ドラッグ処理
+   ========================================================= */
+function onPointerDown(e){
+  const pieceEl = e.currentTarget;
+  const piece = state.pieces.find(p => p.el === pieceEl);
+  if(!piece || piece.placed) return;
+
+  e.preventDefault();
+  pieceEl.setPointerCapture(e.pointerId);
+
+  const areaRect = document.getElementById("play-area").getBoundingClientRect();
+  const rect = pieceEl.getBoundingClientRect();
+
+  state.dragging = piece;
+  piece.dragging = true;
+  pieceEl.classList.add("dragging");
+
+  state.dragOffset.x = e.clientX - rect.left;
+  state.dragOffset.y = e.clientY - rect.top;
+
+  pieceEl.addEventListener("pointermove", onPointerMove);
+  pieceEl.addEventListener("pointerup", onPointerUp);
+  pieceEl.addEventListener("pointercancel", onPointerUp);
+}
+
+function onPointerMove(e){
+  if(!state.dragging) return;
+  e.preventDefault();
+
+  const area = document.getElementById("play-area");
+  const areaRect = area.getBoundingClientRect();
+  const piece = state.dragging;
+  const el = piece.el;
+
+  let nx = e.clientX - areaRect.left - state.dragOffset.x;
+  let ny = e.clientY - areaRect.top - state.dragOffset.y;
+
+  // 画面内に制限
+  nx = Math.max(0, Math.min(areaRect.width - el.offsetWidth, nx));
+  ny = Math.max(0, Math.min(areaRect.height - el.offsetHeight, ny));
+
+  // 重い元素は移動が遅い（補間）
+  const mass = piece.data.mass;
+  const speed = mass > 150 ? 0.25 : mass > 80 ? 0.45 : mass > 40 ? 0.7 : 1.0;
+
+  piece.x += (nx - piece.x) * speed;
+  piece.y += (ny - piece.y) * speed;
+
+  el.style.left = piece.x + "px";
+  el.style.top = piece.y + "px";
+}
+
+function onPointerUp(e){
+  if(!state.dragging) return;
+  const piece = state.dragging;
+  const el = piece.el;
+  el.classList.remove("dragging");
+  el.removeEventListener("pointermove", onPointerMove);
+  el.removeEventListener("pointerup", onPointerUp);
+  el.removeEventListener("pointercancel", onPointerUp);
+  piece.dragging = false;
+  state.dragging = null;
+
+  // 皿の上に落ちたか判定
+  checkDishDrop(piece);
+}
+
+/* =========================================================
+   皿の上に落ちたか判定
+   ========================================================= */
+function checkDishDrop(piece){
+  const el = piece.el;
+  const pieceRect = el.getBoundingClientRect();
+
+  for(const dish of state.dishes){
+    const dishRect = dish.el.getBoundingClientRect();
+    // 中心点が皿の範囲内にあるか
+    const cx = pieceRect.left + pieceRect.width / 2;
+    const cy = pieceRect.top + pieceRect.height / 2;
+
+    if(cx >= dishRect.left && cx <= dishRect.right &&
+       cy >= dishRect.top && cy <= dishRect.bottom){
+
+      if(dish.cat === piece.data.cat){
+        // 正しい皿
+        placeOnDish(piece, dish);
+        return;
+      } else {
+        // 違う皿 → 跳ね返す
+        dish.el.classList.add("highlight");
+        setTimeout(() => dish.el.classList.remove("highlight"), 300);
+        // 少し弾く
+        piece.vx = (Math.random() - 0.5) * 6;
+        piece.vy = -3;
+        return;
+      }
+    }
+  }
+}
+
+function placeOnDish(piece, dish){
+  if(piece.placed) return;
+  piece.placed = true;
+  piece.el.style.display = "none";
+  piece.el.classList.remove("dragging");
+
+  state.placed[dish.cat].add(piece.data.z);
+  state.placedElements++;
+
+  // 皿にミニピースを追加
+  const mini = document.createElement("div");
+  mini.className = "mini";
+  mini.style.background = CAT_COLORS[dish.cat];
+  dish.el.appendChild(mini);
+
+  updateHUD();
+
+  // 勝利判定：全色が1つ以上皿に乗ったら
+  const allColorsPlaced = Object.keys(state.placed).every(cat => state.placed[cat].size > 0);
+  if(allColorsPlaced){
+    setTimeout(() => {
+      showScreen("victory");
+    }, 400);
+  }
+}
+
+/* =========================================================
+   HUD更新
+   ========================================================= */
+function updateHUD(){
+  const colorsDone = Object.keys(state.placed).filter(cat => state.placed[cat].size > 0).length;
+  document.getElementById("count-colors").textContent = colorsDone;
+  document.getElementById("total-colors").textContent = state.totalColors;
+  document.getElementById("count-elements").textContent = state.placedElements;
+}
+
+/* =========================================================
+   アニメーションループ（ふわふわ・うねうね）
+   ========================================================= */
+function startAnimation(){
+  if(state.animFrame) cancelAnimationFrame(state.animFrame);
+
+  function loop(){
+    const area = document.getElementById("play-area");
+    const areaRect = area.getBoundingClientRect();
+
+    state.pieces.forEach(piece => {
+      if(piece.placed || piece.dragging) return;
+
+      const el = piece.el;
+      const mass = piece.data.mass;
+
+      // 浮遊・ふわふわ
+      if(piece.data.state === "gas" || mass < 40){
+        piece.vx += (Math.random() - 0.5) * 0.3;
+        piece.vy += (Math.random() - 0.5) * 0.3;
+        piece.vx *= 0.96;
+        piece.vy *= 0.96;
+      }
+
+      // 液体：うねうね
+      if(piece.data.state === "liquid"){
+        piece.vx += (Math.random() - 0.5) * 0.5;
+        piece.vy += (Math.random() - 0.5) * 0.5;
+        piece.vx *= 0.94;
+        piece.vy *= 0.94;
+      }
+
+      // 重い元素は動きにくい
+      if(mass > 150){
+        piece.vx *= 0.9;
+        piece.vy *= 0.9;
+      }
+
+      piece.x += piece.vx;
+      piece.y += piece.vy;
+
+      // 壁反射
+      const w = el.offsetWidth;
+      const h = el.offsetHeight;
+      if(piece.x < 0){ piece.x = 0; piece.vx *= -0.8; }
+      if(piece.x > areaRect.width - w){ piece.x = areaRect.width - w; piece.vx *= -0.8; }
+      if(piece.y < 0){ piece.y = 0; piece.vy *= -0.8; }
+      if(piece.y > areaRect.height - h){ piece.y = areaRect.height - h; piece.vy *= -0.8; }
+
+      el.style.left = piece.x + "px";
+      el.style.top = piece.y + "px";
+    });
+
+    state.animFrame = requestAnimationFrame(loop);
+  }
+  loop();
+}
+
+/* =========================================================
+   イベント登録
+   ========================================================= */
+document.getElementById("btn-start").addEventListener("click", () => {
+  showScreen("settings");
+});
+
+document.querySelectorAll(".theme-option").forEach(el => {
+  el.addEventListener("click", () => {
+    applyTheme(el.dataset.theme);
+  });
+});
+
+document.getElementById("btn-back").addEventListener("click", () => {
+  showScreen("opening");
+});
+
+document.getElementById("btn-play").addEventListener("click", () => {
+  showScreen("game");
+  // レイアウト確定後に初期化
+  requestAnimationFrame(() => {
+    setTimeout(initGame, 50);
+  });
+});
+
+document.getElementById("btn-again").addEventListener("click", () => {
+  showScreen("game");
+  requestAnimationFrame(() => {
+    setTimeout(initGame, 50);
+  });
+});
+
+// リサイズ対応（ゲーム中のみ再配置）
+let resizeTimer;
+window.addEventListener("resize", () => {
+  if(!document.getElementById("game").classList.contains("active")) return;
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    // 簡易的に再初期化
+    initGame();
+  }, 300);
+});
+
+// 初期テーマ適用
+applyTheme("theme-simple");
+</script>
+</body>
+</html>
