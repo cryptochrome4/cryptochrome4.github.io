@@ -371,22 +371,21 @@
   const MAX_CANNON_SLOTS = 3;
   const AMMO_PER_ITEM = 10;
 
-  // ランダム渦力：50〜200
   const VORTEX_MIN = 50;
   const VORTEX_MAX = 200;
 
-  // 風・波（9倍）
   const WIND_MIN = 0.5 * 9;
   const WIND_MAX = 2.0 * 9;
   const WAVE_MIN = 0.3 * 9;
   const WAVE_MAX = 1.2 * 9;
 
-  // 氷山の数
   const ICEBERG_COUNT = 25;
-  // 宝の地図持ちの敵の数
   const TREASURE_ENEMY_COUNT = 7;
-  // Hawjackの場所を知る敵の数
   const HAWJACK_KNOWER_COUNT = 10;
+
+  // 渦力の基準値（引力範囲の計算に使用）
+  const VORTEX_BASE = 1.0;
+  const VORTEX_INFLUENCE_BASE = 3.0; // 渦力1.0のときの半径倍率
 
   let player = {
     x: WORLD_W / 2, y: WORLD_H / 2,
@@ -461,6 +460,19 @@
     return dirs[idx];
   }
 
+  // 渦力に応じた引力範囲の倍率
+  // 渦力1.0 → 基準3.0倍, 渦力200 → 遥かに広がる
+  // 線形ではなく、渦力の平方根的に効かせると自然（重力っぽい）
+  function getInfluenceFactor() {
+    // vortexPower 1.0 → 1.0倍 (基準3.0 * 1.0)
+    // vortexPower 200 → 大きく拡大
+    // 平方根でスケール: sqrt(200) ≈ 14.14
+    // ただし範囲が広がりすぎると画面外から引っ張られて理不尽なので、
+    // 対数か平方根で適度に。
+    const base = Math.sqrt(Math.max(vortexPower, 0.1) / VORTEX_BASE);
+    return base;
+  }
+
   function initWorld() {
     enemies = [];
     bullets = [];
@@ -479,10 +491,8 @@
     wind.strength = rand(WIND_MIN, WIND_MAX);
     waveStrength = rand(WAVE_MIN, WAVE_MAX);
 
-    // 敵の特殊フラグをシャッフルで決定
     const indices = [];
     for (let i = 0; i < 40; i++) indices.push(i);
-    // シャッフル
     for (let i = indices.length - 1; i > 0; i--) {
       const j = randInt(0, i);
       [indices[i], indices[j]] = [indices[j], indices[i]];
@@ -536,12 +546,12 @@
       });
     }
 
-    // 氷山25個
+    // 氷山25個（3倍の大きさ）
     for (let i = 0; i < ICEBERG_COUNT; i++) {
-      const p = randomWorldPos(60);
+      const p = randomWorldPos(120);
       icebergs.push({
         x: p.x, y: p.y,
-        radius: rand(22, 45),
+        radius: rand(66, 135),  // 元の 22〜45 の約3倍
         rot: rand(0, Math.PI * 2),
         spikes: randInt(5, 9),
       });
@@ -973,10 +983,12 @@
     player.x = clamp(player.x, 20, WORLD_W - 20);
     player.y = clamp(player.y, 20, WORLD_H - 20);
 
-    // 渦
+    // 渦（渦力に応じて引力範囲が拡大）
+    const influenceFactor = getInfluenceFactor();
     for (const wp of whirlpools) {
       const d = dist(player.x, player.y, wp.x, wp.y);
-      const influence = wp.radius * 3;
+      // 引力範囲 = 渦の半径 * 基準倍率 * 渦力による拡大率
+      const influence = wp.radius * VORTEX_INFLUENCE_BASE * influenceFactor;
       if (d < influence && d > 1) {
         const pull = (wp.strength * vortexPower) * 0.05 * (1 - d / influence);
         const a = Math.atan2(wp.y - player.y, wp.x - player.x);
@@ -1197,36 +1209,53 @@
       ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(WORLD_W, y); ctx.stroke();
     }
 
-    // 渦
+    // 渦（渦力に応じてデザインも拡大）
+    const influenceFactor = getInfluenceFactor();
     for (const wp of whirlpools) {
-      if (wp.x < camX - 200 || wp.x > camX + W + 200 || wp.y < camY - 200 || wp.y > camY + H + 200) continue;
+      // 画面外カリング（引力範囲が広がったのでマージンも拡大）
+      const margin = 200 * influenceFactor;
+      if (wp.x < camX - margin || wp.x > camX + W + margin ||
+          wp.y < camY - margin || wp.y > camY + H + margin) continue;
+
       const phase = wp.phase + waveTime * 0.5;
       const r = wp.radius;
+      const visualScale = 1 + (influenceFactor - 1) * 0.3; // 見た目の拡大率（控えめ）
       ctx.save();
       ctx.translate(wp.x, wp.y);
       ctx.rotate(phase);
+
+      // 外側の引力範囲を示す薄い円（渦力が強いほど大きく、薄く）
+      const influenceRadius = r * VORTEX_INFLUENCE_BASE * influenceFactor;
+      ctx.beginPath();
+      ctx.arc(0, 0, influenceRadius, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(100, 180, 255, ${0.03 + 0.02 * Math.min(vortexPower, 50) / 50})`;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([8, 12]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // 渦のリング
       ctx.strokeStyle = `rgba(120, 200, 255, ${0.15 + 0.15 * Math.min(vortexPower, 10) / 10})`;
       ctx.lineWidth = 3;
       for (let i = 0; i < 4; i++) {
         ctx.beginPath();
-        ctx.arc(0, 0, r * (0.4 + i * 0.2), 0, Math.PI * 1.5);
+        ctx.arc(0, 0, r * visualScale * (0.4 + i * 0.2), 0, Math.PI * 1.5);
         ctx.stroke();
       }
       ctx.strokeStyle = `rgba(80, 160, 255, ${0.3 + 0.3 * Math.min(vortexPower, 10) / 10})`;
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(0, 0, r * 0.3, 0, Math.PI * 2);
+      ctx.arc(0, 0, r * visualScale * 0.3, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
     }
 
     // 氷山
     for (const ib of icebergs) {
-      if (ib.x < camX - 100 || ib.x > camX + W + 100 || ib.y < camY - 100 || ib.y > camY + H + 100) continue;
+      if (ib.x < camX - 200 || ib.x > camX + W + 200 || ib.y < camY - 200 || ib.y > camY + H + 200) continue;
       ctx.save();
       ctx.translate(ib.x, ib.y);
       ctx.rotate(ib.rot);
-      // 氷山（多角形）
       ctx.beginPath();
       const spikes = ib.spikes;
       for (let i = 0; i < spikes; i++) {
@@ -1238,7 +1267,6 @@
         else ctx.lineTo(px, py);
       }
       ctx.closePath();
-      // 氷のグラデーション
       const grad = ctx.createRadialGradient(0, 0, 5, 0, 0, ib.radius);
       grad.addColorStop(0, '#ffffff');
       grad.addColorStop(0.5, '#cde8ff');
@@ -1248,7 +1276,6 @@
       ctx.fill();
       ctx.shadowBlur = 0;
       ctx.strokeStyle = '#eaf6ff'; ctx.lineWidth = 2; ctx.stroke();
-      // ひび割れ
       ctx.strokeStyle = 'rgba(100, 150, 200, 0.4)';
       ctx.lineWidth = 1;
       ctx.beginPath();
@@ -1315,7 +1342,6 @@
       }
     }
 
-    // 敵（色統一）
     for (const e of enemies) {
       if (!e.alive) continue;
       if (e.x < camX - 60 || e.x > camX + W + 60 || e.y < camY - 60 || e.y > camY + H + 60) continue;
