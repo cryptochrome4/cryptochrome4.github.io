@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>USA 50 States Puzzle</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; user-select:none; -webkit-user-select:none; }
+  html,body {
+    width:100%; height:100%; overflow:hidden;
+    background:#0a0018; color:#ffe0ff;
+    font-family:'Courier New', Courier, monospace;
+    touch-action:none;
+    -webkit-tap-highlight-color:transparent;
+  }
+
+  /* ===== Opening ===== */
+  #opening {
+    position:fixed; inset:0; z-index:1000;
+    background-image:url('img217america.jpg');
+    background-size:cover; background-position:center;
+    display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    gap:30px; transition:opacity 0.5s ease;
+  }
+  #opening::before {
+    content:''; position:absolute; inset:0;
+    background:
+      linear-gradient(180deg,
+        rgba(20,0,40,0.5) 0%,
+        rgba(60,0,90,0.7) 50%,
+        rgba(10,0,30,0.9) 100%);
+  }
+  /* 80年代の水平ライン */
+  #opening::after {
+    content:''; position:absolute; inset:0;
+    background:repeating-linear-gradient(
+      0deg,
+      rgba(255,0,200,0.06) 0px,
+      rgba(255,0,200,0.06) 1px,
+      transparent 1px,
+      transparent 4px
+    );
+    pointer-events:none;
+  }
+  #opening h1 {
+    position:relative; z-index:2;
+    font-family:'Courier New', Courier, monospace;
+    color:#ff2bd6;
+    font-size:clamp(40px,9vw,84px);
+    font-weight:900;
+    letter-spacing:10px;
+    text-transform:uppercase;
+    text-shadow:
+      0 0 6px #ff2bd6,
+      0 0 18px #ff2bd6,
+      0 0 40px #ff2bd6,
+      0 0 80px #7a00ff,
+      0 4px 0 #4a0080,
+      0 8px 0 #2a004a;
+    transform:skewX(-6deg);
+  }
+  #opening .subtitle {
+    position:relative; z-index:2;
+    color:#00f0ff;
+    font-size:clamp(12px,2.6vw,17px);
+    letter-spacing:8px;
+    margin-top:-14px;
+    text-shadow:
+      0 0 6px #00f0ff,
+      0 0 18px #00f0ff,
+      0 0 40px #0088ff;
+    transform:skewX(-6deg);
+  }
+  #startBtn {
+    position:relative; z-index:2;
+    background:linear-gradient(180deg, #ff8ae2 0%, #ff2bd6 45%, #a000a0 100%);
+    color:#fff;
+    border:3px solid #00f0ff;
+    border-radius:6px;
+    padding:16px 70px;
+    font-family:'Courier New', Courier, monospace;
+    font-size:clamp(17px,3.6vw,24px);
+    font-weight:900;
+    letter-spacing:6px;
+    text-transform:uppercase;
+    cursor:pointer;
+    text-shadow:0 0 6px #fff, 0 0 18px #ff2bd6, 0 2px 0 #4a0080;
+    box-shadow:
+      0 0 12px #ff2bd6,
+      0 0 32px #ff2bd6,
+      inset 0 0 12px rgba(255,255,255,0.35);
+    transition:all 0.15s ease;
+    transform:skewX(-6deg);
+  }
+  #startBtn:hover {
+    background:linear-gradient(180deg, #fff 0%, #ff8ae2 45%, #ff2bd6 100%);
+    box-shadow:
+      0 0 20px #00f0ff,
+      0 0 50px #ff2bd6,
+      0 0 90px #7a00ff,
+      inset 0 0 20px rgba(255,255,255,0.6);
+    transform:skewX(-6deg) scale(1.05);
+  }
+  #startBtn:active { transform:skewX(-6deg) scale(0.97); }
+  #opening.hidden-opening { opacity:0; pointer-events:none; }
+
+  /* ===== Game ===== */
+  #game { display:none; position:fixed; inset:0; }
+  #mapSvg {
+    position:absolute; inset:0;
+    width:100%; height:100%;
+    background:#0a0018;
+    display:block;
+    touch-action:none;
+  }
+  /* ゲーム背景に薄いグリッド */
+  #game::before {
+    content:''; position:absolute; inset:0;
+    background:
+      radial-gradient(circle at 50% 120%, rgba(255,43,214,0.18) 0%, transparent 60%),
+      repeating-linear-gradient(0deg,
+        rgba(0,240,255,0.04) 0px,
+        rgba(0,240,255,0.04) 1px,
+        transparent 1px,
+        transparent 4px);
+    pointer-events:none;
+    z-index:1;
+  }
+
+  /* ===== POOL ===== */
+  #pool {
+    position:fixed;
+    left:16px; top:16px;
+    width:160px;
+    padding:12px 10px;
+    background:linear-gradient(180deg, rgba(30,0,50,0.95) 0%, rgba(10,0,25,0.95) 100%);
+    border:2px solid #00f0ff;
+    border-radius:6px;
+    display:flex; flex-direction:column; gap:10px;
+    box-shadow:
+      0 0 12px #00f0ff,
+      0 0 30px rgba(255,43,214,0.5),
+      inset 0 0 12px rgba(0,240,255,0.15);
+    z-index:50;
+    touch-action:none;
+  }
+  #pool h2 {
+    font-family:'Courier New', Courier, monospace;
+    font-size:12px; letter-spacing:0.4em;
+    color:#ff2bd6;
+    text-align:center;
+    padding-bottom:6px;
+    border-bottom:2px solid #ff2bd6;
+    text-shadow:0 0 6px #ff2bd6, 0 0 14px #ff2bd6;
+    text-transform:uppercase;
+  }
+  .poolSlot {
+    position:relative;
+    width:100%; height:90px;
+    background:linear-gradient(180deg, rgba(0,240,255,0.06) 0%, rgba(255,43,214,0.06) 100%);
+    border:2px dashed rgba(0,240,255,0.5);
+    border-radius:4px;
+    display:flex; align-items:center; justify-content:center;
+    flex-shrink:0;
+    touch-action:none;
+    transition:all 0.15s;
+  }
+  .poolSlot.filled {
+    border-style:solid;
+    border-color:#ff2bd6;
+    background:linear-gradient(180deg, rgba(255,43,214,0.12) 0%, rgba(0,240,255,0.08) 100%);
+    cursor:grab;
+    box-shadow:0 0 8px #ff2bd6, inset 0 0 8px rgba(255,43,214,0.3);
+  }
+  .poolSlot.filled:active { cursor:grabbing; }
+  .poolSlot svg { pointer-events:none; display:block; }
+  .poolSlot .label {
+    position:absolute;
+    bottom:3px; left:0; right:0;
+    text-align:center;
+    font-family:'Courier New', Courier, monospace;
+    font-size:9px; letter-spacing:0.05em;
+    color:#00f0ff;
+    text-shadow:0 0 4px #00f0ff;
+    pointer-events:none;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    padding:0 4px;
+    text-transform:uppercase;
+  }
+
+  /* ===== SVG 州 ===== */
+  .stateHole {
+    fill:rgba(10,0,25,0.75);
+    stroke:#00f0ff;
+    stroke-width:1.5;
+    stroke-dasharray:4 3;
+    vector-effect:non-scaling-stroke;
+    filter:drop-shadow(0 0 4px #00f0ff);
+  }
+  .stateGhost {
+    fill:rgba(122,0,255,0.25);
+    stroke:rgba(255,43,214,0.55);
+    stroke-width:1;
+    vector-effect:non-scaling-stroke;
+    filter:drop-shadow(0 0 2px rgba(255,43,214,0.5));
+  }
+  .stateGhostAlaska {
+    fill:rgba(255,43,214,0.35);
+    stroke:rgba(255,138,226,0.7);
+    stroke-width:1;
+    vector-effect:non-scaling-stroke;
+    filter:drop-shadow(0 0 4px rgba(255,43,214,0.7));
+  }
+  .statePlaced {
+    fill:rgba(0,240,255,0.75);
+    stroke:#fff;
+    stroke-width:2;
+    vector-effect:non-scaling-stroke;
+    filter:drop-shadow(0 0 8px #00f0ff) drop-shadow(0 0 16px #00f0ff);
+  }
+  .statePlacedAlaska {
+    fill:rgba(255,43,214,0.9);
+    stroke:#ffe0ff;
+    stroke-width:2;
+    vector-effect:non-scaling-stroke;
+    filter:drop-shadow(0 0 8px #ff2bd6) drop-shadow(0 0 16px #ff2bd6);
+  }
+  .stateGhostLabel {
+    font-family:'Courier New', Courier, monospace;
+    fill:rgba(255,180,255,0.55);
+    font-size:10px; font-weight:700;
+    letter-spacing:0.05em;
+    pointer-events:none;
+    text-anchor:middle;
+    text-transform:uppercase;
+  }
+  .statePlacedLabel {
+    font-family:'Courier New', Courier, monospace;
+    fill:#0a0018;
+    font-size:10px; font-weight:900;
+    letter-spacing:0.05em;
+    pointer-events:none;
+    text-anchor:middle;
+    text-transform:uppercase;
+  }
+  .statePlacedAlaskaLabel {
+    font-family:'Courier New', Courier, monospace;
+    fill:#fff;
+    font-size:10px; font-weight:900;
+    letter-spacing:0.05em;
+    pointer-events:none;
+    text-anchor:middle;
+    text-transform:uppercase;
+    text-shadow:0 0 4px #ff2bd6;
+  }
+
+  /* ===== カナダ ===== */
+  .canadaShape {
+    fill:rgba(255,255,255,0.92);
+    stroke:#00f0ff;
+    stroke-width:2.5;
+    vector-effect:non-scaling-stroke;
+    filter:drop-shadow(0 0 10px #00f0ff) drop-shadow(0 0 22px rgba(0,240,255,0.6));
+  }
+  .canadaLabel {
+    font-family:'Courier New', Courier, monospace;
+    fill:#0a0018;
+    font-size:80px;
+    font-weight:900;
+    letter-spacing:0.5em;
+    pointer-events:none;
+    text-anchor:middle;
+    dominant-baseline:middle;
+    text-transform:uppercase;
+  }
+
+  /* ===== ドラッグ中 ===== */
+  .dragPiece {
+    fill:rgba(0,240,255,0.9);
+    stroke:#fff;
+    stroke-width:2;
+    vector-effect:non-scaling-stroke;
+    filter:drop-shadow(0 0 10px #00f0ff) drop-shadow(0 0 22px #00f0ff);
+    pointer-events:none;
+  }
+  .dragPieceAlaska {
+    fill:rgba(255,43,214,0.95);
+    stroke:#ffe0ff;
+    stroke-width:2;
+    vector-effect:non-scaling-stroke;
+    filter:drop-shadow(0 0 10px #ff2bd6) drop-shadow(0 0 22px #ff2bd6);
+    pointer-events:none;
+  }
+
+  /* ===== Win ===== */
+  #win {
+    position:fixed; inset:0; z-index:500;
+    display:none; flex-direction:column;
+    align-items:center; justify-content:center;
+    background:
+      radial-gradient(circle at 50% 50%, rgba(60,0,90,0.95) 0%, rgba(10,0,25,0.98) 100%);
+    backdrop-filter:blur(10px);
+    text-align:center; padding:20px;
+  }
+  #win::before {
+    content:''; position:absolute; inset:0;
+    background:repeating-linear-gradient(0deg,
+      rgba(255,43,214,0.06) 0px,
+      rgba(255,43,214,0.06) 1px,
+      transparent 1px,
+      transparent 4px);
+    pointer-events:none;
+  }
+  #win.show { display:flex; }
+  #win h1 {
+    font-family:'Courier New', Courier, monospace;
+    font-size:clamp(36px,9vw,90px);
+    letter-spacing:0.18em;
+    color:#ff2bd6;
+    text-transform:uppercase;
+    font-weight:900;
+    margin-bottom:18px;
+    text-shadow:
+      0 0 8px #ff2bd6,
+      0 0 24px #ff2bd6,
+      0 0 60px #7a00ff,
+      0 4px 0 #4a0080;
+    transform:skewX(-6deg);
+    animation:pulse 1.4s infinite alternate;
+    position:relative;
+    z-index:2;
+  }
+  #win p {
+    font-family:'Courier New', Courier, monospace;
+    color:#00f0ff;
+    font-size:clamp(13px,2.6vw,18px);
+    letter-spacing:0.4em;
+    text-transform:uppercase;
+    text-shadow:0 0 8px #00f0ff, 0 0 20px #00f0ff;
+    position:relative;
+    z-index:2;
+  }
+  @keyframes pulse {
+    from{filter:brightness(1)}
+    to{filter:brightness(1.6)}
+  }
+
+  #winFooter {
+    position:absolute;
+    bottom:0; left:0; right:0;
+    height:60px;
+    background:linear-gradient(180deg, rgba(30,0,50,0.95) 0%, rgba(10,0,25,0.98) 100%);
+    border-top:2px solid #00f0ff;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 -4px 20px rgba(0,240,255,0.5), inset 0 4px 12px rgba(255,43,214,0.2);
+    z-index:3;
+  }
+  #winFooter a {
+    font-family:'Courier New', Courier, monospace;
+    color:#00f0ff;
+    font-size:14px;
+    letter-spacing:0.35em;
+    text-transform:uppercase;
+    font-weight:900;
+    text-decoration:none;
+    padding:10px 30px;
+    border:2px solid #ff2bd6;
+    border-radius:4px;
+    background:linear-gradient(180deg, rgba(255,43,214,0.15) 0%, rgba(0,240,255,0.08) 100%);
+    text-shadow:0 0 6px #00f0ff, 0 0 14px #00f0ff;
+    box-shadow:0 0 10px #ff2bd6, inset 0 0 10px rgba(255,43,214,0.2);
+    transition:all 0.15s;
+    transform:skewX(-6deg);
+  }
+  #winFooter a:hover {
+    background:linear-gradient(180deg, #ff2bd6 0%, #a000a0 100%);
+    color:#fff;
+    text-shadow:0 0 8px #fff, 0 0 20px #fff;
+    box-shadow:0 0 20px #ff2bd6, 0 0 50px #ff2bd6;
+  }
+
+  #hint {
+    position:fixed; right:16px; top:16px;
+    z-index:70;
+    font-family:'Courier New', Courier, monospace;
+    font-size:11px;
+    color:#00f0ff;
+    letter-spacing:0.15em;
+    text-align:right;
+    line-height:1.8;
+    background:linear-gradient(180deg, rgba(30,0,50,0.9) 0%, rgba(10,0,25,0.9) 100%);
+    padding:10px 14px;
+    border-radius:4px;
+    border:2px solid #ff2bd6;
+    text-shadow:0 0 4px #00f0ff;
+    text-transform:uppercase;
+    box-shadow:0 0 10px rgba(255,43,214,0.5), inset 0 0 8px rgba(0,240,255,0.15);
+    pointer-events:none;
+  }
+</style>
+</head>
+<body>
+
+<div id="opening">
+  <h1>USA PUZZLE</h1>
+  <div class="subtitle">- 50 STATES -</div>
+  <button id="startBtn">START</button>
+</div>
+
+<div id="game">
+  <svg id="mapSvg" preserveAspectRatio="xMidYMid slice"></svg>
+
+  <aside id="pool">
+    <h2>POOL</h2>
+    <div class="poolSlot" data-slot="0"></div>
+    <div class="poolSlot" data-slot="1"></div>
+    <div class="poolSlot" data-slot="2"></div>
+    <div class="poolSlot" data-slot="3"></div>
+  </aside>
+
+  <div id="hint">
+    ← ↑ ↓ → MOVE<br>
+    HOLD & DRAG STATE
+  </div>
+</div>
+
+<div id="win">
+  <h1>COMPLETE!</h1>
+  <p>50 STATES PUZZLE CLEARED</p>
+  <div id="winFooter">
+    <a href="air.html" target="_self">AIR へ進む</a>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   州データ
+   ========================================================= */
+const STATE_DATA = [
+  { name:"Alaska",        pts:"-0.9,-0.6 -0.5,-0.9 0.0,-0.7 0.4,-0.4 0.2,0.0 0.5,0.3 0.3,0.7 -0.2,0.8 -0.6,0.4 -0.9,0.0", area:1.00 },
+  { name:"Washington",    pts:"-0.7,-0.5 0.4,-0.5 0.5,0.2 0.2,0.4 -0.5,0.4 -0.7,0.0", area:0.47 },
+  { name:"Oregon",        pts:"-0.7,-0.5 0.5,-0.5 0.5,0.3 0.1,0.5 -0.5,0.5 -0.7,0.1", area:0.55 },
+  { name:"California",    pts:"-0.3,-0.9 0.3,-0.8 0.5,-0.2 0.4,0.3 0.2,0.7 -0.1,0.9 -0.4,0.5 -0.5,0.0", area:0.80 },
+  { name:"Nevada",        pts:"-0.5,-0.7 0.4,-0.7 0.5,0.4 -0.2,0.7 -0.5,0.2", area:0.60 },
+  { name:"Idaho",         pts:"-0.4,-0.9 0.3,-0.7 0.5,0.0 0.3,0.6 -0.2,0.8 -0.5,0.2", area:0.55 },
+  { name:"Utah",          pts:"-0.5,-0.6 0.5,-0.6 0.5,0.3 0.0,0.6 -0.5,0.3", area:0.55 },
+  { name:"Arizona",       pts:"-0.7,-0.5 0.5,-0.5 0.5,0.1 0.2,0.5 -0.3,0.7 -0.7,0.2", area:0.65 },
+  { name:"New Mexico",    pts:"-0.6,-0.5 0.6,-0.5 0.6,0.4 -0.6,0.5", area:0.65 },
+  { name:"Montana",       pts:"-0.8,-0.4 0.6,-0.5 0.7,0.0 0.4,0.4 -0.6,0.4 -0.8,0.0", area:0.75 },
+  { name:"Wyoming",       pts:"-0.6,-0.4 0.6,-0.4 0.6,0.4 -0.6,0.4", area:0.55 },
+  { name:"Colorado",      pts:"-0.6,-0.4 0.6,-0.4 0.6,0.4 -0.6,0.4", area:0.60 },
+  { name:"North Dakota",  pts:"-0.6,-0.3 0.6,-0.3 0.6,0.3 -0.6,0.3", area:0.48 },
+  { name:"South Dakota",  pts:"-0.6,-0.3 0.6,-0.3 0.6,0.3 -0.6,0.3", area:0.50 },
+  { name:"Nebraska",      pts:"-0.6,-0.3 0.6,-0.3 0.6,0.3 -0.6,0.3", area:0.52 },
+  { name:"Kansas",        pts:"-0.6,-0.3 0.6,-0.3 0.6,0.3 -0.6,0.3", area:0.55 },
+  { name:"Oklahoma",      pts:"-0.6,-0.3 0.6,-0.3 0.5,0.3 -0.3,0.5 -0.6,0.2", area:0.47 },
+  { name:"Minnesota",     pts:"-0.5,-0.6 0.5,-0.5 0.6,0.2 0.0,0.6 -0.5,0.3", area:0.55 },
+  { name:"Iowa",          pts:"-0.5,-0.4 0.5,-0.4 0.5,0.4 -0.5,0.4", area:0.38 },
+  { name:"Missouri",      pts:"-0.5,-0.5 0.5,-0.5 0.5,0.4 -0.2,0.6 -0.5,0.2", area:0.48 },
+  { name:"Wisconsin",     pts:"-0.4,-0.6 0.4,-0.5 0.5,0.4 -0.2,0.6 -0.4,0.2", area:0.42 },
+  { name:"Illinois",      pts:"-0.4,-0.6 0.4,-0.6 0.4,0.6 -0.4,0.6", area:0.40 },
+  { name:"Michigan",      pts:"-0.6,-0.4 0.0,-0.5 0.4,0.0 0.6,0.4 0.0,0.5 -0.5,0.1", area:0.45 },
+  { name:"Indiana",       pts:"-0.4,-0.5 0.4,-0.5 0.4,0.5 -0.4,0.5", area:0.26 },
+  { name:"Ohio",          pts:"-0.5,-0.4 0.5,-0.4 0.5,0.4 -0.5,0.4", area:0.30 },
+  { name:"Texas",         pts:"-0.8,-0.6 0.6,-0.6 0.8,0.0 0.5,0.4 0.2,0.7 -0.2,0.5 -0.6,0.2 -0.8,-0.1", area:0.85 },
+  { name:"Arkansas",      pts:"-0.5,-0.4 0.5,-0.4 0.5,0.4 -0.4,0.4", area:0.36 },
+  { name:"Louisiana",     pts:"-0.5,-0.4 0.5,-0.4 0.4,0.3 0.0,0.5 -0.4,0.3", area:0.33 },
+  { name:"Mississippi",   pts:"-0.4,-0.5 0.4,-0.5 0.4,0.5 -0.4,0.5", area:0.32 },
+  { name:"Alabama",       pts:"-0.4,-0.5 0.4,-0.5 0.4,0.5 -0.4,0.5", area:0.35 },
+  { name:"Tennessee",     pts:"-0.7,-0.3 0.7,-0.3 0.5,0.3 -0.5,0.3", area:0.30 },
+  { name:"Kentucky",      pts:"-0.6,-0.4 0.6,-0.4 0.5,0.4 -0.5,0.4", area:0.28 },
+  { name:"Georgia",       pts:"-0.5,-0.5 0.5,-0.5 0.5,0.4 0.0,0.6 -0.5,0.3", area:0.42 },
+  { name:"Florida",       pts:"-0.4,-0.7 0.4,-0.7 0.4,-0.2 0.2,0.2 0.0,0.9 -0.2,0.2 -0.4,-0.2", area:0.40 },
+  { name:"South Carolina",pts:"-0.5,-0.4 0.5,-0.4 0.5,0.4 -0.5,0.4", area:0.24 },
+  { name:"North Carolina",pts:"-0.6,-0.3 0.6,-0.3 0.5,0.3 -0.5,0.3", area:0.36 },
+  { name:"Virginia",      pts:"-0.7,-0.3 0.7,-0.3 0.5,0.3 -0.5,0.3", area:0.30 },
+  { name:"West Virginia", pts:"-0.5,-0.4 0.5,-0.4 0.5,0.4 -0.5,0.4", area:0.22 },
+  { name:"Maryland",      pts:"-0.6,-0.3 0.6,-0.3 0.5,0.3 -0.5,0.3", area:0.18 },
+  { name:"Delaware",      pts:"-0.3,-0.5 0.3,-0.5 0.3,0.5 -0.3,0.5", area:0.06 },
+  { name:"Pennsylvania",  pts:"-0.6,-0.4 0.6,-0.4 0.6,0.4 -0.6,0.4", area:0.32 },
+  { name:"New Jersey",    pts:"-0.3,-0.5 0.3,-0.5 0.4,0.5 -0.3,0.5", area:0.13 },
+  { name:"New York",      pts:"-0.6,-0.5 0.6,-0.5 0.6,0.3 -0.2,0.5 -0.6,0.3", area:0.38 },
+  { name:"Connecticut",   pts:"-0.5,-0.3 0.5,-0.3 0.5,0.3 -0.5,0.3", area:0.10 },
+  { name:"Rhode Island",  pts:"-0.4,-0.3 0.4,-0.3 0.4,0.3 -0.4,0.3", area:0.04 },
+  { name:"Massachusetts", pts:"-0.7,-0.3 0.5,-0.3 0.5,0.3 -0.7,0.3", area:0.14 },
+  { name:"Vermont",       pts:"-0.3,-0.6 0.3,-0.6 0.3,0.6 -0.3,0.6", area:0.15 },
+  { name:"New Hampshire", pts:"-0.3,-0.6 0.3,-0.6 0.3,0.6 -0.3,0.6", area:0.15 },
+  { name:"Maine",         pts:"-0.4,-0.7 0.4,-0.6 0.5,0.3 0.0,0.6 -0.4,0.3", area:0.25 },
+];
+
+const FIXED_POSITIONS = {
+  "Washington":    [1, 2],
+  "Idaho":         [2, 2],
+  "Montana":       [3, 2],
+  "North Dakota":  [5, 2],
+  "Minnesota":     [6, 2],
+  "Wisconsin":     [7, 2],
+  "Michigan":      [8, 2],
+  "New York":      [9, 2],
+  "Maine":         [10, 2],
+  "Oregon":        [1, 3],
+  "Nevada":        [2, 3],
+  "Wyoming":       [3, 3],
+  "South Dakota":  [5, 3],
+  "Iowa":          [6, 3],
+  "Illinois":      [7, 3],
+  "Indiana":       [8, 3],
+  "Ohio":          [8, 3],
+  "Pennsylvania":  [9, 3],
+  "New Jersey":    [10, 3],
+  "California":    [1, 4],
+  "Utah":          [2, 4],
+  "Colorado":      [3, 4],
+  "Nebraska":      [5, 4],
+  "Missouri":      [6, 4],
+  "Kentucky":      [7, 4],
+  "West Virginia": [8, 4],
+  "Virginia":      [9, 4],
+  "Maryland":      [9, 4],
+  "Delaware":      [10, 4],
+  "Arizona":       [1, 5],
+  "New Mexico":    [2, 5],
+  "Kansas":        [4, 5],
+  "Oklahoma":      [4, 5],
+  "Arkansas":      [5, 5],
+  "Tennessee":     [6, 5],
+  "North Carolina":[8, 5],
+  "South Carolina":[9, 5],
+  "Connecticut":   [10, 5],
+  "Rhode Island":  [10, 5],
+  "Texas":         [2, 6],
+  "Louisiana":     [4, 6],
+  "Mississippi":   [5, 6],
+  "Alabama":       [6, 6],
+  "Georgia":       [7, 6],
+  "Massachusetts": [10, 6],
+  "Vermont":       [10, 6],
+  "New Hampshire": [10, 6],
+  "Florida":       [8, 7],
+  "Alaska":        [0, 8],
+};
+
+const GRID_COLS = 12;
+const GRID_ROWS = 12;
+const CELL_MAX = 220;
+const WORLD_W = GRID_COLS * CELL_MAX;
+const WORLD_H = GRID_ROWS * CELL_MAX;
+
+const CANADA_BOX = { x: 0, y: 0, w: WORLD_W, h: CELL_MAX * 2 };
+
+function computeHome(name, col, row) {
+  let cx = col * CELL_MAX + CELL_MAX / 2;
+  let cy = row * CELL_MAX + CELL_MAX / 2;
+  const offsets = {
+    "Ohio":          [ 40, -40],
+    "Indiana":       [-40,  40],
+    "Maryland":      [ 40, -40],
+    "Virginia":      [-40,  40],
+    "Delaware":      [ 40,  40],
+    "New Jersey":    [-40, -40],
+    "Oklahoma":      [-40,  40],
+    "Kansas":        [ 40, -40],
+    "Rhode Island":  [ 40,  40],
+    "Connecticut":   [-40, -40],
+    "Vermont":       [-40, -40],
+    "New Hampshire": [ 40, -40],
+    "Massachusetts": [ 0,   50],
+  };
+  if (offsets[name]) { cx += offsets[name][0]; cy += offsets[name][1]; }
+  return [cx, cy];
+}
+
+const STATES = STATE_DATA.map(s => {
+  const pos = FIXED_POSITIONS[s.name];
+  const [cx, cy] = computeHome(s.name, pos[0], pos[1]);
+  const scale = 0.50 + (s.area - 0.04) / (1.0 - 0.04) * 0.50;
+  return {
+    name: s.name,
+    pts: s.pts,
+    area: s.area,
+    home: [cx, cy],
+    scale: scale * CELL_MAX * 0.42,
+  };
+});
+
+const mapSvg = document.getElementById("mapSvg");
+const poolEl = document.getElementById("pool");
+const winEl = document.getElementById("win");
+const opening = document.getElementById("opening");
+const game = document.getElementById("game");
+
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+const VIEW_W = CELL_MAX * 4;
+const VIEW_H = CELL_MAX * 4;
+
+let activeStates = [];
+let placedCount = 0;
+const CAMERA = { x: 0, y: 0, speed: 22 };
+const keys = {};
+
+function pickRandomStates(n) {
+  const arr = [...STATES];
+  const picked = [];
+  while (picked.length < n && arr.length) {
+    const i = Math.floor(Math.random() * arr.length);
+    picked.push(arr.splice(i, 1)[0]);
+  }
+  return picked;
+}
+
+function statePath(st, cx = null, cy = null) {
+  const c = cx !== null ? cx : st.home[0];
+  const cY = cy !== null ? cy : st.home[1];
+  const pts = st.pts.trim().split(/\s+/).map(p => {
+    const [x, y] = p.split(",").map(Number);
+    return [c + x * st.scale, cY + y * st.scale];
+  });
+  let d = `M ${pts[0][0]} ${pts[0][1]}`;
+  for (let i = 1; i < pts.length; i++) d += ` L ${pts[i][0]} ${pts[i][1]}`;
+  return d + " Z";
+}
+
+function stateBBox(st, cx = null, cy = null) {
+  const c = cx !== null ? cx : st.home[0];
+  const cY = cy !== null ? cy : st.home[1];
+  const pts = st.pts.trim().split(/\s+/).map(p => {
+    const [x, y] = p.split(",").map(Number);
+    return [c + x * st.scale, cY + y * st.scale];
+  });
+  const xs = pts.map(p => p[0]);
+  const ys = pts.map(p => p[1]);
+  return {
+    minX: Math.min(...xs), maxX: Math.max(...xs),
+    minY: Math.min(...ys), maxY: Math.max(...ys),
+  };
+}
+
+function buildMap() {
+  mapSvg.innerHTML = "";
+
+  const defs = document.createElementNS(SVG_NS, "defs");
+  const pattern = document.createElementNS(SVG_NS, "pattern");
+  pattern.setAttribute("id", "grid");
+  pattern.setAttribute("width", CELL_MAX);
+  pattern.setAttribute("height", CELL_MAX);
+  pattern.setAttribute("patternUnits", "userSpaceOnUse");
+  const pp = document.createElementNS(SVG_NS, "path");
+  pp.setAttribute("d", `M ${CELL_MAX} 0 L 0 0 0 ${CELL_MAX}`);
+  pp.setAttribute("fill", "none");
+  pp.setAttribute("stroke", "rgba(0,240,255,0.12)");
+  pp.setAttribute("stroke-width", "1");
+  pattern.appendChild(pp);
+  defs.appendChild(pattern);
+  mapSvg.appendChild(defs);
+
+  const bg = document.createElementNS(SVG_NS, "rect");
+  bg.setAttribute("x", 0); bg.setAttribute("y", 0);
+  bg.setAttribute("width", WORLD_W); bg.setAttribute("height", WORLD_H);
+  bg.setAttribute("fill", "url(#grid)");
+  mapSvg.appendChild(bg);
+
+  const canada = document.createElementNS(SVG_NS, "rect");
+  canada.setAttribute("x", CANADA_BOX.x + 8);
+  canada.setAttribute("y", CANADA_BOX.y + 8);
+  canada.setAttribute("width", CANADA_BOX.w - 16);
+  canada.setAttribute("height", CANADA_BOX.h - 16);
+  canada.setAttribute("rx", 24);
+  canada.setAttribute("class", "canadaShape");
+  mapSvg.appendChild(canada);
+
+  const canadaLabel = document.createElementNS(SVG_NS, "text");
+  canadaLabel.setAttribute("x", CANADA_BOX.x + CANADA_BOX.w / 2);
+  canadaLabel.setAttribute("y", CANADA_BOX.y + CANADA_BOX.h / 2);
+  canadaLabel.setAttribute("class", "canadaLabel");
+  canadaLabel.textContent = "CANADA";
+  mapSvg.appendChild(canadaLabel);
+
+  const holeNames = new Set(activeStates.map(s => s.name));
+
+  STATES.forEach(st => {
+    const isAlaska = st.name === "Alaska";
+
+    if (holeNames.has(st.name)) {
+      const hole = document.createElementNS(SVG_NS, "path");
+      hole.setAttribute("d", statePath(st));
+      hole.setAttribute("class", "stateHole");
+      hole.dataset.stateName = st.name;
+      mapSvg.appendChild(hole);
+    } else {
+      const ghost = document.createElementNS(SVG_NS, "path");
+      ghost.setAttribute("d", statePath(st));
+      ghost.setAttribute("class", isAlaska ? "stateGhostAlaska" : "stateGhost");
+      mapSvg.appendChild(ghost);
+
+      if (st.scale > 35) {
+        const bb = stateBBox(st);
+        const label = document.createElementNS(SVG_NS, "text");
+        label.setAttribute("x", (bb.minX + bb.maxX) / 2);
+        label.setAttribute("y", (bb.minY + bb.maxY) / 2);
+        label.setAttribute("class", "stateGhostLabel");
+        label.textContent = st.name;
+        mapSvg.appendChild(label);
+      }
+    }
+  });
+}
+
+function buildPool() {
+  const slots = poolEl.querySelectorAll(".poolSlot");
+  slots.forEach((slot, i) => {
+    slot.innerHTML = "";
+    slot.classList.remove("filled");
+    delete slot.dataset.stateName;
+    const st = activeStates[i];
+    if (!st) return;
+
+    const isAlaska = st.name === "Alaska";
+
+    const svgEl = document.createElementNS(SVG_NS, "svg");
+    svgEl.setAttribute("viewBox", "-1.3 -1.3 2.6 2.6");
+    svgEl.setAttribute("width", "100%");
+    svgEl.setAttribute("height", "72%");
+    svgEl.setAttribute("preserveAspectRatio", "xMidYMid meet");
+
+    const path = document.createElementNS(SVG_NS, "path");
+    path.setAttribute("d", statePath(st, 0, 0));
+    if (isAlaska) {
+      path.setAttribute("style", "fill:rgba(255,43,214,0.85);stroke:#ffe0ff;stroke-width:1.5;filter:drop-shadow(0 0 4px #ff2bd6);");
+    } else {
+      path.setAttribute("style", "fill:rgba(0,240,255,0.7);stroke:#e0ffff;stroke-width:1.5;filter:drop-shadow(0 0 4px #00f0ff);");
+    }
+    svgEl.appendChild(path);
+    slot.appendChild(svgEl);
+
+    const label = document.createElement("div");
+    label.className = "label";
+    label.textContent = st.name;
+    slot.appendChild(label);
+
+    slot.classList.add("filled");
+    slot.dataset.stateName = st.name;
+
+    attachDrag(slot, st);
+  });
+}
+
+let dragState = null;
+
+function attachDrag(el, state) {
+  el.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (dragState) return;
+
+    el.setPointerCapture(e.pointerId);
+
+    const worldPt = screenToWorld(e.clientX, e.clientY);
+
+    const piece = document.createElementNS(SVG_NS, "path");
+    piece.setAttribute("d", statePath(state, worldPt.x, worldPt.y));
+    piece.setAttribute("class", state.name === "Alaska" ? "dragPieceAlaska" : "dragPiece");
+    mapSvg.appendChild(piece);
+
+    dragState = { state, el, piece, pointerId: e.pointerId };
+    el.style.opacity = "0.3";
+
+    el.addEventListener("pointermove", onDragMove);
+    el.addEventListener("pointerup", onDragEnd);
+    el.addEventListener("pointercancel", onDragEnd);
+  });
+}
+
+function onDragMove(e) {
+  if (!dragState || e.pointerId !== dragState.pointerId) return;
+  e.preventDefault();
+  const worldPt = screenToWorld(e.clientX, e.clientY);
+  dragState.piece.setAttribute("d", statePath(dragState.state, worldPt.x, worldPt.y));
+}
+
+function onDragEnd(e) {
+  if (!dragState || e.pointerId !== dragState.pointerId) return;
+  e.preventDefault();
+
+  const st = dragState.state;
+  const worldPt = screenToWorld(e.clientX, e.clientY);
+
+  const dx = worldPt.x - st.home[0];
+  const dy = worldPt.y - st.home[1];
+  const dist = Math.hypot(dx, dy);
+  const threshold = st.scale * 1.6;
+
+  if (dist < threshold) {
+    placeState(st);
+  } else {
+    dragState.el.style.opacity = "";
+  }
+
+  dragState.piece.remove();
+  dragState = null;
+
+  e.target.removeEventListener("pointermove", onDragMove);
+  e.target.removeEventListener("pointerup", onDragEnd);
+  e.target.removeEventListener("pointercancel", onDragEnd);
+}
+
+function placeState(st) {
+  const holes = mapSvg.querySelectorAll(".stateHole");
+  let targetHole = null;
+  holes.forEach(h => {
+    if (h.dataset.stateName === st.name) targetHole = h;
+  });
+  if (!targetHole) return;
+
+  const isAlaska = st.name === "Alaska";
+  targetHole.setAttribute("class", isAlaska ? "statePlacedAlaska" : "statePlaced");
+  delete targetHole.dataset.stateName;
+
+  if (st.scale > 35) {
+    const bb = stateBBox(st);
+    const label = document.createElementNS(SVG_NS, "text");
+    label.setAttribute("x", (bb.minX + bb.maxX) / 2);
+    label.setAttribute("y", (bb.minY + bb.maxY) / 2);
+    label.setAttribute("class", isAlaska ? "statePlacedAlaskaLabel" : "statePlacedLabel");
+    label.textContent = st.name;
+    mapSvg.appendChild(label);
+  }
+
+  const slot = poolEl.querySelector(`.poolSlot[data-state-name="${st.name}"]`);
+  if (slot) {
+    slot.innerHTML = "";
+    slot.classList.remove("filled");
+    delete slot.dataset.stateName;
+    slot.style.opacity = "";
+  }
+
+  placedCount++;
+  if (placedCount >= activeStates.length) {
+    setTimeout(() => winEl.classList.add("show"), 400);
+  }
+}
+
+function clampCamera() {
+  const maxX = Math.max(0, WORLD_W - VIEW_W);
+  const maxY = Math.max(0, WORLD_H - VIEW_H);
+  CAMERA.x = Math.max(0, Math.min(maxX, CAMERA.x));
+  CAMERA.y = Math.max(0, Math.min(maxY, CAMERA.y));
+}
+
+function applyCamera() {
+  mapSvg.setAttribute("viewBox", `${CAMERA.x} ${CAMERA.y} ${VIEW_W} ${VIEW_H}`);
+}
+
+function screenToWorld(sx, sy) {
+  const pt = mapSvg.createSVGPoint();
+  pt.x = sx; pt.y = sy;
+  const inv = mapSvg.getScreenCTM().inverse();
+  const w = pt.matrixTransform(inv);
+  return { x: w.x, y: w.y };
+}
+
+function updateCamera() {
+  let dx = 0, dy = 0;
+  if (keys["ArrowLeft"])  dx -= 1;
+  if (keys["ArrowRight"]) dx += 1;
+  if (keys["ArrowUp"])    dy -= 1;
+  if (keys["ArrowDown"])  dy += 1;
+
+  if (dx || dy) {
+    CAMERA.x += dx * CAMERA.speed;
+    CAMERA.y += dy * CAMERA.speed;
+    clampCamera();
+    applyCamera();
+  }
+  requestAnimationFrame(updateCamera);
+}
+
+window.addEventListener("keydown", e => {
+  keys[e.key] = true;
+  if (["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"," "].includes(e.key)) e.preventDefault();
+});
+window.addEventListener("keyup", e => { keys[e.key] = false; });
+
+function startGame() {
+  activeStates = pickRandomStates(4);
+  placedCount = 0;
+
+  opening.classList.add("hidden-opening");
+  game.style.display = "block";
+
+  CAMERA.x = (WORLD_W - VIEW_W) / 2;
+  CAMERA.y = CELL_MAX * 2 + 50;
+  clampCamera();
+  applyCamera();
+
+  buildMap();
+  buildPool();
+
+  requestAnimationFrame(updateCamera);
+
+  setTimeout(() => { opening.style.display = "none"; }, 500);
+}
+
+document.getElementById("startBtn").addEventListener("click", startGame);
+</script>
+</body>
+</html>
