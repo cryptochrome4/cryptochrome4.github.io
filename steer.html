@@ -95,7 +95,7 @@
 
   .opening {
     position: fixed; inset: 0;
-    background-image: url('img196battle.jpg');
+    background-image: url('img216ship.jpg');
     background-size: cover; background-position: center;
     background-repeat: no-repeat;
     display: flex; flex-direction: column;
@@ -460,15 +460,8 @@
     return dirs[idx];
   }
 
-  // 渦力に応じた引力範囲の倍率
-  // 渦力1.0 → 基準3.0倍, 渦力200 → 遥かに広がる
-  // 線形ではなく、渦力の平方根的に効かせると自然（重力っぽい）
+  // 渦力に応じた引力範囲の倍率（見た目には影響しない）
   function getInfluenceFactor() {
-    // vortexPower 1.0 → 1.0倍 (基準3.0 * 1.0)
-    // vortexPower 200 → 大きく拡大
-    // 平方根でスケール: sqrt(200) ≈ 14.14
-    // ただし範囲が広がりすぎると画面外から引っ張られて理不尽なので、
-    // 対数か平方根で適度に。
     const base = Math.sqrt(Math.max(vortexPower, 0.1) / VORTEX_BASE);
     return base;
   }
@@ -551,7 +544,7 @@
       const p = randomWorldPos(120);
       icebergs.push({
         x: p.x, y: p.y,
-        radius: rand(66, 135),  // 元の 22〜45 の約3倍
+        radius: rand(66, 135),
         rot: rand(0, Math.PI * 2),
         spikes: randInt(5, 9),
       });
@@ -983,11 +976,10 @@
     player.x = clamp(player.x, 20, WORLD_W - 20);
     player.y = clamp(player.y, 20, WORLD_H - 20);
 
-    // 渦（渦力に応じて引力範囲が拡大）
+    // 渦（見た目は変わらず、引力範囲だけ渦力に比例して拡大）
     const influenceFactor = getInfluenceFactor();
     for (const wp of whirlpools) {
       const d = dist(player.x, player.y, wp.x, wp.y);
-      // 引力範囲 = 渦の半径 * 基準倍率 * 渦力による拡大率
       const influence = wp.radius * VORTEX_INFLUENCE_BASE * influenceFactor;
       if (d < influence && d > 1) {
         const pull = (wp.strength * vortexPower) * 0.05 * (1 - d / influence);
@@ -1209,7 +1201,7 @@
       ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(WORLD_W, y); ctx.stroke();
     }
 
-    // 渦（渦力に応じてデザインも拡大）
+    // 渦（見た目は常に同じ大きさ、引力範囲は非表示の力）
     const influenceFactor = getInfluenceFactor();
     for (const wp of whirlpools) {
       // 画面外カリング（引力範囲が広がったのでマージンも拡大）
@@ -1219,33 +1211,21 @@
 
       const phase = wp.phase + waveTime * 0.5;
       const r = wp.radius;
-      const visualScale = 1 + (influenceFactor - 1) * 0.3; // 見た目の拡大率（控えめ）
       ctx.save();
       ctx.translate(wp.x, wp.y);
       ctx.rotate(phase);
-
-      // 外側の引力範囲を示す薄い円（渦力が強いほど大きく、薄く）
-      const influenceRadius = r * VORTEX_INFLUENCE_BASE * influenceFactor;
-      ctx.beginPath();
-      ctx.arc(0, 0, influenceRadius, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(100, 180, 255, ${0.03 + 0.02 * Math.min(vortexPower, 50) / 50})`;
-      ctx.lineWidth = 2;
-      ctx.setLineDash([8, 12]);
-      ctx.stroke();
-      ctx.setLineDash([]);
-
-      // 渦のリング
+      // 渦のリング（見た目の大きさは渦力に依存しない）
       ctx.strokeStyle = `rgba(120, 200, 255, ${0.15 + 0.15 * Math.min(vortexPower, 10) / 10})`;
       ctx.lineWidth = 3;
       for (let i = 0; i < 4; i++) {
         ctx.beginPath();
-        ctx.arc(0, 0, r * visualScale * (0.4 + i * 0.2), 0, Math.PI * 1.5);
+        ctx.arc(0, 0, r * (0.4 + i * 0.2), 0, Math.PI * 1.5);
         ctx.stroke();
       }
       ctx.strokeStyle = `rgba(80, 160, 255, ${0.3 + 0.3 * Math.min(vortexPower, 10) / 10})`;
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(0, 0, r * visualScale * 0.3, 0, Math.PI * 2);
+      ctx.arc(0, 0, r * 0.3, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
     }
