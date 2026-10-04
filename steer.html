@@ -233,7 +233,7 @@
     width: 100%;
   }
   .vortex-control input {
-    width: 70px; padding: 4px 6px; border-radius: 8px;
+    width: 80px; padding: 4px 6px; border-radius: 8px;
     border: 1px solid #c77dff; background: #0a0f14;
     color: #c77dff; font-size: 12px; text-align: center;
     font-family: inherit;
@@ -301,9 +301,9 @@
 
       <div class="vortex-control hidden" id="vortexControl">
         <span>渦力操作:</span>
-        <input type="number" id="vortexInput" step="0.1" min="0" max="30" value="1.0">
+        <input type="number" id="vortexInput" step="0.1" min="0" max="200" value="1.0">
         <button id="vortexApplyBtn">適用</button>
-        <span style="font-size:10px;color:#4a5a6a;">(0.0〜30.0)</span>
+        <span style="font-size:10px;color:#4a5a6a;">(0.0〜200.0)</span>
       </div>
     </div>
 
@@ -371,13 +371,22 @@
   const MAX_CANNON_SLOTS = 3;
   const AMMO_PER_ITEM = 10;
 
-  // 9倍強化
-  const VORTEX_MIN = 0.2 * 9;   // 1.8
-  const VORTEX_MAX = 2.5 * 9;   // 22.5
-  const WIND_MIN = 0.5 * 9;     // 4.5
-  const WIND_MAX = 2.0 * 9;     // 18.0
-  const WAVE_MIN = 0.3 * 9;     // 2.7
-  const WAVE_MAX = 1.2 * 9;     // 10.8
+  // ランダム渦力：50〜200
+  const VORTEX_MIN = 50;
+  const VORTEX_MAX = 200;
+
+  // 風・波（9倍）
+  const WIND_MIN = 0.5 * 9;
+  const WIND_MAX = 2.0 * 9;
+  const WAVE_MIN = 0.3 * 9;
+  const WAVE_MAX = 1.2 * 9;
+
+  // 氷山の数
+  const ICEBERG_COUNT = 25;
+  // 宝の地図持ちの敵の数
+  const TREASURE_ENEMY_COUNT = 7;
+  // Hawjackの場所を知る敵の数
+  const HAWJACK_KNOWER_COUNT = 10;
 
   let player = {
     x: WORLD_W / 2, y: WORLD_H / 2,
@@ -400,6 +409,7 @@
   let bullets = [];
   let items = [];
   let whirlpools = [];
+  let icebergs = [];
   let stairs = null;
   let showMapCoord = false;
 
@@ -456,6 +466,7 @@
     bullets = [];
     items = [];
     whirlpools = [];
+    icebergs = [];
     skillPoints = 0;
     hawjackDefeated = false;
     vortexPower = 1.0;
@@ -468,9 +479,16 @@
     wind.strength = rand(WIND_MIN, WIND_MAX);
     waveStrength = rand(WAVE_MIN, WAVE_MAX);
 
-    const treasureIdx = randInt(0, 39);
-    let hawjackIdx = randInt(0, 39);
-    while (hawjackIdx === treasureIdx) hawjackIdx = randInt(0, 39);
+    // 敵の特殊フラグをシャッフルで決定
+    const indices = [];
+    for (let i = 0; i < 40; i++) indices.push(i);
+    // シャッフル
+    for (let i = indices.length - 1; i > 0; i--) {
+      const j = randInt(0, i);
+      [indices[i], indices[j]] = [indices[j], indices[i]];
+    }
+    const treasureSet = new Set(indices.slice(0, TREASURE_ENEMY_COUNT));
+    const hawjackSet = new Set(indices.slice(TREASURE_ENEMY_COUNT, TREASURE_ENEMY_COUNT + HAWJACK_KNOWER_COUNT));
 
     for (let i = 0; i < 40; i++) {
       const p = randomWorldPos(80);
@@ -491,8 +509,8 @@
         shootRange: shootRange,
         speed: rand(0.6, 1.8),
         radius: 18,
-        isTreasure: (i === treasureIdx),
-        isHawjackKnower: (i === hawjackIdx),
+        isTreasure: treasureSet.has(i),
+        isHawjackKnower: hawjackSet.has(i),
       });
     }
 
@@ -515,6 +533,17 @@
         radius: rand(40, 100),
         strength: rand(0.3, 1.5),
         phase: rand(0, Math.PI * 2),
+      });
+    }
+
+    // 氷山25個
+    for (let i = 0; i < ICEBERG_COUNT; i++) {
+      const p = randomWorldPos(60);
+      icebergs.push({
+        x: p.x, y: p.y,
+        radius: rand(22, 45),
+        rot: rand(0, Math.PI * 2),
+        spikes: randInt(5, 9),
       });
     }
 
@@ -703,14 +732,12 @@
     dragState = null;
   }
 
-  // アイテムで総弾に追加（皿には自動で入れない）
   function addAmmoItem() {
     player.totalAmmo += AMMO_PER_ITEM;
     updateStockDisplay();
     updateInfoPanel();
   }
 
-  // ストック表示の更新（皿に入っていない総弾を最大3つ表示）
   function updateStockDisplay() {
     let displayCount = Math.min(player.totalAmmo, MAX_CANNON_SLOTS);
     for (let i = 0; i < stockSlots.length; i++) {
@@ -726,7 +753,6 @@
     }
   }
 
-  // 発射時に皿を空にする（総弾から自動補充はしない）
   function consumeCannon() {
     if (player.cannonLoaded <= 0) return false;
     for (let i = 0; i < plateSlots.length; i++) {
@@ -833,7 +859,7 @@
     if (!vortexPowerFixed) return;
     const val = parseFloat(vortexInput.value);
     if (isNaN(val)) return;
-    vortexPower = clamp(val, 0, 30);
+    vortexPower = clamp(val, 0, 200);
     updateInfoPanel();
   });
 
@@ -947,16 +973,26 @@
     player.x = clamp(player.x, 20, WORLD_W - 20);
     player.y = clamp(player.y, 20, WORLD_H - 20);
 
+    // 渦
     for (const wp of whirlpools) {
       const d = dist(player.x, player.y, wp.x, wp.y);
       const influence = wp.radius * 3;
       if (d < influence && d > 1) {
-        const pull = (wp.strength * vortexPower) * 1.2 * (1 - d / influence);
+        const pull = (wp.strength * vortexPower) * 0.05 * (1 - d / influence);
         const a = Math.atan2(wp.y - player.y, wp.x - player.x);
         player.x += Math.cos(a) * pull;
         player.y += Math.sin(a) * pull;
       }
       if (d < 18 && wp.strength * vortexPower > 0.5) {
+        gameOver = true;
+        player.hp = 0;
+      }
+    }
+
+    // 氷山との衝突判定（プレイヤーのみ）
+    for (const ib of icebergs) {
+      const d = dist(player.x, player.y, ib.x, ib.y);
+      if (d < player.radius + ib.radius) {
         gameOver = true;
         player.hp = 0;
       }
@@ -1161,6 +1197,7 @@
       ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(WORLD_W, y); ctx.stroke();
     }
 
+    // 渦
     for (const wp of whirlpools) {
       if (wp.x < camX - 200 || wp.x > camX + W + 200 || wp.y < camY - 200 || wp.y > camY + H + 200) continue;
       const phase = wp.phase + waveTime * 0.5;
@@ -1168,17 +1205,55 @@
       ctx.save();
       ctx.translate(wp.x, wp.y);
       ctx.rotate(phase);
-      ctx.strokeStyle = `rgba(120, 200, 255, ${0.15 + 0.15 * vortexPower})`;
+      ctx.strokeStyle = `rgba(120, 200, 255, ${0.15 + 0.15 * Math.min(vortexPower, 10) / 10})`;
       ctx.lineWidth = 3;
       for (let i = 0; i < 4; i++) {
         ctx.beginPath();
         ctx.arc(0, 0, r * (0.4 + i * 0.2), 0, Math.PI * 1.5);
         ctx.stroke();
       }
-      ctx.strokeStyle = `rgba(80, 160, 255, ${0.3 + 0.3 * vortexPower})`;
+      ctx.strokeStyle = `rgba(80, 160, 255, ${0.3 + 0.3 * Math.min(vortexPower, 10) / 10})`;
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.arc(0, 0, r * 0.3, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // 氷山
+    for (const ib of icebergs) {
+      if (ib.x < camX - 100 || ib.x > camX + W + 100 || ib.y < camY - 100 || ib.y > camY + H + 100) continue;
+      ctx.save();
+      ctx.translate(ib.x, ib.y);
+      ctx.rotate(ib.rot);
+      // 氷山（多角形）
+      ctx.beginPath();
+      const spikes = ib.spikes;
+      for (let i = 0; i < spikes; i++) {
+        const ang = (i / spikes) * Math.PI * 2;
+        const rad = ib.radius * (0.7 + 0.3 * Math.sin(i * 2.3 + ib.rot));
+        const px = Math.cos(ang) * rad;
+        const py = Math.sin(ang) * rad;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      // 氷のグラデーション
+      const grad = ctx.createRadialGradient(0, 0, 5, 0, 0, ib.radius);
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(0.5, '#cde8ff');
+      grad.addColorStop(1, '#7fb8e0');
+      ctx.fillStyle = grad;
+      ctx.shadowColor = '#aaddff'; ctx.shadowBlur = 18;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = '#eaf6ff'; ctx.lineWidth = 2; ctx.stroke();
+      // ひび割れ
+      ctx.strokeStyle = 'rgba(100, 150, 200, 0.4)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(-ib.radius*0.4, -ib.radius*0.2);
+      ctx.lineTo(ib.radius*0.2, ib.radius*0.3);
       ctx.stroke();
       ctx.restore();
     }
@@ -1240,6 +1315,7 @@
       }
     }
 
+    // 敵（色統一）
     for (const e of enemies) {
       if (!e.alive) continue;
       if (e.x < camX - 60 || e.x > camX + W + 60 || e.y < camY - 60 || e.y > camY + H + 60) continue;
@@ -1247,11 +1323,8 @@
       ctx.save();
       ctx.translate(e.x, e.y);
       ctx.rotate(e.angle);
-      let color = '#ff4d6d';
-      if (e.isTreasure) color = '#ffd700';
-      if (e.isHawjackKnower) color = '#ff6b9d';
       ctx.fillStyle = '#2a0a12';
-      ctx.shadowColor = color; ctx.shadowBlur = 14;
+      ctx.shadowColor = '#ff4d6d'; ctx.shadowBlur = 14;
       ctx.beginPath();
       ctx.moveTo(22, 0);
       ctx.lineTo(-10, -14);
@@ -1259,14 +1332,14 @@
       ctx.lineTo(-10, 14);
       ctx.closePath();
       ctx.fill();
-      ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
+      ctx.strokeStyle = '#ff4d6d'; ctx.lineWidth = 2; ctx.stroke();
       ctx.shadowBlur = 0;
       ctx.fillStyle = '#4a1a2a';
       ctx.fillRect(8, -3, 16, 6);
       const hpR = clamp(e.hp / e.maxHp, 0, 1);
       ctx.fillStyle = '#1a0a0e';
       ctx.fillRect(-22, -28, 44, 5);
-      ctx.fillStyle = hpR > 0.5 ? color : (hpR > 0.25 ? '#ff8a5c' : '#ff3b1f');
+      ctx.fillStyle = hpR > 0.5 ? '#ff4d6d' : (hpR > 0.25 ? '#ff8a5c' : '#ff3b1f');
       ctx.fillRect(-22, -28, 44 * hpR, 5);
       ctx.restore();
     }
