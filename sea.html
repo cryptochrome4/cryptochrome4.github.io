@@ -1,0 +1,1479 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SHOT - Sbit風シューティング（海戦改）</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; user-select:none; }
+  body {
+    background:#0a0c0f;
+    font-family:'Segoe UI','Helvetica Neue',sans-serif;
+    display:flex; justify-content:center; align-items:flex-start;
+    min-height:100vh; color:#e0e0e0;
+    padding:20px 0; overflow-y:auto;
+  }
+  .game-wrapper {
+    background:#11161c; border-radius:24px; padding:20px 20px 14px;
+    box-shadow:0 20px 40px rgba(0,0,0,0.8), 0 0 0 1px #2a3a4a inset;
+    display:flex; flex-direction:column; align-items:center; gap:12px;
+    width:fit-content;
+  }
+  canvas {
+    display:block; border-radius:16px; background:#0b0f14;
+    box-shadow:0 0 30px rgba(0,255,200,0.1);
+    cursor:crosshair; width:800px; height:600px;
+  }
+  .info-panel {
+    display:flex; flex-direction:column; gap:8px;
+    width:100%; padding:12px 16px;
+    background:#0d141c; border:1px solid #2a3a4a;
+    border-radius:16px; font-size:13px; color:#b0c8d8;
+  }
+  .info-panel .row {
+    display:flex; gap:14px; flex-wrap:wrap; align-items:center;
+  }
+  .info-panel .stat {
+    display:flex; align-items:center; gap:6px;
+    background:#0a0f14; padding:4px 12px;
+    border-radius:20px; border:1px solid #1e2a36;
+  }
+  .info-panel .stat .label { color:#7a8b9b; font-size:11px; letter-spacing:1px; }
+  .info-panel .stat .value { font-weight:800; font-size:15px; }
+  .info-panel .stat .value.hp { color:#00e6b0; text-shadow:0 0 8px #00e6b088; }
+  .info-panel .stat .value.ammo { color:#ffd166; text-shadow:0 0 8px #ffd16688; }
+  .info-panel .stat .value.total { color:#ff8ad8; text-shadow:0 0 8px #ff8ad888; }
+  .info-panel .stat .value.enemy { color:#ff4d6d; text-shadow:0 0 8px #ff4d6d88; }
+  .info-panel .stat .value.sp { color:#ff8ad8; text-shadow:0 0 8px #ff8ad888; }
+  .info-panel .stat .value.gun { color:#7ad7ff; text-shadow:0 0 8px #7ad7ff88; }
+  .info-panel .stat .value.speed { color:#00e6b0; text-shadow:0 0 8px #00e6b088; }
+  .info-panel .stat .value.rapid { color:#ffd166; text-shadow:0 0 8px #ffd16688; }
+  .info-panel .stat .value.sword { color:#ff8a00; text-shadow:0 0 8px #ff8a0088; }
+  .info-panel .stat .value.vortex { color:#c77dff; text-shadow:0 0 8px #c77dff88; }
+  .info-panel .stat .value.wind { color:#7ad7ff; text-shadow:0 0 8px #7ad7ff88; }
+  .info-panel .stat .value.wave { color:#5fb8ff; text-shadow:0 0 8px #5fb8ff88; }
+  .info-panel .stat .value.treasure { color:#ffd700; text-shadow:0 0 8px #ffd70088; }
+  .info-panel .stat .value.hawjack-c { color:#ff6b9d; text-shadow:0 0 8px #ff6b9d88; }
+  .info-panel .stat .value.map { color:#7ad7ff; text-shadow:0 0 8px #7ad7ff88; }
+  .info-panel .hidden-coord { display:none; }
+
+  .btn-row {
+    display:flex; gap:8px; flex-wrap:wrap; justify-content:center;
+    width:100%; padding:4px 0;
+  }
+  .ui-btn {
+    background:#1a2530; color:#00e6b0; border:2px solid #00e6b0;
+    border-radius:40px; padding:7px 16px; font-size:13px; font-weight:700;
+    letter-spacing:1px; cursor:pointer; transition:all 0.15s ease;
+    box-shadow:0 0 10px #00e6b033; font-family:inherit;
+  }
+  .ui-btn:hover { background:#00e6b0; color:#0a0c0f; box-shadow:0 0 20px #00e6b0aa; }
+  .ui-btn:active { transform:scale(0.96); }
+  .ui-btn:disabled {
+    opacity:0.35; cursor:not-allowed; border-color:#4a5a6a;
+    color:#4a5a6a; background:#151b22; box-shadow:none;
+  }
+  .ui-btn.skill { color:#ffd166; border-color:#ffd166; box-shadow:0 0 10px #ffd16633; }
+  .ui-btn.skill:hover { background:#ffd166; color:#0a0c0f; box-shadow:0 0 20px #ffd166aa; }
+  .ui-btn.skill:disabled { border-color:#4a5a6a; color:#4a5a6a; background:#151b22; box-shadow:none; }
+  .ui-btn.mode { color:#ff4d6d; border-color:#ff4d6d; box-shadow:0 0 10px #ff4d6d33; }
+  .ui-btn.mode:hover { background:#ff4d6d; color:#0a0c0f; box-shadow:0 0 20px #ff4d6daa; }
+  .ui-btn.mode.sword { color:#7ad7ff; border-color:#7ad7ff; box-shadow:0 0 10px #7ad7ff33; }
+  .ui-btn.mode.sword:hover { background:#7ad7ff; color:#0a0c0f; }
+  .ui-btn.map-toggle { color:#7ad7ff; border-color:#7ad7ff; box-shadow:0 0 10px #7ad7ff33; }
+  .ui-btn.map-toggle:hover { background:#7ad7ff; color:#0a0c0f; }
+
+  .victory-footer { display:flex; justify-content:center; width:100%; margin-top:6px; }
+  .victory-footer a {
+    color:#00e6b0; text-decoration:none; font-weight:600; font-size:18px;
+    padding:10px 28px; border:2px solid #00e6b0; border-radius:40px;
+    transition:all 0.2s ease; background:#00e6b010; letter-spacing:1px;
+  }
+  .victory-footer a:hover { background:#00e6b0; color:#0a0c0f; box-shadow:0 0 24px #00e6b0aa; }
+  .hidden { display:none !important; }
+  .hint { font-size:11px; color:#4a5a6a; margin-top:2px; text-align:center; width:100%; }
+
+  .opening {
+    position: fixed; inset: 0;
+    background-image: url('img216ship.jpg');
+    background-size: cover; background-position: center;
+    background-repeat: no-repeat;
+    display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
+    gap: 30px; z-index: 9999;
+    transition: opacity 0.5s ease;
+  }
+  .opening::before {
+    content: ''; position: absolute; inset: 0;
+    background: rgba(0, 0, 0, 0.55); z-index: 0;
+  }
+  .opening h1 {
+    position: relative; z-index: 1;
+    color: #00e6b0; font-size: 72px; font-weight: 800;
+    letter-spacing: 8px;
+    text-shadow: 0 0 30px #00e6b0aa, 0 0 60px #00e6b055;
+  }
+  .opening .subtitle {
+    position: relative; z-index: 1;
+    color: #b0c8d8; font-size: 16px;
+    letter-spacing: 4px; margin-top: -20px;
+  }
+  .start-btn {
+    position: relative; z-index: 1;
+    background: #00e6b0; color: #0a0c0f;
+    border: none; border-radius: 50px;
+    padding: 18px 72px; font-size: 22px; font-weight: 800;
+    letter-spacing: 4px; cursor: pointer; font-family: inherit;
+    box-shadow: 0 0 30px #00e6b0cc, 0 0 60px #00e6b066;
+    transition: all 0.2s ease;
+  }
+  .start-btn:hover {
+    transform: scale(1.06);
+    box-shadow: 0 0 50px #00e6b0ff, 0 0 100px #00e6b0aa;
+    background: #1affc0;
+  }
+  .start-btn:active { transform: scale(0.98); }
+  .opening.hidden-opening { opacity: 0; pointer-events: none; }
+
+  .reload-panel {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 10px; background: #0d141c;
+    border: 1px solid #2a3a4a; border-radius: 16px;
+    padding: 14px 24px; margin-top: 4px; width: 100%;
+  }
+  .reload-panel .label {
+    font-size: 11px; color: #7a8b9b; letter-spacing: 2px;
+  }
+  .reload-panel .sub-label {
+    font-size: 10px; color: #4a5a6a; letter-spacing: 1px;
+  }
+
+  .plate-area {
+    display: flex; gap: 24px; align-items: center; justify-content: center;
+  }
+  .plate-slot {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+  }
+  .plate-slot .plate {
+    width: 52px; height: 52px; border-radius: 50%;
+    border: 3px dashed #4a5a6a; background: #0a0f14;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s ease; position: relative;
+  }
+  .plate-slot .plate.filled {
+    border-style: solid; border-color: #00e6b0;
+    box-shadow: 0 0 16px #00e6b066;
+  }
+  .plate-slot .plate .ball {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: #00e6b0; border: 2px solid #00e6b0;
+    box-shadow: 0 0 12px #00e6b066;
+  }
+  .plate-slot .slot-label {
+    font-size: 9px; color: #4a5a6a; letter-spacing: 1px;
+  }
+
+  .stock-area {
+    display: flex; gap: 20px; align-items: center; justify-content: center;
+    padding: 6px 0;
+  }
+  .stock-slot {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+  }
+  .stock-slot .stock-ball {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: #1a2530; border: 2px solid #4a5a6a;
+    cursor: grab; transition: all 0.15s ease;
+    position: relative; z-index: 5;
+  }
+  .stock-slot .stock-ball.has-ball {
+    background: #2a3a4a; border-color: #7a8b9b;
+    box-shadow: 0 0 8px #7a8b9b44;
+  }
+  .stock-slot .stock-ball.dragging {
+    cursor: grabbing; background: #00e6b0; border-color: #00e6b0;
+    box-shadow: 0 0 20px #00e6b0cc; z-index: 999;
+    position: fixed; pointer-events: none;
+  }
+  .stock-slot .stock-ball.empty {
+    background: #0f151c; border-color: #2a3a4a;
+    cursor: default;
+  }
+  .stock-slot .stock-label {
+    font-size: 9px; color: #4a5a6a; letter-spacing: 1px;
+  }
+
+  .reload-panel .hint-small {
+    font-size: 10px; color: #4a5a6a;
+  }
+
+  .warp-panel {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; color: #b0c8d8; padding: 4px 0;
+    flex-wrap: wrap; justify-content: center;
+  }
+  .warp-panel input {
+    width: 60px; padding: 4px 6px; border-radius: 8px;
+    border: 1px solid #2a3a4a; background: #0a0f14;
+    color: #00e6b0; font-size: 12px; text-align: center;
+    font-family: inherit;
+  }
+  .warp-panel button {
+    background: #1a2530; color: #7ad7ff; border: 1px solid #7ad7ff;
+    border-radius: 20px; padding: 4px 12px; font-size: 11px;
+    cursor: pointer; font-family: inherit;
+  }
+  .warp-panel button:hover { background: #7ad7ff; color: #0a0c0f; }
+
+  .vortex-control {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; color: #c77dff; padding: 4px 0;
+    flex-wrap: wrap; justify-content: center;
+    border-top: 1px solid #2a1a3a; padding-top: 8px;
+    width: 100%;
+  }
+  .vortex-control input {
+    width: 80px; padding: 4px 6px; border-radius: 8px;
+    border: 1px solid #c77dff; background: #0a0f14;
+    color: #c77dff; font-size: 12px; text-align: center;
+    font-family: inherit;
+  }
+  .vortex-control button {
+    background: #1a2530; color: #c77dff; border: 1px solid #c77dff;
+    border-radius: 20px; padding: 4px 12px; font-size: 11px;
+    cursor: pointer; font-family: inherit;
+  }
+  .vortex-control button:hover { background: #c77dff; color: #0a0c0f; }
+</style>
+</head>
+<body>
+
+  <div class="opening" id="opening">
+    <h1>SHOT</h1>
+    <div class="subtitle">- Sbit STYLE SHOOTER -</div>
+    <button class="start-btn" id="startBtn">はじめる</button>
+  </div>
+
+  <div class="game-wrapper">
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+    <div class="info-panel" id="infoPanel">
+      <div class="row">
+        <div class="stat"><span class="label">HP</span><span class="value hp" id="hpDisplay">90</span></div>
+        <div class="stat"><span class="label">装弾</span><span class="value ammo" id="ammoDisplay">0</span>/3</div>
+        <div class="stat"><span class="label">総弾</span><span class="value total" id="totalAmmoDisplay">0</span></div>
+        <div class="stat"><span class="label">敵</span><span class="value enemy" id="enemyDisplay">40</span></div>
+        <div class="stat"><span class="label">SP</span><span class="value sp" id="spDisplay">0</span></div>
+      </div>
+      <div class="row">
+        <div class="stat"><span class="label">砲力</span><span class="value gun" id="gunPowerDisplay">50</span></div>
+        <div class="stat"><span class="label">スピード</span><span class="value speed" id="speedDisplay">70</span></div>
+        <div class="stat"><span class="label">連射力</span><span class="value rapid" id="rapidDisplay">0</span></div>
+        <div class="stat"><span class="label">剣力</span><span class="value sword" id="swordDisplay">20</span></div>
+      </div>
+      <div class="row">
+        <div class="stat"><span class="label">渦力</span><span class="value vortex" id="vortexPowerDisplay">1.00</span></div>
+        <div class="stat"><span class="label">風向</span><span class="value wind" id="windDirDisplay">-</span></div>
+        <div class="stat"><span class="label">風力</span><span class="value wind" id="windStrengthDisplay">0.0</span></div>
+        <div class="stat"><span class="label">波の力</span><span class="value wave" id="waveStrengthDisplay">0.0</span></div>
+      </div>
+      <div class="row">
+        <div class="stat hidden-coord" id="mapCoordSpan"><span class="label">マップ</span><span class="value map" id="mapDisplay">6,6</span></div>
+        <div class="stat hidden-coord" id="treasureCoordSpan"><span class="label">宝の地図</span><span class="value treasure" id="treasureDisplay">?,?</span></div>
+        <div class="stat hidden-coord" id="hawjackCoordSpan"><span class="label">渦力施設</span><span class="value hawjack-c" id="hawjackDisplay">?,?</span></div>
+      </div>
+    </div>
+
+    <div class="reload-panel" id="reloadPanel">
+      <div class="label">CANNON RELOAD</div>
+      <div class="plate-area" id="plateArea"></div>
+      <div class="sub-label">↑ 皿（大砲の装填口）</div>
+      <div class="stock-area" id="stockArea"></div>
+      <div class="sub-label">↑ 運搬待ちの弾（手動で皿へドラッグ）</div>
+      <div class="hint-small">黒い弾を長押しして皿へドラッグ</div>
+
+      <div class="warp-panel">
+        <span>ワープ:</span>
+        <input type="text" id="warpInput" placeholder="0,0" value="0,0">
+        <button id="warpBtn">GO</button>
+        <span style="font-size:10px;color:#4a5a6a;">(HP-89)</span>
+      </div>
+
+      <div class="vortex-control hidden" id="vortexControl">
+        <span>渦力操作:</span>
+        <input type="number" id="vortexInput" step="0.1" min="0" max="500" value="1.0">
+        <button id="vortexApplyBtn">適用</button>
+        <span style="font-size:10px;color:#4a5a6a;">(0.0〜500.0)</span>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="ui-btn mode" id="modeBtn">🔫 大砲モード</button>
+      <button class="ui-btn map-toggle" id="mapToggleBtn">📍 座標表示</button>
+      <button class="ui-btn skill" id="skGun">砲力 +10</button>
+      <button class="ui-btn skill" id="skSpeed">スピード +15</button>
+      <button class="ui-btn skill" id="skRapid">連射力 +1</button>
+      <button class="ui-btn skill" id="skSword">剣力 +15</button>
+    </div>
+
+    <div class="hint" id="hint">
+      移動: 矢印キー / エイム: マウス / 射撃・剣: クリック / モード切替: ボタン / リロード: パネルで装填
+    </div>
+
+    <div class="victory-footer hidden" id="victoryFooter">
+      <a href="ultimate.html">📚 ultimate.html へ進む</a>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  const hpDisplay = document.getElementById('hpDisplay');
+  const ammoDisplay = document.getElementById('ammoDisplay');
+  const totalAmmoDisplay = document.getElementById('totalAmmoDisplay');
+  const enemyDisplay = document.getElementById('enemyDisplay');
+  const spDisplay = document.getElementById('spDisplay');
+  const gunPowerDisplay = document.getElementById('gunPowerDisplay');
+  const speedDisplay = document.getElementById('speedDisplay');
+  const rapidDisplay = document.getElementById('rapidDisplay');
+  const swordDisplay = document.getElementById('swordDisplay');
+  const vortexPowerDisplay = document.getElementById('vortexPowerDisplay');
+  const windDirDisplay = document.getElementById('windDirDisplay');
+  const windStrengthDisplay = document.getElementById('windStrengthDisplay');
+  const waveStrengthDisplay = document.getElementById('waveStrengthDisplay');
+  const mapDisplay = document.getElementById('mapDisplay');
+  const mapCoordSpan = document.getElementById('mapCoordSpan');
+  const treasureCoordSpan = document.getElementById('treasureCoordSpan');
+  const treasureDisplay = document.getElementById('treasureDisplay');
+  const hawjackCoordSpan = document.getElementById('hawjackCoordSpan');
+  const hawjackDisplay = document.getElementById('hawjackDisplay');
+  const victoryFooter = document.getElementById('victoryFooter');
+  const hint = document.getElementById('hint');
+  const modeBtn = document.getElementById('modeBtn');
+  const mapToggleBtn = document.getElementById('mapToggleBtn');
+  const skGun = document.getElementById('skGun');
+  const skSpeed = document.getElementById('skSpeed');
+  const skRapid = document.getElementById('skRapid');
+  const skSword = document.getElementById('skSword');
+  const warpInput = document.getElementById('warpInput');
+  const warpBtn = document.getElementById('warpBtn');
+  const vortexControl = document.getElementById('vortexControl');
+  const vortexInput = document.getElementById('vortexInput');
+  const vortexApplyBtn = document.getElementById('vortexApplyBtn');
+
+  const W = 800, H = 600;
+  const MAP_W = 800, MAP_H = 600;
+  const MAP_COLS = 11, MAP_ROWS = 11;
+  const WORLD_W = MAP_W * MAP_COLS;
+  const WORLD_H = MAP_H * MAP_ROWS;
+
+  const MAX_CANNON_SLOTS = 3;
+  const AMMO_PER_ITEM = 10;
+
+  // ランダム渦力：100〜500
+  const VORTEX_MIN = 100;
+  const VORTEX_MAX = 500;
+
+  // 渦力ランダム変更の間隔（2秒 = 120フレーム @60fps）
+  const VORTEX_RANDOM_INTERVAL = 120;
+
+  const WIND_MIN = 0.5 * 9;
+  const WIND_MAX = 2.0 * 9;
+  const WAVE_MIN = 0.3 * 9;
+  const WAVE_MAX = 1.2 * 9;
+
+  const ICEBERG_COUNT = 25;
+  const TREASURE_ENEMY_COUNT = 7;
+  const HAWJACK_KNOWER_COUNT = 10;
+
+  const VORTEX_BASE = 1.0;
+  const VORTEX_INFLUENCE_BASE = 3.0;
+
+  let player = {
+    x: WORLD_W / 2, y: WORLD_H / 2,
+    hp: 90, maxHp: 90,
+    angle: 0,
+    cannonLoaded: 0,
+    totalAmmo: 0,
+    speed: 70,
+    gunPower: 50,
+    rapidPower: 0,
+    swordPower: 20,
+    mode: 'gun',
+    swingTimer: 0,
+    swingAngle: 0,
+    radius: 18,
+  };
+
+  let skillPoints = 0;
+  let enemies = [];
+  let bullets = [];
+  let items = [];
+  let whirlpools = [];
+  let icebergs = [];
+  let stairs = null;
+  let showMapCoord = false;
+
+  let wind = { angle: 0, strength: 1.0 };
+  let waveStrength = 0.5;
+
+  let hawjack = null;
+  let hawjackDefeated = false;
+  let vortexRandomTimer = 0;
+  let vortexPower = 1.0;
+  let vortexPowerFixed = false;
+
+  let waveTime = 0;
+
+  let treasureEnemyKilled = false;
+  let hawjackEnemyKilled = false;
+
+  const keys = { ArrowUp:false, ArrowDown:false, ArrowLeft:false, ArrowRight:false };
+  let mouseX = W/2, mouseY = H/2;
+  let isFiring = false;
+  let fireTimer = 0;
+  let swordCooldown = 0;
+
+  let lastTime = 0;
+  let gameOver = false;
+  let victory = false;
+
+  let plateSlots = [];
+  let stockSlots = [];
+  let dragState = null;
+
+  const rand = (min, max) => Math.random() * (max - min) + min;
+  const randInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+  const dist = (x1,y1,x2,y2) => Math.hypot(x2-x1, y2-y1);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+  function randomWorldPos(margin = 60) {
+    return {
+      x: rand(margin, WORLD_W - margin),
+      y: rand(margin, WORLD_H - margin),
+    };
+  }
+
+  function angleToCompass(angle) {
+    let deg = (angle * 180 / Math.PI + 360) % 360;
+    let compassDeg = (deg + 90) % 360;
+    const dirs = ['N','NE','E','SE','S','SW','W','NW'];
+    const idx = Math.round(compassDeg / 45) % 8;
+    return dirs[idx];
+  }
+
+  // 渦力に応じた引力範囲の倍率（見た目には影響しない）
+  // 渦力500でも sqrt(500) ≈ 22.4 倍程度に収まるように。
+  function getInfluenceFactor() {
+    const base = Math.sqrt(Math.max(vortexPower, 0.1) / VORTEX_BASE);
+    return base;
+  }
+
+  function initWorld() {
+    enemies = [];
+    bullets = [];
+    items = [];
+    whirlpools = [];
+    icebergs = [];
+    skillPoints = 0;
+    hawjackDefeated = false;
+    vortexPower = 1.0;
+    vortexPowerFixed = false;
+    vortexRandomTimer = VORTEX_RANDOM_INTERVAL;
+    treasureEnemyKilled = false;
+    hawjackEnemyKilled = false;
+
+    wind.angle = rand(0, Math.PI * 2);
+    wind.strength = rand(WIND_MIN, WIND_MAX);
+    waveStrength = rand(WAVE_MIN, WAVE_MAX);
+
+    const indices = [];
+    for (let i = 0; i < 40; i++) indices.push(i);
+    for (let i = indices.length - 1; i > 0; i--) {
+      const j = randInt(0, i);
+      [indices[i], indices[j]] = [indices[j], indices[i]];
+    }
+    const treasureSet = new Set(indices.slice(0, TREASURE_ENEMY_COUNT));
+    const hawjackSet = new Set(indices.slice(TREASURE_ENEMY_COUNT, TREASURE_ENEMY_COUNT + HAWJACK_KNOWER_COUNT));
+
+    for (let i = 0; i < 40; i++) {
+      const p = randomWorldPos(80);
+      const hp = randInt(10, 500);
+      const atk = randInt(10, 30);
+      const chases = Math.random() < 0.5;
+      const chaseRange = chases ? rand(80, 900) : 0;
+      const shootRange = rand(150, 700);
+      enemies.push({
+        x: p.x, y: p.y,
+        hp: hp, maxHp: hp,
+        attack: atk,
+        alive: true,
+        angle: 0,
+        fireTimer: randInt(30, 120),
+        chases: chases,
+        chaseRange: chaseRange,
+        shootRange: shootRange,
+        speed: rand(0.6, 1.8),
+        radius: 18,
+        isTreasure: treasureSet.has(i),
+        isHawjackKnower: hawjackSet.has(i),
+      });
+    }
+
+    for (let i = 0; i < 30; i++) {
+      const p = randomWorldPos(40);
+      items.push({ x:p.x, y:p.y, type:'ammo' });
+    }
+    for (let i = 0; i < 30; i++) {
+      const p = randomWorldPos(40);
+      items.push({ x:p.x, y:p.y, type:'heal' });
+    }
+
+    const sp = randomWorldPos(200);
+    stairs = { x: sp.x, y: sp.y, w: 60, h: 60 };
+
+    for (let i = 0; i < 25; i++) {
+      const p = randomWorldPos(60);
+      whirlpools.push({
+        x: p.x, y: p.y,
+        radius: rand(40, 100),
+        strength: rand(0.3, 1.5),
+        phase: rand(0, Math.PI * 2),
+      });
+    }
+
+    // 氷山25個（3倍の大きさ）
+    for (let i = 0; i < ICEBERG_COUNT; i++) {
+      const p = randomWorldPos(120);
+      icebergs.push({
+        x: p.x, y: p.y,
+        radius: rand(66, 135),
+        rot: rand(0, Math.PI * 2),
+        spikes: randInt(5, 9),
+      });
+    }
+
+    const hw = randomWorldPos(300);
+    hawjack = {
+      x: hw.x, y: hw.y,
+      hp: 200, maxHp: 200,
+      alive: true,
+      radius: 30,
+      angle: 0,
+    };
+  }
+
+  function resetGame() {
+    player.x = WORLD_W / 2;
+    player.y = WORLD_H / 2;
+    player.hp = 90;
+    player.cannonLoaded = 0;
+    player.totalAmmo = 0;
+    player.speed = 70;
+    player.gunPower = 50;
+    player.rapidPower = 0;
+    player.swordPower = 20;
+    player.mode = 'gun';
+    player.swingTimer = 0;
+    player.swingAngle = 0;
+    gameOver = false;
+    victory = false;
+    isFiring = false;
+    fireTimer = 0;
+    swordCooldown = 0;
+    showMapCoord = false;
+    mapCoordSpan.classList.add('hidden-coord');
+    treasureCoordSpan.classList.add('hidden-coord');
+    hawjackCoordSpan.classList.add('hidden-coord');
+    vortexControl.classList.add('hidden');
+    victoryFooter.classList.add('hidden');
+    hint.classList.remove('hidden');
+    document.querySelector('.btn-row').classList.remove('hidden');
+    document.getElementById('reloadPanel').classList.remove('hidden');
+    updateModeBtn();
+    initWorld();
+    resetReloadPanel();
+    updateInfoPanel();
+  }
+
+  function updateModeBtn() {
+    if (player.mode === 'gun') {
+      modeBtn.textContent = '🔫 大砲モード';
+      modeBtn.classList.remove('sword');
+      modeBtn.classList.add('mode');
+    } else {
+      modeBtn.textContent = '⚔ 炎の剣モード';
+      modeBtn.classList.remove('mode');
+      modeBtn.classList.add('sword');
+    }
+  }
+
+  function updateInfoPanel() {
+    hpDisplay.textContent = Math.max(0, player.hp);
+    ammoDisplay.textContent = player.cannonLoaded;
+    totalAmmoDisplay.textContent = player.totalAmmo;
+    enemyDisplay.textContent = enemies.filter(e => e.alive).length;
+    spDisplay.textContent = skillPoints;
+    gunPowerDisplay.textContent = player.gunPower;
+    speedDisplay.textContent = player.speed;
+    rapidDisplay.textContent = player.rapidPower;
+    swordDisplay.textContent = player.swordPower;
+    vortexPowerDisplay.textContent = vortexPower.toFixed(2);
+    windDirDisplay.textContent = angleToCompass(wind.angle);
+    windStrengthDisplay.textContent = wind.strength.toFixed(2);
+    waveStrengthDisplay.textContent = waveStrength.toFixed(2);
+  }
+
+  function resetReloadPanel() {
+    const plateArea = document.getElementById('plateArea');
+    plateArea.innerHTML = '';
+    plateSlots = [];
+    for (let i = 0; i < MAX_CANNON_SLOTS; i++) {
+      const slotDiv = document.createElement('div');
+      slotDiv.className = 'plate-slot';
+      const plate = document.createElement('div');
+      plate.className = 'plate';
+      plate.dataset.index = i;
+      const label = document.createElement('div');
+      label.className = 'slot-label';
+      label.textContent = `砲${i+1}`;
+      slotDiv.appendChild(plate);
+      slotDiv.appendChild(label);
+      plateArea.appendChild(slotDiv);
+      plateSlots.push({ plateEl: plate, filled: false });
+    }
+
+    const stockArea = document.getElementById('stockArea');
+    stockArea.innerHTML = '';
+    stockSlots = [];
+    for (let i = 0; i < MAX_CANNON_SLOTS; i++) {
+      const slotDiv = document.createElement('div');
+      slotDiv.className = 'stock-slot';
+      const ball = document.createElement('div');
+      ball.className = 'stock-ball empty';
+      ball.dataset.index = i;
+      const label = document.createElement('div');
+      label.className = 'stock-label';
+      label.textContent = `弾${i+1}`;
+      slotDiv.appendChild(ball);
+      slotDiv.appendChild(label);
+      stockArea.appendChild(slotDiv);
+      stockSlots.push({ ballEl: ball, hasBall: false });
+      ball.addEventListener('mousedown', onStockBallMouseDown);
+    }
+
+    window.addEventListener('mousemove', onStockBallMouseMove);
+    window.addEventListener('mouseup', onStockBallMouseUp);
+  }
+
+  function onStockBallMouseDown(e) {
+    e.preventDefault();
+    if (player.totalAmmo <= 0) return;
+    const ball = e.target.closest('.stock-ball');
+    if (!ball) return;
+    if (!ball.classList.contains('has-ball')) return;
+
+    const idx = parseInt(ball.dataset.index);
+    const slot = stockSlots[idx];
+    if (!slot || !slot.hasBall) return;
+
+    ball.classList.add('dragging');
+    ball.style.left = (e.clientX - 17) + 'px';
+    ball.style.top = (e.clientY - 17) + 'px';
+    dragState = { stockIndex: idx };
+  }
+
+  function onStockBallMouseMove(e) {
+    if (!dragState) return;
+    e.preventDefault();
+    const ball = stockSlots[dragState.stockIndex].ballEl;
+    if (!ball) return;
+    ball.style.left = (e.clientX - 17) + 'px';
+    ball.style.top = (e.clientY - 17) + 'px';
+  }
+
+  function onStockBallMouseUp(e) {
+    if (!dragState) return;
+    e.preventDefault();
+    const idx = dragState.stockIndex;
+    const slot = stockSlots[idx];
+    const ball = slot.ballEl;
+    if (!ball) { dragState = null; return; }
+
+    ball.classList.remove('dragging');
+    ball.style.position = '';
+    ball.style.left = '';
+    ball.style.top = '';
+    ball.style.pointerEvents = '';
+
+    let droppedOn = -1;
+    plateSlots.forEach((plateSlot, i) => {
+      const rect = plateSlot.plateEl.getBoundingClientRect();
+      if (e.clientX >= rect.left && e.clientX <= rect.right &&
+          e.clientY >= rect.top && e.clientY <= rect.bottom) {
+        droppedOn = i;
+      }
+    });
+
+    if (droppedOn !== -1 && !plateSlots[droppedOn].filled && player.totalAmmo > 0) {
+      player.totalAmmo--;
+      slot.hasBall = false;
+      ball.classList.remove('has-ball');
+      ball.classList.add('empty');
+
+      const plateSlot = plateSlots[droppedOn];
+      plateSlot.filled = true;
+      plateSlot.plateEl.classList.add('filled');
+      const newBall = document.createElement('div');
+      newBall.className = 'ball';
+      plateSlot.plateEl.appendChild(newBall);
+
+      player.cannonLoaded = plateSlots.filter(s => s.filled).length;
+      updateStockDisplay();
+      updateInfoPanel();
+    } else {
+      ball.style.display = '';
+    }
+
+    dragState = null;
+  }
+
+  function addAmmoItem() {
+    player.totalAmmo += AMMO_PER_ITEM;
+    updateStockDisplay();
+    updateInfoPanel();
+  }
+
+  function updateStockDisplay() {
+    let displayCount = Math.min(player.totalAmmo, MAX_CANNON_SLOTS);
+    for (let i = 0; i < stockSlots.length; i++) {
+      if (i < displayCount) {
+        stockSlots[i].hasBall = true;
+        stockSlots[i].ballEl.classList.remove('empty');
+        stockSlots[i].ballEl.classList.add('has-ball');
+      } else {
+        stockSlots[i].hasBall = false;
+        stockSlots[i].ballEl.classList.remove('has-ball');
+        stockSlots[i].ballEl.classList.add('empty');
+      }
+    }
+  }
+
+  function consumeCannon() {
+    if (player.cannonLoaded <= 0) return false;
+    for (let i = 0; i < plateSlots.length; i++) {
+      if (plateSlots[i].filled) {
+        plateSlots[i].filled = false;
+        plateSlots[i].plateEl.classList.remove('filled');
+        const ball = plateSlots[i].plateEl.querySelector('.ball');
+        if (ball) ball.remove();
+        break;
+      }
+    }
+    player.cannonLoaded = plateSlots.filter(s => s.filled).length;
+    updateInfoPanel();
+    return true;
+  }
+
+  window.addEventListener('keydown', (e) => {
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) {
+      e.preventDefault();
+      keys[e.key] = true;
+    }
+  });
+  window.addEventListener('keyup', (e) => {
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) {
+      e.preventDefault();
+      keys[e.key] = false;
+    }
+  });
+
+  canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const sx = canvas.width / rect.width;
+    const sy = canvas.height / rect.height;
+    mouseX = (e.clientX - rect.left) * sx;
+    mouseY = (e.clientY - rect.top) * sy;
+  });
+
+  canvas.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    if (gameOver || victory) { resetGame(); return; }
+    if (player.mode === 'gun') {
+      isFiring = true;
+      fireTimer = 0;
+    } else {
+      swingSword();
+    }
+  });
+  window.addEventListener('mouseup', (e) => {
+    if (e.button === 0) isFiring = false;
+  });
+
+  modeBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (gameOver || victory) return;
+    player.mode = player.mode === 'gun' ? 'sword' : 'gun';
+    updateModeBtn();
+  });
+  mapToggleBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    showMapCoord = !showMapCoord;
+    if (showMapCoord) {
+      mapCoordSpan.classList.remove('hidden-coord');
+      mapToggleBtn.textContent = '📍 座標非表示';
+    } else {
+      mapCoordSpan.classList.add('hidden-coord');
+      mapToggleBtn.textContent = '📍 座標表示';
+    }
+  });
+
+  function trySkill(cost, apply) {
+    if (gameOver || victory) return;
+    if (skillPoints < cost) return;
+    skillPoints -= cost;
+    apply();
+    updateInfoPanel();
+  }
+  skGun.addEventListener('click', (e) => { e.preventDefault(); trySkill(1, () => player.gunPower += 10); });
+  skSpeed.addEventListener('click', (e) => { e.preventDefault(); trySkill(1, () => player.speed += 15); });
+  skRapid.addEventListener('click', (e) => { e.preventDefault(); trySkill(1, () => player.rapidPower += 1); });
+  skSword.addEventListener('click', (e) => { e.preventDefault(); trySkill(1, () => player.swordPower += 15); });
+
+  warpBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (gameOver || victory) return;
+    const val = warpInput.value.trim();
+    const parts = val.split(',');
+    if (parts.length !== 2) return;
+    const col = parseInt(parts[0]) - 1;
+    const row = parseInt(parts[1]) - 1;
+    if (isNaN(col) || isNaN(row)) return;
+    if (col < 0 || col >= MAP_COLS || row < 0 || row >= MAP_ROWS) return;
+    const targetX = col * MAP_W + MAP_W / 2;
+    const targetY = row * MAP_H + MAP_H / 2;
+    player.x = targetX;
+    player.y = targetY;
+    player.hp -= 89;
+    if (player.hp <= 0) { player.hp = 0; gameOver = true; }
+    updateInfoPanel();
+  });
+
+  vortexApplyBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (!vortexPowerFixed) return;
+    const val = parseFloat(vortexInput.value);
+    if (isNaN(val)) return;
+    vortexPower = clamp(val, 0, 500);
+    updateInfoPanel();
+  });
+
+  function swingSword() {
+    if (swordCooldown > 0) return;
+    swordCooldown = 24;
+    player.swingTimer = 12;
+    const RANGE = 70;
+    for (const e of enemies) {
+      if (!e.alive) continue;
+      if (dist(player.x, player.y, e.x, e.y) < RANGE) {
+        e.hp -= player.swordPower;
+        if (e.hp <= 0) {
+          e.alive = false;
+          skillPoints += 1;
+          onEnemyKilled(e);
+        }
+      }
+    }
+    if (hawjack && hawjack.alive && dist(player.x, player.y, hawjack.x, hawjack.y) < RANGE + 20) {
+      hawjack.hp -= player.swordPower;
+      if (hawjack.hp <= 0) {
+        hawjack.alive = false;
+        hawjackDefeated = true;
+        skillPoints += 5;
+        vortexPowerFixed = true;
+        vortexControl.classList.remove('hidden');
+        vortexInput.value = vortexPower.toFixed(1);
+        updateInfoPanel();
+      }
+    }
+  }
+
+  function onEnemyKilled(e) {
+    if (e.isTreasure && !treasureEnemyKilled) {
+      treasureEnemyKilled = true;
+      const col = Math.floor(stairs.x / MAP_W) + 1;
+      const row = Math.floor(stairs.y / MAP_H) + 1;
+      treasureDisplay.textContent = `${col},${row}`;
+      treasureCoordSpan.classList.remove('hidden-coord');
+    }
+    if (e.isHawjackKnower && !hawjackEnemyKilled) {
+      hawjackEnemyKilled = true;
+      const col = Math.floor(hawjack.x / MAP_W) + 1;
+      const row = Math.floor(hawjack.y / MAP_H) + 1;
+      hawjackDisplay.textContent = `${col},${row}`;
+      hawjackCoordSpan.classList.remove('hidden-coord');
+    }
+  }
+
+  function resolvePlayerEnemyCollision() {
+    for (const e of enemies) {
+      if (!e.alive) continue;
+      const d = dist(player.x, player.y, e.x, e.y);
+      const minDist = player.radius + e.radius;
+      if (d < minDist && d > 0.001) {
+        const overlap = minDist - d;
+        const nx = (player.x - e.x) / d;
+        const ny = (player.y - e.y) / d;
+        player.x += nx * overlap;
+        player.y += ny * overlap;
+      } else if (d <= 0.001) {
+        const a = Math.random() * Math.PI * 2;
+        player.x += Math.cos(a) * minDist;
+        player.y += Math.sin(a) * minDist;
+      }
+    }
+    if (hawjack && hawjack.alive) {
+      const d = dist(player.x, player.y, hawjack.x, hawjack.y);
+      const minDist = player.radius + hawjack.radius;
+      if (d < minDist && d > 0.001) {
+        const overlap = minDist - d;
+        const nx = (player.x - hawjack.x) / d;
+        const ny = (player.y - hawjack.y) / d;
+        player.x += nx * overlap;
+        player.y += ny * overlap;
+      }
+    }
+  }
+
+  function update(dt) {
+    if (gameOver || victory) return;
+
+    waveTime += 0.02;
+
+    const windRad = wind.angle;
+    const windStr = wind.strength * 0.15;
+
+    let dx = 0, dy = 0;
+    const sp = player.speed * 0.4;
+    if (keys.ArrowUp)    dy -= sp;
+    if (keys.ArrowDown)  dy += sp;
+    if (keys.ArrowLeft)  dx -= sp;
+    if (keys.ArrowRight) dx += sp;
+
+    if (dx !== 0 || dy !== 0) {
+      const moveAngle = Math.atan2(dy, dx);
+      const dot = Math.cos(moveAngle - windRad);
+      const windEffect = dot * windStr * player.speed * 0.1;
+      dx += Math.cos(windRad) * windEffect;
+      dy += Math.sin(windRad) * windEffect;
+    }
+
+    const waveX = Math.sin(waveTime * 1.7 + player.x * 0.01) * waveStrength * 0.3;
+    const waveY = Math.cos(waveTime * 1.3 + player.y * 0.01) * waveStrength * 0.3;
+    dx += waveX;
+    dy += waveY;
+
+    player.x += dx;
+    player.y += dy;
+    player.x = clamp(player.x, 20, WORLD_W - 20);
+    player.y = clamp(player.y, 20, WORLD_H - 20);
+
+    // 渦（見た目は変わらず、引力範囲だけ渦力に比例して拡大）
+    // ※ 渦力500のような極端な値でも引力が強すぎて即死しないよう、
+    //    pull係数は sqrt スケールで緩やかに。
+    const influenceFactor = getInfluenceFactor();
+    for (const wp of whirlpools) {
+      const d = dist(player.x, player.y, wp.x, wp.y);
+      const influence = wp.radius * VORTEX_INFLUENCE_BASE * influenceFactor;
+      if (d < influence && d > 1) {
+        // pull が強すぎると理不尽なので、vortexPower に比例させつつ
+        // 0.05 の基本係数で調整。500でも 500*0.05=25 程度の加速度。
+        const pull = (wp.strength * vortexPower) * 0.05 * (1 - d / influence);
+        const a = Math.atan2(wp.y - player.y, wp.x - player.x);
+        player.x += Math.cos(a) * pull;
+        player.y += Math.sin(a) * pull;
+      }
+      if (d < 18 && wp.strength * vortexPower > 0.5) {
+        gameOver = true;
+        player.hp = 0;
+      }
+    }
+
+    // 氷山との衝突判定（プレイヤーのみ）
+    for (const ib of icebergs) {
+      const d = dist(player.x, player.y, ib.x, ib.y);
+      if (d < player.radius + ib.radius) {
+        gameOver = true;
+        player.hp = 0;
+      }
+    }
+
+    const camX = clamp(player.x - W/2, 0, WORLD_W - W);
+    const camY = clamp(player.y - H/2, 0, WORLD_H - H);
+    const wmx = mouseX + camX;
+    const wmy = mouseY + camY;
+    player.angle = Math.atan2(wmy - player.y, wmx - player.x);
+
+    if (player.mode === 'gun') {
+      const interval = Math.max(6, 20 - player.rapidPower * 2);
+      if (isFiring && player.cannonLoaded > 0) {
+        if (fireTimer <= 0) {
+          const spread = 0.02;
+          const a = player.angle + (Math.random() - 0.5) * spread;
+          bullets.push({
+            x: player.x + Math.cos(a) * 26,
+            y: player.y + Math.sin(a) * 26,
+            vx: Math.cos(a) * 12,
+            vy: Math.sin(a) * 12,
+            life: 100,
+            owner: 'player',
+            damage: player.gunPower,
+          });
+          consumeCannon();
+          fireTimer = interval;
+        } else {
+          fireTimer--;
+        }
+      } else {
+        fireTimer = 0;
+      }
+    }
+
+    if (swordCooldown > 0) swordCooldown--;
+    if (player.swingTimer > 0) {
+      player.swingTimer--;
+      player.swingAngle = Math.sin((12 - player.swingTimer) / 12 * Math.PI) * 1.4;
+    } else {
+      player.swingAngle = 0;
+    }
+
+    for (let i = bullets.length - 1; i >= 0; i--) {
+      const b = bullets[i];
+      b.x += b.vx;
+      b.y += b.vy;
+      b.life--;
+      if (b.life <= 0 || b.x < 0 || b.x > WORLD_W || b.y < 0 || b.y > WORLD_H) {
+        bullets.splice(i, 1);
+        continue;
+      }
+      if (b.owner === 'player') {
+        let hit = false;
+        for (const e of enemies) {
+          if (!e.alive) continue;
+          if (dist(b.x, b.y, e.x, e.y) < 22) {
+            e.hp -= b.damage;
+            bullets.splice(i, 1);
+            if (e.hp <= 0) {
+              e.alive = false;
+              skillPoints += 1;
+              onEnemyKilled(e);
+            }
+            hit = true;
+            break;
+          }
+        }
+        if (!hit && hawjack && hawjack.alive) {
+          if (dist(b.x, b.y, hawjack.x, hawjack.y) < hawjack.radius + 10) {
+            hawjack.hp -= b.damage;
+            bullets.splice(i, 1);
+            if (hawjack.hp <= 0) {
+              hawjack.alive = false;
+              hawjackDefeated = true;
+              skillPoints += 5;
+              vortexPowerFixed = true;
+              vortexControl.classList.remove('hidden');
+              vortexInput.value = vortexPower.toFixed(1);
+              updateInfoPanel();
+            }
+          }
+        }
+      } else {
+        if (dist(b.x, b.y, player.x, player.y) < 20) {
+          player.hp -= b.damage;
+          bullets.splice(i, 1);
+          if (player.hp <= 0) { player.hp = 0; gameOver = true; }
+        }
+      }
+    }
+
+    const pmx = Math.floor(player.x / MAP_W);
+    const pmy = Math.floor(player.y / MAP_H);
+    const actX0 = (pmx - 1) * MAP_W, actX1 = (pmx + 2) * MAP_W;
+    const actY0 = (pmy - 1) * MAP_H, actY1 = (pmy + 2) * MAP_H;
+
+    for (const e of enemies) {
+      if (!e.alive) continue;
+      const d = dist(player.x, player.y, e.x, e.y);
+      e.angle = Math.atan2(player.y - e.y, player.x - e.x);
+
+      const active = e.x >= actX0 && e.x < actX1 && e.y >= actY0 && e.y < actY1;
+      if (!active) continue;
+
+      if (e.chases && d < e.chaseRange) {
+        const a = Math.atan2(player.y - e.y, player.x - e.x);
+        e.x += Math.cos(a) * e.speed;
+        e.y += Math.sin(a) * e.speed;
+      }
+
+      e.fireTimer--;
+      if (e.fireTimer <= 0 && d < e.shootRange) {
+        e.fireTimer = randInt(60, 140);
+        const a = e.angle + (Math.random() - 0.5) * 0.15;
+        bullets.push({
+          x: e.x + Math.cos(a) * 20,
+          y: e.y + Math.sin(a) * 20,
+          vx: Math.cos(a) * 6,
+          vy: Math.sin(a) * 6,
+          life: 140,
+          owner: 'enemy',
+          damage: e.attack,
+        });
+      }
+    }
+
+    resolvePlayerEnemyCollision();
+
+    for (let i = items.length - 1; i >= 0; i--) {
+      const it = items[i];
+      if (dist(it.x, it.y, player.x, player.y) < 24) {
+        if (it.type === 'ammo') {
+          addAmmoItem();
+        } else {
+          player.hp = Math.min(player.maxHp, player.hp + 10);
+        }
+        items.splice(i, 1);
+      }
+    }
+
+    if (!vortexPowerFixed) {
+      vortexRandomTimer--;
+      if (vortexRandomTimer <= 0) {
+        vortexRandomTimer = VORTEX_RANDOM_INTERVAL;
+        vortexPower = rand(VORTEX_MIN, VORTEX_MAX);
+      }
+    }
+
+    if (stairs && dist(player.x, player.y, stairs.x + stairs.w/2, stairs.y + stairs.h/2) < 40) {
+      victory = true;
+      victoryFooter.classList.remove('hidden');
+      hint.classList.add('hidden');
+      document.querySelector('.btn-row').classList.add('hidden');
+      document.getElementById('reloadPanel').classList.add('hidden');
+    }
+
+    updateInfoPanel();
+    mapDisplay.textContent = `${pmx+1},${pmy+1}`;
+
+    const canSkill = skillPoints >= 1 && !gameOver && !victory;
+    skGun.disabled = !canSkill;
+    skSpeed.disabled = !canSkill;
+    skRapid.disabled = !canSkill;
+    skSword.disabled = !canSkill;
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    const camX = clamp(player.x - W/2, 0, WORLD_W - W);
+    const camY = clamp(player.y - H/2, 0, WORLD_H - H);
+
+    ctx.save();
+    ctx.translate(-camX, -camY);
+
+    ctx.fillStyle = '#0b1a2a';
+    ctx.fillRect(camX, camY, W, H);
+
+    for (let wy = 0; wy < 20; wy++) {
+      const yBase = camY + wy * 35 + Math.sin(waveTime + wy) * 6 * waveStrength;
+      ctx.beginPath();
+      ctx.strokeStyle = `rgba(100, 180, 255, ${0.06 + 0.04 * Math.sin(waveTime + wy)})`;
+      ctx.lineWidth = 2;
+      for (let x = camX; x < camX + W; x += 20) {
+        const y = yBase + Math.sin(x * 0.02 + waveTime * 2 + wy) * 4 * waveStrength;
+        if (x === camX) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+
+    ctx.strokeStyle = '#1e3a4a';
+    ctx.lineWidth = 2;
+    for (let c = 0; c <= MAP_COLS; c++) {
+      const x = c * MAP_W;
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, WORLD_H); ctx.stroke();
+    }
+    for (let r = 0; r <= MAP_ROWS; r++) {
+      const y = r * MAP_H;
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(WORLD_W, y); ctx.stroke();
+    }
+
+    // 渦（見た目は常に同じ大きさ、引力範囲は非表示の力）
+    const influenceFactor = getInfluenceFactor();
+    for (const wp of whirlpools) {
+      const margin = 200 * influenceFactor;
+      if (wp.x < camX - margin || wp.x > camX + W + margin ||
+          wp.y < camY - margin || wp.y > camY + H + margin) continue;
+
+      const phase = wp.phase + waveTime * 0.5;
+      const r = wp.radius;
+      ctx.save();
+      ctx.translate(wp.x, wp.y);
+      ctx.rotate(phase);
+      // 渦のリング（見た目の大きさは渦力に依存しない）
+      ctx.strokeStyle = `rgba(120, 200, 255, ${0.15 + 0.15 * Math.min(vortexPower, 10) / 10})`;
+      ctx.lineWidth = 3;
+      for (let i = 0; i < 4; i++) {
+        ctx.beginPath();
+        ctx.arc(0, 0, r * (0.4 + i * 0.2), 0, Math.PI * 1.5);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = `rgba(80, 160, 255, ${0.3 + 0.3 * Math.min(vortexPower, 10) / 10})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.3, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // 氷山
+    for (const ib of icebergs) {
+      if (ib.x < camX - 200 || ib.x > camX + W + 200 || ib.y < camY - 200 || ib.y > camY + H + 200) continue;
+      ctx.save();
+      ctx.translate(ib.x, ib.y);
+      ctx.rotate(ib.rot);
+      ctx.beginPath();
+      const spikes = ib.spikes;
+      for (let i = 0; i < spikes; i++) {
+        const ang = (i / spikes) * Math.PI * 2;
+        const rad = ib.radius * (0.7 + 0.3 * Math.sin(i * 2.3 + ib.rot));
+        const px = Math.cos(ang) * rad;
+        const py = Math.sin(ang) * rad;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      const grad = ctx.createRadialGradient(0, 0, 5, 0, 0, ib.radius);
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(0.5, '#cde8ff');
+      grad.addColorStop(1, '#7fb8e0');
+      ctx.fillStyle = grad;
+      ctx.shadowColor = '#aaddff'; ctx.shadowBlur = 18;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = '#eaf6ff'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.strokeStyle = 'rgba(100, 150, 200, 0.4)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(-ib.radius*0.4, -ib.radius*0.2);
+      ctx.lineTo(ib.radius*0.2, ib.radius*0.3);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    for (const it of items) {
+      if (it.x < camX - 40 || it.x > camX + W + 40 || it.y < camY - 40 || it.y > camY + H + 40) continue;
+      if (it.type === 'ammo') {
+        ctx.fillStyle = '#ffd166';
+        ctx.shadowColor = '#ffd166'; ctx.shadowBlur = 14;
+        ctx.fillRect(it.x - 8, it.y - 8, 16, 16);
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#0a0c0f';
+        ctx.fillRect(it.x - 3, it.y - 3, 6, 6);
+      } else {
+        ctx.fillStyle = '#00e6b0';
+        ctx.shadowColor = '#00e6b0'; ctx.shadowBlur = 14;
+        ctx.beginPath(); ctx.arc(it.x, it.y, 10, 0, Math.PI*2); ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#0a0c0f';
+        ctx.fillRect(it.x - 5, it.y - 2, 10, 4);
+        ctx.fillRect(it.x - 2, it.y - 5, 4, 10);
+      }
+    }
+
+    if (stairs) {
+      const s = stairs;
+      const cx = s.x + s.w/2;
+      const cy = s.y + s.h/2;
+      ctx.fillStyle = '#8B6914';
+      ctx.shadowColor = '#ffd166'; ctx.shadowBlur = 20;
+      ctx.fillRect(cx - 6, cy - 30, 12, 60);
+      ctx.fillRect(cx - 25, cy - 12, 50, 12);
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = 'rgba(255, 215, 0, 0.15)';
+      ctx.beginPath(); ctx.arc(cx, cy, 40, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#ffd166';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('GOAL', cx, cy - 45);
+    }
+
+    if (hawjack && hawjack.alive) {
+      const hx = hawjack.x, hy = hawjack.y;
+      if (hx > camX - 80 && hx < camX + W + 80 && hy > camY - 80 && hy < camY + H + 80) {
+        ctx.shadowColor = '#c77dff'; ctx.shadowBlur = 20;
+        ctx.fillStyle = '#2a1a3a';
+        ctx.beginPath(); ctx.arc(hx, hy, hawjack.radius, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = '#c77dff'; ctx.lineWidth = 3; ctx.stroke();
+        ctx.shadowBlur = 0;
+        const hpR = clamp(hawjack.hp / hawjack.maxHp, 0, 1);
+        ctx.fillStyle = '#1a0a1e';
+        ctx.fillRect(hx - 30, hy - 44, 60, 6);
+        ctx.fillStyle = '#c77dff';
+        ctx.fillRect(hx - 30, hy - 44, 60 * hpR, 6);
+        ctx.fillStyle = '#c77dff';
+        ctx.font = 'bold 10px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Hawjack', hx, hy - 50);
+      }
+    }
+
+    for (const e of enemies) {
+      if (!e.alive) continue;
+      if (e.x < camX - 60 || e.x > camX + W + 60 || e.y < camY - 60 || e.y > camY + H + 60) continue;
+
+      ctx.save();
+      ctx.translate(e.x, e.y);
+      ctx.rotate(e.angle);
+      ctx.fillStyle = '#2a0a12';
+      ctx.shadowColor = '#ff4d6d'; ctx.shadowBlur = 14;
+      ctx.beginPath();
+      ctx.moveTo(22, 0);
+      ctx.lineTo(-10, -14);
+      ctx.lineTo(-14, 0);
+      ctx.lineTo(-10, 14);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#ff4d6d'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = '#4a1a2a';
+      ctx.fillRect(8, -3, 16, 6);
+      const hpR = clamp(e.hp / e.maxHp, 0, 1);
+      ctx.fillStyle = '#1a0a0e';
+      ctx.fillRect(-22, -28, 44, 5);
+      ctx.fillStyle = hpR > 0.5 ? '#ff4d6d' : (hpR > 0.25 ? '#ff8a5c' : '#ff3b1f');
+      ctx.fillRect(-22, -28, 44 * hpR, 5);
+      ctx.restore();
+    }
+
+    for (const b of bullets) {
+      if (b.x < camX - 20 || b.x > camX + W + 20 || b.y < camY - 20 || b.y > camY + H + 20) continue;
+      if (b.owner === 'player') {
+        ctx.fillStyle = '#00e6b0';
+        ctx.shadowColor = '#00e6b0'; ctx.shadowBlur = 12;
+        ctx.beginPath(); ctx.arc(b.x, b.y, 5, 0, Math.PI*2); ctx.fill();
+      } else {
+        ctx.fillStyle = '#ff4d6d';
+        ctx.shadowColor = '#ff4d6d'; ctx.shadowBlur = 12;
+        ctx.beginPath(); ctx.arc(b.x, b.y, 4, 0, Math.PI*2); ctx.fill();
+      }
+      ctx.shadowBlur = 0;
+    }
+
+    ctx.save();
+    ctx.translate(player.x, player.y);
+    ctx.rotate(player.angle);
+    ctx.fillStyle = '#0a1a1a';
+    ctx.shadowColor = '#00e6b0'; ctx.shadowBlur = 20;
+    ctx.beginPath();
+    ctx.moveTo(22, 0);
+    ctx.lineTo(-10, -16);
+    ctx.lineTo(-14, 0);
+    ctx.lineTo(-10, 16);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#00e6b0'; ctx.lineWidth = 2.5; ctx.stroke();
+    ctx.shadowBlur = 0;
+    if (player.mode === 'gun') {
+      ctx.fillStyle = '#00e6b0';
+      ctx.fillRect(8, -4, 20, 8);
+      ctx.beginPath();
+      ctx.arc(28, 0, 4, 0, Math.PI*2);
+      ctx.fill();
+    } else {
+      const sa = player.swingAngle - 0.6;
+      ctx.save();
+      ctx.rotate(sa);
+      ctx.strokeStyle = '#ff8a00';
+      ctx.lineWidth = 6;
+      ctx.shadowColor = '#ff8a00'; ctx.shadowBlur = 20;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(44, 0);
+      ctx.stroke();
+      ctx.strokeStyle = '#ffcc00';
+      ctx.lineWidth = 3;
+      ctx.shadowColor = '#ffcc00'; ctx.shadowBlur = 16;
+      ctx.beginPath();
+      ctx.moveTo(10, -3);
+      ctx.lineTo(40, -3);
+      ctx.stroke();
+      ctx.restore();
+    }
+    ctx.restore();
+
+    const hpR = clamp(player.hp / player.maxHp, 0, 1);
+    ctx.fillStyle = '#1a2a2a';
+    ctx.fillRect(player.x - 26, player.y - 36, 52, 5);
+    ctx.fillStyle = hpR > 0.5 ? '#00e6b0' : '#ffb84d';
+    ctx.fillRect(player.x - 26, player.y - 36, 52 * hpR, 5);
+
+    ctx.restore();
+
+    if (gameOver) {
+      ctx.fillStyle = 'rgba(0,0,0,0.75)';
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#ff4d6d';
+      ctx.font = 'bold 52px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.shadowColor = '#ff4d6d'; ctx.shadowBlur = 24;
+      ctx.fillText('GAME OVER', W/2, H/2);
+      ctx.shadowBlur = 0;
+      ctx.font = '18px sans-serif';
+      ctx.fillStyle = '#b0c8d8';
+      ctx.fillText('クリックでリスタート', W/2, H/2 + 50);
+    }
+    if (victory) {
+      ctx.fillStyle = 'rgba(0,0,0,0.7)';
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#00e6b0';
+      ctx.font = 'bold 56px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.shadowColor = '#00e6b0'; ctx.shadowBlur = 30;
+      ctx.fillText('VICTORY', W/2, H/2 - 20);
+      ctx.shadowBlur = 0;
+      ctx.font = '18px sans-serif';
+      ctx.fillStyle = '#b0c8d8';
+      ctx.fillText('下のリンクから ultimate.html へ', W/2, H/2 + 50);
+    }
+  }
+
+  function gameLoop(timestamp) {
+    const dt = Math.min(2, (timestamp - lastTime) / (1000/60));
+    lastTime = timestamp;
+
+    if (!gameOver && !victory) update(dt);
+    draw();
+
+    requestAnimationFrame(gameLoop);
+  }
+
+  const opening = document.getElementById('opening');
+  const startBtn = document.getElementById('startBtn');
+
+  startBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    opening.classList.add('hidden-opening');
+    setTimeout(() => {
+      opening.style.display = 'none';
+    }, 500);
+  });
+
+  resetGame();
+  updateModeBtn();
+  requestAnimationFrame(gameLoop);
+})();
+</script>
+</body>
+</html>
