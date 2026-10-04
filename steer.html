@@ -37,6 +37,8 @@
   .footer .status .map-coord { color:#7ad7ff; text-shadow:0 0 8px #7ad7ff88; }
   .footer .status .hidden-coord { display:none; }
   .footer .status .vortex-power { color:#c77dff; text-shadow:0 0 8px #c77dff88; }
+  .footer .status .treasure-coord { color:#ffd700; text-shadow:0 0 8px #ffd70088; }
+  .footer .status .hawjack-coord { color:#ff6b9d; text-shadow:0 0 8px #ff6b9d88; }
 
   .btn-row {
     display:flex; gap:8px; flex-wrap:wrap; justify-content:center;
@@ -175,8 +177,8 @@
     gap: 4px;
   }
   .reload-slot .plate {
-    width: 44px;
-    height: 44px;
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
     border: 3px dashed #4a5a6a;
     background: #0a0f14;
@@ -184,7 +186,6 @@
     align-items: center;
     justify-content: center;
     transition: all 0.15s ease;
-    cursor: pointer;
     position: relative;
   }
   .reload-slot .plate.active {
@@ -196,13 +197,15 @@
     border-color: #00e6b0;
   }
   .reload-slot .ball {
-    width: 28px;
-    height: 28px;
+    width: 32px;
+    height: 32px;
     border-radius: 50%;
     background: #1a2530;
     border: 2px solid #4a5a6a;
     transition: all 0.15s ease;
     cursor: grab;
+    position: relative;
+    z-index: 5;
   }
   .reload-slot .ball.ready {
     background: #2a3a4a;
@@ -213,7 +216,8 @@
     cursor: grabbing;
     background: #00e6b0;
     border-color: #00e6b0;
-    box-shadow: 0 0 16px #00e6b0aa;
+    box-shadow: 0 0 20px #00e6b0cc;
+    z-index: 999;
   }
   .reload-slot .ball.placed {
     background: #00e6b0;
@@ -281,6 +285,8 @@
         <span>SP: <span id="spDisplay" class="sp">0</span></span>
         <span id="vortexPowerSpan" class="hidden-coord">渦重力: <span id="vortexPowerDisplay" class="vortex-power">1.0</span></span>
         <span id="mapCoordSpan" class="hidden-coord">マップ: <span id="mapDisplay" class="map-coord">6,6</span></span>
+        <span id="treasureCoordSpan" class="hidden-coord">宝の地図: <span id="treasureDisplay" class="treasure-coord">?,?</span></span>
+        <span id="hawjackCoordSpan" class="hidden-coord">渦力施設: <span id="hawjackDisplay" class="hawjack-coord">?,?</span></span>
       </div>
     </div>
 
@@ -313,7 +319,7 @@
     </div>
 
     <div class="victory-footer hidden" id="victoryFooter">
-      <a href="humble.html">📚 humble.html へ進む</a>
+      <a href="ultimate.html">📚 ultimate.html へ進む</a>
     </div>
   </div>
 
@@ -332,6 +338,10 @@
   const mapCoordSpan = document.getElementById('mapCoordSpan');
   const vortexPowerSpan = document.getElementById('vortexPowerSpan');
   const vortexPowerDisplay = document.getElementById('vortexPowerDisplay');
+  const treasureCoordSpan = document.getElementById('treasureCoordSpan');
+  const treasureDisplay = document.getElementById('treasureDisplay');
+  const hawjackCoordSpan = document.getElementById('hawjackCoordSpan');
+  const hawjackDisplay = document.getElementById('hawjackDisplay');
   const victoryFooter = document.getElementById('victoryFooter');
   const footer = document.getElementById('footer');
   const hint = document.getElementById('hint');
@@ -360,24 +370,24 @@
     x: WORLD_W / 2, y: WORLD_H / 2,
     hp: 90, maxHp: 90,
     angle: 0,
-    cannonLoaded: 0,       // 現在装填されている大砲の数 (0-3)
-    speed: 10,
-    gunPower: 50,          // 大砲威力
+    cannonLoaded: 0,
+    speed: 70,             // ← デフォルトを70に変更（+60でちょうど良いため）
+    gunPower: 50,
     rapidPower: 0,
-    swordPower: 20,        // 炎の剣威力
+    swordPower: 20,
     mode: 'gun',
     reloading: false,
     swingTimer: 0,
     swingAngle: 0,
-    radius: 18,            // 船の判定半径
+    radius: 18,
   };
 
   let skillPoints = 0;
   let enemies = [];
   let bullets = [];
   let items = [];
-  let whirlpools = [];     // 渦
-  let stairs = null;       // ゴール（十字架）
+  let whirlpools = [];
+  let stairs = null;
   let showMapCoord = false;
   let showVortexPower = false;
 
@@ -385,14 +395,20 @@
   let wind = { angle: 0, strength: 1.0 };
 
   // Hawjack
-  let hawjack = null;      // { x, y, hp, maxHp, alive }
+  let hawjack = null;
   let hawjackDefeated = false;
-  let vortexRandomTimer = 0; // 10秒ごとに渦力ランダム変更
-  let vortexPower = 1.0;     // 渦の強さ倍率（0.1〜3.0）
+  let vortexRandomTimer = 0;
+  let vortexPower = 1.0;
 
   // 波
   let waveTime = 0;
-  let waveStrength = 0.5;   // ランダム生成時に決定
+  let waveStrength = 0.5;
+
+  // 宝の地図 / 渦力施設座標
+  let treasureEnemyKilled = false;
+  let hawjackEnemyKilled = false;
+  let treasureCoord = null;
+  let hawjackCoord = null;
 
   const keys = { ArrowUp:false, ArrowDown:false, ArrowLeft:false, ArrowRight:false };
   let mouseX = W/2, mouseY = H/2;
@@ -405,8 +421,8 @@
   let victory = false;
 
   // リロードパネル用
-  let reloadSlots = []; // { plateEl, ballEl, filled, dragging }
-  let dragState = null; // { slotIndex, startX, startY, offsetX, offsetY }
+  let reloadSlots = [];
+  let dragState = null;
 
   // ============================================================
   //  ユーティリティ
@@ -434,16 +450,22 @@
     skillPoints = 0;
     hawjackDefeated = false;
     vortexPower = 1.0;
-    vortexRandomTimer = 600; // 10秒 * 60fps
+    vortexRandomTimer = 600;
+    treasureEnemyKilled = false;
+    hawjackEnemyKilled = false;
+    treasureCoord = null;
+    hawjackCoord = null;
 
-    // 風をランダム生成
     wind.angle = rand(0, Math.PI * 2);
     wind.strength = rand(0.5, 2.0);
-
-    // 波の強さ
     waveStrength = rand(0.3, 1.2);
 
     // 敵（船）40体
+    // そのうち1体は「宝の地図持ち」、1体は「渦力施設の場所を知る敵」
+    const treasureIdx = randInt(0, 39);
+    let hawjackIdx = randInt(0, 39);
+    while (hawjackIdx === treasureIdx) hawjackIdx = randInt(0, 39);
+
     for (let i = 0; i < 40; i++) {
       const p = randomWorldPos(80);
       const hp = randInt(10, 500);
@@ -463,10 +485,11 @@
         shootRange: shootRange,
         speed: rand(0.6, 1.8),
         radius: 18,
+        isTreasure: (i === treasureIdx),
+        isHawjackKnower: (i === hawjackIdx),
       });
     }
 
-    // アイテム（弾薬・回復）をそれぞれ30個
     for (let i = 0; i < 30; i++) {
       const p = randomWorldPos(40);
       items.push({ x:p.x, y:p.y, type:'ammo' });
@@ -476,11 +499,9 @@
       items.push({ x:p.x, y:p.y, type:'heal' });
     }
 
-    // ゴール（十字架）
     const sp = randomWorldPos(200);
     stairs = { x: sp.x, y: sp.y, w: 60, h: 60 };
 
-    // 渦を25個配置
     for (let i = 0; i < 25; i++) {
       const p = randomWorldPos(60);
       whirlpools.push({
@@ -491,7 +512,6 @@
       });
     }
 
-    // Hawjack（渦力調整施設）
     const hw = randomWorldPos(300);
     hawjack = {
       x: hw.x, y: hw.y,
@@ -500,6 +520,7 @@
       radius: 30,
       angle: 0,
     };
+    hawjackCoord = { col: Math.floor(hw.x / MAP_W) + 1, row: Math.floor(hw.y / MAP_H) + 1 };
   }
 
   function resetGame() {
@@ -507,7 +528,7 @@
     player.y = WORLD_H / 2;
     player.hp = 90;
     player.cannonLoaded = 0;
-    player.speed = 10;
+    player.speed = 70;
     player.gunPower = 50;
     player.rapidPower = 0;
     player.swordPower = 20;
@@ -524,6 +545,8 @@
     showVortexPower = false;
     mapCoordSpan.classList.add('hidden-coord');
     vortexPowerSpan.classList.add('hidden-coord');
+    treasureCoordSpan.classList.add('hidden-coord');
+    hawjackCoordSpan.classList.add('hidden-coord');
     victoryFooter.classList.add('hidden');
     footer.classList.remove('hidden');
     hint.classList.remove('hidden');
@@ -547,7 +570,7 @@
   }
 
   // ============================================================
-  //  リロードパネル（DS風）
+  //  リロードパネル（DS風・ドラッグで運ぶ）
   // ============================================================
   function resetReloadPanel() {
     const container = document.getElementById('reloadSlots');
@@ -579,11 +602,9 @@
         plateEl: plate,
         ballEl: ball,
         filled: false,
-        dragging: false,
       });
     }
 
-    // ドラッグイベント
     document.querySelectorAll('.reload-slot .ball').forEach(ball => {
       ball.addEventListener('mousedown', onBallMouseDown);
     });
@@ -593,22 +614,20 @@
 
   function onBallMouseDown(e) {
     e.preventDefault();
-    if (player.cannonLoaded >= MAX_CANNON_SLOTS) return; // 既に満タン
+    if (player.cannonLoaded >= MAX_CANNON_SLOTS) return;
     const ball = e.target.closest('.ball');
     if (!ball) return;
     const idx = parseInt(ball.dataset.index);
     const slot = reloadSlots[idx];
     if (!slot || slot.filled) return;
+    if (ball.classList.contains('empty')) return;
+    if (ball.classList.contains('placed')) return;
 
-    // 装填済みの弾をドラッグ開始
-    slot.dragging = true;
     ball.classList.add('dragging');
-
-    const rect = ball.getBoundingClientRect();
     dragState = {
       slotIndex: idx,
-      offsetX: e.clientX - rect.left - rect.width/2,
-      offsetY: e.clientY - rect.top - rect.height/2,
+      startX: e.clientX,
+      startY: e.clientY,
     };
   }
 
@@ -616,8 +635,12 @@
     if (!dragState) return;
     e.preventDefault();
     const ball = reloadSlots[dragState.slotIndex].ballEl;
-    // 画面上の移動（見た目だけ）
-    // 実際はドロップ判定で処理
+    if (!ball) return;
+    // 視覚的にマウスに追従させる（position: fixed で）
+    ball.style.position = 'fixed';
+    ball.style.left = (e.clientX - 16) + 'px';
+    ball.style.top = (e.clientY - 16) + 'px';
+    ball.style.pointerEvents = 'none';
   }
 
   function onBallMouseUp(e) {
@@ -626,9 +649,15 @@
     const idx = dragState.slotIndex;
     const slot = reloadSlots[idx];
     const ball = slot.ballEl;
-    ball.classList.remove('dragging');
+    if (!ball) { dragState = null; return; }
 
-    // マウス位置からどの皿の上に落ちたか判定
+    ball.classList.remove('dragging');
+    ball.style.position = '';
+    ball.style.left = '';
+    ball.style.top = '';
+    ball.style.pointerEvents = '';
+
+    // ドロップ先の皿を判定
     const plates = document.querySelectorAll('.reload-slot .plate');
     let droppedOn = -1;
     plates.forEach((plate, i) => {
@@ -640,42 +669,23 @@
     });
 
     if (droppedOn !== -1 && !reloadSlots[droppedOn].filled) {
-      // 装填成功
-      slot.filled = true;
-      slot.ballEl.classList.remove('ready');
-      slot.ballEl.classList.add('placed');
-      ball.style.display = 'none'; // 元の位置から消す
+      // 装填成功：元のボールを消し、ターゲットの皿に弾を表示
+      ball.style.display = 'none';
+      ball.classList.remove('ready');
+      ball.classList.add('empty');
 
-      // 皿にセット
       const targetSlot = reloadSlots[droppedOn];
       targetSlot.filled = true;
       targetSlot.plateEl.classList.add('filled');
-      // 皿の中央に弾を表示
       const newBall = document.createElement('div');
       newBall.className = 'ball placed';
-      newBall.style.display = 'block';
       targetSlot.plateEl.appendChild(newBall);
 
-      // 元のボールをリセット（空にする）
-      slot.filled = false;
-      slot.plateEl.classList.remove('filled');
-      slot.ballEl.style.display = 'none'; // 元のボールは隠す
-      // 新しい空のボールを生成
-      const emptyBall = document.createElement('div');
-      emptyBall.className = 'ball empty';
-      emptyBall.dataset.index = idx;
-      emptyBall.addEventListener('mousedown', onBallMouseDown);
-      // 元のボールと置き換え
-      if (slot.ballEl.parentNode) {
-        slot.ballEl.parentNode.replaceChild(emptyBall, slot.ballEl);
-        slot.ballEl = emptyBall;
-      }
-
-      // 装填数を更新
       player.cannonLoaded = reloadSlots.filter(s => s.filled).length;
+      ammoDisplay.textContent = player.cannonLoaded;
     } else {
-      // ドロップ失敗：元に戻す
-      ball.classList.remove('dragging');
+      // 失敗：元に戻す
+      ball.style.display = '';
     }
 
     dragState = null;
@@ -684,25 +694,23 @@
   // 砲弾を撃ったときに皿を空にする
   function consumeCannon() {
     if (player.cannonLoaded <= 0) return false;
-    // 一番左の filled を空にする
     for (let i = 0; i < reloadSlots.length; i++) {
       if (reloadSlots[i].filled) {
         reloadSlots[i].filled = false;
         reloadSlots[i].plateEl.classList.remove('filled');
-        // 皿の中の弾を削除
         const placedBall = reloadSlots[i].plateEl.querySelector('.ball.placed');
         if (placedBall) placedBall.remove();
-        // 元の位置に空のボールを戻す
-        if (!reloadSlots[i].ballEl.parentNode) {
-          reloadSlots[i].plateEl.appendChild(reloadSlots[i].ballEl);
+        // 元のボールを復活
+        const origBall = reloadSlots[i].ballEl;
+        if (origBall) {
+          origBall.style.display = '';
+          origBall.className = 'ball ready';
         }
-        reloadSlots[i].ballEl.style.display = 'block';
-        reloadSlots[i].ballEl.className = 'ball ready';
-        reloadSlots[i].ballEl.addEventListener('mousedown', onBallMouseDown);
         break;
       }
     }
     player.cannonLoaded = reloadSlots.filter(s => s.filled).length;
+    ammoDisplay.textContent = player.cannonLoaded;
     return true;
   }
 
@@ -785,7 +793,6 @@
     const row = parseInt(parts[1]) - 1;
     if (isNaN(col) || isNaN(row)) return;
     if (col < 0 || col >= MAP_COLS || row < 0 || row >= MAP_ROWS) return;
-    // ワープ実行
     const targetX = col * MAP_W + MAP_W / 2;
     const targetY = row * MAP_H + MAP_H / 2;
     player.x = targetX;
@@ -793,14 +800,6 @@
     player.hp -= 89;
     if (player.hp <= 0) { player.hp = 0; gameOver = true; }
   });
-
-  // ============================================================
-  //  リロード（大砲）
-  // ============================================================
-  function reload() {
-    // リロードボタンは廃止。パネルで直接装填。
-    // この関数はもう使わない
-  }
 
   // ============================================================
   //  剣（炎の剣）
@@ -814,10 +813,13 @@
       if (!e.alive) continue;
       if (dist(player.x, player.y, e.x, e.y) < RANGE) {
         e.hp -= player.swordPower;
-        if (e.hp <= 0) { e.alive = false; skillPoints += 1; }
+        if (e.hp <= 0) {
+          e.alive = false;
+          skillPoints += 1;
+          onEnemyKilled(e);
+        }
       }
     }
-    // Hawjackにも剣が効く？
     if (hawjack && hawjack.alive && dist(player.x, player.y, hawjack.x, hawjack.y) < RANGE + 20) {
       hawjack.hp -= player.swordPower;
       if (hawjack.hp <= 0) {
@@ -830,8 +832,26 @@
     }
   }
 
+  function onEnemyKilled(e) {
+    if (e.isTreasure && !treasureEnemyKilled) {
+      treasureEnemyKilled = true;
+      const col = Math.floor(stairs.x / MAP_W) + 1;
+      const row = Math.floor(stairs.y / MAP_H) + 1;
+      treasureCoord = { col, row };
+      treasureDisplay.textContent = `${col},${row}`;
+      treasureCoordSpan.classList.remove('hidden-coord');
+    }
+    if (e.isHawjackKnower && !hawjackEnemyKilled) {
+      hawjackEnemyKilled = true;
+      const col = Math.floor(hawjack.x / MAP_W) + 1;
+      const row = Math.floor(hawjack.y / MAP_H) + 1;
+      hawjackDisplay.textContent = `${col},${row}`;
+      hawjackCoordSpan.classList.remove('hidden-coord');
+    }
+  }
+
   // ============================================================
-  //  物理判定：プレイヤー vs 敵
+  //  物理判定
   // ============================================================
   function resolvePlayerEnemyCollision() {
     for (const e of enemies) {
@@ -850,7 +870,6 @@
         player.y += Math.sin(a) * minDist;
       }
     }
-    // Hawjackとの衝突
     if (hawjack && hawjack.alive) {
       const d = dist(player.x, player.y, hawjack.x, hawjack.y);
       const minDist = player.radius + hawjack.radius;
@@ -872,11 +891,9 @@
 
     waveTime += 0.02;
 
-    // 風による移動補正
     const windRad = wind.angle;
-    const windStr = wind.strength * 0.15; // 風の影響度
+    const windStr = wind.strength * 0.15;
 
-    // 基本移動
     let dx = 0, dy = 0;
     const sp = player.speed * 0.4;
     if (keys.ArrowUp)    dy -= sp;
@@ -884,17 +901,14 @@
     if (keys.ArrowLeft)  dx -= sp;
     if (keys.ArrowRight) dx += sp;
 
-    // 風の影響：移動方向と風向きの内積で速度変化
     if (dx !== 0 || dy !== 0) {
       const moveAngle = Math.atan2(dy, dx);
       const dot = Math.cos(moveAngle - windRad);
-      // 追い風なら +、向かい風なら -
       const windEffect = dot * windStr * player.speed * 0.1;
       dx += Math.cos(windRad) * windEffect;
       dy += Math.sin(windRad) * windEffect;
     }
 
-    // 波による揺れ（微小なランダム移動）
     const waveX = Math.sin(waveTime * 1.7 + player.x * 0.01) * waveStrength * 0.3;
     const waveY = Math.cos(waveTime * 1.3 + player.y * 0.01) * waveStrength * 0.3;
     dx += waveX;
@@ -905,14 +919,21 @@
     player.x = clamp(player.x, 20, WORLD_W - 20);
     player.y = clamp(player.y, 20, WORLD_H - 20);
 
-    // 渦による引力
+    // 渦による引力（蟻地獄）
     for (const wp of whirlpools) {
       const d = dist(player.x, player.y, wp.x, wp.y);
-      if (d < wp.radius * 2.5 && d > 1) {
-        const pull = (wp.strength * vortexPower) * 0.8 * (1 - d / (wp.radius * 2.5));
+      // 渦の影響範囲：半径 * 3 まで及ぶ（強い渦ほど遠くから引く）
+      const influence = wp.radius * 3;
+      if (d < influence && d > 1) {
+        const pull = (wp.strength * vortexPower) * 1.2 * (1 - d / influence);
         const a = Math.atan2(wp.y - player.y, wp.x - player.x);
         player.x += Math.cos(a) * pull;
         player.y += Math.sin(a) * pull;
+      }
+      // 完全に引き込まれたらゲームオーバー
+      if (d < 18 && wp.strength * vortexPower > 0.5) {
+        gameOver = true;
+        player.hp = 0;
       }
     }
 
@@ -973,7 +994,11 @@
           if (dist(b.x, b.y, e.x, e.y) < 22) {
             e.hp -= b.damage;
             bullets.splice(i, 1);
-            if (e.hp <= 0) { e.alive = false; skillPoints += 1; }
+            if (e.hp <= 0) {
+              e.alive = false;
+              skillPoints += 1;
+              onEnemyKilled(e);
+            }
             hit = true;
             break;
           }
@@ -1016,10 +1041,8 @@
 
       if (e.chases && d < e.chaseRange) {
         const a = Math.atan2(player.y - e.y, player.x - e.x);
-        const nx = e.x + Math.cos(a) * e.speed;
-        const ny = e.y + Math.sin(a) * e.speed;
-        e.x = nx;
-        e.y = ny;
+        e.x += Math.cos(a) * e.speed;
+        e.y += Math.sin(a) * e.speed;
       }
 
       e.fireTimer--;
@@ -1038,9 +1061,6 @@
       }
     }
 
-    // Hawjackは攻撃してこない（移動もしない）
-
-    // プレイヤーと敵の物理衝突
     resolvePlayerEnemyCollision();
 
     // アイテム取得
@@ -1048,22 +1068,17 @@
       const it = items[i];
       if (dist(it.x, it.y, player.x, player.y) < 24) {
         if (it.type === 'ammo') {
-          // 弾薬を拾うと、リロードパネルに1つ追加（未装填の弾として）
-          // 今回は簡略化：拾ったら自動的に1つ装填可能な弾としてストック？ 
-          // 仕様に合わせ、ここでは「大砲の弾を1つ拾う」＝ リロードパネルの空き皿に自動装填
           if (player.cannonLoaded < MAX_CANNON_SLOTS) {
-            // 空いているスロットを探す
             for (let s = 0; s < reloadSlots.length; s++) {
               if (!reloadSlots[s].filled) {
                 reloadSlots[s].filled = true;
                 reloadSlots[s].plateEl.classList.add('filled');
-                // 皿に弾を表示
                 const ball = document.createElement('div');
                 ball.className = 'ball placed';
                 reloadSlots[s].plateEl.appendChild(ball);
-                // 元のボールを非表示
                 reloadSlots[s].ballEl.style.display = 'none';
                 player.cannonLoaded = reloadSlots.filter(s => s.filled).length;
+                ammoDisplay.textContent = player.cannonLoaded;
                 break;
               }
             }
@@ -1075,20 +1090,16 @@
       }
     }
 
-    // 渦の力ランダム変更（Hawjackが生きている間）
+    // 渦力ランダム変更
     if (!hawjackDefeated) {
       vortexRandomTimer--;
       if (vortexRandomTimer <= 0) {
-        vortexRandomTimer = 600; // 10秒
+        vortexRandomTimer = 600;
         vortexPower = rand(0.2, 2.5);
       }
-    } else {
-      // Hawjackが倒されたら、情報パネルの数値を反映
-      // vortexPower はプレイヤーがUIで操作可能になる
-      // （UIは後で追加）
     }
 
-    // ゴール判定（十字架）
+    // ゴール判定
     if (stairs && dist(player.x, player.y, stairs.x + stairs.w/2, stairs.y + stairs.h/2) < 40) {
       victory = true;
       victoryFooter.classList.remove('hidden');
@@ -1127,11 +1138,9 @@
     ctx.save();
     ctx.translate(-camX, -camY);
 
-    // 海の背景
     ctx.fillStyle = '#0b1a2a';
     ctx.fillRect(camX, camY, W, H);
 
-    // 波（海面）
     for (let wy = 0; wy < 20; wy++) {
       const yBase = camY + wy * 35 + Math.sin(waveTime + wy) * 6 * waveStrength;
       ctx.beginPath();
@@ -1145,7 +1154,6 @@
       ctx.stroke();
     }
 
-    // マップ境界線
     ctx.strokeStyle = '#1e3a4a';
     ctx.lineWidth = 2;
     for (let c = 0; c <= MAP_COLS; c++) {
@@ -1159,20 +1167,20 @@
 
     // 渦
     for (const wp of whirlpools) {
-      if (wp.x < camX - 150 || wp.x > camX + W + 150 || wp.y < camY - 150 || wp.y > camY + H + 150) continue;
+      if (wp.x < camX - 200 || wp.x > camX + W + 200 || wp.y < camY - 200 || wp.y > camY + H + 200) continue;
       const phase = wp.phase + waveTime * 0.5;
       const r = wp.radius;
       ctx.save();
       ctx.translate(wp.x, wp.y);
       ctx.rotate(phase);
-      ctx.strokeStyle = `rgba(120, 200, 255, ${0.15 + 0.1 * vortexPower})`;
+      ctx.strokeStyle = `rgba(120, 200, 255, ${0.15 + 0.15 * vortexPower})`;
       ctx.lineWidth = 3;
       for (let i = 0; i < 4; i++) {
         ctx.beginPath();
         ctx.arc(0, 0, r * (0.4 + i * 0.2), 0, Math.PI * 1.5);
         ctx.stroke();
       }
-      ctx.strokeStyle = `rgba(80, 160, 255, ${0.3 + 0.2 * vortexPower})`;
+      ctx.strokeStyle = `rgba(80, 160, 255, ${0.3 + 0.3 * vortexPower})`;
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.arc(0, 0, r * 0.3, 0, Math.PI * 2);
@@ -1206,13 +1214,11 @@
       const s = stairs;
       const cx = s.x + s.w/2;
       const cy = s.y + s.h/2;
-      // 十字架
       ctx.fillStyle = '#8B6914';
       ctx.shadowColor = '#ffd166'; ctx.shadowBlur = 20;
-      ctx.fillRect(cx - 6, cy - 30, 12, 60); // 縦
-      ctx.fillRect(cx - 25, cy - 12, 50, 12); // 横
+      ctx.fillRect(cx - 6, cy - 30, 12, 60);
+      ctx.fillRect(cx - 25, cy - 12, 50, 12);
       ctx.shadowBlur = 0;
-      // 光
       ctx.fillStyle = 'rgba(255, 215, 0, 0.15)';
       ctx.beginPath(); ctx.arc(cx, cy, 40, 0, Math.PI*2); ctx.fill();
       ctx.fillStyle = '#ffd166';
@@ -1221,7 +1227,7 @@
       ctx.fillText('GOAL', cx, cy - 45);
     }
 
-    // Hawjack（渦力調整施設）
+    // Hawjack
     if (hawjack && hawjack.alive) {
       const hx = hawjack.x, hy = hawjack.y;
       if (hx > camX - 80 && hx < camX + W + 80 && hy > camY - 80 && hy < camY + H + 80) {
@@ -1230,7 +1236,6 @@
         ctx.beginPath(); ctx.arc(hx, hy, hawjack.radius, 0, Math.PI*2); ctx.fill();
         ctx.strokeStyle = '#c77dff'; ctx.lineWidth = 3; ctx.stroke();
         ctx.shadowBlur = 0;
-        // HPバー
         const hpR = clamp(hawjack.hp / hawjack.maxHp, 0, 1);
         ctx.fillStyle = '#1a0a1e';
         ctx.fillRect(hx - 30, hy - 44, 60, 6);
@@ -1251,9 +1256,11 @@
       ctx.save();
       ctx.translate(e.x, e.y);
       ctx.rotate(e.angle);
-      // 船体
+      let color = '#ff4d6d';
+      if (e.isTreasure) color = '#ffd700';
+      if (e.isHawjackKnower) color = '#ff6b9d';
       ctx.fillStyle = '#2a0a12';
-      ctx.shadowColor = '#ff4d6d'; ctx.shadowBlur = 14;
+      ctx.shadowColor = color; ctx.shadowBlur = 14;
       ctx.beginPath();
       ctx.moveTo(22, 0);
       ctx.lineTo(-10, -14);
@@ -1261,16 +1268,14 @@
       ctx.lineTo(-10, 14);
       ctx.closePath();
       ctx.fill();
-      ctx.strokeStyle = '#ff4d6d'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
       ctx.shadowBlur = 0;
-      // 大砲
       ctx.fillStyle = '#4a1a2a';
       ctx.fillRect(8, -3, 16, 6);
-      // HPバー
       const hpR = clamp(e.hp / e.maxHp, 0, 1);
       ctx.fillStyle = '#1a0a0e';
       ctx.fillRect(-22, -28, 44, 5);
-      ctx.fillStyle = hpR > 0.5 ? '#ff4d6d' : (hpR > 0.25 ? '#ff8a5c' : '#ff3b1f');
+      ctx.fillStyle = hpR > 0.5 ? color : (hpR > 0.25 ? '#ff8a5c' : '#ff3b1f');
       ctx.fillRect(-22, -28, 44 * hpR, 5);
       ctx.restore();
     }
@@ -1294,7 +1299,6 @@
     ctx.save();
     ctx.translate(player.x, player.y);
     ctx.rotate(player.angle);
-    // 船体
     ctx.fillStyle = '#0a1a1a';
     ctx.shadowColor = '#00e6b0'; ctx.shadowBlur = 20;
     ctx.beginPath();
@@ -1306,7 +1310,6 @@
     ctx.fill();
     ctx.strokeStyle = '#00e6b0'; ctx.lineWidth = 2.5; ctx.stroke();
     ctx.shadowBlur = 0;
-    // 大砲 or 剣
     if (player.mode === 'gun') {
       ctx.fillStyle = '#00e6b0';
       ctx.fillRect(8, -4, 20, 8);
@@ -1314,7 +1317,6 @@
       ctx.arc(28, 0, 4, 0, Math.PI*2);
       ctx.fill();
     } else {
-      // 炎の剣
       const sa = player.swingAngle - 0.6;
       ctx.save();
       ctx.rotate(sa);
@@ -1325,7 +1327,6 @@
       ctx.moveTo(0, 0);
       ctx.lineTo(44, 0);
       ctx.stroke();
-      // 炎
       ctx.strokeStyle = '#ffcc00';
       ctx.lineWidth = 3;
       ctx.shadowColor = '#ffcc00'; ctx.shadowBlur = 16;
@@ -1337,7 +1338,6 @@
     }
     ctx.restore();
 
-    // HPバー
     const hpR = clamp(player.hp / player.maxHp, 0, 1);
     ctx.fillStyle = '#1a2a2a';
     ctx.fillRect(player.x - 26, player.y - 36, 52, 5);
@@ -1346,7 +1346,6 @@
 
     ctx.restore();
 
-    // 画面オーバーレイ
     if (gameOver) {
       ctx.fillStyle = 'rgba(0,0,0,0.75)';
       ctx.fillRect(0, 0, W, H);
@@ -1371,7 +1370,7 @@
       ctx.shadowBlur = 0;
       ctx.font = '18px sans-serif';
       ctx.fillStyle = '#b0c8d8';
-      ctx.fillText('下のリンクから humble.html へ', W/2, H/2 + 50);
+      ctx.fillText('下のリンクから ultimate.html へ', W/2, H/2 + 50);
     }
   }
 
