@@ -301,9 +301,9 @@
 
       <div class="vortex-control hidden" id="vortexControl">
         <span>渦力操作:</span>
-        <input type="number" id="vortexInput" step="0.1" min="0" max="200" value="1.0">
+        <input type="number" id="vortexInput" step="0.1" min="0" max="500" value="1.0">
         <button id="vortexApplyBtn">適用</button>
-        <span style="font-size:10px;color:#4a5a6a;">(0.0〜200.0)</span>
+        <span style="font-size:10px;color:#4a5a6a;">(0.0〜500.0)</span>
       </div>
     </div>
 
@@ -371,8 +371,12 @@
   const MAX_CANNON_SLOTS = 3;
   const AMMO_PER_ITEM = 10;
 
-  const VORTEX_MIN = 50;
-  const VORTEX_MAX = 200;
+  // ランダム渦力：100〜500
+  const VORTEX_MIN = 100;
+  const VORTEX_MAX = 500;
+
+  // 渦力ランダム変更の間隔（2秒 = 120フレーム @60fps）
+  const VORTEX_RANDOM_INTERVAL = 120;
 
   const WIND_MIN = 0.5 * 9;
   const WIND_MAX = 2.0 * 9;
@@ -383,9 +387,8 @@
   const TREASURE_ENEMY_COUNT = 7;
   const HAWJACK_KNOWER_COUNT = 10;
 
-  // 渦力の基準値（引力範囲の計算に使用）
   const VORTEX_BASE = 1.0;
-  const VORTEX_INFLUENCE_BASE = 3.0; // 渦力1.0のときの半径倍率
+  const VORTEX_INFLUENCE_BASE = 3.0;
 
   let player = {
     x: WORLD_W / 2, y: WORLD_H / 2,
@@ -461,6 +464,7 @@
   }
 
   // 渦力に応じた引力範囲の倍率（見た目には影響しない）
+  // 渦力500でも sqrt(500) ≈ 22.4 倍程度に収まるように。
   function getInfluenceFactor() {
     const base = Math.sqrt(Math.max(vortexPower, 0.1) / VORTEX_BASE);
     return base;
@@ -476,7 +480,7 @@
     hawjackDefeated = false;
     vortexPower = 1.0;
     vortexPowerFixed = false;
-    vortexRandomTimer = 600;
+    vortexRandomTimer = VORTEX_RANDOM_INTERVAL;
     treasureEnemyKilled = false;
     hawjackEnemyKilled = false;
 
@@ -862,7 +866,7 @@
     if (!vortexPowerFixed) return;
     const val = parseFloat(vortexInput.value);
     if (isNaN(val)) return;
-    vortexPower = clamp(val, 0, 200);
+    vortexPower = clamp(val, 0, 500);
     updateInfoPanel();
   });
 
@@ -977,11 +981,15 @@
     player.y = clamp(player.y, 20, WORLD_H - 20);
 
     // 渦（見た目は変わらず、引力範囲だけ渦力に比例して拡大）
+    // ※ 渦力500のような極端な値でも引力が強すぎて即死しないよう、
+    //    pull係数は sqrt スケールで緩やかに。
     const influenceFactor = getInfluenceFactor();
     for (const wp of whirlpools) {
       const d = dist(player.x, player.y, wp.x, wp.y);
       const influence = wp.radius * VORTEX_INFLUENCE_BASE * influenceFactor;
       if (d < influence && d > 1) {
+        // pull が強すぎると理不尽なので、vortexPower に比例させつつ
+        // 0.05 の基本係数で調整。500でも 500*0.05=25 程度の加速度。
         const pull = (wp.strength * vortexPower) * 0.05 * (1 - d / influence);
         const a = Math.atan2(wp.y - player.y, wp.x - player.x);
         player.x += Math.cos(a) * pull;
@@ -1142,7 +1150,7 @@
     if (!vortexPowerFixed) {
       vortexRandomTimer--;
       if (vortexRandomTimer <= 0) {
-        vortexRandomTimer = 600;
+        vortexRandomTimer = VORTEX_RANDOM_INTERVAL;
         vortexPower = rand(VORTEX_MIN, VORTEX_MAX);
       }
     }
@@ -1204,7 +1212,6 @@
     // 渦（見た目は常に同じ大きさ、引力範囲は非表示の力）
     const influenceFactor = getInfluenceFactor();
     for (const wp of whirlpools) {
-      // 画面外カリング（引力範囲が広がったのでマージンも拡大）
       const margin = 200 * influenceFactor;
       if (wp.x < camX - margin || wp.x > camX + W + margin ||
           wp.y < camY - margin || wp.y > camY + H + margin) continue;
