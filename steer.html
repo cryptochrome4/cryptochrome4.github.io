@@ -135,7 +135,6 @@
   .start-btn:active { transform: scale(0.98); }
   .opening.hidden-opening { opacity: 0; pointer-events: none; }
 
-  /* ===== 大砲リロードパネル ===== */
   .reload-panel {
     display: flex; flex-direction: column; align-items: center;
     gap: 10px; background: #0d141c;
@@ -290,7 +289,7 @@
       <div class="plate-area" id="plateArea"></div>
       <div class="sub-label">↑ 皿（大砲の装填口）</div>
       <div class="stock-area" id="stockArea"></div>
-      <div class="sub-label">↑ 運搬待ちの弾（皿が空くと自動補充）</div>
+      <div class="sub-label">↑ 運搬待ちの弾（手動で皿へドラッグ）</div>
       <div class="hint-small">黒い弾を長押しして皿へドラッグ</div>
 
       <div class="warp-panel">
@@ -302,9 +301,9 @@
 
       <div class="vortex-control hidden" id="vortexControl">
         <span>渦力操作:</span>
-        <input type="number" id="vortexInput" step="0.1" min="0" max="5" value="1.0">
+        <input type="number" id="vortexInput" step="0.1" min="0" max="30" value="1.0">
         <button id="vortexApplyBtn">適用</button>
-        <span style="font-size:10px;color:#4a5a6a;">(0.0〜5.0)</span>
+        <span style="font-size:10px;color:#4a5a6a;">(0.0〜30.0)</span>
       </div>
     </div>
 
@@ -328,9 +327,6 @@
 
 <script>
 (function(){
-  // ============================================================
-  //  基本設定
-  // ============================================================
   const canvas = document.getElementById('gameCanvas');
   const ctx = canvas.getContext('2d');
   const hpDisplay = document.getElementById('hpDisplay');
@@ -375,15 +371,20 @@
   const MAX_CANNON_SLOTS = 3;
   const AMMO_PER_ITEM = 10;
 
-  // ============================================================
-  //  ゲーム状態
-  // ============================================================
+  // 9倍強化
+  const VORTEX_MIN = 0.2 * 9;   // 1.8
+  const VORTEX_MAX = 2.5 * 9;   // 22.5
+  const WIND_MIN = 0.5 * 9;     // 4.5
+  const WIND_MAX = 2.0 * 9;     // 18.0
+  const WAVE_MIN = 0.3 * 9;     // 2.7
+  const WAVE_MAX = 1.2 * 9;     // 10.8
+
   let player = {
     x: WORLD_W / 2, y: WORLD_H / 2,
     hp: 90, maxHp: 90,
     angle: 0,
-    cannonLoaded: 0,       // 皿に装填されている数
-    totalAmmo: 0,          // 裏の総弾数（皿に装填されていない残り）
+    cannonLoaded: 0,
+    totalAmmo: 0,
     speed: 70,
     gunPower: 50,
     rapidPower: 0,
@@ -430,9 +431,6 @@
   let stockSlots = [];
   let dragState = null;
 
-  // ============================================================
-  //  ユーティリティ
-  // ============================================================
   const rand = (min, max) => Math.random() * (max - min) + min;
   const randInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
   const dist = (x1,y1,x2,y2) => Math.hypot(x2-x1, y2-y1);
@@ -445,22 +443,14 @@
     };
   }
 
-  // 角度から方位文字列へ（N, NE, E, SE, S, SW, W, NW）
   function angleToCompass(angle) {
-    // 数学角度: 0=東, π/2=南 (canvas座標系)
-    // 北 = -π/2, 東 = 0, 南 = π/2, 西 = π
-    // 8方位に変換
     let deg = (angle * 180 / Math.PI + 360) % 360;
-    // 北を0度に変換: 北=-90度 → 0度
     let compassDeg = (deg + 90) % 360;
     const dirs = ['N','NE','E','SE','S','SW','W','NW'];
     const idx = Math.round(compassDeg / 45) % 8;
     return dirs[idx];
   }
 
-  // ============================================================
-  //  初期化
-  // ============================================================
   function initWorld() {
     enemies = [];
     bullets = [];
@@ -475,8 +465,8 @@
     hawjackEnemyKilled = false;
 
     wind.angle = rand(0, Math.PI * 2);
-    wind.strength = rand(0.5, 2.0);
-    waveStrength = rand(0.3, 1.2);
+    wind.strength = rand(WIND_MIN, WIND_MAX);
+    waveStrength = rand(WAVE_MIN, WAVE_MAX);
 
     const treasureIdx = randInt(0, 39);
     let hawjackIdx = randInt(0, 39);
@@ -599,9 +589,6 @@
     waveStrengthDisplay.textContent = waveStrength.toFixed(2);
   }
 
-  // ============================================================
-  //  リロードパネル
-  // ============================================================
   function resetReloadPanel() {
     const plateArea = document.getElementById('plateArea');
     plateArea.innerHTML = '';
@@ -707,6 +694,7 @@
       plateSlot.plateEl.appendChild(newBall);
 
       player.cannonLoaded = plateSlots.filter(s => s.filled).length;
+      updateStockDisplay();
       updateInfoPanel();
     } else {
       ball.style.display = '';
@@ -715,35 +703,15 @@
     dragState = null;
   }
 
-  // アイテムで総弾に追加し、自動的に皿へ補充
+  // アイテムで総弾に追加（皿には自動で入れない）
   function addAmmoItem() {
     player.totalAmmo += AMMO_PER_ITEM;
-    autoFillPlates();
+    updateStockDisplay();
     updateInfoPanel();
   }
 
-  // 皿が空いていれば総弾から自動補充
-  function autoFillPlates() {
-    for (let i = 0; i < plateSlots.length; i++) {
-      if (!plateSlots[i].filled && player.totalAmmo > 0) {
-        player.totalAmmo--;
-        plateSlots[i].filled = true;
-        plateSlots[i].plateEl.classList.add('filled');
-        const newBall = document.createElement('div');
-        newBall.className = 'ball';
-        plateSlots[i].plateEl.appendChild(newBall);
-      }
-    }
-    player.cannonLoaded = plateSlots.filter(s => s.filled).length;
-    updateStockDisplay();
-  }
-
-  // ストック表示の更新
+  // ストック表示の更新（皿に入っていない総弾を最大3つ表示）
   function updateStockDisplay() {
-    // 皿の埋まり具合を表示
-    // ストックには「運搬待ちの弾」として、皿に入っていない総弾のうち最大3つまで表示
-    // 皿に自動で入るので、ストック表示は「皿が空くのを待っている弾」＝ totalAmmo のうち表示できる数
-    // ただし、ドラッグで運ぶ演出のため、皿に入っていない弾を最大3つ表示する
     let displayCount = Math.min(player.totalAmmo, MAX_CANNON_SLOTS);
     for (let i = 0; i < stockSlots.length; i++) {
       if (i < displayCount) {
@@ -758,7 +726,7 @@
     }
   }
 
-  // 発射時に皿を空にし、自動補充
+  // 発射時に皿を空にする（総弾から自動補充はしない）
   function consumeCannon() {
     if (player.cannonLoaded <= 0) return false;
     for (let i = 0; i < plateSlots.length; i++) {
@@ -770,16 +738,11 @@
         break;
       }
     }
-    // 自動補充（総弾から）
-    autoFillPlates();
     player.cannonLoaded = plateSlots.filter(s => s.filled).length;
     updateInfoPanel();
     return true;
   }
 
-  // ============================================================
-  //  入力
-  // ============================================================
   window.addEventListener('keydown', (e) => {
     if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) {
       e.preventDefault();
@@ -870,13 +833,10 @@
     if (!vortexPowerFixed) return;
     const val = parseFloat(vortexInput.value);
     if (isNaN(val)) return;
-    vortexPower = clamp(val, 0, 5);
+    vortexPower = clamp(val, 0, 30);
     updateInfoPanel();
   });
 
-  // ============================================================
-  //  剣（炎の剣）
-  // ============================================================
   function swingSword() {
     if (swordCooldown > 0) return;
     swordCooldown = 24;
@@ -924,9 +884,6 @@
     }
   }
 
-  // ============================================================
-  //  物理判定
-  // ============================================================
   function resolvePlayerEnemyCollision() {
     for (const e of enemies) {
       if (!e.alive) continue;
@@ -957,9 +914,6 @@
     }
   }
 
-  // ============================================================
-  //  更新
-  // ============================================================
   function update(dt) {
     if (gameOver || victory) return;
 
@@ -1149,7 +1103,7 @@
       vortexRandomTimer--;
       if (vortexRandomTimer <= 0) {
         vortexRandomTimer = 600;
-        vortexPower = rand(0.2, 2.5);
+        vortexPower = rand(VORTEX_MIN, VORTEX_MAX);
       }
     }
 
@@ -1171,9 +1125,6 @@
     skSword.disabled = !canSkill;
   }
 
-  // ============================================================
-  //  描画
-  // ============================================================
   function draw() {
     ctx.clearRect(0, 0, W, H);
 
@@ -1412,9 +1363,6 @@
     }
   }
 
-  // ============================================================
-  //  ループ
-  // ============================================================
   function gameLoop(timestamp) {
     const dt = Math.min(2, (timestamp - lastTime) / (1000/60));
     lastTime = timestamp;
@@ -1425,9 +1373,6 @@
     requestAnimationFrame(gameLoop);
   }
 
-  // ============================================================
-  //  オープニング画面
-  // ============================================================
   const opening = document.getElementById('opening');
   const startBtn = document.getElementById('startBtn');
 
@@ -1439,9 +1384,6 @@
     }, 500);
   });
 
-  // ============================================================
-  //  起動
-  // ============================================================
   resetGame();
   updateModeBtn();
   requestAnimationFrame(gameLoop);
