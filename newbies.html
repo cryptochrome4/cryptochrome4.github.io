@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SHOT - 和モダンシューティング</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; user-select:none; }
+  body {
+    background:#0d0b08;
+    font-family:'Yu Mincho','Hiragino Mincho ProN','Noto Serif JP',serif;
+    display:flex; justify-content:center; align-items:flex-start;
+    min-height:100vh; color:#e8e2d5;
+    padding:20px 0; overflow-y:auto;
+  }
+  .game-wrapper {
+    background:#1a1612;
+    border:1px solid #3a3028;
+    border-radius:4px;
+    padding:24px 24px 16px;
+    box-shadow:0 20px 60px rgba(0,0,0,0.9), 0 0 0 1px #2a2218 inset;
+    display:flex; flex-direction:column; align-items:center; gap:14px;
+    width:fit-content;
+  }
+  canvas {
+    display:block;
+    background:#0d0b08;
+    border:1px solid #3a3028;
+    cursor:crosshair; width:800px; height:600px;
+  }
+  .footer {
+    display:flex; flex-direction:column; gap:8px;
+    width:100%; padding:8px 4px 0; font-size:13px;
+    color:#9a8e7a; letter-spacing:1px;
+  }
+  .footer .status {
+    display:flex; gap:18px; flex-wrap:wrap;
+    padding:8px 12px;
+    background:#12100c;
+    border:1px solid #2a2218;
+    border-left:3px solid #b8860b;
+  }
+  .footer .status span { color:#d8cdb8; font-weight:500; }
+  .footer .status .highlight { color:#d4a84b; text-shadow:0 0 6px #d4a84b66; }
+  .footer .status .sp { color:#c73e3a; text-shadow:0 0 6px #c73e3a66; }
+  .footer .status .total { color:#8fa88a; text-shadow:0 0 6px #8fa88a66; }
+  .footer .status .map-coord { color:#7a9eb8; text-shadow:0 0 6px #7a9eb866; }
+  .footer .status .hidden-coord { display:none; }
+
+  /* 力の常時表示パネル */
+  .power-panel {
+    display:flex; gap:18px; flex-wrap:wrap;
+    padding:8px 12px;
+    background:#12100c;
+    border:1px solid #2a2218;
+    border-left:3px solid #c73e3a;
+    font-size:12px;
+  }
+  .power-panel span { color:#9a8e7a; }
+  .power-panel .val { color:#d8cdb8; font-weight:700; margin-left:4px; }
+  .power-panel .gun { color:#d4a84b; }
+  .power-panel .speed { color:#8fa88a; }
+  .power-panel .rapid { color:#c73e3a; }
+  .power-panel .sword { color:#7a9eb8; }
+
+  /* 情報メッセージ欄 */
+  .info-msg {
+    padding:8px 12px;
+    background:#12100c;
+    border:1px solid #2a2218;
+    border-left:3px solid #7a9eb8;
+    font-size:12px;
+    color:#d8cdb8;
+    min-height:20px;
+    line-height:1.5;
+  }
+  .info-msg .truth { color:#8fa88a; }
+  .info-msg .false { color:#c73e3a; }
+  .info-msg .dir { color:#d4a84b; font-weight:700; }
+
+  .btn-row {
+    display:flex; gap:8px; flex-wrap:wrap; justify-content:center;
+    width:100%; padding:6px 0;
+  }
+  .ui-btn {
+    background:#1a1612; color:#d4a84b;
+    border:1px solid #b8860b;
+    border-radius:2px;
+    padding:8px 18px; font-size:13px; font-weight:700;
+    letter-spacing:1.5px; cursor:pointer;
+    transition:all 0.15s ease;
+    font-family:inherit;
+  }
+  .ui-btn:hover { background:#b8860b; color:#0d0b08; }
+  .ui-btn:active { transform:scale(0.97); }
+  .ui-btn:disabled {
+    opacity:0.3; cursor:not-allowed;
+    border-color:#3a3028; color:#5a5044; background:#12100c;
+  }
+  .ui-btn.skill { color:#d4a84b; border-color:#b8860b; }
+  .ui-btn.skill:hover { background:#b8860b; color:#0d0b08; }
+  .ui-btn.skill:disabled { border-color:#3a3028; color:#5a5044; background:#12100c; }
+  .ui-btn.mode { color:#c73e3a; border-color:#c73e3a; }
+  .ui-btn.mode:hover { background:#c73e3a; color:#0d0b08; }
+  .ui-btn.mode.sword { color:#7a9eb8; border-color:#7a9eb8; }
+  .ui-btn.mode.sword:hover { background:#7a9eb8; color:#0d0b08; }
+  .ui-btn.map-toggle { color:#7a9eb8; border-color:#7a9eb8; }
+  .ui-btn.map-toggle:hover { background:#7a9eb8; color:#0d0b08; }
+  .ui-btn.special { color:#8fa88a; border-color:#8fa88a; }
+  .ui-btn.special:hover { background:#8fa88a; color:#0d0b08; }
+  .ui-btn.special:disabled { border-color:#3a3028; color:#5a5044; background:#12100c; }
+
+  .victory-footer { display:flex; justify-content:center; width:100%; margin-top:8px; }
+  .victory-footer a {
+    color:#d4a84b; text-decoration:none; font-weight:600; font-size:18px;
+    padding:10px 32px; border:1px solid #b8860b;
+    transition:all 0.2s ease; background:#b8860b10;
+    letter-spacing:2px;
+  }
+  .victory-footer a:hover { background:#b8860b; color:#0d0b08; }
+  .hidden { display:none !important; }
+  .hint { font-size:11px; color:#6a6054; margin-top:4px; text-align:center; width:100%; letter-spacing:1px; }
+
+  /* オープニング画面 */
+  .opening {
+    position: fixed;
+    inset: 0;
+    background-image: url('img196battle.jpg');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 30px;
+    z-index: 9999;
+    transition: opacity 0.5s ease;
+  }
+  .opening::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(13, 11, 8, 0.7);
+    z-index: 0;
+  }
+  .opening h1 {
+    position: relative;
+    z-index: 1;
+    color: #d4a84b;
+    font-size: 80px;
+    font-weight: 800;
+    letter-spacing: 16px;
+    text-shadow: 0 0 30px #d4a84baa, 0 0 60px #d4a84b55;
+    font-family: 'Yu Mincho','Hiragino Mincho ProN',serif;
+  }
+  .opening .subtitle {
+    position: relative;
+    z-index: 1;
+    color: #9a8e7a;
+    font-size: 16px;
+    letter-spacing: 8px;
+    margin-top: -20px;
+  }
+  .start-btn {
+    position: relative;
+    z-index: 1;
+    background: transparent;
+    color: #d4a84b;
+    border: 2px solid #b8860b;
+    border-radius: 0;
+    padding: 18px 80px;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: 8px;
+    cursor: pointer;
+    font-family: 'Yu Mincho','Hiragino Mincho ProN',serif;
+    transition: all 0.2s ease;
+  }
+  .start-btn:hover {
+    background: #b8860b;
+    color: #0d0b08;
+  }
+  .start-btn:active {
+    transform: scale(0.98);
+  }
+  .opening.hidden-opening {
+    opacity: 0;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+  <!-- オープニング画面 -->
+  <div class="opening" id="opening">
+    <h1>SHOT</h1>
+    <div class="subtitle">- 和 モ ダ ン -</div>
+    <button class="start-btn" id="startBtn">はじめる</button>
+  </div>
+
+  <div class="game-wrapper">
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+    <div class="footer" id="footer">
+      <!-- ステータス -->
+      <div class="status">
+        <span>HP: <span id="hpDisplay" class="highlight">90</span></span>
+        <span>装弾: <span id="ammoDisplay" class="highlight">0</span>/10</span>
+        <span>総弾: <span id="totalAmmoDisplay" class="total">0</span></span>
+        <span>敵: <span id="enemyDisplay" class="highlight">40</span></span>
+        <span>SP: <span id="spDisplay" class="sp">0</span></span>
+        <span id="mapCoordSpan" class="hidden-coord">マップ: <span id="mapDisplay" class="map-coord">6,6</span></span>
+      </div>
+      <!-- 力の常時表示 -->
+      <div class="power-panel">
+        <span>銃力<span id="gunPowerDisplay" class="val gun">10</span></span>
+        <span>スピード<span id="speedPowerDisplay" class="val speed">10</span></span>
+        <span>連射力<span id="rapidPowerDisplay" class="val rapid">0</span></span>
+        <span>剣力<span id="swordPowerDisplay" class="val sword">20</span></span>
+      </div>
+      <!-- 情報メッセージ -->
+      <div class="info-msg" id="infoMsg">— 情報パネル —</div>
+    </div>
+
+    <div class="btn-row">
+      <button class="ui-btn mode" id="modeBtn">🔫 銃モード</button>
+      <button class="ui-btn" id="reloadBtn">RELOAD</button>
+      <button class="ui-btn map-toggle" id="mapToggleBtn">📍 座標表示</button>
+      <button class="ui-btn special" id="lieTruthBtn">🕯 嘘本当 (SP4)</button>
+      <button class="ui-btn special" id="nwesBtn">🧭 NWES (SP4)</button>
+      <button class="ui-btn skill" id="skGun">銃力 +10</button>
+      <button class="ui-btn skill" id="skSpeed">スピード +15</button>
+      <button class="ui-btn skill" id="skRapid">連射力 +1</button>
+      <button class="ui-btn skill" id="skSword">剣力 +15</button>
+    </div>
+
+    <div class="hint" id="hint">
+      移動: 矢印キー / エイム: マウス / 射撃・剣: クリック / モード切替: ボタン / リロード: ボタン
+    </div>
+
+    <div class="victory-footer hidden" id="victoryFooter">
+      <a href="trade.html">📚 trade.html へ進む</a>
+    </div>
+  </div>
+
+<script>
+(function(){
+  // ============================================================
+  //  基本設定
+  // ============================================================
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  const hpDisplay = document.getElementById('hpDisplay');
+  const ammoDisplay = document.getElementById('ammoDisplay');
+  const totalAmmoDisplay = document.getElementById('totalAmmoDisplay');
+  const enemyDisplay = document.getElementById('enemyDisplay');
+  const spDisplay = document.getElementById('spDisplay');
+  const mapDisplay = document.getElementById('mapDisplay');
+  const mapCoordSpan = document.getElementById('mapCoordSpan');
+  const gunPowerDisplay = document.getElementById('gunPowerDisplay');
+  const speedPowerDisplay = document.getElementById('speedPowerDisplay');
+  const rapidPowerDisplay = document.getElementById('rapidPowerDisplay');
+  const swordPowerDisplay = document.getElementById('swordPowerDisplay');
+  const infoMsg = document.getElementById('infoMsg');
+  const victoryFooter = document.getElementById('victoryFooter');
+  const footer = document.getElementById('footer');
+  const hint = document.getElementById('hint');
+  const reloadBtn = document.getElementById('reloadBtn');
+  const modeBtn = document.getElementById('modeBtn');
+  const mapToggleBtn = document.getElementById('mapToggleBtn');
+  const lieTruthBtn = document.getElementById('lieTruthBtn');
+  const nwesBtn = document.getElementById('nwesBtn');
+  const skGun = document.getElementById('skGun');
+  const skSpeed = document.getElementById('skSpeed');
+  const skRapid = document.getElementById('skRapid');
+  const skSword = document.getElementById('skSword');
+
+  const W = 800, H = 600;
+  const MAP_W = 800, MAP_H = 600;
+  const MAP_COLS = 11, MAP_ROWS = 11;
+  const WORLD_W = MAP_W * MAP_COLS;
+  const WORLD_H = MAP_H * MAP_ROWS;
+
+  const MAGAZINE_SIZE = 10;
+  const AMMO_PER_ITEM = 10;
+  const SPECIAL_COST = 4;
+
+  // ============================================================
+  //  ゲーム状態
+  // ============================================================
+  let player = {
+    x: WORLD_W / 2, y: WORLD_H / 2,
+    hp: 90, maxHp: 90,
+    angle: 0,
+    ammo: 0,
+    totalAmmo: 0,
+    speed: 10,
+    gunPower: 10,
+    rapidPower: 0,
+    swordPower: 20,
+    mode: 'gun',
+    reloading: false,
+    reloadTimer: 0,
+    swingTimer: 0,
+    swingAngle: 0,
+    radius: 16,
+  };
+
+  let skillPoints = 0;
+  let enemies = [];
+  let bullets = [];
+  let items = [];
+  let magmas = [];
+  let stairs = null;
+  let showMapCoord = false;
+  let lieTruthUsed = false;   // 嘘本当ボタンの使用済みフラグ
+
+  const keys = { ArrowUp:false, ArrowDown:false, ArrowLeft:false, ArrowRight:false };
+  let mouseX = W/2, mouseY = H/2;
+  let isFiring = false;
+  let fireTimer = 0;
+  let swordCooldown = 0;
+
+  let lastTime = 0;
+  let gameOver = false;
+  let victory = false;
+  let magmaTimer = 10 * 60;
+
+  // ============================================================
+  //  ユーティリティ
+  // ============================================================
+  const rand = (min, max) => Math.random() * (max - min) + min;
+  const randInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+  const dist = (x1,y1,x2,y2) => Math.hypot(x2-x1, y2-y1);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+  function randomWorldPos(margin = 60) {
+    return {
+      x: rand(margin, WORLD_W - margin),
+      y: rand(margin, WORLD_H - margin),
+    };
+  }
+
+  // 方角を返す（8方位）
+  function getDirection(fromX, fromY, toX, toY) {
+    const dx = toX - fromX;
+    const dy = toY - fromY;
+    const angle = Math.atan2(dy, dx); // -π 〜 π
+    // 8方位に変換（右がE、上をN）
+    // angle: 0=東, π/2=南, π=西, -π/2=北
+    const deg = angle * 180 / Math.PI;
+    // 北を0度基準に
+    let d = (deg + 90 + 360) % 360;
+    const dirs = ['E','SE','S','SW','W','NW','N','NE'];
+    const idx = Math.round(d / 45) % 8;
+    return dirs[idx];
+  }
+
+  function setInfoMsg(html) {
+    infoMsg.innerHTML = html;
+  }
+
+  // ============================================================
+  //  初期化
+  // ============================================================
+  function initWorld() {
+    enemies = [];
+    bullets = [];
+    items = [];
+    magmas = [];
+    skillPoints = 0;
+    lieTruthUsed = false;
+
+    for (let i = 0; i < 40; i++) {
+      const p = randomWorldPos(80);
+      const hp = randInt(10, 500);
+      const atk = randInt(10, 30);
+      const chases = Math.random() < 0.5;
+      const chaseRange = chases ? rand(80, 900) : 0;
+      const shootRange = rand(150, 700);
+      enemies.push({
+        x: p.x, y: p.y,
+        hp: hp, maxHp: hp,
+        attack: atk,
+        alive: true,
+        angle: 0,
+        fireTimer: randInt(30, 120),
+        chases: chases,
+        chaseRange: chaseRange,
+        shootRange: shootRange,
+        speed: rand(0.6, 1.8),
+        radius: 18,
+      });
+    }
+
+    for (let i = 0; i < 30; i++) {
+      const p = randomWorldPos(40);
+      items.push({ x:p.x, y:p.y, type:'ammo' });
+    }
+    for (let i = 0; i < 30; i++) {
+      const p = randomWorldPos(40);
+      items.push({ x:p.x, y:p.y, type:'heal' });
+    }
+
+    const sp = randomWorldPos(200);
+    stairs = { x: sp.x, y: sp.y, w: 60, h: 60 };
+
+    spawnMagma(40);
+  }
+
+  function spawnMagma(count) {
+    for (let i = 0; i < count; i++) {
+      const p = randomWorldPos(20);
+      magmas.push({
+        x: p.x, y: p.y,
+        timer: 180,
+        phase: 0,
+        hit: false,
+      });
+    }
+  }
+
+  function resetGame() {
+    player.x = WORLD_W / 2;
+    player.y = WORLD_H / 2;
+    player.hp = 90;
+    player.ammo = 0;
+    player.totalAmmo = 0;
+    player.speed = 10;
+    player.gunPower = 10;
+    player.rapidPower = 0;
+    player.swordPower = 20;
+    player.mode = 'gun';
+    player.reloading = false;
+    player.reloadTimer = 0;
+    player.swingTimer = 0;
+    player.swingAngle = 0;
+    gameOver = false;
+    victory = false;
+    isFiring = false;
+    fireTimer = 0;
+    swordCooldown = 0;
+    magmaTimer = 10 * 60;
+    showMapCoord = false;
+    mapCoordSpan.classList.add('hidden-coord');
+    victoryFooter.classList.add('hidden');
+    footer.classList.remove('hidden');
+    hint.classList.remove('hidden');
+    document.querySelector('.btn-row').classList.remove('hidden');
+    updateModeBtn();
+    setInfoMsg('— 情報パネル —');
+    initWorld();
+  }
+
+  function updateModeBtn() {
+    if (player.mode === 'gun') {
+      modeBtn.textContent = '🔫 銃モード';
+      modeBtn.classList.remove('sword');
+      modeBtn.classList.add('mode');
+    } else {
+      modeBtn.textContent = '⚔ 剣モード';
+      modeBtn.classList.remove('mode');
+      modeBtn.classList.add('sword');
+    }
+  }
+
+  // ============================================================
+  //  入力
+  // ============================================================
+  window.addEventListener('keydown', (e) => {
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) {
+      e.preventDefault();
+      keys[e.key] = true;
+    }
+  });
+  window.addEventListener('keyup', (e) => {
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) {
+      e.preventDefault();
+      keys[e.key] = false;
+    }
+  });
+
+  canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const sx = canvas.width / rect.width;
+    const sy = canvas.height / rect.height;
+    mouseX = (e.clientX - rect.left) * sx;
+    mouseY = (e.clientY - rect.top) * sy;
+  });
+
+  canvas.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    if (gameOver || victory) { resetGame(); return; }
+    if (player.mode === 'gun') {
+      isFiring = true;
+      fireTimer = 0;
+    } else {
+      swingSword();
+    }
+  });
+  window.addEventListener('mouseup', (e) => {
+    if (e.button === 0) isFiring = false;
+  });
+
+  reloadBtn.addEventListener('click', (e) => { e.preventDefault(); reload(); });
+  modeBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (gameOver || victory) return;
+    player.mode = player.mode === 'gun' ? 'sword' : 'gun';
+    updateModeBtn();
+  });
+  mapToggleBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    showMapCoord = !showMapCoord;
+    if (showMapCoord) {
+      mapCoordSpan.classList.remove('hidden-coord');
+      mapToggleBtn.textContent = '📍 座標非表示';
+    } else {
+      mapCoordSpan.classList.add('hidden-coord');
+      mapToggleBtn.textContent = '📍 座標表示';
+    }
+  });
+
+  // 嘘本当ボタン
+  lieTruthBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (gameOver || victory) return;
+    if (lieTruthUsed) return;
+    if (skillPoints < SPECIAL_COST) return;
+    skillPoints -= SPECIAL_COST;
+    lieTruthUsed = true;
+
+    // 50%で本当、50%で嘘
+    const isTruth = Math.random() < 0.5;
+    let tx, ty;
+    if (isTruth) {
+      tx = stairs.x + stairs.w/2;
+      ty = stairs.y + stairs.h/2;
+    } else {
+      // 完全ランダム（階段とたまたま一致する可能性もある）
+      const p = randomWorldPos(60);
+      tx = p.x;
+      ty = p.y;
+    }
+    const px = Math.round(tx);
+    const py = Math.round(ty);
+    setInfoMsg(`🕯 階段の座標は… <span class="dir">(${px}, ${py})</span> …だと思う。`);
+  });
+
+  // NWESボタン
+  nwesBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (gameOver || victory) return;
+    if (skillPoints < SPECIAL_COST) return;
+    skillPoints -= SPECIAL_COST;
+
+    const dir = getDirection(player.x, player.y, stairs.x + stairs.w/2, stairs.y + stairs.h/2);
+    setInfoMsg(`🧭 階段の方角は… <span class="dir">${dir}</span> の方角だ。`);
+  });
+
+  function trySkill(cost, apply) {
+    if (gameOver || victory) return;
+    if (skillPoints < cost) return;
+    skillPoints -= cost;
+    apply();
+  }
+  skGun.addEventListener('click', (e) => { e.preventDefault(); trySkill(1, () => player.gunPower += 10); });
+  skSpeed.addEventListener('click', (e) => { e.preventDefault(); trySkill(1, () => player.speed += 15); });
+  skRapid.addEventListener('click', (e) => { e.preventDefault(); trySkill(1, () => player.rapidPower += 1); });
+  skSword.addEventListener('click', (e) => { e.preventDefault(); trySkill(1, () => player.swordPower += 15); });
+
+  // ============================================================
+  //  リロード / 剣
+  // ============================================================
+  function reload() {
+    if (gameOver || victory) return;
+    if (player.reloading) return;
+    if (player.ammo >= MAGAZINE_SIZE) return;
+    if (player.totalAmmo <= 0) return;
+    player.reloading = true;
+    player.reloadTimer = 60;
+  }
+
+  function finishReload() {
+    const need = MAGAZINE_SIZE - player.ammo;
+    const take = Math.min(need, player.totalAmmo);
+    player.ammo += take;
+    player.totalAmmo -= take;
+    player.reloading = false;
+  }
+
+  function swingSword() {
+    if (swordCooldown > 0) return;
+    swordCooldown = 24;
+    player.swingTimer = 12;
+    const RANGE = 70;
+    for (const e of enemies) {
+      if (!e.alive) continue;
+      if (dist(player.x, player.y, e.x, e.y) < RANGE) {
+        e.hp -= player.swordPower;
+        if (e.hp <= 0) { e.alive = false; skillPoints += 1; }
+      }
+    }
+  }
+
+  // ============================================================
+  //  物理判定
+  // ============================================================
+  function resolvePlayerEnemyCollision() {
+    for (const e of enemies) {
+      if (!e.alive) continue;
+      const d = dist(player.x, player.y, e.x, e.y);
+      const minDist = player.radius + e.radius;
+      if (d < minDist && d > 0.001) {
+        const overlap = minDist - d;
+        const nx = (player.x - e.x) / d;
+        const ny = (player.y - e.y) / d;
+        player.x += nx * overlap;
+        player.y += ny * overlap;
+      } else if (d <= 0.001) {
+        const a = Math.random() * Math.PI * 2;
+        player.x += Math.cos(a) * minDist;
+        player.y += Math.sin(a) * minDist;
+      }
+    }
+  }
+
+  // ============================================================
+  //  更新
+  // ============================================================
+  function update(dt) {
+    if (gameOver || victory) return;
+
+    const sp = player.speed * 0.4;
+    if (keys.ArrowUp)    player.y -= sp;
+    if (keys.ArrowDown)  player.y += sp;
+    if (keys.ArrowLeft)  player.x -= sp;
+    if (keys.ArrowRight) player.x += sp;
+    player.x = clamp(player.x, 20, WORLD_W - 20);
+    player.y = clamp(player.y, 20, WORLD_H - 20);
+
+    const camX = clamp(player.x - W/2, 0, WORLD_W - W);
+    const camY = clamp(player.y - H/2, 0, WORLD_H - H);
+    const wmx = mouseX + camX;
+    const wmy = mouseY + camY;
+    player.angle = Math.atan2(wmy - player.y, wmx - player.x);
+
+    if (player.reloading) {
+      player.reloadTimer--;
+      if (player.reloadTimer <= 0) {
+        finishReload();
+      }
+    }
+
+    if (player.mode === 'gun') {
+      const interval = Math.max(3, 10 - player.rapidPower);
+      if (isFiring && !player.reloading && player.ammo > 0) {
+        if (fireTimer <= 0) {
+          const spread = 0.03;
+          const a = player.angle + (Math.random() - 0.5) * spread;
+          bullets.push({
+            x: player.x + Math.cos(a) * 22,
+            y: player.y + Math.sin(a) * 22,
+            vx: Math.cos(a) * 10,
+            vy: Math.sin(a) * 10,
+            life: 90,
+            owner: 'player',
+            damage: player.gunPower,
+          });
+          player.ammo--;
+          fireTimer = interval;
+        } else {
+          fireTimer--;
+        }
+      } else {
+        fireTimer = 0;
+      }
+    }
+
+    if (swordCooldown > 0) swordCooldown--;
+    if (player.swingTimer > 0) {
+      player.swingTimer--;
+      player.swingAngle = Math.sin((12 - player.swingTimer) / 12 * Math.PI) * 1.4;
+    } else {
+      player.swingAngle = 0;
+    }
+
+    for (let i = bullets.length - 1; i >= 0; i--) {
+      const b = bullets[i];
+      b.x += b.vx;
+      b.y += b.vy;
+      b.life--;
+      if (b.life <= 0 || b.x < 0 || b.x > WORLD_W || b.y < 0 || b.y > WORLD_H) {
+        bullets.splice(i, 1);
+        continue;
+      }
+      if (b.owner === 'player') {
+        for (const e of enemies) {
+          if (!e.alive) continue;
+          if (dist(b.x, b.y, e.x, e.y) < 22) {
+            e.hp -= b.damage;
+            bullets.splice(i, 1);
+            if (e.hp <= 0) { e.alive = false; skillPoints += 1; }
+            break;
+          }
+        }
+      } else {
+        if (dist(b.x, b.y, player.x, player.y) < 20) {
+          player.hp -= b.damage;
+          bullets.splice(i, 1);
+          if (player.hp <= 0) { player.hp = 0; gameOver = true; }
+        }
+      }
+    }
+
+    const pmx = Math.floor(player.x / MAP_W);
+    const pmy = Math.floor(player.y / MAP_H);
+    const actX0 = (pmx - 1) * MAP_W, actX1 = (pmx + 2) * MAP_W;
+    const actY0 = (pmy - 1) * MAP_H, actY1 = (pmy + 2) * MAP_H;
+
+    for (const e of enemies) {
+      if (!e.alive) continue;
+      const d = dist(player.x, player.y, e.x, e.y);
+      e.angle = Math.atan2(player.y - e.y, player.x - e.x);
+
+      const active = e.x >= actX0 && e.x < actX1 && e.y >= actY0 && e.y < actY1;
+      if (!active) continue;
+
+      if (e.chases && d < e.chaseRange) {
+        const a = Math.atan2(player.y - e.y, player.x - e.x);
+        e.x += Math.cos(a) * e.speed;
+        e.y += Math.sin(a) * e.speed;
+      }
+
+      e.fireTimer--;
+      if (e.fireTimer <= 0 && d < e.shootRange) {
+        e.fireTimer = randInt(60, 140);
+        const a = e.angle + (Math.random() - 0.5) * 0.15;
+        bullets.push({
+          x: e.x + Math.cos(a) * 20,
+          y: e.y + Math.sin(a) * 20,
+          vx: Math.cos(a) * 6,
+          vy: Math.sin(a) * 6,
+          life: 140,
+          owner: 'enemy',
+          damage: e.attack,
+        });
+      }
+    }
+
+    resolvePlayerEnemyCollision();
+
+    for (let i = items.length - 1; i >= 0; i--) {
+      const it = items[i];
+      if (dist(it.x, it.y, player.x, player.y) < 24) {
+        if (it.type === 'ammo') {
+          player.totalAmmo += AMMO_PER_ITEM;
+        } else {
+          player.hp = Math.min(player.maxHp, player.hp + 10);
+        }
+        items.splice(i, 1);
+      }
+    }
+
+    for (const m of magmas) {
+      if (m.phase < 2) {
+        m.timer--;
+        if (m.timer <= 0) {
+          m.phase++;
+          m.timer = m.phase === 1 ? 120 : 999999;
+        }
+      }
+      if (m.phase === 2 && !m.hit) {
+        if (dist(m.x, m.y, player.x, player.y) < 26) {
+          player.hp -= 80;
+          m.hit = true;
+          if (player.hp <= 0) { player.hp = 0; gameOver = true; }
+        }
+      }
+    }
+
+    magmaTimer--;
+    if (magmaTimer <= 0) {
+      magmaTimer = 10 * 60;
+      spawnMagma(40);
+    }
+
+    if (stairs && dist(player.x, player.y, stairs.x + stairs.w/2, stairs.y + stairs.h/2) < 40) {
+      victory = true;
+      victoryFooter.classList.remove('hidden');
+      footer.classList.add('hidden');
+      hint.classList.add('hidden');
+      document.querySelector('.btn-row').classList.add('hidden');
+    }
+
+    // 表示更新
+    hpDisplay.textContent = Math.max(0, player.hp);
+    ammoDisplay.textContent = player.reloading ? '...' : player.ammo;
+    totalAmmoDisplay.textContent = player.totalAmmo;
+    enemyDisplay.textContent = enemies.filter(e => e.alive).length;
+    spDisplay.textContent = skillPoints;
+    mapDisplay.textContent = `${pmx+1},${pmy+1}`;
+    gunPowerDisplay.textContent = player.gunPower;
+    speedPowerDisplay.textContent = player.speed;
+    rapidPowerDisplay.textContent = player.rapidPower;
+    swordPowerDisplay.textContent = player.swordPower;
+
+    reloadBtn.disabled = player.reloading || player.ammo >= MAGAZINE_SIZE || player.totalAmmo <= 0 || gameOver || victory;
+    reloadBtn.textContent = player.reloading ? 'RELOADING...' : 'RELOAD';
+
+    const canSkill = skillPoints >= 1 && !gameOver && !victory;
+    skGun.disabled = !canSkill;
+    skSpeed.disabled = !canSkill;
+    skRapid.disabled = !canSkill;
+    skSword.disabled = !canSkill;
+
+    const canSpecial = skillPoints >= SPECIAL_COST && !gameOver && !victory;
+    lieTruthBtn.disabled = !canSpecial || lieTruthUsed;
+    nwesBtn.disabled = !canSpecial;
+
+    if (lieTruthUsed) {
+      lieTruthBtn.textContent = '🕯 使用済み';
+    } else {
+      lieTruthBtn.textContent = '🕯 嘘本当 (SP4)';
+    }
+  }
+
+  // ============================================================
+  //  描画
+  // ============================================================
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    const camX = clamp(player.x - W/2, 0, WORLD_W - W);
+    const camY = clamp(player.y - H/2, 0, WORLD_H - H);
+
+    ctx.save();
+    ctx.translate(-camX, -camY);
+
+    // 背景（和モダン：墨色）
+    ctx.fillStyle = '#0d0b08';
+    ctx.fillRect(camX, camY, W, H);
+
+    // グリッド（薄い金茶）
+    ctx.strokeStyle = '#1a1612';
+    ctx.lineWidth = 1;
+    const gx0 = Math.floor(camX / 40) * 40;
+    const gy0 = Math.floor(camY / 40) * 40;
+    for (let x = gx0; x <= camX + W; x += 40) {
+      ctx.beginPath(); ctx.moveTo(x, camY); ctx.lineTo(x, camY + H); ctx.stroke();
+    }
+    for (let y = gy0; y <= camY + H; y += 40) {
+      ctx.beginPath(); ctx.moveTo(camX, y); ctx.lineTo(camX + W, y); ctx.stroke();
+    }
+
+    // マップ境界（金茶）
+    ctx.strokeStyle = '#3a3028';
+    ctx.lineWidth = 1;
+    for (let c = 0; c <= MAP_COLS; c++) {
+      const x = c * MAP_W;
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, WORLD_H); ctx.stroke();
+    }
+    for (let r = 0; r <= MAP_ROWS; r++) {
+      const y = r * MAP_H;
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(WORLD_W, y); ctx.stroke();
+    }
+
+    // マグマ（和モダン：朱色系）
+    for (const m of magmas) {
+      if (m.x < camX - 40 || m.x > camX + W + 40 || m.y < camY - 40 || m.y > camY + H + 40) continue;
+      if (m.phase === 0) {
+        ctx.fillStyle = '#8a5a5a';
+      } else if (m.phase === 1) {
+        ctx.fillStyle = '#c73e3a';
+        ctx.shadowColor = '#c73e3a'; ctx.shadowBlur = 8;
+      } else {
+        ctx.fillStyle = '#e84a2a';
+        ctx.shadowColor = '#e84a2a'; ctx.shadowBlur = 16;
+      }
+      ctx.fillRect(m.x - 20, m.y - 20, 40, 40);
+      ctx.shadowBlur = 0;
+    }
+
+    // アイテム
+    for (const it of items) {
+      if (it.x < camX - 40 || it.x > camX + W + 40 || it.y < camY - 40 || it.y > camY + H + 40) continue;
+      if (it.type === 'ammo') {
+        // 弾：金茶の菱形
+        ctx.fillStyle = '#d4a84b';
+        ctx.shadowColor = '#d4a84b'; ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.moveTo(it.x, it.y - 10);
+        ctx.lineTo(it.x + 10, it.y);
+        ctx.lineTo(it.x, it.y + 10);
+        ctx.lineTo(it.x - 10, it.y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      } else {
+        // 回復：緑の円
+        ctx.fillStyle = '#8fa88a';
+        ctx.shadowColor = '#8fa88a'; ctx.shadowBlur = 10;
+        ctx.beginPath(); ctx.arc(it.x, it.y, 10, 0, Math.PI*2); ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#0d0b08';
+        ctx.fillRect(it.x - 5, it.y - 2, 10, 4);
+        ctx.fillRect(it.x - 2, it.y - 5, 4, 10);
+      }
+    }
+
+    // 階段
+    if (stairs) {
+      const s = stairs;
+      ctx.fillStyle = '#1a1612';
+      ctx.fillRect(s.x, s.y, s.w, s.h);
+      ctx.fillStyle = '#3a3028';
+      for (let i = 0; i < 4; i++) {
+        ctx.fillRect(s.x + 4, s.y + s.h - 8 - i*12, s.w - 8, 8);
+      }
+      ctx.strokeStyle = '#d4a84b';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(s.x, s.y, s.w, s.h);
+      ctx.fillStyle = '#d4a84b';
+      ctx.font = 'bold 11px serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('上', s.x + s.w/2, s.y - 6);
+    }
+
+    // 敵（朱色）
+    for (const e of enemies) {
+      if (!e.alive) continue;
+      if (e.x < camX - 60 || e.x > camX + W + 60 || e.y < camY - 60 || e.y > camY + H + 60) continue;
+
+      ctx.shadowColor = '#c73e3a'; ctx.shadowBlur = 12;
+      ctx.fillStyle = '#2a1210';
+      ctx.beginPath(); ctx.arc(e.x, e.y, e.radius, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = '#c73e3a'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      const hpR = clamp(e.hp / e.maxHp, 0, 1);
+      ctx.fillStyle = '#1a0e0c';
+      ctx.fillRect(e.x - 22, e.y - 30, 44, 4);
+      ctx.fillStyle = hpR > 0.5 ? '#c73e3a' : (hpR > 0.25 ? '#d47a3a' : '#e84a2a');
+      ctx.fillRect(e.x - 22, e.y - 30, 44 * hpR, 4);
+
+      ctx.fillStyle = '#c73e3a';
+      ctx.beginPath();
+      ctx.arc(e.x + Math.cos(e.angle)*16, e.y + Math.sin(e.angle)*16, 4, 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    // 弾（プレイヤー：金茶、敵：朱色）
+    for (const b of bullets) {
+      if (b.x < camX - 20 || b.x > camX + W + 20 || b.y < camY - 20 || b.y > camY + H + 20) continue;
+      if (b.owner === 'player') {
+        ctx.fillStyle = '#d4a84b';
+        ctx.shadowColor = '#d4a84b'; ctx.shadowBlur = 10;
+      } else {
+        ctx.fillStyle = '#c73e3a';
+        ctx.shadowColor = '#c73e3a'; ctx.shadowBlur = 10;
+      }
+      ctx.beginPath(); ctx.arc(b.x, b.y, 3.5, 0, Math.PI*2); ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+
+    // プレイヤー（生成り色）
+    ctx.shadowColor = '#e8e2d5'; ctx.shadowBlur = 16;
+    ctx.fillStyle = '#1a1612';
+    ctx.beginPath(); ctx.arc(player.x, player.y, player.radius, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#e8e2d5'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    if (player.mode === 'gun') {
+      ctx.strokeStyle = '#e8e2d5'; ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(player.x, player.y);
+      ctx.lineTo(player.x + Math.cos(player.angle)*32, player.y + Math.sin(player.angle)*32);
+      ctx.stroke();
+      ctx.fillStyle = '#d4a84b';
+      ctx.beginPath();
+      ctx.arc(player.x + Math.cos(player.angle)*32, player.y + Math.sin(player.angle)*32, 4, 0, Math.PI*2);
+      ctx.fill();
+    } else {
+      const sa = player.angle + player.swingAngle - 0.6;
+      ctx.strokeStyle = '#7a9eb8'; ctx.lineWidth = 4;
+      ctx.shadowColor = '#7a9eb8'; ctx.shadowBlur = 12;
+      ctx.beginPath();
+      ctx.moveTo(player.x, player.y);
+      ctx.lineTo(player.x + Math.cos(sa)*44, player.y + Math.sin(sa)*44);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+
+    const hpR = clamp(player.hp / player.maxHp, 0, 1);
+    ctx.fillStyle = '#1a1612';
+    ctx.fillRect(player.x - 26, player.y - 36, 52, 4);
+    ctx.fillStyle = hpR > 0.5 ? '#8fa88a' : '#c73e3a';
+    ctx.fillRect(player.x - 26, player.y - 36, 52 * hpR, 4);
+
+    if (player.reloading) {
+      ctx.fillStyle = '#d4a84b';
+      ctx.font = 'bold 13px serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('装填中…', player.x, player.y - 48);
+    }
+
+    ctx.restore();
+
+    if (gameOver) {
+      ctx.fillStyle = 'rgba(13,11,8,0.85)';
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#c73e3a';
+      ctx.font = 'bold 52px serif';
+      ctx.textAlign = 'center';
+      ctx.shadowColor = '#c73e3a'; ctx.shadowBlur = 20;
+      ctx.fillText('GAME OVER', W/2, H/2);
+      ctx.shadowBlur = 0;
+      ctx.font = '16px serif';
+      ctx.fillStyle = '#9a8e7a';
+      ctx.fillText('クリックでリスタート', W/2, H/2 + 50);
+    }
+    if (victory) {
+      ctx.fillStyle = 'rgba(13,11,8,0.85)';
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#d4a84b';
+      ctx.font = 'bold 56px serif';
+      ctx.textAlign = 'center';
+      ctx.shadowColor = '#d4a84b'; ctx.shadowBlur = 24;
+      ctx.fillText('VICTORY', W/2, H/2 - 20);
+      ctx.shadowBlur = 0;
+      ctx.font = '16px serif';
+      ctx.fillStyle = '#9a8e7a';
+      ctx.fillText('下のリンクから trade.html へ', W/2, H/2 + 50);
+    }
+  }
+
+  // ============================================================
+  //  ループ
+  // ============================================================
+  function gameLoop(timestamp) {
+    const dt = Math.min(2, (timestamp - lastTime) / (1000/60));
+    lastTime = timestamp;
+
+    if (!gameOver && !victory) update(dt);
+    draw();
+
+    requestAnimationFrame(gameLoop);
+  }
+
+  // ============================================================
+  //  オープニング画面
+  // ============================================================
+  const opening = document.getElementById('opening');
+  const startBtn = document.getElementById('startBtn');
+
+  startBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    opening.classList.add('hidden-opening');
+    setTimeout(() => {
+      opening.style.display = 'none';
+    }, 500);
+  });
+
+  // ============================================================
+  //  起動
+  // ============================================================
+  resetGame();
+  updateModeBtn();
+  requestAnimationFrame(gameLoop);
+})();
+</script>
+</body>
+</html>
