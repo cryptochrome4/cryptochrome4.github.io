@@ -1,0 +1,1783 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ギリシャ証券 - 取引</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Yusei+Magic&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap');
+
+  :root {
+    --canvas: #e8dfc8;
+    --canvas-dark: #d4c8a8;
+    --canvas-deep: #b8a880;
+    --wood: #6b4a2a;
+    --wood-dark: #4a3018;
+    --wood-light: #8a6a42;
+    --forest: #2d4a2d;
+    --forest-deep: #1a2e1a;
+    --olive: #6a7a3a;
+    --khaki: #8a8a5a;
+    --fire: #d45a2a;
+    --fire-light: #e88a3a;
+    --sun: #e8c04a;
+    --sky: #4a7aa5;
+    --ink: #2a2018;
+    --ink-soft: #5a4a38;
+    --line: #8a7554;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    font-family: 'Zen Kaku Gothic New', 'Yusei Magic', sans-serif;
+    background: var(--canvas);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    overflow-x: hidden;
+    overflow-y: auto;
+    background-image:
+      repeating-linear-gradient(45deg,
+        transparent 0px, transparent 20px,
+        rgba(107, 74, 42, 0.04) 20px, rgba(107, 74, 42, 0.04) 22px);
+  }
+
+  .trade-wrap {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-height: 100vh;
+  }
+
+  button {
+    font-family: inherit;
+    cursor: pointer;
+    background: var(--canvas);
+    color: var(--ink);
+    border: 2px solid var(--wood);
+    border-radius: 4px;
+    padding: 6px 12px;
+    font-weight: 700;
+    font-size: 0.82rem;
+    transition: all 0.12s;
+    box-shadow: 2px 2px 0 var(--wood-dark);
+  }
+  button:hover {
+    background: var(--sun);
+    transform: translate(-1px, -1px);
+    box-shadow: 3px 3px 0 var(--wood-dark);
+  }
+  button:active {
+    transform: translate(1px, 1px);
+    box-shadow: 1px 1px 0 var(--wood-dark);
+  }
+
+  /* ============================================================
+     HEADER
+     ============================================================ */
+  .zone-header {
+    background: linear-gradient(180deg, var(--wood) 0%, var(--wood-dark) 100%);
+    border-bottom: 5px solid var(--forest-deep);
+    color: var(--canvas);
+    position: relative;
+  }
+
+  .header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 20px;
+    flex-wrap: wrap;
+    gap: 10px;
+    border-bottom: 3px dashed var(--wood-light);
+  }
+
+  .title-area {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  h1.site-title {
+    font-family: 'Yusei Magic', sans-serif;
+    font-size: 1.6rem;
+    font-weight: 900;
+    letter-spacing: 0.12em;
+    color: var(--sun);
+    text-shadow: 2px 2px 0 var(--wood-dark);
+  }
+
+  .menu-btn {
+    background: var(--sun);
+    color: var(--wood-dark);
+    border: 2px solid var(--wood-dark);
+    width: 40px;
+    height: 40px;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .header-links {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .header-links button {
+    background: var(--canvas);
+    font-size: 0.78rem;
+    padding: 5px 10px;
+  }
+
+  .header-menu-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding: 10px 20px;
+    border-bottom: 2px solid var(--wood-light);
+  }
+  .header-menu-row button {
+    background: var(--canvas);
+    border: 2px solid var(--wood-light);
+    font-size: 0.8rem;
+    padding: 6px 14px;
+  }
+
+  .header-time-row {
+    display: flex;
+    justify-content: flex-end;
+    padding: 6px 20px 10px;
+    font-size: 0.82rem;
+    letter-spacing: 0.1em;
+    color: var(--sun);
+    font-family: 'Yusei Magic', monospace;
+  }
+
+  .menu-panel {
+    display: none;
+    background: var(--canvas);
+    color: var(--ink);
+    border-bottom: 5px solid var(--sun);
+    padding: 10px 20px;
+  }
+  .menu-panel.open { display: block; }
+  .menu-panel > button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: none;
+    border-bottom: 1px dashed var(--line);
+    border-radius: 0;
+    padding: 10px 6px;
+    background: transparent;
+    box-shadow: none;
+    font-size: 0.92rem;
+  }
+  .menu-panel > button:hover { background: var(--sun); padding-left: 14px; }
+
+  .service-sub {
+    display: none;
+    border-left: 5px solid var(--forest);
+    padding-left: 12px;
+    margin: 6px 0;
+    background: rgba(45,74,45,0.06);
+  }
+  .service-sub.open { display: block; }
+  .service-sub h4 {
+    font-size: 0.72rem;
+    color: var(--forest);
+    letter-spacing: 0.15em;
+    margin: 10px 0 4px;
+    font-weight: 900;
+  }
+  .service-sub button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: none;
+    border-radius: 0;
+    padding: 6px 4px;
+    background: transparent;
+    box-shadow: none;
+    font-size: 0.8rem;
+  }
+
+  .nav-primary {
+    display: flex;
+    gap: 6px;
+    padding: 10px 20px;
+    flex-wrap: wrap;
+    border-bottom: 2px solid var(--wood-light);
+  }
+  .nav-primary button {
+    background: var(--canvas);
+    font-size: 0.84rem;
+  }
+
+  .nav-secondary {
+    display: flex;
+    gap: 6px;
+    padding: 10px 20px;
+    flex-wrap: wrap;
+    position: relative;
+  }
+  .nav-secondary button {
+    background: var(--canvas);
+    font-size: 0.8rem;
+  }
+
+  .other-sub {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 20px;
+    background: var(--canvas);
+    border: 3px solid var(--wood);
+    border-radius: 6px;
+    z-index: 100;
+    min-width: 240px;
+    padding: 6px 0;
+    box-shadow: 4px 4px 0 var(--wood-dark);
+  }
+  .other-sub.open { display: block; }
+  .other-sub button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: none;
+    border-radius: 0;
+    border-bottom: 1px solid var(--line);
+    padding: 8px 14px;
+    background: transparent;
+    box-shadow: none;
+    color: var(--ink);
+  }
+  .other-sub button:hover { background: var(--sun); }
+  .other-sub button:last-child { border-bottom: none; }
+
+  .product-select {
+    position: relative;
+    display: inline-flex;
+    align-items: stretch;
+  }
+  .product-label {
+    border-radius: 4px 0 0 4px;
+    border-right: none;
+  }
+  .product-arrow {
+    padding: 6px 10px;
+    font-size: 0.7rem;
+    border-radius: 0 4px 4px 0;
+  }
+  .product-options {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: var(--canvas);
+    border: 3px solid var(--wood);
+    border-radius: 6px;
+    z-index: 150;
+    min-width: 160px;
+    box-shadow: 4px 4px 0 var(--wood-dark);
+  }
+  .product-options.open { display: block; }
+  .product-options button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: none;
+    border-radius: 0;
+    border-bottom: 1px solid var(--line);
+    background: transparent;
+    box-shadow: none;
+    color: var(--ink);
+  }
+  .product-options button:last-child { border-bottom: none; }
+
+  .bubble-section { padding: 14px 20px; }
+  .bubble {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 12px 16px;
+    background: var(--canvas);
+    border: 3px dashed var(--wood);
+    border-radius: 30px;
+  }
+
+  /* ============================================================
+     MIDDLE
+     ============================================================ */
+  .zone-middle {
+    display: flex;
+    flex-direction: row;
+    border-top: 4px solid var(--forest-deep);
+    border-bottom: 4px solid var(--forest-deep);
+  }
+
+  .zone-left {
+    flex: 0 0 auto;
+    width: 320px;
+    background: var(--canvas-dark);
+    border-right: 4px solid var(--wood);
+    padding: 16px 0;
+  }
+
+  .sidebar-title {
+    font-family: 'Yusei Magic', sans-serif;
+    font-size: 1.05rem;
+    letter-spacing: 0.1em;
+    color: var(--forest-deep);
+    padding: 0 18px 14px;
+    border-bottom: 3px solid var(--forest);
+    font-weight: 900;
+  }
+
+  .cat {
+    border-bottom: 1px solid var(--line);
+  }
+  .cat-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 11px 18px;
+    font-size: 0.85rem;
+    font-weight: 900;
+    color: var(--ink);
+    text-align: left;
+    box-shadow: none;
+    position: relative;
+  }
+  .cat-header::before {
+    content: '＋';
+    font-size: 0.9rem;
+    color: var(--fire);
+    margin-right: 10px;
+    font-weight: 900;
+  }
+  .cat.open .cat-header::before { content: '－'; }
+  .cat-header:hover { background: var(--sun); }
+
+  .cat-items { display: none; background: var(--canvas); }
+  .cat.open .cat-items { display: block; }
+
+  .cat-items button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: none;
+    border-radius: 0;
+    border-bottom: 1px dotted var(--line);
+    padding: 8px 18px 8px 34px;
+    font-size: 0.76rem;
+    color: var(--ink-soft);
+    background: transparent;
+    box-shadow: none;
+    position: relative;
+  }
+  .cat-items button::before {
+    content: '▸';
+    position: absolute;
+    left: 20px;
+    color: var(--olive);
+    font-size: 0.7rem;
+  }
+  .cat-items button:hover {
+    background: var(--sun);
+    color: var(--ink);
+  }
+
+  .cat-items button.marker-blue {
+    background: var(--sky);
+    color: #fff;
+    font-weight: 900;
+  }
+  .cat-items button.marker-blue::before { color: #fff; }
+  .cat-items button.marker-blue:hover { background: #3a6a95; }
+
+  .zone-center {
+    flex: 1 1 auto;
+    background: var(--canvas);
+    padding: 24px;
+    min-width: 0;
+  }
+
+  .c-container { max-width: 1100px; margin: 0 auto; }
+
+  .order-top-bar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .order-top-bar button { font-size: 0.82rem; }
+
+  .quote-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+  .quote-row button { font-size: 0.82rem; }
+
+  .user-name {
+    font-size: 0.9rem;
+    color: var(--ink-soft);
+    margin-bottom: 16px;
+    padding: 8px 12px;
+    background: var(--canvas-dark);
+    border-left: 4px solid var(--forest);
+    border-radius: 0 4px 4px 0;
+  }
+  .user-name strong { color: var(--forest-deep); }
+
+  .order-form {
+    background: var(--canvas);
+    border: 3px solid var(--wood);
+    border-radius: 6px;
+    padding: 20px;
+    box-shadow: 4px 4px 0 var(--wood-dark);
+  }
+
+  .form-section {
+    padding: 14px 0;
+    border-bottom: 2px dashed var(--line);
+  }
+  .form-section:last-child { border-bottom: none; }
+
+  .form-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .form-row:last-child { margin-bottom: 0; }
+
+  .form-label {
+    font-weight: 900;
+    font-size: 0.9rem;
+    color: var(--forest-deep);
+    min-width: 90px;
+  }
+
+  .radio-group {
+    display: inline-flex;
+    gap: 14px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .radio-group label {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+  .radio-group input[type="radio"] {
+    accent-color: var(--fire);
+    width: 16px;
+    height: 16px;
+  }
+
+  .text-input {
+    border: 2px solid var(--wood);
+    border-radius: 3px;
+    padding: 6px 10px;
+    font-family: inherit;
+    font-size: 0.85rem;
+    color: var(--ink);
+    background: #fff;
+    min-width: 100px;
+    outline: none;
+  }
+  .text-input:focus {
+    border-color: var(--fire);
+    box-shadow: 0 0 0 2px rgba(212,90,42,0.2);
+  }
+
+  .cond-select {
+    position: relative;
+    display: inline-flex;
+    align-items: stretch;
+  }
+  .cond-label {
+    background: var(--canvas);
+    border: 2px solid var(--wood);
+    border-right: none;
+    border-radius: 3px 0 0 3px;
+    padding: 6px 10px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .cond-arrow {
+    background: var(--canvas);
+    border: 2px solid var(--wood);
+    border-radius: 0 3px 3px 0;
+    padding: 6px 8px;
+    font-size: 0.7rem;
+    box-shadow: none;
+  }
+  .cond-arrow:hover { background: var(--sun); }
+  .cond-options {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: var(--canvas);
+    border: 3px solid var(--wood);
+    border-radius: 4px;
+    z-index: 200;
+    min-width: 120px;
+    box-shadow: 3px 3px 0 var(--wood-dark);
+  }
+  .cond-options.open { display: block; }
+  .cond-options button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: none;
+    border-radius: 0;
+    border-bottom: 1px solid var(--line);
+    padding: 7px 12px;
+    background: transparent;
+    box-shadow: none;
+    font-size: 0.8rem;
+    color: var(--ink);
+  }
+  .cond-options button:hover { background: var(--sun); }
+  .cond-options button:last-child { border-bottom: none; }
+
+  .market-select {
+    position: relative;
+    display: inline-flex;
+    align-items: stretch;
+  }
+  .market-label {
+    background: var(--canvas);
+    border: 2px solid var(--wood);
+    border-right: none;
+    border-radius: 3px 0 0 3px;
+    padding: 6px 10px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .market-arrow {
+    background: var(--canvas);
+    border: 2px solid var(--wood);
+    border-radius: 0 3px 3px 0;
+    padding: 6px 8px;
+    font-size: 0.7rem;
+    box-shadow: none;
+  }
+  .market-arrow:hover { background: var(--sun); }
+  .market-options {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: var(--canvas);
+    border: 3px solid var(--wood);
+    border-radius: 4px;
+    z-index: 200;
+    min-width: 160px;
+    box-shadow: 3px 3px 0 var(--wood-dark);
+  }
+  .market-options.open { display: block; }
+  .market-options button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: none;
+    border-radius: 0;
+    border-bottom: 1px solid var(--line);
+    padding: 7px 12px;
+    background: transparent;
+    box-shadow: none;
+    font-size: 0.8rem;
+    color: var(--ink);
+  }
+  .market-options button:hover { background: var(--sun); }
+  .market-options button:last-child { border-bottom: none; }
+
+  .period-select {
+    position: relative;
+    display: inline-flex;
+    align-items: stretch;
+  }
+  .period-label {
+    background: var(--canvas);
+    border: 2px solid var(--wood);
+    border-right: none;
+    border-radius: 3px 0 0 3px;
+    padding: 6px 10px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .period-arrow {
+    background: var(--canvas);
+    border: 2px solid var(--wood);
+    border-radius: 0 3px 3px 0;
+    padding: 6px 8px;
+    font-size: 0.7rem;
+    box-shadow: none;
+  }
+  .period-arrow:hover { background: var(--sun); }
+  .period-options {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: var(--canvas);
+    border: 3px solid var(--wood);
+    border-radius: 4px;
+    z-index: 200;
+    min-width: 140px;
+    box-shadow: 3px 3px 0 var(--wood-dark);
+  }
+  .period-options.open { display: block; }
+  .period-options button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: none;
+    border-radius: 0;
+    border-bottom: 1px solid var(--line);
+    padding: 7px 12px;
+    background: transparent;
+    box-shadow: none;
+    font-size: 0.8rem;
+    color: var(--ink);
+  }
+  .period-options button:hover { background: var(--sun); }
+  .period-options button:last-child { border-bottom: none; }
+
+  .caution-box {
+    background: rgba(232,192,74,0.25);
+    border: 2px solid var(--sun);
+    border-radius: 4px;
+    padding: 12px;
+    font-size: 0.82rem;
+    margin: 14px 0;
+    line-height: 1.6;
+  }
+  .caution-box strong { color: var(--fire); }
+
+  .password-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: 14px;
+  }
+  .order-confirm-btn {
+    background: var(--fire);
+    color: #fff;
+    border: 2px solid var(--wood-dark);
+    font-size: 0.95rem;
+    padding: 10px 22px;
+    font-weight: 900;
+    letter-spacing: 0.05em;
+  }
+  .order-confirm-btn:hover { background: var(--fire-light); }
+
+  .skip-confirm {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+  .skip-confirm input {
+    accent-color: var(--fire);
+    width: 16px;
+    height: 16px;
+  }
+
+  /* ============================================================
+     FOOTER
+     ============================================================ */
+  .zone-footer {
+    background: var(--forest);
+    border-top: 5px solid var(--forest-deep);
+    padding: 30px 20px;
+    color: var(--canvas);
+  }
+
+  .footer-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .section-title {
+    font-family: 'Yusei Magic', sans-serif;
+    font-size: 1.15rem;
+    letter-spacing: 0.15em;
+    color: var(--sun);
+    margin-bottom: 14px;
+    font-weight: 900;
+  }
+  .section-title::before { content: '🔥 '; }
+
+  .contact-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  @media (max-width: 480px) {
+    .contact-grid { grid-template-columns: 1fr; }
+  }
+
+  .link-btn {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 0.82rem;
+    background: var(--canvas);
+    color: var(--ink);
+    border: 2px solid var(--wood);
+    border-radius: 4px;
+    box-shadow: 3px 3px 0 var(--wood-dark);
+    font-weight: 700;
+  }
+
+  .copyright {
+    text-align: center;
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 2px solid var(--wood-light);
+    font-size: 0.75rem;
+    letter-spacing: 0.2em;
+    color: var(--canvas-dark);
+  }
+
+  @media (max-width: 900px) {
+    .zone-middle { flex-direction: column; }
+    .zone-left {
+      width: 100%;
+      border-right: none;
+      border-bottom: 4px solid var(--wood);
+    }
+    h1.site-title { font-size: 1.2rem; }
+  }
+
+  /* ============================================================
+     漫才CM OVERLAY
+     ============================================================ */
+  .manzai-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: #0a0a0a;
+    z-index: 99999;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 30px;
+    font-family: 'Yusei Magic', 'Zen Kaku Gothic New', sans-serif;
+  }
+  .manzai-overlay.active { display: flex; }
+
+  .manzai-stage {
+    display: flex;
+    gap: 80px;
+    justify-content: center;
+    align-items: flex-end;
+    margin-bottom: 40px;
+    flex-wrap: wrap;
+  }
+
+  .manzai-actor {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transition: transform 0.2s;
+  }
+  .manzai-actor.speaking {
+    transform: translateY(-10px) scale(1.08);
+  }
+
+  .actor-body { position: relative; width: 100px; height: 140px; }
+
+  .actor-head {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 70px;
+    height: 70px;
+    background: #d8d0b8;
+    border: 4px solid #000;
+    border-radius: 4px;
+  }
+
+  .actor-head .eye {
+    position: absolute;
+    top: 22px;
+    width: 8px;
+    height: 8px;
+    background: #000;
+    border-radius: 0;
+  }
+  .actor-head .eye.left { left: 14px; }
+  .actor-head .eye.right { right: 14px; }
+
+  .actor-head .mouth {
+    position: absolute;
+    bottom: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 22px;
+    height: 4px;
+    background: #000;
+  }
+  .manzai-actor.speaking .actor-head .mouth {
+    height: 12px;
+    width: 20px;
+    border-radius: 0;
+  }
+
+  .actor-torso {
+    position: absolute;
+    top: 66px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60px;
+    height: 70px;
+    border: 4px solid #000;
+    border-radius: 4px;
+  }
+  .manzai-actor.boke .actor-torso {
+    background: #c83a3a;
+  }
+  .manzai-actor.tsukkomi .actor-torso {
+    background: #3a5ac8;
+  }
+
+  .actor-name {
+    margin-top: 12px;
+    font-size: 0.85rem;
+    letter-spacing: 0.2em;
+    color: #fff;
+    background: #000;
+    padding: 4px 14px;
+    border: 2px solid #fff;
+    font-weight: 900;
+  }
+
+  .manzai-speech {
+    min-height: 80px;
+    font-size: 1.4rem;
+    color: #fff;
+    text-align: center;
+    letter-spacing: 0.05em;
+    line-height: 1.6;
+    max-width: 800px;
+    font-weight: 900;
+    text-shadow: 2px 2px 0 #000;
+    padding: 20px;
+    border: 3px solid #fff;
+    background: #1a1a1a;
+    border-radius: 8px;
+    width: 100%;
+    max-width: 900px;
+  }
+
+  .manzai-progress {
+    width: 100%;
+    max-width: 900px;
+    height: 8px;
+    background: #333;
+    border: 2px solid #fff;
+    border-radius: 4px;
+    margin-top: 20px;
+    overflow: hidden;
+  }
+  .manzai-progress-bar {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #e8c04a, #d45a2a);
+    transition: width 0.1s linear;
+  }
+
+  .manzai-skip {
+    position: absolute;
+    bottom: 24px;
+    right: 24px;
+    background: #000;
+    color: #fff;
+    border: 3px solid #fff;
+    padding: 10px 20px;
+    font-size: 0.9rem;
+    font-weight: 900;
+    letter-spacing: 0.15em;
+    cursor: pointer;
+    box-shadow: 4px 4px 0 #d45a2a;
+  }
+  .manzai-skip:hover { background: #d45a2a; color: #fff; }
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     漫才CM OVERLAY
+     ============================================================ -->
+<div class="manzai-overlay" id="manzaiOverlay">
+  <div class="manzai-stage">
+    <div class="manzai-actor boke" id="actorBoke">
+      <div class="actor-body">
+        <div class="actor-head">
+          <div class="eye left"></div>
+          <div class="eye right"></div>
+          <div class="mouth"></div>
+        </div>
+        <div class="actor-torso"></div>
+      </div>
+      <div class="actor-name">ボケ</div>
+    </div>
+
+    <div class="manzai-actor tsukkomi" id="actorTsukkomi">
+      <div class="actor-body">
+        <div class="actor-head">
+          <div class="eye left"></div>
+          <div class="eye right"></div>
+          <div class="mouth"></div>
+        </div>
+        <div class="actor-torso"></div>
+      </div>
+      <div class="actor-name">ツッコミ</div>
+    </div>
+  </div>
+
+  <div class="manzai-speech" id="manzaiSpeech"></div>
+
+  <div class="manzai-progress">
+    <div class="manzai-progress-bar" id="manzaiProgressBar"></div>
+  </div>
+
+  <button class="manzai-skip" id="manzaiSkip">SKIP ▶▶</button>
+</div>
+
+<div class="trade-wrap">
+
+  <!-- ============================================================
+       HEADER
+       ============================================================ -->
+  <div class="zone-header">
+    <div class="header-top">
+      <div class="title-area">
+        <h1 class="site-title">🏕 ギリシャ証券</h1>
+        <button class="menu-btn" id="menuBtn" aria-label="メニュー">☰</button>
+      </div>
+
+      <div class="header-links">
+        <button data-term="3商品ごとの銘柄検索">3商品ごとの銘柄検索</button>
+        <div class="product-select">
+          <button class="product-label" id="productLabel">国内株式</button>
+          <button class="product-arrow" id="productToggle" aria-label="商品を切り替え">▼</button>
+          <div class="product-options" id="productOptions">
+            <button data-product="国内株式">国内株式</button>
+            <button data-product="外国株式">外国株式</button>
+            <button data-product="投資信託">投資信託</button>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:6px;border:2px solid var(--wood-dark);border-radius:4px;padding:4px 8px;background:#fff;">
+          <span>🔍</span>
+          <input type="text" placeholder="銘柄、コード" readonly style="border:none;outline:none;font-family:inherit;font-size:0.8rem;width:110px;">
+        </div>
+        <span style="font-size:0.72rem;">サイト内検索『』</span>
+
+        <button data-term="銀行">銀行</button>
+        <button data-term="保険">保険</button>
+      </div>
+    </div>
+
+    <div class="header-menu-row">
+      <button data-term="国内株式トップ">国内株式トップ</button>
+      <button data-term="取引">取引</button>
+      <button data-term="積立">積立</button>
+      <button data-term="ランキング">ランキング</button>
+      <button data-term="IPO・PO">IPO・PO</button>
+      <button data-term="株主優待">株主優待</button>
+      <button data-term="貸株">貸株</button>
+      <button data-term="口座状況">口座状況</button>
+      <button data-term="注文照会">注文照会</button>
+      <button data-term="当日約定一覧">当日約定一覧</button>
+    </div>
+
+    <div class="header-time-row">
+      <span id="liveClock">20XX年X月X日X時X分X秒</span>
+    </div>
+
+    <div class="menu-panel" id="menuPanel">
+      <button data-term="メッセージ">メッセージ</button>
+      <button data-term="My設定">My設定</button>
+      <button id="serviceToggle">サービス ▸</button>
+      <div class="service-sub" id="serviceSub">
+        <h4>おトクに投資</h4>
+        <button data-term="クレカ積立について">クレカ積立について</button>
+        <button data-term="ポイントサービスについて">ポイントサービスについて</button>
+        <h4>ローンサービス</h4>
+        <button data-term="SBIマネーアシスタント">SBIマネーアシスタント</button>
+        <h4>資産に関するお困りごと</h4>
+        <button data-term="相続そうだんターミナル">相続そうだんターミナル</button>
+        <button data-term="相続のご相談・お手続きについて">相続のご相談・お手続きについて</button>
+        <button data-term="資産運用のご相談">資産運用のご相談</button>
+        <h4>安心への取り組み</h4>
+        <button data-term="セキュリティ">セキュリティ</button>
+        <button data-term="手数料">手数料</button>
+        <button data-term="取扱商品のご紹介">取扱商品のご紹介</button>
+        <button data-term="ツール・アプリ">ツール・アプリ</button>
+        <button data-term="投資を学ぼう">投資を学ぼう</button>
+        <button data-term="セミナー・イベント">セミナー・イベント</button>
+        <button data-term="各種ご案内">各種ご案内</button>
+      </div>
+      <button data-term="サポート">サポート</button>
+      <button data-term="ログアウト">ログアウト</button>
+    </div>
+
+    <div class="nav-primary">
+      <button data-term="ポートフォリオ">ポートフォリオ</button>
+      <button data-term="口座管理">口座管理</button>
+      <button data-term="取引">取引</button>
+      <button data-term="入出金">入出金</button>
+    </div>
+
+    <div class="nav-secondary">
+      <button data-term="ホーム">ホーム</button>
+      <button data-term="マーケット">マーケット</button>
+      <button data-term="NISA">NISA</button>
+      <button data-term="国内株式">国内株式</button>
+      <button data-term="外国株式">外国株式</button>
+      <button data-term="投資信託">投資信託</button>
+      <button data-term="債券">債券</button>
+      <button data-term="FX">FX</button>
+      <button data-term="おまかせ投資">おまかせ投資</button>
+      <button id="otherToggle">その他の商品 ▾</button>
+
+      <div class="other-sub" id="otherSub">
+        <button data-term="SBI株オプション">SBI株オプション</button>
+        <button data-term="先物・オプション">先物・オプション</button>
+        <button data-term="商品先物">商品先物</button>
+        <button data-term="金・銀・プラチナ">金・銀・プラチナ</button>
+        <button data-term="外貨建MMF">外貨建MMF</button>
+        <button data-term="取引所CFD(くりっく株365)">取引所CFD(くりっく株365)</button>
+        <button data-term="店頭CFD">店頭CFD</button>
+        <button data-term="ST(セキュリティ・トークン)">ST(セキュリティ・トークン)</button>
+        <button data-term="SBIラップ">SBIラップ</button>
+        <button data-term="ロボアド(ROBOPRO)">ロボアド(ROBOPRO)</button>
+        <button data-term="iDeCo">iDeCo</button>
+      </div>
+    </div>
+
+    <div class="bubble-section">
+      <div class="bubble">
+        <button data-term="マーケットトップ">マーケットトップ</button>
+        <button data-term="指数・為替・金利">指数・為替・金利</button>
+        <button data-term="ランキング">ランキング</button>
+        <button data-term="経済カレンダー">経済カレンダー</button>
+        <button data-term="レポート">レポート</button>
+        <button data-term="朝イチ情報">朝イチ情報</button>
+        <button data-term="ニュース">ニュース</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       MIDDLE
+       ============================================================ -->
+  <div class="zone-middle">
+
+    <div class="zone-left">
+      <div class="sidebar-title">国内株式　取引メニュー</div>
+
+      <div class="cat" data-cat>
+        <button class="cat-header"><span>銘柄検索</span></button>
+        <div class="cat-items">
+          <button>銘柄検索 &gt;</button>
+          <button>株主優待検索 &gt;</button>
+          <button>一般信用売り銘柄一覧 &gt;</button>
+          <button>HYPER空売り銘柄一覧 &gt;</button>
+          <button>銘柄スクリーニング &gt;</button>
+          <button>チャート形状銘柄検索 ↗</button>
+          <button>貸株サービス適用金利一覧 &gt;</button>
+          <button>ETF・ETN取扱銘柄一覧 &gt;</button>
+          <button>REIT(不動産投資信託)取扱銘柄一覧 &gt;</button>
+          <button>テーマ投資一覧 &gt;</button>
+          <button>積立ランキング &gt;</button>
+        </div>
+      </div>
+
+      <div class="cat" data-cat>
+        <button class="cat-header"><span>取引</span></button>
+        <div class="cat-items">
+          <button class="marker-blue">取引(取引所) &gt;</button>
+          <button>取引(PTS) &gt;</button>
+          <button>単元未満株(S株)取引 &gt;</button>
+          <button>積立 &gt;</button>
+          <button>信用返済・取引現渡 &gt;</button>
+          <button>IPO・PO &gt;</button>
+          <button>立会外(分売・トレード) &gt;</button>
+        </div>
+      </div>
+
+      <div class="cat" data-cat>
+        <button class="cat-header"><span>国内株式Myメニュー</span></button>
+        <div class="cat-items">
+          <button>保有株式 &gt;</button>
+          <button>信用建玉 &gt;</button>
+          <button>注文照会(取消・訂正) &gt;</button>
+          <button>積立設定履歴 &gt;</button>
+          <button>積立発注履歴 &gt;</button>
+          <button>日計り信用成績表 &gt;</button>
+          <button>SORレポート &gt;</button>
+        </div>
+      </div>
+
+      <div class="cat" data-cat>
+        <button class="cat-header"><span>はじめての方へ</span></button>
+        <div class="cat-items">
+          <button>はじめての現物取引 ↗</button>
+        </div>
+      </div>
+
+      <div class="cat" data-cat>
+        <button class="cat-header"><span>国内株式　案内メニュー</span></button>
+        <div class="cat-items">
+          <button>取引・商品一覧 &gt;</button>
+        </div>
+      </div>
+
+      <div class="cat" data-cat>
+        <button class="cat-header"><span>取引・商品一覧</span></button>
+        <div class="cat-items">
+          <button>現物取引 &gt;</button>
+          <button>信用取引 &gt;</button>
+          <button>はじめて信用 &gt;</button>
+          <button>ETF・ETN &gt;</button>
+          <button>IPO &gt;</button>
+          <button>REIT &gt;</button>
+        </div>
+      </div>
+
+      <div class="cat" data-cat>
+        <button class="cat-header"><span>関連サービス</span></button>
+        <div class="cat-items">
+          <button>一覧 &gt;</button>
+          <button>日株積立 &gt;</button>
+          <button>S株(単元未満株) &gt;</button>
+          <button>ポイント投資 ↗</button>
+          <button>テーマ投資 &gt;</button>
+          <button>株主優待 &gt;</button>
+          <button>配当金 &gt;</button>
+          <button>貸株 &gt;</button>
+          <button>TOB(公開買付け) &gt;</button>
+        </div>
+      </div>
+
+      <div class="cat" data-cat>
+        <button class="cat-header"><span>ツール・アプリ</span></button>
+        <div class="cat-items">
+          <button>HYPER SBI 2 ↗</button>
+          <button>株アプリ &gt;</button>
+          <button>銘柄スクリーニング &gt;</button>
+          <button>ヒートマップ &gt;</button>
+        </div>
+      </div>
+
+      <div class="cat" data-cat>
+        <button class="cat-header"><span>投資情報</span></button>
+        <div class="cat-items">
+          <button>朝刊・夕刊 ↗</button>
+          <button>レポート・動画 ↗</button>
+          <button>決算カレンダー &gt;</button>
+          <button>新着株式評価レポート &gt;</button>
+        </div>
+      </div>
+
+      <div class="cat" data-cat>
+        <button class="cat-header"><span>取引の流れ</span></button>
+        <div class="cat-items">
+          <button>操作ガイド ↗</button>
+        </div>
+      </div>
+
+      <div class="cat" data-cat>
+        <button class="cat-header"><span>サービス概要</span></button>
+        <div class="cat-items">
+          <button>現物 &gt;</button>
+          <button>信用 &gt;</button>
+          <button>PTS &gt;</button>
+          <button>日株積立 &gt;</button>
+          <button>立会外分売 &gt;</button>
+          <button>立会外トレード &gt;</button>
+          <button>貸株 &gt;</button>
+          <button>S株(単元未満株) &gt;</button>
+          <button>テーマ投資 &gt;</button>
+          <button>ETF・ETN &gt;</button>
+          <button>REIT &gt;</button>
+        </div>
+      </div>
+
+      <div class="cat" data-cat>
+        <button class="cat-header"><span>システム障害時の対応</span></button>
+        <div class="cat-items">
+          <button>システム障害時の対応 &gt;</button>
+        </div>
+      </div>
+
+      <div class="cat" data-cat>
+        <button class="cat-header"><span>ご注意事項</span></button>
+        <div class="cat-items">
+          <button>国内株式現物　本日の注意銘柄 ↗</button>
+          <button>国内株式信用　本日の注意銘柄 ↗</button>
+          <button>国内株式　取引注意事項 ↗</button>
+          <button>資本剰余金を原資とする配当の取扱い ↗</button>
+          <button>コーポレートアクションの取扱い &gt;</button>
+        </div>
+      </div>
+
+      <div class="cat" data-cat>
+        <button class="cat-header"><span>サポート3</span></button>
+        <div class="cat-items">
+          <button>SBI証券のセキュリティ/認証サービス &gt;</button>
+          <button>ヘルプ ↗</button>
+          <button>株式情報について ↗</button>
+          <button>ご意見・ご要望 &gt;</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="zone-center">
+      <div class="c-container">
+
+        <div class="order-top-bar">
+          <button>注文入力</button>
+          <button>約定状況 ↗</button>
+          <button>買付余力</button>
+        </div>
+
+        <div class="quote-row">
+          <button>株価</button>
+          <button>全板</button>
+          <button>取引所・PTS株価比較</button>
+        </div>
+
+        <div class="user-name">
+          ようこそ、<strong>ユーザー名</strong> さん
+        </div>
+
+        <div class="order-form">
+
+          <div class="form-section">
+            <div class="form-row">
+              <span class="form-label">取引:</span>
+              <div class="radio-group">
+                <label><input type="radio" name="trade-type" checked> 現物買</label>
+                <label><input type="radio" name="trade-type"> 現物売</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <div class="form-row">
+              <span class="form-label">銘柄コード:</span>
+              <input type="text" class="text-input" value="" placeholder="『』" style="width:120px;">
+              <button>銘柄コード検索</button>
+            </div>
+
+            <div class="form-row">
+              <span class="form-label">市場:</span>
+              <div class="market-select">
+                <button class="market-label" id="marketLabel">当社優先市場／SOR</button>
+                <button class="market-arrow" id="marketToggle">▼</button>
+                <div class="market-options" id="marketOptions">
+                  <button data-market="東証">東証</button>
+                  <button data-market="名証">名証</button>
+                  <button data-market="福証">福証</button>
+                  <button data-market="札証">札証</button>
+                </div>
+              </div>
+              <button>株価表示</button>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <div class="form-row">
+              <span class="form-label">枚数:</span>
+              <input type="text" class="text-input" placeholder="『』" style="width:120px;">
+              <span>株</span>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <div class="form-row">
+              <span class="form-label">価格:</span>
+              <div class="radio-group">
+                <label><input type="radio" name="price-type" checked> 指値</label>
+              </div>
+              <div class="cond-select">
+                <button class="cond-label" id="condLabel1">条件なし</button>
+                <button class="cond-arrow" id="condToggle1">▼</button>
+                <div class="cond-options" id="condOptions1">
+                  <button data-cond="寄指">寄指</button>
+                  <button data-cond="引指">引指</button>
+                  <button data-cond="不成">不成</button>
+                  <button data-cond="IOC指">IOC指</button>
+                </div>
+              </div>
+              <input type="text" class="text-input" placeholder="『』" style="width:120px;">
+              <span>円</span>
+            </div>
+
+            <div class="form-row">
+              <div class="radio-group">
+                <label><input type="radio" name="price-type"> 成行</label>
+              </div>
+              <div class="cond-select">
+                <button class="cond-label" id="condLabel2">条件なし</button>
+                <button class="cond-arrow" id="condToggle2">▼</button>
+                <div class="cond-options" id="condOptions2">
+                  <button data-cond="寄成">寄成</button>
+                  <button data-cond="引成">引成</button>
+                  <button data-cond="IOC成">IOC成</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="radio-group">
+                <label><input type="radio" name="price-type"> 逆指値</label>
+              </div>
+              <span style="font-size:0.85rem;">現在値が</span>
+              <input type="text" class="text-input" placeholder="『』" style="width:100px;">
+              <span style="font-size:0.85rem;">円以上になった時点で</span>
+            </div>
+
+            <div class="form-row">
+              <div class="radio-group">
+                <label><input type="radio" name="price-type"> 指値</label>
+              </div>
+              <div class="cond-select">
+                <button class="cond-label" id="condLabel3">条件なし</button>
+                <button class="cond-arrow" id="condToggle3">▼</button>
+                <div class="cond-options" id="condOptions3">
+                  <button data-cond="引指">引指</button>
+                  <button data-cond="不成">不成</button>
+                </div>
+              </div>
+              <input type="text" class="text-input" placeholder="『』" style="width:100px;">
+              <span style="font-size:0.85rem;">円で執行</span>
+            </div>
+
+            <div class="form-row">
+              <div class="radio-group">
+                <label><input type="radio" name="price-type"> 成行</label>
+              </div>
+              <div class="cond-select">
+                <button class="cond-label" id="condLabel4">条件なし</button>
+                <button class="cond-arrow" id="condToggle4">▼</button>
+                <div class="cond-options" id="condOptions4">
+                  <button data-cond="引成">引成</button>
+                </div>
+              </div>
+              <span style="font-size:0.85rem;">で執行</span>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <div class="form-row">
+              <span class="form-label">期間:</span>
+              <div class="radio-group">
+                <label><input type="radio" name="period" checked> 当日中</label>
+                <label><input type="radio" name="period"> 今週中</label>
+                <label><input type="radio" name="period"> 期間指定</label>
+              </div>
+              <div class="period-select">
+                <button class="period-label" id="periodLabel">26/10/08</button>
+                <button class="period-arrow" id="periodToggle">▼</button>
+                <div class="period-options" id="periodOptions">
+                  <button data-period="～26/10/28">～26/10/28</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <div class="form-row" style="align-items:flex-start;">
+              <span class="form-label">預かり区分:</span>
+              <div style="display:flex;flex-direction:column;gap:8px;">
+                <label style="display:inline-flex;align-items:center;gap:5px;font-size:0.85rem;cursor:pointer;">
+                  <input type="radio" name="account-type" checked style="accent-color:var(--fire);width:16px;height:16px;"> 特定預り
+                </label>
+                <label style="display:inline-flex;align-items:center;gap:5px;font-size:0.85rem;cursor:pointer;">
+                  <input type="radio" name="account-type" style="accent-color:var(--fire);width:16px;height:16px;"> 一般預り
+                </label>
+                <label style="display:inline-flex;align-items:center;gap:5px;font-size:0.85rem;cursor:pointer;">
+                  <input type="radio" name="account-type" style="accent-color:var(--fire);width:16px;height:16px;"> NISA預り
+                </label>
+                <label style="display:inline-flex;align-items:center;gap:5px;font-size:0.85rem;cursor:pointer;">
+                  <input type="radio" name="account-type" style="accent-color:var(--fire);width:16px;height:16px;"> 旧NISA預り
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="caution-box">
+            ご注文の際には<strong>ご注意事項</strong>を必ずご確認下さい。<br>
+            ⚠️ SOR対象銘柄をご注文の際は、SOR注文に際してのご注意事項を必ずご確認下さい。
+          </div>
+
+          <div class="password-row">
+            <span class="form-label">取引パスワード:</span>
+            <input type="password" class="text-input" placeholder="『』" style="width:160px;">
+            <button class="order-confirm-btn">注文確認画面へ</button>
+            <label class="skip-confirm">
+              <input type="checkbox"> 注文確認画面を省略
+            </label>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============================================================
+       FOOTER
+       ============================================================ -->
+  <div class="zone-footer">
+    <div class="footer-inner">
+      <h2 class="section-title">お問合せ</h2>
+      <div class="contact-grid">
+        <button class="link-btn">投資情報の免責事項</button>
+        <button class="link-btn">決算公告</button>
+        <button class="link-btn">金融商品取引法等に係わる表示</button>
+        <button class="link-btn">定期・臨時システムメンテナンスのお知らせ</button>
+        <button class="link-btn">システム障害の備え</button>
+        <button class="link-btn">システム障害時の対応</button>
+      </div>
+      <div class="copyright">
+        🏕 ギリシャ証券 — TRADE REFERENCE
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  /* ============================================================
+     サイト本体：UI 制御
+     ============================================================ */
+
+  /* メニューパネル */
+  const menuBtn = document.getElementById('menuBtn');
+  const menuPanel = document.getElementById('menuPanel');
+  menuBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    menuPanel.classList.toggle('open');
+  });
+  document.addEventListener('click', (e) => {
+    if (!menuPanel.contains(e.target) && e.target !== menuBtn) {
+      menuPanel.classList.remove('open');
+    }
+  });
+
+  /* サービスサブ */
+  const serviceToggle = document.getElementById('serviceToggle');
+  const serviceSub = document.getElementById('serviceSub');
+  serviceToggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    serviceSub.classList.toggle('open');
+    serviceToggle.textContent = serviceSub.classList.contains('open') ? 'サービス ▾' : 'サービス ▸';
+  });
+
+  /* その他の商品サブ */
+  const otherToggle = document.getElementById('otherToggle');
+  const otherSub = document.getElementById('otherSub');
+  otherToggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    otherSub.classList.toggle('open');
+    otherToggle.textContent = otherSub.classList.contains('open') ? 'その他の商品 ▴' : 'その他の商品 ▾';
+  });
+  document.addEventListener('click', (e) => {
+    if (!otherSub.contains(e.target) && e.target !== otherToggle) {
+      otherSub.classList.remove('open');
+      otherToggle.textContent = 'その他の商品 ▾';
+    }
+  });
+
+  /* 商品切替 */
+  const productLabel = document.getElementById('productLabel');
+  const productToggle = document.getElementById('productToggle');
+  const productOptions = document.getElementById('productOptions');
+  productToggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    productOptions.classList.toggle('open');
+  });
+  productOptions.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      productLabel.textContent = btn.dataset.product;
+      productOptions.classList.remove('open');
+    });
+  });
+  document.addEventListener('click', (e) => {
+    if (!productOptions.contains(e.target) && e.target !== productToggle) {
+      productOptions.classList.remove('open');
+    }
+  });
+
+  /* 左サイドカテゴリ */
+  document.querySelectorAll('.cat[data-cat]').forEach(cat => {
+    const header = cat.querySelector('.cat-header');
+    header.addEventListener('click', (e) => {
+      e.stopPropagation();
+      cat.classList.toggle('open');
+    });
+  });
+
+  /* 市場ドロップダウン */
+  const marketLabel = document.getElementById('marketLabel');
+  const marketToggle = document.getElementById('marketToggle');
+  const marketOptions = document.getElementById('marketOptions');
+  marketToggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    marketOptions.classList.toggle('open');
+  });
+  marketOptions.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      marketLabel.textContent = btn.dataset.market;
+      marketOptions.classList.remove('open');
+    });
+  });
+  document.addEventListener('click', (e) => {
+    if (!marketOptions.contains(e.target) && e.target !== marketToggle) {
+      marketOptions.classList.remove('open');
+    }
+  });
+
+  /* 条件ドロップダウン（4つ） */
+  function setupCond(labelId, toggleId, optionsId) {
+    const label = document.getElementById(labelId);
+    const toggle = document.getElementById(toggleId);
+    const options = document.getElementById(optionsId);
+    toggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      options.classList.toggle('open');
+    });
+    options.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        label.textContent = btn.dataset.cond;
+        options.classList.remove('open');
+      });
+    });
+    document.addEventListener('click', (e) => {
+      if (!options.contains(e.target) && e.target !== toggle) {
+        options.classList.remove('open');
+      }
+    });
+  }
+  setupCond('condLabel1', 'condToggle1', 'condOptions1');
+  setupCond('condLabel2', 'condToggle2', 'condOptions2');
+  setupCond('condLabel3', 'condToggle3', 'condOptions3');
+  setupCond('condLabel4', 'condToggle4', 'condOptions4');
+
+  /* 期間ドロップダウン */
+  const periodLabel = document.getElementById('periodLabel');
+  const periodToggle = document.getElementById('periodToggle');
+  const periodOptions = document.getElementById('periodOptions');
+  periodToggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    periodOptions.classList.toggle('open');
+  });
+  periodOptions.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      periodLabel.textContent = btn.dataset.period;
+      periodOptions.classList.remove('open');
+    });
+  });
+  document.addEventListener('click', (e) => {
+    if (!periodOptions.contains(e.target) && e.target !== periodToggle) {
+      periodOptions.classList.remove('open');
+    }
+  });
+
+  /* ライブ時計 */
+  function updateClock() {
+    const now = new Date();
+    const y = now.getFullYear();
+    const mo = now.getMonth() + 1;
+    const d = now.getDate();
+    const h = now.getHours();
+    const mi = now.getMinutes();
+    const s = now.getSeconds();
+    document.getElementById('liveClock').textContent =
+      `${y}年${mo}月${d}日${h}時${mi}分${s}秒`;
+  }
+  updateClock();
+  setInterval(updateClock, 1000);
+
+  /* ============================================================
+     漫才CM
+     ============================================================ */
+  const MANZAI_LINES = [
+    [
+      ['ボケ', 'なあ、聞いてや。俺、最近朝に強なったんよ。'],
+      ['ツッコミ', 'へえ、ええやん。何時に起きてんの？'],
+      ['ボケ', '毎朝4時に目が覚めるねん。'],
+      ['ツッコミ', '早っ！ 何するん？'],
+      ['ボケ', '二度寝する。'],
+      ['ツッコミ', '意味ないやろ！ 早起きした意味どこ行ったん！'],
+      ['ボケ', 'いや、二度寝って最高やで。一回起きてから寝るから、特別感が違うねん。'],
+      ['ツッコミ', '特別感で言うたら、起きなさんな！'],
+      ['ボケ', 'せやけどな、二度寝の夢って、なぜか学校に遅刻する夢ばっかりやねん。'],
+      ['ツッコミ', 'それは焦るわ！ で、起きるん？'],
+      ['ボケ', '起きへん。夢の中でもう一回寝る。'],
+      ['ツッコミ', '二重に寝るな！ 現実戻ってこい！']
+    ],
+    [
+      ['ボケ', 'なあ、コンビニでさ、新商品のスイーツ買うたんよ。'],
+      ['ツッコミ', 'お、ええやん。美味しかった？'],
+      ['ボケ', '食べへん。'],
+      ['ツッコミ', '買うたのに！？ なんでやねん！'],
+      ['ボケ', 'だって、冷蔵庫に入れるの忘れて、朝見たら溶けてん。'],
+      ['ツッコミ', 'そらアンタのせいやろ！ 冷蔵庫入れな！'],
+      ['ボケ', 'いや、溶けたやつもな、それはそれで味があるねん。'],
+      ['ツッコミ', 'どんな味やねん！ 液体やぞ、もはや！'],
+      ['ボケ', 'ストローで飲んだら、意外といけた。'],
+      ['ツッコミ', 'スイーツをストローで飲むな！ カフェやないんやから！'],
+      ['ボケ', 'しかも、次の日も同じやつ買うて、また溶かした。'],
+      ['ツッコミ', '学習しろ！ 学習能力どこやったん！']
+    ],
+    [
+      ['ボケ', 'なあ、聞いてくれ。俺、遅刻しそうになって駅まで走ったんよ。'],
+      ['ツッコミ', 'お、間に合ったん？'],
+      ['ボケ', '電車、目の前で行った。'],
+      ['ツッコミ', 'あー、あるある。で、次の電車乗ったん？'],
+      ['ボケ', '乗らへん。'],
+      ['ツッコミ', 'なんでやねん！ 早く乗れや！'],
+      ['ボケ', 'いや、目の前で行った電車が、なぜか戻ってきたんよ。'],
+      ['ツッコミ', '戻ってくるか！ 電車は一方通行や！'],
+      ['ボケ', 'いや、マジで見たんやって。ドア閉まって、5秒後に「プシュー」て開いた。'],
+      ['ツッコミ', 'それは忘れ物した人がおるだけや！ アンタのための電車ちゃう！'],
+      ['ボケ', 'せやけど、俺のためやと思たら、ありがたく乗れるやろ。'],
+      ['ツッコミ', '乗れ！ 素直に乗れ！ もう遅刻確定やぞ！']
+    ]
+  ];
+
+  function shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  const overlay       = document.getElementById('manzaiOverlay');
+  const actorBoke     = document.getElementById('actorBoke');
+  const actorTsukkomi = document.getElementById('actorTsukkomi');
+  const speechEl      = document.getElementById('manzaiSpeech');
+  const progressBar   = document.getElementById('manzaiProgressBar');
+  const skipBtn       = document.getElementById('manzaiSkip');
+
+  const playOrder = shuffle(MANZAI_LINES);
+
+  let currentShowIndex = 0;
+  let lineIndex = 0;
+  let lineTimer = null;
+  let skipRequested = false;
+
+  const LINE_DURATION = 1800;
+  const SITE_INTERVAL = 10 * 60 * 1000;
+
+  function startManzai(index) {
+    currentShowIndex = index;
+    lineIndex = 0;
+    skipRequested = false;
+    const script = playOrder[index];
+    overlay.classList.add('active');
+    speechEl.textContent = '';
+    progressBar.style.width = '0%';
+    updateProgress(0, script.length);
+    showLine();
+  }
+
+  function showLine() {
+    if (skipRequested) {
+      endManzai();
+      return;
+    }
+    const script = playOrder[currentShowIndex];
+
+    if (lineIndex >= script.length) {
+      setTimeout(endManzai, 800);
+      return;
+    }
+
+    const [who, text] = script[lineIndex];
+
+    actorBoke.classList.toggle('speaking', who === 'ボケ');
+    actorTsukkomi.classList.toggle('speaking', who === 'ツッコミ');
+
+    speechEl.textContent = text;
+
+    updateProgress(lineIndex + 1, script.length);
+    lineIndex++;
+
+    lineTimer = setTimeout(showLine, LINE_DURATION);
+  }
+
+  function updateProgress(current, total) {
+    const pct = (current / total) * 100;
+    progressBar.style.width = pct + '%';
+  }
+
+  function endManzai() {
+    overlay.classList.remove('active');
+    actorBoke.classList.remove('speaking');
+    actorTsukkomi.classList.remove('speaking');
+    if (lineTimer) clearTimeout(lineTimer);
+
+    if (currentShowIndex + 1 < playOrder.length) {
+      setTimeout(() => {
+        startManzai(currentShowIndex + 1);
+      }, SITE_INTERVAL);
+    }
+  }
+
+  skipBtn.addEventListener('click', () => {
+    skipRequested = true;
+    if (lineTimer) clearTimeout(lineTimer);
+    endManzai();
+  });
+
+  window.addEventListener('load', () => {
+    setTimeout(() => {
+      startManzai(0);
+    }, 500);
+  });
+</script>
+
+</body>
+</html>
