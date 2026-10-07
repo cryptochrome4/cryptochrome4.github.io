@@ -51,6 +51,7 @@
         background: #1d3449; border-radius: 48px; padding: 30px 50px;
         text-align: center; color: #edf7f5; box-shadow: 0 20px 30px #00000080, inset 0 0 0 3px #5f8aa8;
         max-width: 780px; border: 2px solid #9bc2db;
+        position: relative; z-index: 2;
     }
     .overlay-card h1 {
         font-size: 2.6rem; margin: 0 0 10px; text-shadow: 6px 6px 0 #0e1b24;
@@ -75,8 +76,8 @@
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
         background-image: url('img39x.jpg'); background-size: cover;
         background-position: center; opacity: 0.3; z-index: 0;
+        pointer-events: none;
     }
-    .overlay .overlay-card { position: relative; z-index: 2; }
     .subnote { font-size: 0.85rem; color: #b8d0dd; margin-top: 12px; }
 
     /* ストーリーアニメーション */
@@ -98,8 +99,6 @@
         font-size: 1.15rem; line-height: 2; min-height: 200px;
         white-space: pre-wrap; color: #d4e9f7;
     }
-    .story-cursor { display: inline-block; width: 10px; background: #ffd966; animation: blink 1s infinite; }
-    @keyframes blink { 0%,50% { opacity: 1; } 51%,100% { opacity: 0; } }
     .story-next {
         margin-top: 24px; text-align: center;
     }
@@ -111,6 +110,7 @@
     .story-scene {
         display: flex; justify-content: center; gap: 30px;
         margin: 20px 0; font-size: 2.5rem; letter-spacing: 8px;
+        min-height: 60px;
     }
     .clear-screen {
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -128,32 +128,36 @@
     .clear-card .final-money { font-size: 2rem; color: #9be89b; font-weight: bold;
         background: #0e1f2c; padding: 10px 30px; border-radius: 40px; margin: 20px 0; }
     .log-panel {
-        position: absolute; bottom: 10px; left: 10px;
+        position: absolute; bottom: 80px; left: 10px;
         background: rgba(0,0,0,0.6); color: #ffd966;
         padding: 8px 14px; border-radius: 10px; font-size: 0.85rem;
         max-width: 400px; border: 1px solid #4a7a9c;
+        pointer-events: none;
     }
+    .log-panel div { margin: 2px 0; }
 </style>
 </head>
 <body>
 
+<!-- 背景（独立、クリック透過） -->
+<div class="opening-bg"></div>
+
 <!-- オープニング -->
 <div id="openingOverlay" class="overlay">
-    <div class="opening-bg"></div>
     <div class="overlay-card">
         <h1>こしょうと船</h1>
         <p>投資の根源は こしょう と 船 の話</p>
         <p style="font-size:0.9rem; background:#0a1620;">— モードを選択 —</p>
         <div class="mode-buttons" id="modeSelector">
-            <button data-mode="simple" class="selected">シンプル</button>
-            <button data-mode="nisa">NISA</button>
-            <button data-mode="domestic">国内株式</button>
-            <button data-mode="foreign">外国株式</button>
-            <button data-mode="trust">投資信託</button>
-            <button data-mode="bond">債券</button>
-            <button data-mode="fx">FX</button>
+            <button type="button" data-mode="simple" class="selected">シンプル</button>
+            <button type="button" data-mode="nisa">NISA</button>
+            <button type="button" data-mode="domestic">国内株式</button>
+            <button type="button" data-mode="foreign">外国株式</button>
+            <button type="button" data-mode="trust">投資信託</button>
+            <button type="button" data-mode="bond">債券</button>
+            <button type="button" data-mode="fx">FX</button>
         </div>
-        <button id="startGameBtn" class="start-btn">⚓ 出航 ⚓</button>
+        <button type="button" id="startGameBtn" class="start-btn">⚓ 出航 ⚓</button>
         <div class="subnote">※ 矢印キーで船を操作 / 目的地クリックで交易 / 島に帰ればクリア</div>
     </div>
 </div>
@@ -165,7 +169,7 @@
         <div class="story-scene" id="storyScene"></div>
         <div class="story-text" id="storyText"></div>
         <div class="story-next">
-            <button id="storyNextBtn">▶ 次へ</button>
+            <button type="button" id="storyNextBtn">▶ 次へ</button>
         </div>
     </div>
 </div>
@@ -178,7 +182,7 @@
         <span class="money" id="moneyDisplay">💰 こしょう: 0</span>
         <span class="goal" id="goalDisplay">🎯 目標: 1</span>
         <span id="modeLabel">シンプル</span>
-        <button id="backToMenuBtn">メニュー</button>
+        <button type="button" id="backToMenuBtn">メニュー</button>
     </div>
 </div>
 
@@ -189,7 +193,7 @@
         <p id="clearMessage">こしょうを集めて島に帰ってきた！</p>
         <div class="final-money" id="clearMoney">+0 こしょう</div>
         <p id="clearSub" style="font-size:1rem; color:#b8d0dd;"></p>
-        <button onclick="location.reload()" style="margin-top:20px; font-size:1.2rem; padding:12px 40px;">もう一度</button>
+        <button type="button" onclick="location.reload()" style="margin-top:20px; font-size:1.2rem; padding:12px 40px;">もう一度</button>
     </div>
 </div>
 
@@ -220,8 +224,8 @@
         { name: '不可説不可説転', value: 1e72 }
     ];
 
-    // 数値を読みやすく（大きい数は単位で表示）
     function formatMoney(v) {
+        if (v < 0) v = 0;
         if (v < 10000) return Math.floor(v) + ' 円';
         for (let i = UNITS.length - 1; i >= 0; i--) {
             if (v >= UNITS[i].value) {
@@ -233,12 +237,12 @@
     }
 
     // =========================================================
-    // モード定義（ストーリー・クリア条件・利益）
+    // モード定義
     // =========================================================
     const MODES = {
         simple: {
             label: 'シンプル',
-            goal: 100,             // 100こしょうでクリア（後で調整）
+            goal: 100,
             goalLabel: '100 こしょう',
             storyTitle: 'こしょうと船の話（シンプル）',
             intro: [
@@ -255,7 +259,7 @@
         },
         nisa: {
             label: 'NISA',
-            goal: 3600000,         // 360万こしょう（非課税枠）
+            goal: 3600000,
             goalLabel: '360万 こしょう（非課税枠）',
             storyTitle: 'NISAモード — 非課税の島',
             intro: [
@@ -272,7 +276,7 @@
         },
         domestic: {
             label: '国内株式',
-            goal: 500000,          // 50万こしょう
+            goal: 500000,
             goalLabel: '50万 こしょう',
             storyTitle: '国内株式モード — 日本の港',
             intro: [
@@ -289,7 +293,7 @@
         },
         foreign: {
             label: '外国株式',
-            goal: 5000000,         // 500万こしょう
+            goal: 5000000,
             goalLabel: '500万 こしょう',
             storyTitle: '外国株式モード — 遠い海',
             intro: [
@@ -306,7 +310,7 @@
         },
         trust: {
             label: '投資信託',
-            goal: 10000000,        // 1000万こしょう
+            goal: 10000000,
             goalLabel: '1000万 こしょう',
             storyTitle: '投資信託モード — ほったらかしの海',
             intro: [
@@ -323,7 +327,7 @@
         },
         bond: {
             label: '債券',
-            goal: 300000,          // 30万こしょう
+            goal: 300000,
             goalLabel: '30万 こしょう',
             storyTitle: '債券モード — 安定の港',
             intro: [
@@ -335,12 +339,12 @@
             ],
             outro: [
                 { scene: '🏛️  📜  💰', text: '満期が来るたび、\n利子が支払われた。\nあなたは着実に富を築いた。' },
-                { scene: '⏳  🪙  ⏳', text: '債券は投資ポートフォリオの\n安定剤。\n派手ではないが、頼りになる。' ]
+                { scene: '⏳  🪙  ⏳', text: '債券は投資ポートフォリオの\n安定剤。\n派手ではないが、頼りになる。' }
             ]
         },
         fx: {
             label: 'FX',
-            goal: 100000000,       // 1億こしょう（でもすぐ超える）
+            goal: 100000000,
             goalLabel: '1億 こしょう',
             storyTitle: 'FXモード — レバレッジの嵐',
             intro: [
@@ -380,11 +384,11 @@
     let money = 0;
     let lastTimestamp = 0;
     let storyIndex = 0;
-    let storyPhase = 'intro'; // intro or outro
+    let storyPhase = 'intro';
     let storyQueue = [];
-    let storyComplete = false;
+    let typewriterTimer = null;
 
-    const SHIP_SPEED = 140; // 2倍
+    const SHIP_SPEED = 140;
     const SHIP_SIZE = 18;
     const ship = { x: 400, y: 250 };
 
@@ -393,16 +397,15 @@
     const MAP_WIDTH = 2600;
     const MAP_HEIGHT = 1800;
 
-    // 島（スタート＆ゴール地点）
     const HOME_ISLAND = { x: 400, y: 250, r: 60 };
 
     let destinations = [];
     let offsetX = 0, offsetY = 0;
-    let hasLeftIsland = false; // 一度でも島を出たか
+    let hasLeftIsland = false;
     let autoIncomeTimer = 0;
 
     // =========================================================
-    // 目的地生成（モード別）
+    // 目的地生成
     // =========================================================
     function getDestinationsForMode(mode) {
         const base = [
@@ -467,7 +470,7 @@
     }
 
     // =========================================================
-    // ストーリー表示
+    // ストーリー
     // =========================================================
     function startStory() {
         const mode = MODES[currentMode];
@@ -475,21 +478,21 @@
         mode.intro.forEach(s => storyQueue.push({ ...s, phase: 'intro' }));
         storyIndex = 0;
         storyPhase = 'intro';
-        storyComplete = false;
         storyScreen.classList.remove('hidden');
         openingOverlay.classList.add('hidden');
         gameWrapper.style.display = 'none';
+        clearScreen.classList.add('hidden');
         showStoryStep();
     }
 
     function showStoryStep() {
+        if (typewriterTimer) clearInterval(typewriterTimer);
+
         if (storyIndex >= storyQueue.length) {
             if (storyPhase === 'intro') {
-                // イントロ終了 → ゲーム開始
                 storyScreen.classList.add('hidden');
                 startGame();
             } else {
-                // アウトロ終了 → クリア画面
                 storyScreen.classList.add('hidden');
                 showClearScreen();
             }
@@ -498,31 +501,23 @@
         const step = storyQueue[storyIndex];
         storyTitle.textContent = MODES[currentMode].storyTitle;
         storyScene.textContent = step.scene || '';
-        // タイプライター風
         storyText.textContent = '';
         let i = 0;
         const text = step.text;
-        const interval = setInterval(() => {
+        typewriterTimer = setInterval(() => {
             storyText.textContent = text.slice(0, i + 1);
             i++;
-            if (i >= text.length) clearInterval(interval);
+            if (i >= text.length) { clearInterval(typewriterTimer); typewriterTimer = null; }
         }, 18);
         storyNextBtn.textContent = (storyIndex === storyQueue.length - 1) ?
             (storyPhase === 'intro' ? '▶ 出航！' : '▶ 帰還') : '▶ 次へ';
     }
 
     storyNextBtn.addEventListener('click', () => {
-        if (storyIndex < storyQueue.length - 1) {
+        if (typewriterTimer) { clearInterval(typewriterTimer); typewriterTimer = null; }
+        if (storyIndex < storyQueue.length) {
             storyIndex++;
             showStoryStep();
-        } else {
-            if (storyPhase === 'intro') {
-                storyIndex++;
-                showStoryStep();
-            } else {
-                storyIndex++;
-                showStoryStep();
-            }
         }
     });
 
@@ -562,7 +557,7 @@
     }
 
     // =========================================================
-    // 更新処理
+    // 更新
     // =========================================================
     function updateOffset() {
         offsetX = ship.x - canvas.width / 2;
@@ -584,7 +579,6 @@
         ship.y = Math.max(SHIP_SIZE, Math.min(MAP_HEIGHT - SHIP_SIZE, ship.y));
         updateOffset();
 
-        // 島から離れたか
         const distToIsland = Math.hypot(ship.x - HOME_ISLAND.x, ship.y - HOME_ISLAND.y);
         if (!hasLeftIsland && distToIsland > HOME_ISLAND.r + 20) {
             hasLeftIsland = true;
@@ -598,7 +592,6 @@
     }
 
     function updateAutoIncome(dt) {
-        // 国内株式の配当
         if (currentMode === 'domestic') {
             autoIncomeTimer += dt;
             if (autoIncomeTimer >= 3) {
@@ -609,7 +602,6 @@
                 addLog('📈 配当 +' + formatMoney(dividend));
             }
         }
-        // 投資信託の自動運用
         if (currentMode === 'trust') {
             autoIncomeTimer += dt;
             if (autoIncomeTimer >= 0.5) {
@@ -620,7 +612,6 @@
                 addLog('🤖 自動運用 +' + formatMoney(auto));
             }
         }
-        // FXの変動（ランダムイベント）
         if (currentMode === 'fx') {
             autoIncomeTimer += dt;
             if (autoIncomeTimer >= 2) {
@@ -647,7 +638,6 @@
         let value = dest.value;
         let label = '';
 
-        // モード別補正
         if (currentMode === 'nisa') {
             value = Math.floor(value * 1.5);
             label = '（非課税）';
@@ -689,14 +679,12 @@
 
     function checkClear() {
         const mode = MODES[currentMode];
-        if (money >= mode.goal && !hasLeftIsland) return; // まだ島にいる
-        if (money >= mode.goal) {
-            // 島に戻ったらクリア
-            const distToIsland = Math.hypot(ship.x - HOME_ISLAND.x, ship.y - HOME_ISLAND.y);
-            if (distToIsland <= HOME_ISLAND.r + 30) {
-                gameActive = false;
-                startOutro();
-            }
+        if (money < mode.goal) return;
+        if (!hasLeftIsland) return;
+        const distToIsland = Math.hypot(ship.x - HOME_ISLAND.x, ship.y - HOME_ISLAND.y);
+        if (distToIsland <= HOME_ISLAND.r + 30) {
+            gameActive = false;
+            startOutro();
         }
     }
 
@@ -726,7 +714,6 @@
     // 描画
     // =========================================================
     function drawShip(ctx, x, y) {
-        // 船体
         ctx.fillStyle = '#8B5A2B';
         ctx.beginPath();
         ctx.moveTo(x - 12, y + 8);
@@ -735,10 +722,8 @@
         ctx.lineTo(x - 8, y - 6);
         ctx.closePath();
         ctx.fill();
-        // マスト
         ctx.fillStyle = '#654321';
         ctx.fillRect(x - 1, y - 20, 2, 16);
-        // 帆
         ctx.fillStyle = '#F5F5DC';
         ctx.beginPath();
         ctx.moveTo(x - 2, y - 18);
@@ -746,13 +731,11 @@
         ctx.lineTo(x - 2, y - 6);
         ctx.closePath();
         ctx.fill();
-        // 旗
         ctx.fillStyle = '#D32F2F';
         ctx.fillRect(x + 2, y - 22, 6, 6);
     }
 
     function drawIsland(ctx, sx, sy) {
-        // 島
         ctx.fillStyle = '#c2b280';
         ctx.beginPath();
         ctx.arc(sx, sy, HOME_ISLAND.r, 0, Math.PI * 2);
@@ -764,7 +747,6 @@
         ctx.beginPath();
         ctx.arc(sx + 20, sy + 10, 15, 0, Math.PI * 2);
         ctx.fill();
-        // 旗
         ctx.fillStyle = '#ffd966';
         ctx.fillRect(sx - 2, sy - 60, 4, 40);
         ctx.fillStyle = '#D32F2F';
@@ -773,7 +755,6 @@
         ctx.lineTo(sx + 30, sy - 50);
         ctx.lineTo(sx + 2, sy - 40);
         ctx.fill();
-        // ラベル
         ctx.fillStyle = '#0e1f2c';
         ctx.font = 'bold 14px Courier New';
         ctx.textAlign = 'center';
@@ -783,9 +764,8 @@
     function drawDestination(ctx, dest, offsetX, offsetY) {
         const sx = dest.x - offsetX;
         const sy = dest.y - offsetY;
-        if (sx < -50 || sx > canvas.width + 50 || sy < -50 || sy > canvas.height + 50) return;
+        if (sx < -60 || sx > canvas.width + 60 || sy < -60 || sy > canvas.height + 60) return;
 
-        // 港
         let color = '#3a7ca5';
         if (dest.highRisk) color = '#c44545';
         else if (dest.stable) color = '#4caf50';
@@ -795,18 +775,15 @@
         ctx.beginPath();
         ctx.rect(sx - 14, sy - 14, 28, 28);
         ctx.fill();
-        // 内側
         ctx.fillStyle = '#f0e68c';
         ctx.beginPath();
         ctx.arc(sx, sy, 7, 0, Math.PI * 2);
         ctx.fill();
-        // 名前
         ctx.fillStyle = '#fff';
         ctx.font = 'bold 11px Courier New';
         ctx.textAlign = 'center';
         ctx.fillText(dest.name, sx, sy + 30);
 
-        // クールダウン
         if (dest.cd > 0) {
             ctx.fillStyle = 'rgba(0,0,0,0.6)';
             ctx.beginPath();
@@ -819,10 +796,8 @@
     }
 
     function draw() {
-        // 海
         ctx.fillStyle = '#1e3b4f';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        // 波
         ctx.fillStyle = '#2d5a73';
         for (let i = 0; i < 60; i++) {
             const wx = (i * 173 + 31) % MAP_WIDTH;
@@ -833,11 +808,8 @@
                 ctx.fillRect(sx, sy, 4, 4);
             }
         }
-        // 島
         drawIsland(ctx, HOME_ISLAND.x - offsetX, HOME_ISLAND.y - offsetY);
-        // 目的地
         destinations.forEach(d => drawDestination(ctx, d, offsetX, offsetY));
-        // 船
         drawShip(ctx, ship.x - offsetX, ship.y - offsetY);
     }
 
@@ -853,8 +825,6 @@
         updateCooldowns(dt);
         updateAutoIncome(dt);
         draw();
-
-        // クリア判定（島に戻ったか）
         checkClear();
 
         requestAnimationFrame(gameLoop);
