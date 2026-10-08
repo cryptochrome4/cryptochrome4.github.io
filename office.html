@@ -62,7 +62,6 @@
   .hidden { display:none !important; }
   .hint { font-size:11px; color:#4a5a6a; margin-top:2px; text-align:center; width:100%; }
 
-  /* Opening screen */
   .opening {
     position: fixed;
     inset: 0;
@@ -155,7 +154,6 @@
     pointer-events: none;
   }
 
-  /* Background image viewer */
   .bg-viewer {
     position: fixed;
     inset: 0;
@@ -189,7 +187,6 @@
   }
   .bg-viewer .close-bg:hover { background: #ff8ad8; }
 
-  /* Checklist */
   .checklist-panel {
     position: fixed;
     top: 0; right: 0; bottom: 0;
@@ -244,7 +241,6 @@
   }
   .checklist-panel .panel-btns button { flex: 1; }
 
-  /* Dialogue window */
   .dialogue {
     position: fixed;
     left: 50%;
@@ -306,7 +302,6 @@
     align-self: center;
   }
 
-  /* NPC info panel */
   .npc-panel {
     position: fixed;
     left: 24px;
@@ -334,7 +329,6 @@
 </head>
 <body>
 
-  <!-- Opening screen -->
   <div class="opening" id="opening">
     <h1>GS OFFICE</h1>
     <div class="subtitle">- WALK &amp; TALK -</div>
@@ -344,7 +338,6 @@
     </div>
   </div>
 
-  <!-- Background image viewer -->
   <div class="bg-viewer hidden" id="bgViewer">
     <button class="close-bg" id="closeBgBtn">CLOSE ✕</button>
     <img src="img196battle.jpg" alt="background">
@@ -367,11 +360,10 @@
     </div>
 
     <div class="hint" id="hint">
-      Move: Arrow Keys / Talk: Approach an NPC and click / Door: Stand in front and click
+      Move: Arrow Keys / Talk: Approach an NPC and click / Door: Stand in front and click to open or close
     </div>
   </div>
 
-  <!-- Checklist panel -->
   <div class="checklist-panel" id="checklistPanel">
     <h2>CHECKLIST</h2>
     <div class="progress">Talked: <b id="clProgress">0</b> / 140</div>
@@ -382,7 +374,6 @@
     </div>
   </div>
 
-  <!-- Dialogue window -->
   <div class="dialogue" id="dialogue">
     <div class="d-head">
       <div class="d-name" id="dName">Name</div>
@@ -396,7 +387,6 @@
     </div>
   </div>
 
-  <!-- NPC info panel -->
   <div class="npc-panel" id="npcPanel">
     <div class="n-name" id="npName">Name</div>
     <div>Age: <span id="npAge">30</span></div>
@@ -524,6 +514,8 @@
 
   // ============================================================
   //  Doors
+  //  Doors DO block movement when closed.
+  //  When open, the player can pass through.
   // ============================================================
   function buildDoors() {
     doors = [];
@@ -1070,16 +1062,73 @@
   }
 
   // ============================================================
+  //  Collision helpers
+  // ============================================================
+  function circleRectCollide(cx, cy, r, rx, ry, rw, rh) {
+    const nx = clamp(cx, rx, rx + rw);
+    const ny = clamp(cy, ry, ry + rh);
+    const dx = cx - nx;
+    const dy = cy - ny;
+    return dx*dx + dy*dy < r*r;
+  }
+
+  // Push player out of a rect if overlapping
+  function resolveRectCollision(cx, cy, r, rx, ry, rw, rh) {
+    const nx = clamp(cx, rx, rx + rw);
+    const ny = clamp(cy, ry, ry + rh);
+    let dx = cx - nx;
+    let dy = cy - ny;
+    let d2 = dx*dx + dy*dy;
+    if (d2 >= r*r) return null;
+
+    if (d2 > 0.0001) {
+      const d = Math.sqrt(d2);
+      const overlap = r - d;
+      return { x: cx + (dx / d) * overlap, y: cy + (dy / d) * overlap };
+    } else {
+      // Center is inside the rect: push out to the nearest edge
+      const left   = cx - rx;
+      const right  = rx + rw - cx;
+      const top    = cy - ry;
+      const bottom = ry + rh - cy;
+      const min = Math.min(left, right, top, bottom);
+      if (min === left)   return { x: rx - r, y: cy };
+      if (min === right)  return { x: rx + rw + r, y: cy };
+      if (min === top)    return { x: cx, y: ry - r };
+      return { x: cx, y: ry + rh + r };
+    }
+  }
+
+  // ============================================================
   //  Update
+  //  Doors block movement when closed; open doors let you pass.
   // ============================================================
   function update(dt) {
     const sp = player.speed * 0.4;
-    if (keys.ArrowUp)    player.y -= sp;
-    if (keys.ArrowDown)  player.y += sp;
-    if (keys.ArrowLeft)  player.x -= sp;
-    if (keys.ArrowRight) player.x += sp;
-    player.x = clamp(player.x, 20, WORLD_W - 20);
-    player.y = clamp(player.y, 20, WORLD_H - 20);
+    let nx = player.x;
+    let ny = player.y;
+    if (keys.ArrowUp)    ny -= sp;
+    if (keys.ArrowDown)  ny += sp;
+    if (keys.ArrowLeft)  nx -= sp;
+    if (keys.ArrowRight) nx += sp;
+    nx = clamp(nx, 20, WORLD_W - 20);
+    ny = clamp(ny, 20, WORLD_H - 20);
+
+    // Apply X movement first, then resolve collisions
+    player.x = nx;
+    for (const dr of doors) {
+      if (dr.open) continue;
+      const res = resolveRectCollision(player.x, player.y, player.radius, dr.x, dr.y, dr.w, dr.h);
+      if (res) { player.x = res.x; player.y = res.y; }
+    }
+
+    // Then Y movement, then resolve collisions again
+    player.y = ny;
+    for (const dr of doors) {
+      if (dr.open) continue;
+      const res = resolveRectCollision(player.x, player.y, player.radius, dr.x, dr.y, dr.w, dr.h);
+      if (res) { player.x = res.x; player.y = res.y; }
+    }
 
     for (const n of npcs) {
       if (n.behavior === 'walk') {
@@ -1089,12 +1138,15 @@
       }
     }
 
+    // Find nearby NPC
     activeNPC = null;
     let bestD = 60;
     for (const n of npcs) {
       const d = dist(n.x, n.y, player.x, player.y);
       if (d < bestD) { bestD = d; activeNPC = n; }
     }
+
+    // Find nearby door
     activeDoor = null;
     let bestDoorD = 70;
     for (const dr of doors) {
@@ -1386,8 +1438,10 @@
     ctx.beginPath(); ctx.arc(x + 80, y + 50, 10, 0, Math.PI*2); ctx.fill();
   }
   function drawDoor(dr) {
+    // Closed door: solid brown with golden outline.
+    // Open door: greenish and slightly transparent.
     if (dr.open) {
-      ctx.fillStyle = '#2a5a3a';
+      ctx.fillStyle = 'rgba(42,90,58,0.55)';
       ctx.fillRect(dr.x, dr.y, dr.w, dr.h);
       ctx.strokeStyle = '#00e6b0';
       ctx.lineWidth = 2;
