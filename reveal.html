@@ -1,0 +1,1763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Imperial Household - Walk &amp; Talk</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; user-select:none; }
+  body {
+    background:#0a0c0f;
+    font-family:'Segoe UI','Helvetica Neue',sans-serif;
+    display:flex; justify-content:center; align-items:flex-start;
+    min-height:100vh; color:#e0e0e0;
+    padding:20px 0; overflow-y:auto;
+  }
+  .game-wrapper {
+    background:#11161c; border-radius:24px; padding:20px 20px 14px;
+    box-shadow:0 20px 40px rgba(0,0,0,0.8), 0 0 0 1px #2a3a4a inset;
+    display:flex; flex-direction:column; align-items:center; gap:12px;
+    width:fit-content;
+  }
+  canvas {
+    display:block; border-radius:16px; background:#0b0f14;
+    box-shadow:0 0 30px rgba(255,215,0,0.15);
+    cursor:crosshair; width:800px; height:600px;
+  }
+  .footer {
+    display:flex; flex-direction:column; gap:6px;
+    width:100%; padding:4px 8px 0; font-size:13px; color:#7a8b9b;
+    letter-spacing:0.5px;
+  }
+  .footer .status { display:flex; gap:16px; flex-wrap:wrap; }
+  .footer .status span { color:#b0c8d8; font-weight:500; }
+  .footer .status .highlight { color:#ffd700; text-shadow:0 0 8px #ffd70088; }
+  .footer .status .sp { color:#ffb347; text-shadow:0 0 8px #ffb34788; }
+  .footer .status .map-coord { color:#7ad7ff; text-shadow:0 0 8px #7ad7ff88; }
+  .footer .status .hidden-coord { display:none; }
+
+  .btn-row {
+    display:flex; gap:8px; flex-wrap:wrap; justify-content:center;
+    width:100%; padding:4px 0;
+  }
+  .ui-btn {
+    background:#1a2530; color:#ffd700; border:2px solid #ffd700;
+    border-radius:40px; padding:7px 16px; font-size:13px; font-weight:700;
+    letter-spacing:1px; cursor:pointer; transition:all 0.15s ease;
+    box-shadow:0 0 10px #ffd70033; font-family:inherit;
+  }
+  .ui-btn:hover { background:#ffd700; color:#0a0c0f; box-shadow:0 0 20px #ffd700aa; }
+  .ui-btn:active { transform:scale(0.96); }
+  .ui-btn:disabled {
+    opacity:0.35; cursor:not-allowed; border-color:#4a5a6a;
+    color:#4a5a6a; background:#151b22; box-shadow:none;
+  }
+  .ui-btn.map-toggle { color:#7ad7ff; border-color:#7ad7ff; box-shadow:0 0 10px #7ad7ff33; }
+  .ui-btn.map-toggle:hover { background:#7ad7ff; color:#0a0c0f; }
+  .ui-btn.minimap-toggle { color:#ff8ad8; border-color:#ff8ad8; box-shadow:0 0 10px #ff8ad833; }
+  .ui-btn.minimap-toggle:hover { background:#ff8ad8; color:#0a0c0f; }
+  .ui-btn.warn { color:#ff4d6d; border-color:#ff4d6d; box-shadow:0 0 10px #ff4d6d33; }
+  .ui-btn.warn:hover { background:#ff4d6d; color:#0a0c0f; }
+  .ui-btn.list { color:#ffd166; border-color:#ffd166; box-shadow:0 0 10px #ffd16633; }
+  .ui-btn.list:hover { background:#ffd166; color:#0a0c0f; }
+
+  .hidden { display:none !important; }
+  .hint { font-size:11px; color:#4a5a6a; margin-top:2px; text-align:center; width:100%; }
+
+  .opening {
+    position: fixed;
+    inset: 0;
+    background-image: url('img223house.jpg');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 30px;
+    z-index: 9999;
+    transition: opacity 0.5s ease;
+  }
+  .opening::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 0;
+  }
+  .opening h1 {
+    position: relative;
+    z-index: 1;
+    color: #ffd700;
+    font-size: 72px;
+    font-weight: 800;
+    letter-spacing: 8px;
+    text-shadow: 0 0 30px #ffd700aa, 0 0 60px #ffd70055;
+    font-family: 'Segoe UI', 'Helvetica Neue', sans-serif;
+  }
+  .opening .subtitle {
+    position: relative;
+    z-index: 1;
+    color: #d4c5a0;
+    font-size: 16px;
+    letter-spacing: 4px;
+    margin-top: -20px;
+  }
+  .opening .opening-btns {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .start-btn {
+    background: #ffd700;
+    color: #0a0c0f;
+    border: none;
+    border-radius: 50px;
+    padding: 18px 72px;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: 4px;
+    cursor: pointer;
+    font-family: inherit;
+    box-shadow: 0 0 30px #ffd700cc, 0 0 60px #ffd70066;
+    transition: all 0.2s ease;
+  }
+  .start-btn:hover {
+    transform: scale(1.06);
+    box-shadow: 0 0 50px #ffd700ff, 0 0 100px #ffd700aa;
+    background: #ffe44d;
+  }
+  .start-btn:active { transform: scale(0.98); }
+  .bgview-btn {
+    background: transparent;
+    color: #7ad7ff;
+    border: 2px solid #7ad7ff;
+    border-radius: 50px;
+    padding: 16px 40px;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    cursor: pointer;
+    font-family: inherit;
+    box-shadow: 0 0 20px #7ad7ff55;
+    transition: all 0.2s ease;
+  }
+  .bgview-btn:hover {
+    background: #7ad7ff;
+    color: #0a0c0f;
+    box-shadow: 0 0 40px #7ad7ffaa;
+  }
+  .opening.hidden-opening {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .bg-viewer {
+    position: fixed;
+    inset: 0;
+    background: #000;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+  }
+  .bg-viewer img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #000;
+  }
+  .bg-viewer .close-bg {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: #ff4d6d;
+    color: #fff;
+    border: none;
+    border-radius: 40px;
+    padding: 10px 24px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    box-shadow: 0 0 20px #ff4d6daa;
+  }
+  .bg-viewer .close-bg:hover { background: #ff8ad8; }
+
+  .checklist-panel {
+    position: fixed;
+    top: 0; right: 0; bottom: 0;
+    width: 340px;
+    background: #0d131a;
+    border-left: 2px solid #ffd700;
+    box-shadow: -10px 0 40px rgba(0,0,0,0.8);
+    z-index: 9000;
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    transform: translateX(100%);
+    transition: transform 0.25s ease;
+  }
+  .checklist-panel.open { transform: translateX(0); }
+  .checklist-panel h2 {
+    color: #ffd700;
+    font-size: 18px;
+    letter-spacing: 2px;
+    margin-bottom: 12px;
+    text-shadow: 0 0 10px #ffd70088;
+  }
+  .checklist-panel .progress {
+    color: #b0c8d8;
+    font-size: 13px;
+    margin-bottom: 12px;
+  }
+  .checklist-panel .progress b { color: #ffd700; }
+  .checklist-scroll {
+    flex: 1;
+    overflow-y: auto;
+    border-top: 1px solid #3a2a1a;
+    border-bottom: 1px solid #3a2a1a;
+    padding: 8px 0;
+  }
+  .checklist-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #b0c8d8;
+  }
+  .checklist-item.checked { color: #ffd700; background: #ffd70010; }
+  .checklist-item .mark { width: 16px; text-align: center; }
+  .checklist-item .rank { color: #ffb347; font-size: 11px; margin-left: auto; }
+  .checklist-panel .panel-btns {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .checklist-panel .panel-btns button { flex: 1; }
+
+  .dialogue {
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    transform: translateX(-50%) translateY(20px);
+    width: 720px;
+    max-width: 92vw;
+    background: #0d131aee;
+    border: 2px solid #ffd700;
+    border-radius: 16px;
+    padding: 18px 22px;
+    z-index: 9500;
+    box-shadow: 0 0 40px #ffd70055;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+  .dialogue.open {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(-50%) translateY(0);
+  }
+  .dialogue .d-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+  .dialogue .d-name {
+    color: #ffd700;
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: 1px;
+  }
+  .dialogue .d-meta {
+    color: #7a8b9b;
+    font-size: 12px;
+  }
+  .dialogue .d-meta b { color: #ffb347; }
+  .dialogue .d-text {
+    color: #e0e0e0;
+    font-size: 16px;
+    line-height: 1.6;
+    min-height: 60px;
+    letter-spacing: 0.3px;
+  }
+  .dialogue .d-foot {
+    display: flex;
+    gap: 10px;
+    margin-top: 14px;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+  .dialogue .d-page {
+    color: #7a8b9b;
+    font-size: 12px;
+    margin-right: auto;
+    align-self: center;
+  }
+
+  .npc-panel {
+    position: fixed;
+    left: 24px;
+    bottom: 24px;
+    background: #0d131aee;
+    border: 2px solid #ffb347;
+    border-radius: 14px;
+    padding: 12px 16px;
+    z-index: 9400;
+    color: #e0e0e0;
+    font-size: 13px;
+    line-height: 1.5;
+    box-shadow: 0 0 30px #ffb34744;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+    max-width: 280px;
+  }
+  .npc-panel.open { opacity: 1; }
+  .npc-panel .n-name { color: #ffb347; font-weight: 800; font-size: 15px; }
+  .npc-panel .n-rank { color: #ffd166; }
+  .npc-panel .n-role { color: #b0c8d8; }
+  .npc-panel .n-hint { color: #ffd700; font-size: 11px; margin-top: 6px; }
+</style>
+</head>
+<body>
+
+  <div class="opening" id="opening">
+    <h1>IMPERIAL HOUSEHOLD</h1>
+    <div class="subtitle">- WALK &amp; TALK -</div>
+    <div class="opening-btns">
+      <button class="start-btn" id="startBtn">START</button>
+      <button class="bgview-btn" id="bgViewBtn">VIEW BACKGROUND</button>
+    </div>
+  </div>
+
+  <div class="bg-viewer hidden" id="bgViewer">
+    <button class="close-bg" id="closeBgBtn">CLOSE ✕</button>
+    <img src="img223house.jpg" alt="background">
+  </div>
+
+  <div class="game-wrapper">
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+    <div class="footer" id="footer">
+      <div class="status">
+        <span>Talked: <span id="talkedDisplay" class="highlight">0</span>/140</span>
+        <span>Area: <span id="areaDisplay" class="sp">Outer Gate</span></span>
+        <span id="mapCoordSpan" class="hidden-coord">Map: <span id="mapDisplay" class="map-coord">7,11</span></span>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="ui-btn list" id="checklistBtn">📋 CHECKLIST</button>
+      <button class="ui-btn minimap-toggle" id="minimapBtn">🗺 SHOW MINIMAP</button>
+      <button class="ui-btn map-toggle" id="mapToggleBtn">📍 SHOW COORDS</button>
+    </div>
+
+    <div class="hint" id="hint">
+      Move: Arrow Keys / Talk: Approach an NPC and click / Door: Stand in front and click to open or close
+    </div>
+  </div>
+
+  <div class="checklist-panel" id="checklistPanel">
+    <h2>CHECKLIST</h2>
+    <div class="progress">Talked: <b id="clProgress">0</b> / 140</div>
+    <div class="checklist-scroll" id="checklistScroll"></div>
+    <div class="panel-btns">
+      <button class="ui-btn" id="clClose">CLOSE</button>
+      <button class="ui-btn warn" id="clReset">RESET</button>
+    </div>
+  </div>
+
+  <div class="dialogue" id="dialogue">
+    <div class="d-head">
+      <div class="d-name" id="dName">Name</div>
+      <div class="d-meta">Age <b id="dAge">30</b> / Rank <b id="dRank">50</b> / <span id="dRole">Role</span></div>
+    </div>
+    <div class="d-text" id="dText"></div>
+    <div class="d-foot">
+      <div class="d-page" id="dPage">1 / 1</div>
+      <button class="ui-btn" id="dNext">NEXT ▶</button>
+      <button class="ui-btn warn" id="dClose">CLOSE</button>
+    </div>
+  </div>
+
+  <div class="npc-panel" id="npcPanel">
+    <div class="n-name" id="npName">Name</div>
+    <div>Age: <span id="npAge">30</span></div>
+    <div class="n-rank">Rank: <span id="npRank">50</span> / 100</div>
+    <div class="n-role">Role: <span id="npRole">Trader</span></div>
+    <div class="n-hint">Click to talk</div>
+  </div>
+
+<script>
+(function(){
+  // ============================================================
+  //  Basic setup
+  // ============================================================
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  const talkedDisplay = document.getElementById('talkedDisplay');
+  const areaDisplay = document.getElementById('areaDisplay');
+  const mapDisplay = document.getElementById('mapDisplay');
+  const mapCoordSpan = document.getElementById('mapCoordSpan');
+  const checklistBtn = document.getElementById('checklistBtn');
+  const minimapBtn = document.getElementById('minimapBtn');
+  const mapToggleBtn = document.getElementById('mapToggleBtn');
+  const checklistPanel = document.getElementById('checklistPanel');
+  const checklistScroll = document.getElementById('checklistScroll');
+  const clProgress = document.getElementById('clProgress');
+  const clClose = document.getElementById('clClose');
+  const clReset = document.getElementById('clReset');
+  const dialogue = document.getElementById('dialogue');
+  const dName = document.getElementById('dName');
+  const dAge = document.getElementById('dAge');
+  const dRank = document.getElementById('dRank');
+  const dRole = document.getElementById('dRole');
+  const dText = document.getElementById('dText');
+  const dPage = document.getElementById('dPage');
+  const dNext = document.getElementById('dNext');
+  const dClose = document.getElementById('dClose');
+  const npcPanel = document.getElementById('npcPanel');
+  const npName = document.getElementById('npName');
+  const npAge = document.getElementById('npAge');
+  const npRank = document.getElementById('npRank');
+  const npRole = document.getElementById('npRole');
+
+  const W = 800, H = 600;
+  const MAP_W = 800, MAP_H = 600;
+  const MAP_COLS = 11, MAP_ROWS = 11;
+  const WORLD_W = MAP_W * MAP_COLS;
+  const WORLD_H = MAP_H * MAP_ROWS;
+
+  const STORAGE_KEY = 'imperial_household_talked_v1';
+
+  // ============================================================
+  //  Game state
+  // ============================================================
+  const player = {
+    x: WORLD_W / 2, y: WORLD_H / 2,
+    speed: 90,
+    angle: 0,
+    radius: 16,
+  };
+
+  const keys = { ArrowUp:false, ArrowDown:false, ArrowLeft:false, ArrowRight:false };
+  let mouseX = W/2, mouseY = H/2;
+  let lastTime = 0;
+  let showMapCoord = false;
+  let showMinimap = false;
+  let talked = new Set();
+  let npcs = [];
+  let doors = [];
+  let walls = [];
+  let areas = [];
+  let activeNPC = null;
+  let activeDoor = null;
+  let conversation = null;
+
+  // ============================================================
+  //  Utilities
+  // ============================================================
+  const rand = (min, max) => Math.random() * (max - min) + min;
+  const randInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+  const dist = (x1,y1,x2,y2) => Math.hypot(x2-x1, y2-y1);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const pick = arr => arr[Math.floor(Math.random()*arr.length)];
+
+  // ============================================================
+  //  Area definition (11x11) — Imperial Palace & surroundings
+  // ============================================================
+  function buildAreas() {
+    const grid = [
+      ['outer','outer','road','road','garden','garden','garden','garden','garden','garden','garden'],
+      ['outer','gate','gate','courtyard','courtyard','courtyard','courtyard','garden','garden','garden','garden'],
+      ['road','gate','residence','residence','residence','audience','audience','courtyard','garden','garden','garden'],
+      ['road','courtyard','residence','residence','residence','audience','audience','courtyard','tea','tea','garden'],
+      ['garden','courtyard','residence','residence','residence','courtyard','courtyard','courtyard','tea','tea','garden'],
+      ['garden','office','office','courtyard','archive','archive','courtyard','lounge','tea','tea','garden'],
+      ['garden','office','office','courtyard','archive','archive','courtyard','lounge','courtyard','courtyard','garden'],
+      ['garden','courtyard','courtyard','courtyard','courtyard','courtyard','courtyard','lounge','dojo','dojo','garden'],
+      ['garden','shrine','shrine','courtyard','library','library','courtyard','courtyard','dojo','dojo','garden'],
+      ['garden','shrine','shrine','courtyard','library','library','courtyard','rooftop','rooftop','rooftop','garden'],
+      ['garden','garden','garden','garden','garden','garden','garden','rooftop','rooftop','rooftop','garden'],
+    ];
+    const nameMap = {
+      outer:'Outer Precinct', road:'Imperial Road', garden:'Palace Garden',
+      gate:'Main Gate', courtyard:'Courtyard', residence:'Imperial Residence',
+      audience:'Audience Chamber', tea:'Tea House', office:'Chancellery',
+      archive:'Imperial Archive', lounge:'Lounge', dojo:'Martial Hall',
+      shrine:'Shrine', library:'Imperial Library', rooftop:'Rooftop Garden',
+    };
+    areas = [];
+    for (let r = 0; r < MAP_ROWS; r++) {
+      for (let c = 0; c < MAP_COLS; c++) {
+        areas.push({
+          col:c, row:r,
+          x:c*MAP_W, y:r*MAP_H,
+          w:MAP_W, h:MAP_H,
+          type:grid[r][c],
+          name:nameMap[grid[r][c]] || 'Area',
+        });
+      }
+    }
+  }
+
+  function areaAt(x, y) {
+    const c = clamp(Math.floor(x / MAP_W), 0, MAP_COLS-1);
+    const r = clamp(Math.floor(y / MAP_H), 0, MAP_ROWS-1);
+    return areas.find(a => a.col===c && a.row===r) || areas[0];
+  }
+
+  // ============================================================
+  //  Walls + Doors
+  // ============================================================
+  const WALL_THICK = 20;
+  const DOOR_LEN = 80;
+
+  function isOutdoor(a) {
+    return a.type === 'garden' || a.type === 'outer' ||
+           a.type === 'road';
+  }
+
+  function buildWallsAndDoors() {
+    walls = [];
+    doors = [];
+
+    const visited = new Set();
+
+    function boundaryKey(x1, y1, x2, y2) {
+      if (x1 > x2 || (x1 === x2 && y1 > y2)) {
+        return `${x2},${y2}-${x1},${y1}`;
+      }
+      return `${x1},${y1}-${x2},${y2}`;
+    }
+
+    function buildBoundary(a, side) {
+      let x1, y1, x2, y2;
+      let horizontal;
+      if (side === 'top') {
+        x1 = a.x; y1 = a.y; x2 = a.x + a.w; y2 = a.y;
+        horizontal = true;
+      } else if (side === 'bottom') {
+        x1 = a.x; y1 = a.y + a.h; x2 = a.x + a.w; y2 = a.y + a.h;
+        horizontal = true;
+      } else if (side === 'left') {
+        x1 = a.x; y1 = a.y; x2 = a.x; y2 = a.y + a.h;
+        horizontal = false;
+      } else {
+        x1 = a.x + a.w; y1 = a.y; x2 = a.x + a.w; y2 = a.y + a.h;
+        horizontal = false;
+      }
+
+      const key = boundaryKey(x1, y1, x2, y2);
+      if (visited.has(key)) return;
+      visited.add(key);
+
+      const cx = (x1 + x2) / 2;
+      const cy = (y1 + y2) / 2;
+
+      if (horizontal) {
+        const wallY = (side === 'top') ? a.y : a.y + a.h;
+        walls.push({ x:a.x, y:wallY - WALL_THICK/2, w:(a.w - DOOR_LEN)/2, h:WALL_THICK });
+        walls.push({ x:a.x + (a.w + DOOR_LEN)/2, y:wallY - WALL_THICK/2, w:(a.w - DOOR_LEN)/2, h:WALL_THICK });
+        doors.push({
+          x: cx - DOOR_LEN/2,
+          y: wallY - 8,
+          w: DOOR_LEN,
+          h: 16,
+          open: false,
+          area: a,
+          side: side,
+        });
+      } else {
+        const wallX = (side === 'left') ? a.x : a.x + a.w;
+        walls.push({ x:wallX - WALL_THICK/2, y:a.y, w:WALL_THICK, h:(a.h - DOOR_LEN)/2 });
+        walls.push({ x:wallX - WALL_THICK/2, y:a.y + (a.h + DOOR_LEN)/2, w:WALL_THICK, h:(a.h - DOOR_LEN)/2 });
+        doors.push({
+          x: wallX - 8,
+          y: cy - DOOR_LEN/2,
+          w: 16,
+          h: DOOR_LEN,
+          open: false,
+          area: a,
+          side: side,
+        });
+      }
+    }
+
+    for (const a of areas) {
+      if (isOutdoor(a)) continue;
+      buildBoundary(a, 'top');
+      buildBoundary(a, 'bottom');
+      buildBoundary(a, 'left');
+      buildBoundary(a, 'right');
+    }
+  }
+
+  // ============================================================
+  //  NPC data (140 people) — Imperial bloodline, aides & staff
+  // ============================================================
+  const FIRST_NAMES = [
+    'Akihito','Michiko','Naruhito','Masako','Aiko','Fumihito','Kiko','Mako','Kako','Hisahito',
+    'Takahito','Yuriko','Tsuneyoshi','Nobuko','Tomohito','Nobuko','Yoshihito','Hisako','Norihito','Hisako',
+    'Sugihito','Kazuko','Yasuhito','Kazuko','Tadateru','Kikuko','Katsura','Toshiko','Fumihito','Kiko',
+    'Iemasa','Kazuko','Morihiro','Yoshiko','Yoshimitsu','Hisako','Takamasa','Nobuko','Iehisa','Sachiko',
+    'Tsunetada','Yoshiko','Tsuneo','Keiko','Masahito','Hanako','Yoshihisa','Kazuko','Norihisa','Sachiko',
+    'Yoshiharu','Fumiko','Yasuhiko','Yoshiko','Toshihito','Noriko','Takaharu','Yoshiko','Tadashi','Keiko',
+    'Hiroaki','Michiko','Yasuhiro','Yoshiko','Toshiaki','Noriko','Yoshitaka','Yoshiko','Toshihiro','Keiko',
+    'Hiroshi','Yoshiko','Yoshio','Yoshiko','Toshio','Yoshiko','Hiroshi','Yoshiko','Yoshio','Yoshiko',
+    'Kenji','Yoko','Taro','Hanako','Ichiro','Miyuki','Jiro','Keiko','Saburo','Yuki',
+    'Shiro','Aiko','Goro','Naoko','Rokuro','Mieko','Shichiro','Fumiko','Hachiro','Setsuko',
+    'Kuro','Toshiko','Juro','Kazuko','Taro','Sachiko','Jiro','Fumiko','Saburo','Mieko',
+    'Shiro','Haruko','Goro','Sumiko','Rokuro','Yoshiko','Shichiro','Teruko','Hachiro','Kiyoko',
+    'Kuro','Akiko','Juro','Yoko','Taro','Hiroko','Jiro','Yaeko','Saburo','Mutsuko',
+    'Shiro','Chieko','Goro','Chiyoko','Rokuro','Kazue','Shichiro','Fumie','Hachiro','Sadako',
+  ];
+  const LAST_NAMES = [
+    'Kōshitsu','Yamato','Fujiwara','Minamoto','Taira','Tachibana','Sugawara','Abe',
+    'Kikkawa','Hosokawa','Konoe','Takatsukasa','Kujō','Ichijō','Nijō','Sanjō',
+    'Saionji','Tokudaiji','Imadegawa','Asukai','Karasuma','Reizei','Oinomikado','Kazanin',
+    'Hirohata','Nakahara','Sasaki','Ōkawa','Kitabatake','Kusunoki','Nawa','Yoshida',
+    'Ishikawa','Sakai','Ii','Honda','Ogasawara','Takeda','Uesugi','Mōri',
+    'Shimazu','Date','Matsudaira','Ii','Hotta','Mizuno','Toda','Aoyama',
+    'Nabeshima','Ikeda','Asano','Yamanouchi','Tanaka','Suzuki','Takahashi','Watanabe',
+  ];
+  const ROLES = [
+    'Emperor','Empress','Crown Prince','Crown Princess','Prince','Princess',
+    'Prince Akishino','Princess Kiko','Princess Mako','Princess Kako','Prince Hisahito',
+    'Grand Chamberlain','Chamberlain','Lady-in-Waiting','Imperial Aide','Court Physician',
+    'Imperial Guard','Palace Police','Ceremonial Officer','Shrine Priest','Archive Keeper',
+    'Tea Master','Gardener','Chef','Swordsmanship Master','Librarian','Calligrapher',
+    'Poet','Historian','Musician','Astronomer','Master of Ceremonies',
+  ];
+
+  const EN_LINES = {
+    'Emperor': [
+      "Welcome to the Imperial Residence.",
+      "The harmony of the people is my greatest wish.",
+      "I hope you find peace in these gardens.",
+      "May our conversation be fruitful.",
+    ],
+    'Empress': [
+      "It is a pleasure to meet you.",
+      "The tea house is especially beautiful today.",
+      "I often walk in the garden at dawn.",
+      "Please enjoy your visit.",
+    ],
+    'Crown Prince': [
+      "I am preparing for my future duties.",
+      "The audience chamber is where I learn.",
+      "My father teaches me much about leadership.",
+      "The people's happiness is our guide.",
+    ],
+    'Crown Princess': [
+      "I support my husband in all his duties.",
+      "The library is my favorite place here.",
+      "I believe in the power of quiet diplomacy.",
+      "Welcome to our home.",
+    ],
+    'Prince': [
+      "I enjoy studying history in the archive.",
+      "The dojo is where I train my spirit.",
+      "My siblings and I play in the garden.",
+      "It is an honor to meet you.",
+    ],
+    'Princess': [
+      "The tea ceremony is a beautiful art.",
+      "I love walking among the cherry trees.",
+      "My mother taught me calligraphy.",
+      "Please feel at home here.",
+    ],
+    'Grand Chamberlain': [
+      "I oversee the daily operations of the palace.",
+      "The Emperor is expecting you.",
+      "Everything must be perfect for the audience.",
+      "It is my duty to serve the Imperial family.",
+    ],
+    'Chamberlain': [
+      "I attend to the Emperor's needs.",
+      "The schedule is quite full today.",
+      "The gardens require constant care.",
+      "Please follow me to the audience chamber.",
+    ],
+    'Lady-in-Waiting': [
+      "The Empress is resting in the tea house.",
+      "I arrange the flowers for the ceremonies.",
+      "The silk robes are prepared for the banquet.",
+      "It is a privilege to serve.",
+    ],
+    'Imperial Aide': [
+      "I handle correspondence for the palace.",
+      "The archive holds records of centuries.",
+      "The Emperor's messages are most important.",
+      "We must be discreet in all matters.",
+    ],
+    'Court Physician': [
+      "The health of the Imperial family is my duty.",
+      "Herbal remedies are still useful today.",
+      "I examine the Emperor every morning.",
+      "A healthy body supports a clear mind.",
+    ],
+    'Imperial Guard': [
+      "Halt. State your business.",
+      "The palace is well protected.",
+      "I have served here for twenty years.",
+      "Please keep to the designated paths.",
+    ],
+    'Palace Police': [
+      "Security is our highest priority.",
+      "The outer gate is heavily guarded.",
+      "We coordinate with the local authorities.",
+      "Enjoy your visit safely.",
+    ],
+    'Ceremonial Officer': [
+      "The rituals must be performed precisely.",
+      "The Emperor's robes are sacred.",
+      "We prepare for the New Year ceremony.",
+      "Tradition guides our every step.",
+    ],
+    'Shrine Priest': [
+      "The shrine is the heart of the palace.",
+      "I perform the daily offerings.",
+      "The gods protect this house.",
+      "Please bow before entering.",
+    ],
+    'Archive Keeper': [
+      "The imperial records go back a thousand years.",
+      "I preserve the scrolls with great care.",
+      "History teaches us humility.",
+      "You may read, but do not remove.",
+    ],
+    'Tea Master': [
+      "The way of tea is the way of peace.",
+      "One bowl, one heart.",
+      "The water must be just the right temperature.",
+      "Please enjoy this matcha.",
+    ],
+    'Gardener': [
+      "The cherry trees are my children.",
+      "Each season brings new beauty.",
+      "The moss garden requires daily attention.",
+      "The Emperor loves these flowers.",
+    ],
+    'Chef': [
+      "The kaiseki dinner is almost ready.",
+      "Fresh fish from the market this morning.",
+      "The Emperor prefers light flavors.",
+      "Cooking for the palace is an honor.",
+    ],
+    'Swordsmanship Master': [
+      "The way of the sword is the way of the spirit.",
+      "Focus your mind before you strike.",
+      "The dojo is a place of discipline.",
+      "The Prince shows great promise.",
+    ],
+    'Librarian': [
+      "The imperial library holds rare texts.",
+      "Silence is observed here.",
+      "I recommend the poetry collection.",
+      "Knowledge is a treasure.",
+    ],
+    'Calligrapher': [
+      "Each stroke must be perfect.",
+      "The Emperor admires my work.",
+      "Ink and brush are my tools.",
+      "The characters carry the spirit.",
+    ],
+    'Poet': [
+      "The cherry blossoms inspire me.",
+      "I write in the traditional forms.",
+      "The Emperor often requests verses.",
+      "Words can capture the wind.",
+    ],
+    'Historian': [
+      "I study the reigns of past emperors.",
+      "The Meiji period was transformative.",
+      "The archives are a goldmine.",
+      "History is the mirror of the soul.",
+    ],
+    'Musician': [
+      "The gagaku ensemble plays at ceremonies.",
+      "The koto strings are tuned to the seasons.",
+      "Music calms the spirit.",
+      "The Emperor appreciates our art.",
+    ],
+    'Astronomer': [
+      "I chart the heavens for auspicious days.",
+      "The stars guide our calendar.",
+      "The Emperor consults me on eclipses.",
+      "The universe is vast and orderly.",
+    ],
+    'Master of Ceremonies': [
+      "Every bow has a precise angle.",
+      "The order of precedence matters.",
+      "The Emperor's entrance must be flawless.",
+      "It is my duty to orchestrate.",
+    ],
+    'Prince Akishino': [
+      "My family and I are glad you came.",
+      "The garden is beautiful this time of year.",
+      "My son Hisahito is studying hard.",
+      "Tradition and modernity must balance.",
+    ],
+    'Princess Kiko': [
+      "I enjoy arranging flowers for the palace.",
+      "The children keep me busy.",
+      "The tea house is a peaceful retreat.",
+      "Welcome to our home.",
+    ],
+    'Princess Mako': [
+      "I love visiting the library.",
+      "The old tales are fascinating.",
+      "The garden is my favorite place.",
+      "Thank you for coming.",
+    ],
+    'Princess Kako': [
+      "I practice calligraphy every morning.",
+      "The dojo is where I find focus.",
+      "My family is very important to me.",
+      "It's a lovely day, isn't it?",
+    ],
+    'Prince Hisahito': [
+      "I am learning about our history.",
+      "The Emperor is my grandfather.",
+      "I like playing in the garden.",
+      "One day I will serve the people.",
+    ],
+  };
+
+  const START_X = 6 * MAP_W + MAP_W / 2;
+  const START_Y = 10 * MAP_H + MAP_H / 2;
+
+  function buildNPCs() {
+    npcs = [];
+    const total = 140;
+    const rolePlan = [];
+    rolePlan.push({role:'Emperor', count:1, rankMin:100, rankMax:100});
+    rolePlan.push({role:'Empress', count:1, rankMin:100, rankMax:100});
+    rolePlan.push({role:'Crown Prince', count:1, rankMin:99, rankMax:99});
+    rolePlan.push({role:'Crown Princess', count:1, rankMin:99, rankMax:99});
+    rolePlan.push({role:'Prince', count:2, rankMin:95, rankMax:98});
+    rolePlan.push({role:'Princess', count:2, rankMin:95, rankMax:98});
+    rolePlan.push({role:'Prince Akishino', count:1, rankMin:97, rankMax:97});
+    rolePlan.push({role:'Princess Kiko', count:1, rankMin:97, rankMax:97});
+    rolePlan.push({role:'Princess Mako', count:1, rankMin:92, rankMax:92});
+    rolePlan.push({role:'Princess Kako', count:1, rankMin:92, rankMax:92});
+    rolePlan.push({role:'Prince Hisahito', count:1, rankMin:94, rankMax:94});
+    rolePlan.push({role:'Grand Chamberlain', count:2, rankMin:88, rankMax:90});
+    rolePlan.push({role:'Chamberlain', count:6, rankMin:75, rankMax:85});
+    rolePlan.push({role:'Lady-in-Waiting', count:8, rankMin:70, rankMax:80});
+    rolePlan.push({role:'Imperial Aide', count:6, rankMin:65, rankMax:78});
+    rolePlan.push({role:'Court Physician', count:3, rankMin:70, rankMax:82});
+    rolePlan.push({role:'Imperial Guard', count:12, rankMin:30, rankMax:55});
+    rolePlan.push({role:'Palace Police', count:8, rankMin:30, rankMax:50});
+    rolePlan.push({role:'Ceremonial Officer', count:5, rankMin:60, rankMax:75});
+    rolePlan.push({role:'Shrine Priest', count:3, rankMin:55, rankMax:70});
+    rolePlan.push({role:'Archive Keeper', count:3, rankMin:50, rankMax:65});
+    rolePlan.push({role:'Tea Master', count:2, rankMin:60, rankMax:72});
+    rolePlan.push({role:'Gardener', count:8, rankMin:20, rankMax:45});
+    rolePlan.push({role:'Chef', count:4, rankMin:30, rankMax:55});
+    rolePlan.push({role:'Swordsmanship Master', count:2, rankMin:65, rankMax:75});
+    rolePlan.push({role:'Librarian', count:3, rankMin:40, rankMax:60});
+    rolePlan.push({role:'Calligrapher', count:2, rankMin:50, rankMax:65});
+    rolePlan.push({role:'Poet', count:3, rankMin:45, rankMax:60});
+    rolePlan.push({role:'Historian', count:3, rankMin:50, rankMax:65});
+    rolePlan.push({role:'Musician', count:4, rankMin:35, rankMax:55});
+    rolePlan.push({role:'Astronomer', count:2, rankMin:60, rankMax:70});
+    rolePlan.push({role:'Master of Ceremonies', count:2, rankMin:80, rankMax:88});
+
+    let idx = 0;
+    for (const plan of rolePlan) {
+      for (let i = 0; i < plan.count && idx < total; i++) {
+        const role = plan.role;
+        const age = role.includes('Prince') || role.includes('Princess') || role === 'Emperor' || role === 'Empress'
+          ? randInt(18, 85)
+          : randInt(22, 70);
+        const rank = (role === 'Emperor' || role === 'Empress') ? 100 : randInt(plan.rankMin, plan.rankMax);
+        const first = pick(FIRST_NAMES);
+        const last = pick(LAST_NAMES);
+        const name = `${first} ${last}`;
+
+        let areaType = 'courtyard';
+        if (role === 'Emperor' || role === 'Empress' || role === 'Crown Prince' || role === 'Crown Princess')
+          areaType = 'residence';
+        else if (role.includes('Prince') || role.includes('Princess'))
+          areaType = 'residence';
+        else if (role === 'Grand Chamberlain' || role === 'Chamberlain' || role === 'Lady-in-Waiting')
+          areaType = 'courtyard';
+        else if (role === 'Imperial Guard' || role === 'Palace Police')
+          areaType = 'gate';
+        else if (role === 'Tea Master')
+          areaType = 'tea';
+        else if (role === 'Shrine Priest')
+          areaType = 'shrine';
+        else if (role === 'Archive Keeper')
+          areaType = 'archive';
+        else if (role === 'Swordsmanship Master')
+          areaType = 'dojo';
+        else if (role === 'Librarian' || role === 'Historian')
+          areaType = 'library';
+        else if (role === 'Chef')
+          areaType = 'courtyard';
+        else if (role === 'Gardener')
+          areaType = 'garden';
+        else if (role === 'Astronomer')
+          areaType = 'rooftop';
+        else areaType = pick(['courtyard','office','lounge','library','garden']);
+
+        const areaCandidates = areas.filter(a => a.type === areaType);
+        const area = areaCandidates.length ? pick(areaCandidates) : pick(areas);
+        let x = rand(area.x + 80, area.x + area.w - 80);
+        let y = rand(area.y + 80, area.y + area.h - 80);
+
+        const dStart = dist(x, y, START_X, START_Y);
+        if (dStart < 120) {
+          const ang = Math.atan2(y - START_Y, x - START_X);
+          x = START_X + Math.cos(ang) * 150;
+          y = START_Y + Math.sin(ang) * 150;
+          x = clamp(x, area.x + 40, area.x + area.w - 40);
+          y = clamp(y, area.y + 40, area.y + area.h - 40);
+        }
+
+        let behavior = 'idle';
+        if (areaType === 'garden' || areaType === 'courtyard' || areaType === 'outer') {
+          behavior = Math.random() < 0.6 ? 'walk' : 'idle';
+        } else if (areaType === 'residence' || areaType === 'office' || areaType === 'archive') {
+          behavior = Math.random() < 0.8 ? 'idle' : 'walk';
+        } else {
+          behavior = Math.random() < 0.5 ? 'walk' : 'idle';
+        }
+
+        const walkRange = behavior === 'walk' ? rand(40, 160) : 0;
+        const baseX = x, baseY = y;
+        const phase = Math.random() * Math.PI * 2;
+        const speed = behavior === 'walk' ? rand(0.3, 0.9) : 0;
+
+        const baseLines = EN_LINES[role] || EN_LINES['Imperial Aide'];
+        const talkLen = randInt(1, Math.max(1, baseLines.length));
+        const dialogueEN = baseLines.slice(0, talkLen);
+
+        npcs.push({
+          id: idx,
+          name, age, rank, role,
+          x, y,
+          baseX, baseY,
+          behavior, walkRange, phase, speed,
+          radius: 14,
+          dialogueEN,
+          talked: false,
+        });
+        idx++;
+      }
+    }
+    while (npcs.length < total) {
+      const first = pick(FIRST_NAMES);
+      const last = pick(LAST_NAMES);
+      const area = pick(areas);
+      let x = rand(area.x + 80, area.x + area.w - 80);
+      let y = rand(area.y + 80, area.y + area.h - 80);
+      const dStart = dist(x, y, START_X, START_Y);
+      if (dStart < 120) {
+        const ang = Math.atan2(y - START_Y, x - START_X);
+        x = START_X + Math.cos(ang) * 150;
+        y = START_Y + Math.sin(ang) * 150;
+      }
+      const role = pick(ROLES);
+      const baseLines = EN_LINES[role] || EN_LINES['Imperial Aide'];
+      npcs.push({
+        id: npcs.length,
+        name: `${first} ${last}`,
+        age: randInt(22, 70),
+        rank: randInt(0, 99),
+        role,
+        x, y, baseX:x, baseY:y,
+        behavior: Math.random() < 0.5 ? 'walk' : 'idle',
+        walkRange: rand(40, 160),
+        phase: Math.random() * Math.PI * 2,
+        speed: rand(0.3, 0.9),
+        radius: 14,
+        dialogueEN: baseLines,
+        talked: false,
+      });
+    }
+  }
+
+  // ============================================================
+  //  Save / Load
+  // ============================================================
+  function loadTalked() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const arr = JSON.parse(raw);
+        talked = new Set(arr);
+        for (const n of npcs) {
+          if (talked.has(n.id)) n.talked = true;
+        }
+      }
+    } catch(e) { talked = new Set(); }
+  }
+  function saveTalked() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify([...talked]));
+    } catch(e) {}
+  }
+
+  // ============================================================
+  //  Init
+  // ============================================================
+  function initGame() {
+    buildAreas();
+    buildWallsAndDoors();
+    buildNPCs();
+    player.x = START_X;
+    player.y = START_Y;
+    loadTalked();
+    updateHUD();
+    buildChecklist();
+  }
+
+  function updateHUD() {
+    talkedDisplay.textContent = talked.size;
+    const a = areaAt(player.x, player.y);
+    areaDisplay.textContent = a.name;
+    const c = Math.floor(player.x / MAP_W) + 1;
+    const r = Math.floor(player.y / MAP_H) + 1;
+    mapDisplay.textContent = `${c},${r}`;
+  }
+
+  // ============================================================
+  //  Checklist
+  // ============================================================
+  function buildChecklist() {
+    checklistScroll.innerHTML = '';
+    for (const n of npcs) {
+      const div = document.createElement('div');
+      div.className = 'checklist-item' + (talked.has(n.id) ? ' checked' : '');
+      div.innerHTML = `<span class="mark">${talked.has(n.id) ? '✔' : '□'}</span>
+        <span>${n.name}</span>
+        <span class="rank">${n.rank}</span>`;
+      checklistScroll.appendChild(div);
+    }
+    clProgress.textContent = talked.size;
+  }
+
+  // ============================================================
+  //  Input
+  // ============================================================
+  window.addEventListener('keydown', (e) => {
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) {
+      e.preventDefault();
+      keys[e.key] = true;
+    }
+    if (e.key === 'Escape') {
+      closeDialogue();
+      closeChecklist();
+    }
+  });
+  window.addEventListener('keyup', (e) => {
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) {
+      e.preventDefault();
+      keys[e.key] = false;
+    }
+  });
+
+  canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const sx = canvas.width / rect.width;
+    const sy = canvas.height / rect.height;
+    mouseX = (e.clientX - rect.left) * sx;
+    mouseY = (e.clientY - rect.top) * sy;
+  });
+
+  canvas.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    if (conversation) {
+      nextDialogue();
+      return;
+    }
+    if (activeDoor) {
+      activeDoor.open = !activeDoor.open;
+      return;
+    }
+    if (activeNPC) {
+      startDialogue(activeNPC);
+      return;
+    }
+  });
+
+  checklistBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    checklistPanel.classList.toggle('open');
+    buildChecklist();
+  });
+  minimapBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    showMinimap = !showMinimap;
+    minimapBtn.textContent = showMinimap ? '🗺 HIDE MINIMAP' : '🗺 SHOW MINIMAP';
+  });
+  clClose.addEventListener('click', (e) => { e.preventDefault(); closeChecklist(); });
+  clReset.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (confirm('Are you sure you want to reset?')) {
+      if (confirm('Are you really sure you want to reset?')) {
+        if (confirm('Final warning: really reset all progress?')) {
+          talked = new Set();
+          for (const n of npcs) n.talked = false;
+          saveTalked();
+          buildChecklist();
+          updateHUD();
+        }
+      }
+    }
+  });
+  mapToggleBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    showMapCoord = !showMapCoord;
+    if (showMapCoord) {
+      mapCoordSpan.classList.remove('hidden-coord');
+      mapToggleBtn.textContent = '📍 HIDE COORDS';
+    } else {
+      mapCoordSpan.classList.add('hidden-coord');
+      mapToggleBtn.textContent = '📍 SHOW COORDS';
+    }
+  });
+
+  dNext.addEventListener('click', (e) => { e.preventDefault(); nextDialogue(); });
+  dClose.addEventListener('click', (e) => { e.preventDefault(); closeDialogue(); });
+
+  function closeChecklist() { checklistPanel.classList.remove('open'); }
+
+  // ============================================================
+  //  Dialogue
+  // ============================================================
+  function startDialogue(npc) {
+    conversation = { npc, page: 0 };
+    dName.textContent = npc.name;
+    dAge.textContent = npc.age;
+    dRank.textContent = npc.rank;
+    dRole.textContent = npc.role;
+    renderDialogue();
+    dialogue.classList.add('open');
+    if (!talked.has(npc.id)) {
+      talked.add(npc.id);
+      npc.talked = true;
+      saveTalked();
+      updateHUD();
+      buildChecklist();
+    }
+  }
+
+  function renderDialogue() {
+    if (!conversation) return;
+    const { npc, page } = conversation;
+    dText.textContent = npc.dialogueEN[page] || '';
+    dPage.textContent = `${page+1} / ${npc.dialogueEN.length}`;
+    dNext.textContent = (page < npc.dialogueEN.length - 1) ? 'NEXT ▶' : 'FINISH';
+  }
+
+  function nextDialogue() {
+    if (!conversation) return;
+    if (conversation.page < conversation.npc.dialogueEN.length - 1) {
+      conversation.page++;
+      renderDialogue();
+    } else {
+      closeDialogue();
+    }
+  }
+
+  function closeDialogue() {
+    conversation = null;
+    dialogue.classList.remove('open');
+  }
+
+  // ============================================================
+  //  Collision
+  // ============================================================
+  function resolveRectCollision(cx, cy, r, rx, ry, rw, rh) {
+    const nx = clamp(cx, rx, rx + rw);
+    const ny = clamp(cy, ry, ry + rh);
+    const dx = cx - nx;
+    const dy = cy - ny;
+    const d2 = dx*dx + dy*dy;
+    if (d2 >= r*r) return null;
+
+    if (d2 > 0.0001) {
+      const d = Math.sqrt(d2);
+      const overlap = r - d;
+      return { x: cx + (dx / d) * overlap, y: cy + (dy / d) * overlap };
+    }
+    const left   = cx - rx;
+    const right  = rx + rw - cx;
+    const top    = cy - ry;
+    const bottom = ry + rh - cy;
+    const min = Math.min(left, right, top, bottom);
+    if (min === left)   return { x: rx - r, y: cy };
+    if (min === right)  return { x: rx + rw + r, y: cy };
+    if (min === top)    return { x: cx, y: ry - r };
+    return { x: cx, y: ry + rh + r };
+  }
+
+  function tryMovePlayer(dx, dy) {
+    let nx = clamp(player.x + dx, 20, WORLD_W - 20);
+    player.x = nx;
+    for (const w of walls) {
+      const res = resolveRectCollision(player.x, player.y, player.radius, w.x, w.y, w.w, w.h);
+      if (res) { player.x = res.x; player.y = res.y; }
+    }
+    for (const dr of doors) {
+      if (dr.open) continue;
+      const res = resolveRectCollision(player.x, player.y, player.radius, dr.x, dr.y, dr.w, dr.h);
+      if (res) { player.x = res.x; player.y = res.y; }
+    }
+
+    let ny = clamp(player.y + dy, 20, WORLD_H - 20);
+    player.y = ny;
+    for (const w of walls) {
+      const res = resolveRectCollision(player.x, player.y, player.radius, w.x, w.y, w.w, w.h);
+      if (res) { player.x = res.x; player.y = res.y; }
+    }
+    for (const dr of doors) {
+      if (dr.open) continue;
+      const res = resolveRectCollision(player.x, player.y, player.radius, dr.x, dr.y, dr.w, dr.h);
+      if (res) { player.x = res.x; player.y = res.y; }
+    }
+  }
+
+  // ============================================================
+  //  Update
+  // ============================================================
+  function update(dt) {
+    const baseSpeed = player.speed * 0.4;
+
+    let dx = 0, dy = 0;
+    if (keys.ArrowUp)    dy -= 1;
+    if (keys.ArrowDown)  dy += 1;
+    if (keys.ArrowLeft)  dx -= 1;
+    if (keys.ArrowRight) dx += 1;
+
+    if (dx !== 0 || dy !== 0) {
+      const len = Math.hypot(dx, dy);
+      dx = dx / len * baseSpeed;
+      dy = dy / len * baseSpeed;
+
+      const total = Math.hypot(dx, dy);
+      const steps = Math.max(1, Math.ceil(total / 4));
+      const stepX = dx / steps;
+      const stepY = dy / steps;
+      for (let s = 0; s < steps; s++) {
+        tryMovePlayer(stepX, stepY);
+      }
+    }
+
+    const camX = clamp(player.x - W/2, 0, WORLD_W - W);
+    const camY = clamp(player.y - H/2, 0, WORLD_H - H);
+    const wmx = mouseX + camX;
+    const wmy = mouseY + camY;
+    player.angle = Math.atan2(wmy - player.y, wmx - player.x);
+
+    for (const n of npcs) {
+      if (n.behavior === 'walk') {
+        n.phase += 0.02 * n.speed;
+        n.x = n.baseX + Math.cos(n.phase) * n.walkRange;
+        n.y = n.baseY + Math.sin(n.phase * 0.8) * n.walkRange * 0.5;
+      }
+    }
+
+    activeNPC = null;
+    let bestD = 60;
+    for (const n of npcs) {
+      const d = dist(n.x, n.y, player.x, player.y);
+      if (d < bestD) { bestD = d; activeNPC = n; }
+    }
+
+    activeDoor = null;
+    let bestDoorD = 55;
+    for (const dr of doors) {
+      const cx = dr.x + dr.w/2;
+      const cy = dr.y + dr.h/2;
+      const d = dist(cx, cy, player.x, player.y);
+      if (d < bestDoorD) { bestDoorD = d; activeDoor = dr; }
+    }
+
+    if (activeNPC && !conversation) {
+      npName.textContent = activeNPC.name;
+      npAge.textContent = activeNPC.age;
+      npRank.textContent = activeNPC.rank;
+      npRole.textContent = activeNPC.role;
+      npcPanel.classList.add('open');
+    } else {
+      npcPanel.classList.remove('open');
+    }
+
+    updateHUD();
+  }
+
+  // ============================================================
+  //  Draw
+  // ============================================================
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    const camX = clamp(player.x - W/2, 0, WORLD_W - W);
+    const camY = clamp(player.y - H/2, 0, WORLD_H - H);
+    ctx.save();
+    ctx.translate(-camX, -camY);
+
+    for (const a of areas) {
+      if (a.x > camX + W || a.x + a.w < camX || a.y > camY + H || a.y + a.h < camY) continue;
+      drawArea(a);
+    }
+
+    for (const dr of doors) {
+      if (dr.x > camX + W || dr.x + dr.w < camX || dr.y > camY + H || dr.y + dr.h < camY) continue;
+      drawDoor(dr);
+    }
+
+    for (const n of npcs) {
+      if (n.x < camX - 40 || n.x > camX + W + 40 || n.y < camY - 40 || n.y > camY + H + 40) continue;
+      drawNPC(n);
+    }
+
+    drawPlayer();
+
+    if (activeNPC && !conversation) {
+      ctx.fillStyle = '#ffd700';
+      ctx.font = 'bold 13px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Click to talk', activeNPC.x, activeNPC.y - 34);
+    }
+    if (activeDoor) {
+      ctx.fillStyle = '#7ad7ff';
+      ctx.font = 'bold 12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(activeDoor.open ? 'Click to close' : 'Click to open',
+        activeDoor.x + activeDoor.w/2, activeDoor.y - 6);
+    }
+
+    ctx.restore();
+    if (showMinimap) drawMinimap();
+  }
+
+  function drawArea(a) {
+    if (a.type === 'garden') {
+      ctx.fillStyle = '#0e2a1a';
+      ctx.fillRect(a.x, a.y, a.w, a.h);
+      for (let i = 0; i < 8; i++) {
+        const tx = a.x + 60 + (i * 90) % (a.w - 100);
+        const ty = a.y + 60 + Math.floor(i / 4) * 240;
+        drawTree(tx, ty);
+      }
+      drawRockGarden(a.x + a.w/2 - 60, a.y + a.h/2);
+    } else if (a.type === 'outer') {
+      ctx.fillStyle = '#11181a';
+      ctx.fillRect(a.x, a.y, a.w, a.h);
+      ctx.fillStyle = '#2a3a3a';
+      for (let i = 0; i < 6; i++) {
+        ctx.fillRect(a.x + 30 + i*120, a.y + 30, 80, 8);
+        ctx.fillRect(a.x + 30 + i*120, a.y + a.h - 38, 80, 8);
+      }
+    } else if (a.type === 'road') {
+      ctx.fillStyle = '#1a1d22';
+      ctx.fillRect(a.x, a.y, a.w, a.h);
+      ctx.fillStyle = '#5a4a2a';
+      for (let i = 0; i < 8; i++) {
+        ctx.fillRect(a.x + 40 + i*90, a.y + a.h/2 - 3, 50, 6);
+      }
+    } else if (a.type === 'gate') {
+      ctx.fillStyle = '#1a1e22';
+      ctx.fillRect(a.x, a.y, a.w, a.h);
+      ctx.fillStyle = '#3a2a1a';
+      ctx.fillRect(a.x + a.w/2 - 150, a.y + 100, 300, 60);
+      ctx.fillStyle = '#ffd700';
+      ctx.fillRect(a.x + a.w/2 - 150, a.y + 100, 300, 8);
+      ctx.fillStyle = '#8b0000';
+      ctx.fillRect(a.x + a.w/2 - 30, a.y + 160, 60, 80);
+    } else if (a.type === 'residence') {
+      ctx.fillStyle = '#1a1410';
+      ctx.fillRect(a.x, a.y, a.w, a.h);
+      ctx.fillStyle = '#2a1f18';
+      ctx.fillRect(a.x + 60, a.y + 60, a.w - 120, a.h - 120);
+      ctx.strokeStyle = '#ffd700';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(a.x + 60, a.y + 60, a.w - 120, a.h - 120);
+      ctx.fillStyle = '#3a2a1a';
+      ctx.fillRect(a.x + a.w/2 - 120, a.y + 100, 240, 80);
+      ctx.fillStyle = '#ffd700';
+      ctx.beginPath();
+      ctx.arc(a.x + a.w/2, a.y + 140, 20, 0, Math.PI*2);
+      ctx.fill();
+    } else if (a.type === 'audience') {
+      ctx.fillStyle = '#1a1218';
+      ctx.fillRect(a.x, a.y, a.w, a.h);
+      ctx.fillStyle = '#2a1a2a';
+      ctx.beginPath();
+      ctx.ellipse(a.x + a.w/2, a.y + a.h/2, 200, 120, 0, 0, Math.PI*2);
+      ctx.fill();
+      ctx.strokeStyle = '#ffd700';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.fillStyle = '#8b0000';
+      ctx.fillRect(a.x + a.w/2 - 80, a.y + 80, 160, 60);
+    } else if (a.type === 'courtyard') {
+      ctx.fillStyle = '#1a1a1e';
+      ctx.fillRect(a.x, a.y, a.w, a.h);
+      ctx.fillStyle = '#2a2a2e';
+      for (let r = 0; r < 5; r++) {
+        for (let c = 0; c < 7; c++) {
+          ctx.fillRect(a.x + 40 + c*110, a.y + 40 + r*110, 60, 60);
+        }
+      }
+    } else if (a.type === 'tea') {
+      ctx.fillStyle = '#1a1e14';
+      ctx.fillRect(a.x, a.y, a.w, a.h);
+      ctx.fillStyle = '#2a3a1a';
+      ctx.beginPath();
+      ctx.arc(a.x + a.w/2, a.y + a.h/2, 60, 0, Math.PI*2);
+      ctx.fill();
+      ctx.strokeStyle = '#ffd700';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      drawTeaSet(a.x + a.w/2, a.y + a.h/2);
+    } else if (a.type === 'office') {
+      ctx.fillStyle = '#1a1a20';
+      ctx.fillRect(a.x, a.y, a.w, a.h);
+      for (let r = 0; r < 3; r++) {
+        for (let c = 0; c < 5; c++) {
+          drawDesk(a.x + 60 + c*140, a.y + 60 + r*160);
+        }
+      }
+    } else if (a.type === 'archive') {
+      ctx.fillStyle = '#1a1410';
+      ctx.fillRect(a.x, a.y, a.w, a.h);
+      for (let r = 0; r < 3; r++) {
+        for (let c = 0; c < 4; c++) {
+          drawBookshelf(a.x + 80 + c*180, a.y + 80 + r*160);
+        }
+      }
+    } else if (a.type === 'lounge') {
+      ctx.fillStyle = '#1a1a1a';
+      ctx.fillRect(a.x, a.y, a.w, a.h);
+      drawSofa(a.x + 120, a.y + 120);
+      drawSofa(a.x + 480, a.y + 120);
+      drawSofa(a.x + 120, a.y + 380);
+      drawSofa(a.x + 480, a.y + 380);
+      drawPlant(a.x + 60, a.y + 60);
+      drawPlant(a.x + a.w - 60, a.y + a.h - 60);
+    } else if (a.type === 'dojo') {
+      ctx.fillStyle = '#1a1814';
+      ctx.fillRect(a.x, a.y, a.w, a.h);
+      ctx.fillStyle = '#2a1a0a';
+      ctx.fillRect(a.x + 80, a.y + 80, a.w - 160, a.h - 160);
+      ctx.strokeStyle = '#ffd700';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(a.x + 80, a.y + 80, a.w - 160, a.h - 160);
+    } else if (a.type === 'shrine') {
+      ctx.fillStyle = '#1a1418';
+      ctx.fillRect(a.x, a.y, a.w, a.h);
+      ctx.fillStyle = '#8b0000';
+      ctx.fillRect(a.x + a.w/2 - 100, a.y + 100, 200, 40);
+      ctx.fillStyle = '#ffd700';
+      ctx.fillRect(a.x + a.w/2 - 120, a.y + 80, 240, 20);
+      ctx.fillStyle = '#3a2a1a';
+      ctx.fillRect(a.x + a.w/2 - 60, a.y + 140, 120, 60);
+    } else if (a.type === 'library') {
+      ctx.fillStyle = '#1a1814';
+      ctx.fillRect(a.x, a.y, a.w, a.h);
+      for (let r = 0; r < 3; r++) {
+        for (let c = 0; c < 4; c++) {
+          drawBookshelf(a.x + 80 + c*180, a.y + 80 + r*160);
+        }
+      }
+    } else if (a.type === 'rooftop') {
+      ctx.fillStyle = '#1a2a1a';
+      ctx.fillRect(a.x, a.y, a.w, a.h);
+      for (let i = 0; i < 4; i++) {
+        drawTree(a.x + 100 + i*200, a.y + 100);
+        drawBench(a.x + 100 + i*200, a.y + 400);
+      }
+    } else {
+      ctx.fillStyle = '#161c24';
+      ctx.fillRect(a.x, a.y, a.w, a.h);
+    }
+    ctx.strokeStyle = '#3a2a1a';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(a.x, a.y, a.w, a.h);
+    ctx.fillStyle = '#8a7a5a';
+    ctx.font = 'bold 14px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(a.name, a.x + 12, a.y + 24);
+  }
+
+  function drawDesk(x, y) {
+    ctx.fillStyle = '#2a1f18';
+    ctx.fillRect(x, y, 100, 60);
+    ctx.fillStyle = '#1a0f08';
+    ctx.fillRect(x + 10, y + 8, 80, 30);
+    ctx.fillStyle = '#ffd700';
+    ctx.fillRect(x + 14, y + 12, 72, 22);
+    ctx.fillStyle = '#2a1f18';
+    ctx.fillRect(x + 20, y + 70, 60, 20);
+  }
+  function drawChair(x, y) {
+    ctx.fillStyle = '#3a2a1a';
+    ctx.beginPath();
+    ctx.arc(x, y, 12, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillRect(x - 12, y - 24, 24, 12);
+  }
+  function drawRoundTable(x, y) {
+    ctx.fillStyle = '#3a2a1a';
+    ctx.beginPath();
+    ctx.arc(x, y, 40, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle = '#ffd700';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+  function drawSofa(x, y) {
+    ctx.fillStyle = '#2a1a2a';
+    ctx.fillRect(x, y, 100, 50);
+    ctx.fillStyle = '#1a0a1a';
+    ctx.fillRect(x, y, 100, 15);
+  }
+  function drawPlant(x, y) {
+    ctx.fillStyle = '#3a2a1a';
+    ctx.fillRect(x - 10, y + 10, 20, 20);
+    ctx.fillStyle = '#1a5a2a';
+    ctx.beginPath();
+    ctx.arc(x, y, 18, 0, Math.PI*2);
+    ctx.fill();
+  }
+  function drawServerRack(x, y) {
+    ctx.fillStyle = '#1a2a3a';
+    ctx.fillRect(x, y, 80, 120);
+    ctx.strokeStyle = '#2a4a6a';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 8; i++) {
+      ctx.strokeRect(x + 6, y + 6 + i*14, 68, 10);
+      ctx.fillStyle = Math.random() < 0.5 ? '#ffd700' : '#ff4d6d';
+      ctx.fillRect(x + 10, y + 8 + i*14, 4, 4);
+    }
+  }
+  function drawBookshelf(x, y) {
+    ctx.fillStyle = '#3a2a1a';
+    ctx.fillRect(x, y, 120, 100);
+    for (let i = 0; i < 4; i++) {
+      ctx.fillStyle = '#2a1a0a';
+      ctx.fillRect(x + 6, y + 6 + i*24, 108, 20);
+      for (let j = 0; j < 6; j++) {
+        ctx.fillStyle = ['#ffd700','#8b0000','#ffb347','#7ad7ff','#ff8ad8'][j%5];
+        ctx.fillRect(x + 10 + j*16, y + 8 + i*24, 10, 16);
+      }
+    }
+  }
+  function drawTree(x, y) {
+    ctx.fillStyle = '#3a2a1a';
+    ctx.fillRect(x - 6, y, 12, 30);
+    ctx.fillStyle = '#1a5a2a';
+    ctx.beginPath();
+    ctx.arc(x, y - 10, 26, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = '#2a7a3a';
+    ctx.beginPath();
+    ctx.arc(x - 10, y - 20, 18, 0, Math.PI*2);
+    ctx.fill();
+  }
+  function drawBench(x, y) {
+    ctx.fillStyle = '#5a3a1a';
+    ctx.fillRect(x, y, 100, 14);
+    ctx.fillRect(x + 6, y + 14, 8, 20);
+    ctx.fillRect(x + 86, y + 14, 8, 20);
+  }
+  function drawCar(x, y) {
+    ctx.fillStyle = '#2a4a6a';
+    ctx.fillRect(x, y, 100, 50);
+    ctx.fillStyle = '#1a2a3a';
+    ctx.fillRect(x + 15, y + 8, 70, 20);
+    ctx.fillStyle = '#0a0c0f';
+    ctx.beginPath(); ctx.arc(x + 20, y + 50, 10, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x + 80, y + 50, 10, 0, Math.PI*2); ctx.fill();
+  }
+  function drawRockGarden(x, y) {
+    ctx.fillStyle = '#4a4a4a';
+    ctx.beginPath();
+    ctx.arc(x, y, 30, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = '#3a3a3a';
+    ctx.beginPath();
+    ctx.arc(x + 40, y + 20, 20, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = '#5a5a5a';
+    ctx.beginPath();
+    ctx.arc(x - 30, y + 30, 15, 0, Math.PI*2);
+    ctx.fill();
+  }
+  function drawTeaSet(x, y) {
+    ctx.fillStyle = '#2a1a0a';
+    ctx.beginPath();
+    ctx.arc(x, y, 20, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = '#ffd700';
+    ctx.beginPath();
+    ctx.arc(x, y, 8, 0, Math.PI*2);
+    ctx.fill();
+  }
+  function drawDoor(dr) {
+    if (dr.open) {
+      ctx.fillStyle = 'rgba(42,90,58,0.55)';
+      ctx.fillRect(dr.x, dr.y, dr.w, dr.h);
+      ctx.strokeStyle = '#ffd700';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(dr.x, dr.y, dr.w, dr.h);
+    } else {
+      ctx.fillStyle = '#5a3a1a';
+      ctx.fillRect(dr.x, dr.y, dr.w, dr.h);
+      ctx.strokeStyle = '#ffd700';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(dr.x, dr.y, dr.w, dr.h);
+      ctx.fillStyle = '#ffd700';
+      if (dr.w > dr.h) {
+        ctx.beginPath(); ctx.arc(dr.x + dr.w - 8, dr.y + dr.h/2, 3, 0, Math.PI*2); ctx.fill();
+      } else {
+        ctx.beginPath(); ctx.arc(dr.x + dr.w/2, dr.y + dr.h - 8, 3, 0, Math.PI*2); ctx.fill();
+      }
+    }
+  }
+
+  function drawNPC(n) {
+    const x = n.x, y = n.y;
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.beginPath();
+    ctx.ellipse(x, y + 16, 12, 4, 0, 0, Math.PI*2);
+    ctx.fill();
+    const isRoyal = n.rank >= 90;
+    const isNoble = n.rank >= 60;
+    const bodyColor = isRoyal ? '#3a1a2a' : (isNoble ? '#1a2a4a' : '#2a2a2a');
+    ctx.fillStyle = bodyColor;
+    ctx.fillRect(x - 8, y - 4, 16, 20);
+    ctx.fillStyle = '#e0c0a0';
+    ctx.beginPath();
+    ctx.arc(x, y - 12, 8, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = ['#1a1a1a','#3a2a1a','#5a4a2a','#7a6a3a'][n.id % 4];
+    ctx.beginPath();
+    ctx.arc(x, y - 15, 8, Math.PI, Math.PI*2);
+    ctx.fill();
+    if (talked.has(n.id)) {
+      ctx.fillStyle = '#ffd700';
+      ctx.font = 'bold 12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('✔', x + 12, y - 18);
+    }
+    if (n.rank === 100) {
+      ctx.fillStyle = '#ffd700';
+      ctx.beginPath();
+      ctx.moveTo(x - 10, y - 22);
+      ctx.lineTo(x - 6, y - 28);
+      ctx.lineTo(x, y - 22);
+      ctx.lineTo(x + 6, y - 28);
+      ctx.lineTo(x + 10, y - 22);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  function drawPlayer() {
+    const x = player.x, y = player.y;
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.beginPath();
+    ctx.ellipse(x, y + 16, 12, 4, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 18;
+    ctx.fillStyle = '#1a1a0a';
+    ctx.beginPath();
+    ctx.arc(x, y, player.radius, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle = '#ffd700'; ctx.lineWidth = 2.5;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#ffd700'; ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + Math.cos(player.angle)*24, y + Math.sin(player.angle)*24);
+    ctx.stroke();
+  }
+
+  function drawMinimap() {
+    const mw = 160, mh = 120;
+    const mx = W - mw - 12, my = H - mh - 12;
+    ctx.fillStyle = 'rgba(10,12,15,0.8)';
+    ctx.fillRect(mx, my, mw, mh);
+    ctx.strokeStyle = '#3a2a1a';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(mx, my, mw, mh);
+    const sx = mw / WORLD_W, sy = mh / WORLD_H;
+    for (const a of areas) {
+      ctx.fillStyle = (a.type === 'garden') ? '#1a3a2a' :
+                      (a.type === 'outer' || a.type === 'road') ? '#2a2a2a' :
+                      (a.type === 'residence') ? '#3a1a2a' :
+                      (a.type === 'audience') ? '#2a1a2a' :
+                      (a.type === 'gate') ? '#3a2a1a' : '#1a222c';
+      ctx.fillRect(mx + a.x*sx, my + a.y*sy, a.w*sx, a.h*sy);
+    }
+    ctx.fillStyle = '#ffd700';
+    ctx.fillRect(mx + player.x*sx - 2, my + player.y*sy - 2, 4, 4);
+    ctx.fillStyle = '#ffd166';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('MINIMAP', mx + 4, my + 12);
+  }
+
+  // ============================================================
+  //  Loop
+  // ============================================================
+  function gameLoop(timestamp) {
+    const dt = Math.min(2, (timestamp - lastTime) / (1000/60));
+    lastTime = timestamp;
+    update(dt);
+    draw();
+    requestAnimationFrame(gameLoop);
+  }
+
+  // ============================================================
+  //  Opening
+  // ============================================================
+  const opening = document.getElementById('opening');
+  const startBtn = document.getElementById('startBtn');
+  const bgViewBtn = document.getElementById('bgViewBtn');
+  const bgViewer = document.getElementById('bgViewer');
+  const closeBgBtn = document.getElementById('closeBgBtn');
+
+  startBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    opening.classList.add('hidden-opening');
+    setTimeout(() => { opening.style.display = 'none'; }, 500);
+  });
+  bgViewBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    bgViewer.classList.remove('hidden');
+  });
+  closeBgBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    bgViewer.classList.add('hidden');
+  });
+
+  // ============================================================
+  //  Start
+  // ============================================================
+  initGame();
+  requestAnimationFrame(gameLoop);
+})();
+</script>
+</body>
+</html>
