@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>分解・組み立てゲーム - iPhone / AirTag / Battery</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+  html, body {
+    height: 100%; overflow: hidden; background: #111;
+    font-family: 'Segoe UI', Roboto, system-ui, sans-serif;
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #game-container {
+    position: relative;
+    width: 100vw; height: 100vh;
+    overflow: hidden;
+    background: #1e1e1e;
+  }
+
+  /* ===== オープニング ===== */
+  #opening-screen {
+    position: absolute; inset: 0;
+    background-image: url('img221mecha.jpg');
+    background-size: cover;
+    background-position: center;
+    background-color: #111;
+    display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
+    z-index: 100;
+    transition: opacity 0.5s ease;
+  }
+  #opening-screen h1 {
+    font-size: clamp(1.4rem, 5vw, 2.4rem);
+    color: #fff;
+    text-shadow: 3px 3px 0 #000, 5px 5px 0 rgba(52,152,219,0.5);
+    letter-spacing: 4px; margin-bottom: 26px; font-weight: 800;
+    background: rgba(0,0,0,0.4); padding: 10px 28px;
+    border-radius: 50px; backdrop-filter: blur(2px);
+    text-align: center;
+  }
+  .opening-buttons {
+    display: flex; flex-direction: column; gap: 16px;
+    align-items: center;
+  }
+  .opening-btn {
+    padding: 14px 56px;
+    font-size: clamp(1rem, 3vw, 1.3rem);
+    font-weight: bold; color: white;
+    border: none; border-radius: 50px; cursor: pointer;
+    transition: 0.08s linear; letter-spacing: 4px;
+    text-shadow: 2px 2px 0 black;
+    min-width: 260px;
+  }
+  #start-btn {
+    background: #c0392b;
+    box-shadow: 0 8px 0 #7a1f1a, 0 10px 22px black;
+  }
+  #start-btn:hover { background: #e74c3c; }
+  #start-btn:active {
+    box-shadow: 0 4px 0 #7a1f1a, 0 6px 18px black;
+    transform: translateY(6px);
+  }
+  #settings-btn {
+    background: #2980b9;
+    box-shadow: 0 8px 0 #1a5276, 0 10px 22px black;
+  }
+  #settings-btn:hover { background: #3498db; }
+  #settings-btn:active {
+    box-shadow: 0 4px 0 #1a5276, 0 6px 18px black;
+    transform: translateY(6px);
+  }
+  #bgview-btn {
+    background: #27ae60;
+    box-shadow: 0 8px 0 #196f3d, 0 10px 22px black;
+  }
+  #bgview-btn:hover { background: #2ecc71; }
+  #bgview-btn:active {
+    box-shadow: 0 4px 0 #196f3d, 0 6px 18px black;
+    transform: translateY(6px);
+  }
+
+  /* ===== ゲーム画面 ===== */
+  #game-screen {
+    position: absolute; inset: 0;
+    display: none;
+    background: radial-gradient(circle at 30% 30%, #2a2a2a 0%, #0a0a0a 100%);
+  }
+  #gameCanvas {
+    display: block; width: 100%; height: 100%;
+    touch-action: none;
+  }
+  #status {
+    position: absolute; top: 16px; left: 20px;
+    color: #ddd; background: rgba(0,0,0,0.65);
+    padding: 10px 22px; border-radius: 40px;
+    font-size: clamp(0.9rem, 2.5vw, 1.2rem);
+    font-weight: 600; backdrop-filter: blur(4px);
+    border-left: 6px solid #e74c3c;
+    pointer-events: none; z-index: 10; letter-spacing: 1px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.7);
+  }
+  #status span { color: #f1c40f; font-weight: 800; }
+  #mode-label {
+    position: absolute; top: 16px; right: 20px;
+    color: #fff; background: rgba(41,128,185,0.85);
+    padding: 10px 22px; border-radius: 40px;
+    font-size: clamp(0.8rem, 2.2vw, 1.1rem);
+    font-weight: 600; backdrop-filter: blur(4px);
+    z-index: 10; letter-spacing: 1px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.7);
+    pointer-events: none;
+  }
+  #hint {
+    position: absolute; bottom: 20px; left: 50%;
+    transform: translateX(-50%);
+    color: #aaa; background: rgba(0,0,0,0.6);
+    padding: 8px 26px; border-radius: 40px;
+    font-size: clamp(0.65rem, 1.8vw, 0.95rem);
+    letter-spacing: 1px; backdrop-filter: blur(4px);
+    border: 1px solid #444; pointer-events: none; z-index: 10;
+    white-space: nowrap; max-width: 90vw;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+  .hidden { opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+
+  /* ===== 完了画面 ===== */
+  #complete-screen {
+    position: absolute; inset: 0;
+    display: none;
+    flex-direction: column;
+    justify-content: center; align-items: center;
+    background: radial-gradient(circle at 50% 40%, #1a3a1f 0%, #0a0a0a 100%);
+    z-index: 200;
+    text-align: center;
+    padding: 20px;
+  }
+  #complete-screen h2 {
+    font-size: clamp(1.8rem, 7vw, 3.4rem);
+    color: #f1c40f;
+    text-shadow: 4px 4px 0 #000, 0 0 30px rgba(241,196,15,0.6);
+    letter-spacing: 5px;
+    margin-bottom: 16px;
+    font-weight: 900;
+  }
+  #complete-screen p {
+    font-size: clamp(0.95rem, 2.8vw, 1.4rem);
+    color: #ccc;
+    margin-bottom: 34px;
+    letter-spacing: 2px;
+  }
+  #go-intricate-btn {
+    padding: 18px 70px;
+    font-size: clamp(1.2rem, 4.5vw, 1.8rem);
+    font-weight: bold;
+    background: #8e44ad;
+    color: white;
+    border: none;
+    border-radius: 60px;
+    cursor: pointer;
+    box-shadow: 0 10px 0 #5b2c6f, 0 12px 25px black;
+    transition: 0.08s linear;
+    letter-spacing: 4px;
+    text-shadow: 2px 2px 0 black;
+  }
+  #go-intricate-btn:active {
+    box-shadow: 0 4px 0 #5b2c6f, 0 8px 20px black;
+    transform: translateY(6px);
+  }
+  #go-intricate-btn:hover { background: #9b59b6; }
+
+  /* ===== 設定モーダル ===== */
+  #settings-modal {
+    display: none;
+    position: absolute; inset: 0;
+    background: rgba(10, 15, 25, 0.92);
+    backdrop-filter: blur(6px);
+    z-index: 150;
+    justify-content: center; align-items: center;
+    padding: 20px;
+  }
+  #settings-modal.active { display: flex; }
+  .settings-card {
+    background: #f0f4f0;
+    max-width: 460px; width: 100%;
+    padding: 34px 28px;
+    border-radius: 36px 18px 36px 18px;
+    box-shadow: 0 26px 50px rgba(0,0,0,0.8);
+    border: 6px solid #2980b9;
+    color: #1a2a1a;
+    text-align: center;
+  }
+  .settings-card h2 {
+    font-size: 26px;
+    border-bottom: 5px dotted #2980b9;
+    padding-bottom: 16px;
+    margin-bottom: 18px;
+    color: #1a3a6a;
+  }
+  .mode-option {
+    display: block;
+    width: 100%;
+    background: #e8eef5;
+    border: 3px solid #b0c4d8;
+    border-radius: 18px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    text-align: left;
+    font-size: 16px;
+    font-weight: 600;
+    color: #1a2a3a;
+    transition: 0.08s linear;
+  }
+  .mode-option:hover {
+    background: #d8e4f0;
+    border-color: #2980b9;
+  }
+  .mode-option.selected {
+    background: #2980b9;
+    border-color: #1a5276;
+    color: #fff;
+    box-shadow: 0 4px 0 #1a5276;
+  }
+  .mode-option .mode-title { font-size: 17px; font-weight: 800; display: block; }
+  .mode-option .mode-desc { font-size: 13px; opacity: 0.8; display: block; margin-top: 4px; }
+  .settings-close-btn {
+    background: #3a6b4a;
+    border: none;
+    border-bottom: 6px solid #1f3f2a;
+    color: white;
+    font-weight: bold;
+    font-size: 18px;
+    padding: 12px 30px;
+    border-radius: 60px;
+    cursor: pointer;
+    margin-top: 14px;
+    width: 100%;
+    transition: 0.05s linear;
+    box-shadow: 0 2px 0 #1a2a1a;
+  }
+  .settings-close-btn:active { transform: translateY(4px); border-bottom-width: 2px; }
+
+  /* ===== 背景ビューア ===== */
+  #bgview-modal {
+    display: none;
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,0.95);
+    z-index: 160;
+    justify-content: center; align-items: center;
+    padding: 20px;
+  }
+  #bgview-modal.active { display: flex; }
+  #bgview-modal img {
+    max-width: 100%; max-height: 90%;
+    object-fit: contain;
+    border-radius: 12px;
+    border: 4px solid #2980b9;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.9);
+  }
+  #bgview-close {
+    position: absolute;
+    top: 20px; right: 20px;
+    background: #c0392b;
+    color: white;
+    border: none;
+    border-radius: 50px;
+    padding: 12px 28px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 6px 0 #7a1f1a;
+    letter-spacing: 2px;
+  }
+  #bgview-close:active { transform: translateY(4px); box-shadow: 0 2px 0 #7a1f1a; }
+
+  /* ===== Twitchコメント（貼り付けコード参考） ===== */
+  .twitch-chat {
+    position: absolute;
+    right: 8px;
+    top: 10px;
+    width: 170px;
+    height: 360px;
+    pointer-events: none;
+    overflow: hidden;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.65);
+    border: 2px solid #6441a5;
+    box-shadow: 0 0 20px rgba(100, 65, 165, 0.5);
+    display: none;
+    z-index: 20;
+    backdrop-filter: blur(2px);
+    padding: 4px 0;
+  }
+  .twitch-chat.active { display: block; }
+  .chat-line {
+    color: #fff;
+    font-size: 12px;
+    padding: 2px 8px;
+    font-family: 'Segoe UI', 'Arial', sans-serif;
+    text-shadow: 0 0 6px #000;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    opacity: 0.95;
+    animation: chatScroll 7s linear forwards;
+    position: relative;
+    width: 100%;
+    line-height: 1.5;
+    background: rgba(0,0,0,0.2);
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    transform: translateY(0);
+  }
+  .chat-line .username {
+    color: #bf94ff;
+    font-weight: bold;
+    margin-right: 4px;
+    flex-shrink: 0;
+  }
+  .chat-line .message {
+    color: #f0f0f0;
+    display: inline-block;
+  }
+  @keyframes chatScroll {
+    0%   { opacity: 0; transform: translateY(20px); }
+    10%  { opacity: 1; transform: translateY(0); }
+    85%  { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(-20px); }
+  }
+
+  @media (max-width: 640px) {
+    .twitch-chat { width: 130px; height: 270px; right: 4px; top: 6px; }
+    .twitch-chat .chat-line { font-size: 10px; }
+    #start-btn, #settings-btn, #bgview-btn { min-width: 200px; padding: 12px 30px; }
+  }
+</style>
+</head>
+<body>
+<div id="game-container">
+
+  <!-- オープニング -->
+  <div id="opening-screen">
+    <h1>🔧 分解・組み立てゲーム</h1>
+    <div class="opening-buttons">
+      <button id="start-btn" class="opening-btn">はじめる</button>
+      <button id="settings-btn" class="opening-btn">⚙ 設定</button>
+      <button id="bgview-btn" class="opening-btn">🖼 背景画像を見る</button>
+    </div>
+  </div>
+
+  <!-- ゲーム画面 -->
+  <div id="game-screen">
+    <canvas id="gameCanvas"></canvas>
+    <div id="status">組み立て: <span id="assembledCount">0</span> / <span id="totalCount">5</span></div>
+    <div id="mode-label">📱 iPhone</div>
+    <div id="hint">パーツを長押しでドラッグ → 中央の組み立て位置へ</div>
+    <div id="twitch-chat" class="twitch-chat"></div>
+  </div>
+
+  <!-- 完了 → intricate.html -->
+  <div id="complete-screen">
+    <h2>✅ 組み立て完了！</h2>
+    <p>次の挑戦へ進もう。</p>
+    <button id="go-intricate-btn">intricate.html へ進む</button>
+  </div>
+
+  <!-- 設定モーダル -->
+  <div id="settings-modal">
+    <div class="settings-card">
+      <h2>⚙ 組み立てモード設定</h2>
+      <button class="mode-option selected" data-mode="iphone">
+        <span class="mode-title">📱 最新 iPhone</span>
+        <span class="mode-desc">5パーツ：画面 / バッテリー / 基板 / カメラ / 筐体</span>
+      </button>
+      <button class="mode-option" data-mode="airtag">
+        <span class="mode-title">🔵 AirTag (Apple)</span>
+        <span class="mode-desc">5パーツ：カバー / 基板 / スピーカー / 電池 / 背面</span>
+      </button>
+      <button class="mode-option" data-mode="battery">
+        <span class="mode-title">🔋 2010年ノートPCバッテリー</span>
+        <span class="mode-desc">5パーツ：外装 / セル / 基板 / コネクタ / ラベル</span>
+      </button>
+      <button class="settings-close-btn" id="settings-close">決定して戻る</button>
+    </div>
+  </div>
+
+  <!-- 背景ビューア -->
+  <div id="bgview-modal">
+    <img id="bgview-img" src="img221mecha.jpg" alt="背景画像">
+    <button id="bgview-close">✕ 閉じる</button>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  // ===== DOM =====
+  const openingScreen   = document.getElementById('opening-screen');
+  const gameScreen      = document.getElementById('game-screen');
+  const completeScreen  = document.getElementById('complete-screen');
+  const startBtn        = document.getElementById('start-btn');
+  const settingsBtn     = document.getElementById('settings-btn');
+  const bgviewBtn       = document.getElementById('bgview-btn');
+  const goIntricateBtn  = document.getElementById('go-intricate-btn');
+  const canvas          = document.getElementById('gameCanvas');
+  const ctx             = canvas.getContext('2d');
+  const assembledCountSpan = document.getElementById('assembledCount');
+  const totalCountSpan  = document.getElementById('totalCount');
+  const modeLabel       = document.getElementById('mode-label');
+  const twitchChat      = document.getElementById('twitch-chat');
+
+  const settingsModal   = document.getElementById('settings-modal');
+  const settingsClose   = document.getElementById('settings-close');
+  const modeOptions     = document.querySelectorAll('.mode-option');
+
+  const bgviewModal     = document.getElementById('bgview-modal');
+  const bgviewClose     = document.getElementById('bgview-close');
+
+  // ===== モード定義 =====
+  const MODES = {
+    iphone: {
+      label: '📱 iPhone',
+      parts: ['Screen','Battery','Logic Board','Camera','Frame'],
+      colors: ['#5dade2','#e74c3c','#27ae60','#8e44ad','#7f8c8d'],
+      sizes: [
+        { w: 150, h: 260 }, // Screen
+        { w: 130, h: 160 }, // Battery
+        { w: 150, h: 110 }, // Logic Board
+        { w: 110, h: 80  }, // Camera
+        { w: 170, h: 280 }  // Frame（一番大きい土台）
+      ],
+      initial: [
+        { x: 0.18, y: 0.28 },
+        { x: 0.82, y: 0.24 },
+        { x: 0.22, y: 0.76 },
+        { x: 0.80, y: 0.72 },
+        { x: 0.50, y: 0.85 }
+      ],
+      assembly: [
+        { x: 0.50, y: 0.42 }, // Screen
+        { x: 0.50, y: 0.55 }, // Battery
+        { x: 0.50, y: 0.62 }, // Logic Board
+        { x: 0.38, y: 0.30 }, // Camera
+        { x: 0.50, y: 0.50 }  // Frame（土台・背面）
+      ]
+    },
+    airtag: {
+      label: '🔵 AirTag',
+      parts: ['Cover','Logic Board','Speaker','Battery','Back Plate'],
+      colors: ['#ecf0f1','#27ae60','#e67e22','#f1c40f','#95a5a6'],
+      sizes: [
+        { w: 190, h: 190 }, // Cover（円盤）
+        { w: 150, h: 150 }, // Logic Board
+        { w: 100, h: 100 }, // Speaker
+        { w: 90,  h: 90  }, // Battery（CR2032）
+        { w: 200, h: 200 }  // Back Plate（一番大きい土台）
+      ],
+      initial: [
+        { x: 0.20, y: 0.30 },
+        { x: 0.80, y: 0.26 },
+        { x: 0.22, y: 0.74 },
+        { x: 0.78, y: 0.72 },
+        { x: 0.50, y: 0.86 }
+      ],
+      assembly: [
+        { x: 0.50, y: 0.50 }, // Cover
+        { x: 0.50, y: 0.50 }, // Logic Board
+        { x: 0.50, y: 0.50 }, // Speaker
+        { x: 0.50, y: 0.50 }, // Battery
+        { x: 0.50, y: 0.50 }  // Back Plate（土台）
+      ]
+    },
+    battery: {
+      label: '🔋 2010 Notebook Battery',
+      parts: ['Casing','Cells','PCB','Connector','Label'],
+      colors: ['#7f8c8d','#e67e22','#2980b9','#c0392b','#f1c40f'],
+      sizes: [
+        { w: 240, h: 130 }, // Casing
+        { w: 220, h: 100 }, // Cells
+        { w: 150, h: 70  }, // PCB
+        { w: 90,  h: 60  }, // Connector
+        { w: 200, h: 100 }  // Label
+      ],
+      initial: [
+        { x: 0.20, y: 0.30 },
+        { x: 0.80, y: 0.26 },
+        { x: 0.22, y: 0.74 },
+        { x: 0.80, y: 0.72 },
+        { x: 0.50, y: 0.86 }
+      ],
+      assembly: [
+        { x: 0.50, y: 0.50 }, // Casing（土台）
+        { x: 0.50, y: 0.48 }, // Cells
+        { x: 0.50, y: 0.44 }, // PCB
+        { x: 0.38, y: 0.36 }, // Connector
+        { x: 0.50, y: 0.52 }  // Label
+      ]
+    }
+  };
+
+  let currentMode = 'iphone'; // デフォルト：iPhone
+
+  // ===== ゲーム状態 =====
+  let gameActive = false;
+  let assembledParts = 0;
+  let parts = [];
+  let draggingPart = null;
+  let dragOffsetX = 0, dragOffsetY = 0;
+  let activePointerId = null;
+
+  // ===== Twitchコメント関連 =====
+  let chatInterval = null;
+  const COMMENT_TOPICS = {
+    chelsea: [
+      "チェルシーの3バックは機能してる？",
+      "やっぱ4-2-3-1だよね",
+      "エンソ・フェルナンデスの位置が鍵",
+      "チェルシーは若手を買いすぎ問題",
+      "ストライカー不在が痛い",
+      "ポチェッティーノの采配どう思う？",
+      "コール・パーマー伸びたなぁ",
+      "チェルシーの補強はもはやパズル",
+      "アウェイでの守備ブロックが弱い",
+      "セットプレーもう少し何とかならない？",
+      "チェルシーは監督コロコロ変わりすぎ",
+      "ギャラガー残してほしかった",
+      "今季のチェルシーは中位が妥当？",
+      "スタンフォードブリッジの雰囲気好き",
+      "ロンドンダービーは熱い"
+    ],
+    usa: [
+      "日本人が住むならカリフォルニア？",
+      "テキサスは暑すぎるって",
+      "ワシントン州は雨多いよね",
+      "ニューヨークは物価高い",
+      "フロリダはハリケーンが怖い",
+      "コロラドは自然が豊か",
+      "ノースカロライナは住みやすいらしい",
+      "アリゾナは乾燥してる",
+      "オレゴンはポートランドが人気",
+      "ジョージアはアトランタが中心",
+      "マサチューセッツは学術都市",
+      "イリノイはシカゴが寒い",
+      "ハワイは物価が異常",
+      "ネバダはラスベガス以外住みにくい？",
+      "ミシガンは五大湖が近い"
+    ],
+    zoo: [
+      "1人で動物園行ったことある",
+      "レッサーパンダ可愛すぎた",
+      "ゾウの餌やり楽しかった",
+      "1人だと自分のペースで見れる",
+      "ペンギンの散歩見た",
+      "キリンの首の長さに感動",
+      "1人動物園は意外と楽しい",
+      "ゴリラの迫力やばかった",
+      "フラミンゴのピンクが綺麗",
+      "1人で行くと写真撮りづらい",
+      "ホワイトタイガーかっこよかった",
+      "カピバラの温泉見たい",
+      "1人動物園デビューおすすめ",
+      "コアラは寝てばかりだった",
+      "プレーリードッグが可愛い"
+    ]
+  };
+  const TOPIC_KEYS = Object.keys(COMMENT_TOPICS);
+
+  function addChatLine(msg) {
+    const username = 'viewer' + Math.floor(Math.random() * 1000);
+    // 4文字ずつに分割して複数行にする（貼り付けコード参考）
+    const chunks = [];
+    for (let i = 0; i < msg.length; i += 4) {
+      chunks.push(msg.substring(i, i + 4));
+    }
+    chunks.forEach(function(chunk, index) {
+      const line = document.createElement('div');
+      line.className = 'chat-line';
+      if (index === 0) {
+        line.innerHTML = '<span class="username">' + username + '</span><span class="message">' + chunk + '</span>';
+      } else {
+        line.innerHTML = '<span class="message" style="padding-left:4px;">' + chunk + '</span>';
+      }
+      twitchChat.appendChild(line);
+    });
+    while (twitchChat.children.length > 30) {
+      twitchChat.removeChild(twitchChat.firstChild);
+    }
+    twitchChat.scrollTop = twitchChat.scrollHeight;
+  }
+
+  function randomComment() {
+    if (!gameActive) return;
+    const topicKey = TOPIC_KEYS[Math.floor(Math.random() * TOPIC_KEYS.length)];
+    const pool = COMMENT_TOPICS[topicKey];
+    const msg = pool[Math.floor(Math.random() * pool.length)];
+    addChatLine(msg);
+  }
+
+  function startChat() {
+    twitchChat.classList.add('active');
+    twitchChat.innerHTML = '';
+    addChatLine('🔴 コメント欄オープン！');
+    if (chatInterval) clearInterval(chatInterval);
+    chatInterval = setInterval(randomComment, 2600);
+  }
+
+  function stopChat() {
+    if (chatInterval) { clearInterval(chatInterval); chatInterval = null; }
+    twitchChat.classList.remove('active');
+    twitchChat.innerHTML = '';
+  }
+
+  // ===== キャンバスサイズ =====
+  function resizeCanvas() {
+    const dpr = window.devicePixelRatio || 1;
+    const w = gameScreen.clientWidth;
+    const h = gameScreen.clientHeight;
+    canvas.width  = w * dpr;
+    canvas.height = h * dpr;
+    canvas.style.width  = w + 'px';
+    canvas.style.height = h + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    draw();
+  }
+  window.addEventListener('resize', resizeCanvas);
+
+  // ===== パーツ初期化 =====
+  function initParts() {
+    const mode = MODES[currentMode];
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    parts = mode.parts.map((name, i) => ({
+      id: i,
+      name,
+      color: mode.colors[i],
+      w: mode.sizes[i].w,
+      h: mode.sizes[i].h,
+      x: mode.initial[i].x * w,
+      y: mode.initial[i].y * h,
+      assembled: false,
+      dragging: false
+    }));
+    assembledParts = 0;
+    totalCountSpan.textContent = mode.parts.length;
+    updateStatus();
+    modeLabel.textContent = mode.label;
+    // ヒント文言もモードに合わせて変更
+    document.getElementById('hint').textContent =
+      mode.parts.length + 'パーツを長押しでドラッグ → 中央の組み立て位置へ';
+  }
+
+  function updateStatus() {
+    assembledCountSpan.textContent = assembledParts;
+  }
+
+  // ===== 座標変換 =====
+  function getCanvasPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    };
+  }
+
+  function hitTest(px, py, part) {
+    return px >= part.x - part.w/2 && px <= part.x + part.w/2 &&
+           py >= part.y - part.h/2 && py <= part.y + part.h/2;
+  }
+
+  // ===== ドラッグ =====
+  canvas.addEventListener('pointerdown', (e) => {
+    if (!gameActive) return;
+    if (e.button !== 0 && e.pointerType === 'mouse') return;
+    e.preventDefault();
+    const pos = getCanvasPos(e);
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const p = parts[i];
+      if (p.assembled) continue;
+      if (hitTest(pos.x, pos.y, p)) {
+        draggingPart = p;
+        p.dragging = true;
+        dragOffsetX = pos.x - p.x;
+        dragOffsetY = pos.y - p.y;
+        activePointerId = e.pointerId;
+        canvas.setPointerCapture(e.pointerId);
+        draw();
+        break;
+      }
+    }
+  });
+
+  canvas.addEventListener('pointermove', (e) => {
+    if (!draggingPart || e.pointerId !== activePointerId) return;
+    e.preventDefault();
+    const pos = getCanvasPos(e);
+    draggingPart.x = pos.x - dragOffsetX;
+    draggingPart.y = pos.y - dragOffsetY;
+    draw();
+  });
+
+  function endDrag(e) {
+    if (!draggingPart || e.pointerId !== activePointerId) return;
+    e.preventDefault();
+    const p = draggingPart;
+    p.dragging = false;
+
+    const mode = MODES[currentMode];
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    const target = mode.assembly[p.id];
+    const tx = target.x * w;
+    const ty = target.y * h;
+    const dist = Math.hypot(p.x - tx, p.y - ty);
+    const threshold = Math.max(p.w, p.h) * 0.55;
+
+    if (dist < threshold) {
+      p.x = tx;
+      p.y = ty;
+      p.assembled = true;
+      assembledParts++;
+      updateStatus();
+      if (assembledParts === mode.parts.length) {
+        setTimeout(showComplete, 350);
+      }
+    }
+
+    draggingPart = null;
+    activePointerId = null;
+    if (canvas.hasPointerCapture(e.pointerId)) {
+      canvas.releasePointerCapture(e.pointerId);
+    }
+    draw();
+  }
+
+  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('pointercancel', endDrag);
+  canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  // ===== キーボード微調整 =====
+  window.addEventListener('keydown', (e) => {
+    if (!gameActive || !draggingPart) return;
+    const step = 4;
+    let moved = false;
+    if (e.key === 'ArrowUp')    { draggingPart.y -= step; moved = true; }
+    if (e.key === 'ArrowDown')  { draggingPart.y += step; moved = true; }
+    if (e.key === 'ArrowLeft')  { draggingPart.x -= step; moved = true; }
+    if (e.key === 'ArrowRight') { draggingPart.x += step; moved = true; }
+    if (moved) { e.preventDefault(); draw(); }
+  });
+
+  // ===== 描画 =====
+  function draw() {
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    ctx.clearRect(0, 0, w, h);
+    if (!gameActive) return;
+
+    const mode = MODES[currentMode];
+
+    // 組み立てガイド
+    ctx.save();
+    ctx.strokeStyle = 'rgba(52, 152, 219, 0.4)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 8]);
+    for (let i = 0; i < mode.parts.length; i++) {
+      const pos = mode.assembly[i];
+      const size = mode.sizes[i];
+      const px = pos.x * w, py = pos.y * h;
+      ctx.strokeRect(px - size.w/2, py - size.h/2, size.w, size.h);
+    }
+    ctx.setLineDash([]);
+    ctx.restore();
+
+    // パーツ描画（ドラッグ中を最前面、組み立て済みを背面に）
+    const sorted = [...parts].sort((a, b) => {
+      if (a.dragging) return 1;
+      if (b.dragging) return -1;
+      if (a.assembled && !b.assembled) return -1;
+      if (!a.assembled && b.assembled) return 1;
+      return 0;
+    });
+
+    for (const p of sorted) {
+      ctx.shadowColor = 'rgba(0,0,0,0.8)';
+      ctx.shadowBlur = p.dragging ? 24 : 12;
+      ctx.shadowOffsetX = 4;
+      ctx.shadowOffsetY = 4;
+
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      roundRect(ctx, p.x - p.w/2, p.y - p.h/2, p.w, p.h, 10);
+      ctx.fill();
+
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
+      ctx.strokeStyle = p.assembled ? '#f1c40f' : '#2c3e50';
+      ctx.lineWidth = p.assembled ? 3 : 2;
+      ctx.stroke();
+
+      ctx.font = 'bold 13px "Segoe UI", sans-serif';
+      ctx.fillStyle = '#fff';
+      ctx.shadowColor = 'black';
+      ctx.shadowBlur = 4;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(p.name, p.x, p.y);
+      ctx.shadowBlur = 0;
+    }
+
+    if (assembledParts === mode.parts.length && gameActive) {
+      ctx.font = 'bold 48px "Segoe UI", sans-serif';
+      ctx.fillStyle = '#f1c40f';
+      ctx.shadowColor = 'black';
+      ctx.shadowBlur = 24;
+      ctx.shadowOffsetX = 6;
+      ctx.shadowOffsetY = 6;
+      ctx.textAlign = 'center';
+      ctx.fillText('COMPLETE!', w/2, h*0.15);
+      ctx.shadowBlur = 0;
+    }
+  }
+
+  function roundRect(ctx, x, y, w, h, r) {
+    if (w < 2*r) r = w/2;
+    if (h < 2*r) r = h/2;
+    ctx.moveTo(x+r, y);
+    ctx.lineTo(x+w-r, y);
+    ctx.quadraticCurveTo(x+w, y, x+w, y+r);
+    ctx.lineTo(x+w, y+h-r);
+    ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+    ctx.lineTo(x+r, y+h);
+    ctx.quadraticCurveTo(x, y+h, x, y+h-r);
+    ctx.lineTo(x, y+r);
+    ctx.quadraticCurveTo(x, y, x+r, y);
+    ctx.closePath();
+  }
+
+  // ===== ゲーム開始 =====
+  function startGame() {
+    openingScreen.classList.add('hidden');
+    gameScreen.style.display = 'block';
+    requestAnimationFrame(() => {
+      resizeCanvas();
+      initParts();
+      draw();
+    });
+    gameActive = true;
+    startChat();
+    setTimeout(() => { openingScreen.style.display = 'none'; }, 500);
+  }
+
+  // ===== 完了 =====
+  function showComplete() {
+    gameActive = false;
+    stopChat();
+    gameScreen.style.display = 'none';
+    completeScreen.style.display = 'flex';
+  }
+
+  goIntricateBtn.addEventListener('click', () => {
+    window.location.href = 'intricate.html';
+  });
+
+  startBtn.addEventListener('click', startGame);
+
+  // ===== 設定モーダル =====
+  settingsBtn.addEventListener('click', () => {
+    settingsModal.classList.add('active');
+    // 現在のモードを選択状態に
+    modeOptions.forEach(opt => {
+      opt.classList.toggle('selected', opt.dataset.mode === currentMode);
+    });
+  });
+  settingsClose.addEventListener('click', () => {
+    settingsModal.classList.remove('active');
+  });
+  modeOptions.forEach(opt => {
+    opt.addEventListener('click', () => {
+      currentMode = opt.dataset.mode;
+      modeOptions.forEach(o => o.classList.toggle('selected', o === opt));
+    });
+  });
+
+  // ===== 背景ビューア =====
+  bgviewBtn.addEventListener('click', () => {
+    bgviewModal.classList.add('active');
+  });
+  bgviewClose.addEventListener('click', () => {
+    bgviewModal.classList.remove('active');
+  });
+
+  // 初期描画
+  resizeCanvas();
+})();
+</script>
+</body>
+</html>
