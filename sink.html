@@ -6,50 +6,44 @@
 <title>周期表ピース運び・沈む順</title>
 <style>
   :root{
-    --bg-overlay: rgba(0,0,0,0.45);
+    --bg-overlay: rgba(0,0,0,0.55);
     --panel-bg: rgba(20,20,30,0.92);
     --panel-border: #4a4a6a;
     --text: #eaeaf0;
     --accent: #7fd1ff;
-    --dish: #3a3a4a;
-    --dish-inner: #2a2a38;
     --shadow: 0 8px 24px rgba(0,0,0,0.5);
     --water: #1a3f5c;
     --water-light: #2a6f9c;
-    --brick: #b85c3a;
   }
 
   body.theme-simple{
-    --bg-overlay: rgba(0,0,0,0.45);
+    --bg-overlay: rgba(0,0,0,0.55);
     --panel-bg: rgba(20,20,30,0.92);
     --panel-border: #4a4a6a;
     --text: #eaeaf0;
     --accent: #7fd1ff;
     --water: #1a3f5c;
     --water-light: #2a6f9c;
-    --brick: #b85c3a;
   }
 
   body.theme-seabreeze{
-    --bg-overlay: rgba(10,40,60,0.5);
+    --bg-overlay: rgba(10,40,60,0.55);
     --panel-bg: rgba(18,50,70,0.94);
     --panel-border: #4a9ec0;
     --text: #e0f2ff;
     --accent: #7ee8fa;
     --water: #0d3b4f;
     --water-light: #1e6f8c;
-    --brick: #c77a4a;
   }
 
   body.theme-mediterranean{
-    --bg-overlay: rgba(30,20,10,0.5);
+    --bg-overlay: rgba(30,20,10,0.55);
     --panel-bg: rgba(60,40,25,0.94);
     --panel-border: #d4a373;
     --text: #fefae0;
     --accent: #e9c46a;
     --water: #2a5a7a;
     --water-light: #3a8aaa;
-    --brick: #d68c5a;
   }
 
   body.theme-ukiyoe{
@@ -60,7 +54,6 @@
     --accent: #e8a0b0;
     --water: #1a2a4a;
     --water-light: #2a4a7a;
-    --brick: #c07050;
   }
 
   *{ box-sizing: border-box; margin: 0; padding: 0; }
@@ -195,7 +188,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background: rgba(0,0,0,0.4);
+    background: rgba(0,0,0,0.35);
     backdrop-filter: blur(4px);
     z-index: 20;
     flex-shrink: 0;
@@ -203,25 +196,28 @@
     gap: 8px;
   }
   #game-header .info{
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 700;
     letter-spacing: 0.04em;
   }
   #game-header .info span{ color: var(--accent); }
-  #game-header .cat-legend{
-    font-size: 10px;
+
+  /* 横並びの分類凡例（ヘッダー内） */
+  #cat-legend{
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
-    width: 100%;
+    gap: 8px;
     justify-content: center;
+    width: 100%;
     margin-top: 4px;
   }
   .cat-legend-item{
-    padding: 2px 8px;
+    padding: 3px 10px;
     border-radius: 10px;
     background: rgba(255,255,255,0.1);
     font-weight: 700;
+    font-size: 11px;
+    border-left: 4px solid;
   }
 
   #play-area{
@@ -229,13 +225,25 @@
     flex: 1;
     width: 100%;
     overflow: hidden;
-    background: linear-gradient(180deg, transparent 0%, var(--water) 60%, var(--water-light) 100%);
+    background: linear-gradient(180deg, transparent 0%, transparent 40%, var(--water) 65%, var(--water-light) 100%);
+  }
+
+  /* 置き場（上部）とプール（下部）の境界線 */
+  .pool-line{
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 40%;
+    height: 2px;
+    background: rgba(255,255,255,0.15);
+    pointer-events: none;
+    z-index: 1;
   }
 
   .piece{
     position: absolute;
-    width: 46px;
-    height: 46px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
     cursor: grab;
     user-select: none;
@@ -250,24 +258,38 @@
     box-shadow: inset -3px -3px 6px rgba(0,0,0,0.4), inset 3px 3px 6px rgba(255,255,255,0.25), 0 4px 10px rgba(0,0,0,0.5);
     transition: transform 0.1s;
     z-index: 5;
-    border: 2px solid rgba(255,255,255,0.3);
+    border: 2px solid rgba(255,255,255,0.25);
   }
   .piece:active{ cursor: grabbing; }
   .piece.dragging{
     z-index: 999;
-    transform: scale(1.2);
+    transform: scale(1.25);
     box-shadow: 0 0 0 3px var(--accent), 0 8px 24px rgba(0,0,0,0.7);
   }
+  .piece.lifted{
+    animation: float 2.2s ease-in-out infinite;
+  }
+  @keyframes float{
+    0%,100%{ transform: translateY(0) rotate(0deg); }
+    50%{ transform: translateY(-6px) rotate(6deg); }
+  }
+  .piece.liquid{
+    animation: wobble 1.6s ease-in-out infinite;
+    border-radius: 40% 60% 55% 45% / 50% 45% 55% 50%;
+  }
+  @keyframes wobble{
+    0%,100%{ border-radius: 40% 60% 55% 45% / 50% 45% 55% 50%; transform: rotate(-4deg); }
+    50%{ border-radius: 55% 45% 40% 60% / 45% 55% 45% 55%; transform: rotate(4deg); }
+  }
 
-  /* レンガ型（重い元素用） */
+  /* レンガ型：色は元素のカテゴリ色のまま、形だけ四角 */
   .piece.brick{
     border-radius: 4px;
     width: 54px;
     height: 32px;
     font-size: 10px;
-    background: var(--brick) !important;
-    background-image: repeating-linear-gradient(45deg, rgba(0,0,0,0.08) 0px, rgba(0,0,0,0.08) 4px, transparent 4px, transparent 8px);
-    border: 2px solid rgba(0,0,0,0.3);
+    background-image: repeating-linear-gradient(45deg, rgba(0,0,0,0.06) 0px, rgba(0,0,0,0.06) 4px, transparent 4px, transparent 8px);
+    border: 2px solid rgba(0,0,0,0.25);
     box-shadow: inset -2px -2px 4px rgba(0,0,0,0.4), inset 2px 2px 4px rgba(255,255,255,0.15), 0 4px 8px rgba(0,0,0,0.5);
   }
   .piece.brick .dot{ display: none; }
@@ -276,7 +298,7 @@
     position: absolute;
     inset: 6px;
     border-radius: 50%;
-    opacity: 0.4;
+    opacity: 0.5;
     background-image: radial-gradient(circle, rgba(255,255,255,0.6) 1px, transparent 1px);
     background-size: 6px 6px;
     pointer-events: none;
@@ -285,22 +307,23 @@
   /* 水面の波紋 */
   .ripple{
     position: absolute;
-    border: 2px solid rgba(255,255,255,0.4);
+    border: 2px solid rgba(255,255,255,0.5);
     border-radius: 50%;
     pointer-events: none;
     animation: rippleAnim 1.2s ease-out forwards;
     z-index: 1;
+    transform: translate(-50%,-50%);
   }
   @keyframes rippleAnim{
-    0%{ width: 10px; height: 10px; opacity: 0.8; transform: translate(-50%,-50%) scale(1); }
-    100%{ width: 120px; height: 120px; opacity: 0; transform: translate(-50%,-50%) scale(1); }
+    0%{ width: 10px; height: 10px; opacity: 0.9; }
+    100%{ width: 140px; height: 140px; opacity: 0; }
   }
 
   /* 沈むアニメーション */
   @keyframes sinkDown{
     0%{ transform: translateY(0) scale(1); opacity: 1; }
     70%{ opacity: 0.9; }
-    100%{ transform: translateY(300px) scale(0.6); opacity: 0; }
+    100%{ transform: translateY(300px) scale(0.5); opacity: 0; }
   }
   .sinking{
     animation: sinkDown 1.2s ease-in forwards;
@@ -309,50 +332,10 @@
   /* 浮くアニメーション */
   @keyframes floatUp{
     0%{ transform: translateY(0) scale(1); opacity: 1; }
-    100%{ transform: translateY(-60px) scale(0.9); opacity: 0.7; }
+    100%{ transform: translateY(-80px) scale(0.85); opacity: 0.6; }
   }
   .floating{
     animation: floatUp 1.5s ease-out forwards;
-  }
-
-  /* 情報パネル */
-  #info-panel{
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    background: var(--panel-bg);
-    border: 2px solid var(--panel-border);
-    border-radius: 12px;
-    padding: 12px 16px;
-    max-width: 260px;
-    z-index: 30;
-    font-size: 11px;
-    line-height: 1.6;
-    box-shadow: var(--shadow);
-    backdrop-filter: blur(4px);
-  }
-  #info-panel h3{
-    font-size: 13px;
-    margin-bottom: 8px;
-    text-align: center;
-    color: var(--accent);
-    letter-spacing: 0.05em;
-  }
-  .info-cat{
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-bottom: 4px;
-  }
-  .info-cat .swatch{
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-  .info-cat .name{
-    font-weight: 700;
-    font-size: 10px;
   }
 
   #victory .panel, #gameover .panel{
@@ -394,9 +377,10 @@
 
   @media (max-width: 600px){
     .theme-list{ grid-template-columns: 1fr; }
-    .piece{ width: 38px; height: 38px; font-size: 9px; }
+    .piece{ width: 38px; height: 38px; font-size: 10px; }
     .piece.brick{ width: 46px; height: 28px; font-size: 8px; }
-    #info-panel{ max-width: 180px; font-size: 9px; padding: 8px 10px; }
+    #cat-legend{ gap: 4px; }
+    .cat-legend-item{ font-size: 9px; padding: 2px 6px; }
   }
 </style>
 </head>
@@ -434,12 +418,10 @@
   <div id="game-header">
     <div class="info">連続正解：<span id="count-streak">0</span> / <span id="total-streak">8</span></div>
     <div class="info">残り元素：<span id="count-remaining">0</span></div>
-    <div class="cat-legend" id="cat-legend"></div>
+    <div id="cat-legend"></div>
   </div>
-  <div id="play-area"></div>
-  <div id="info-panel">
-    <h3>分類の色</h3>
-    <div id="info-cats"></div>
+  <div id="play-area">
+    <div class="pool-line"></div>
   </div>
 </div>
 
@@ -614,13 +596,13 @@ const CAT_NAMES = {
   noble:      "貴ガス"
 };
 
-/* 背景画像の候補 */
+/* 背景画像 */
 const BG_IMAGES = ["img99aria.jpg", "img122fleet.jpg"];
 
-/* 重い元素の閾値（質量 > 59 でレンガ） */
+/* 重い元素の閾値（質量 > 59 でレンガ形） */
 const BRICK_MASS_THRESHOLD = 59;
 
-/* ゲーム設定 */
+/* 勝利に必要な連続正解数 */
 const TARGET_STREAK = 8;
 
 /* =========================================================
@@ -631,12 +613,12 @@ const state = {
   pieces: [],
   totalElements: 0,
   streak: 0,
-  placedMasses: [],      // 正しく置かれた質量の履歴（降順チェック用）
+  placedMasses: [],
   gameActive: false,
   dragging: null,
   dragOffset: {x:0, y:0},
   animFrame: null,
-  sortedByMass: []       // 選ばれた32個を質量降順にソートしたリスト
+  sortedByMass: []
 };
 
 /* =========================================================
@@ -692,33 +674,7 @@ function pickRandom32(){
 }
 
 /* =========================================================
-   情報パネル生成
-   ========================================================= */
-function buildInfoPanel(){
-  const container = document.getElementById("info-cats");
-  container.innerHTML = "";
-  const cats = Object.keys(CAT_COLORS);
-
-  cats.forEach(cat => {
-    const div = document.createElement("div");
-    div.className = "info-cat";
-
-    const swatch = document.createElement("div");
-    swatch.className = "swatch";
-    swatch.style.background = CAT_COLORS[cat];
-
-    const name = document.createElement("div");
-    name.className = "name";
-    name.textContent = CAT_NAMES[cat];
-
-    div.appendChild(swatch);
-    div.appendChild(name);
-    container.appendChild(div);
-  });
-}
-
-/* =========================================================
-   ヘッダー凡例
+   ヘッダー凡例（横並び）
    ========================================================= */
 function buildHeaderLegend(){
   const container = document.getElementById("cat-legend");
@@ -727,6 +683,7 @@ function buildHeaderLegend(){
   cats.forEach(cat => {
     const span = document.createElement("span");
     span.className = "cat-legend-item";
+    span.style.borderLeftColor = CAT_COLORS[cat];
     span.style.color = CAT_COLORS[cat];
     span.textContent = CAT_NAMES[cat];
     container.appendChild(span);
@@ -738,7 +695,11 @@ function buildHeaderLegend(){
    ========================================================= */
 function initGame(){
   const area = document.getElementById("play-area");
+  // プールライン以外を削除
+  const poolLine = area.querySelector(".pool-line");
   area.innerHTML = "";
+  if(poolLine) area.appendChild(poolLine);
+
   state.pieces = [];
   state.streak = 0;
   state.placedMasses = [];
@@ -751,16 +712,16 @@ function initGame(){
   // 質量降順にソート（正解順）
   state.sortedByMass = [...selected].sort((a, b) => b.mass - a.mass);
 
-  // 情報パネル・凡例
-  buildInfoPanel();
+  // ヘッダー凡例
   buildHeaderLegend();
 
   const areaRect = area.getBoundingClientRect();
-  const margin = 70;
-  const topMargin = 60;
-  const bottomLimit = areaRect.height - 120;
+  const margin = 60;
+  const topMargin = 50;
+  // 置き場は上部40%まで
+  const bottomLimit = areaRect.height * 0.4 - 20;
 
-  // 元素ピース配置
+  // 元素ピース配置（置き場＝画面上部）
   selected.forEach(el => {
     const piece = document.createElement("div");
     piece.className = "piece";
@@ -769,13 +730,13 @@ function initGame(){
     piece.dataset.mass = el.mass;
     piece.textContent = el.sym;
 
-    // 重い元素はレンガ型
+    // 重い元素はレンガ形（色はカテゴリ色のまま）
     const isBrick = el.mass > BRICK_MASS_THRESHOLD;
     if(isBrick){
       piece.classList.add("brick");
-    } else {
-      piece.style.background = CAT_COLORS[el.cat];
     }
+    // 色は常にカテゴリ色
+    piece.style.background = CAT_COLORS[el.cat];
 
     piece.title = `${el.z} ${el.name}（${CAT_NAMES[el.cat]}）質量:${el.mass}`;
 
@@ -789,6 +750,13 @@ function initGame(){
     const y = topMargin + Math.random() * (bottomLimit - topMargin);
     piece.style.left = x + "px";
     piece.style.top = y + "px";
+
+    // 液体・軽い元素のアニメーション
+    if(el.state === "liquid"){
+      piece.classList.add("liquid");
+    } else if(el.mass < 40){
+      piece.classList.add("lifted");
+    }
 
     piece.addEventListener("pointerdown", onPointerDown);
 
@@ -881,13 +849,12 @@ function checkPoolDrop(piece){
   const areaRect = document.getElementById("play-area").getBoundingClientRect();
   const pieceRect = el.getBoundingClientRect();
 
-  // プール領域＝画面下部60%以降
-  const poolTop = areaRect.top + areaRect.height * 0.35;
+  // プール領域＝画面下部60%以降（pool-lineより下）
+  const poolTop = areaRect.top + areaRect.height * 0.6;
   const cx = pieceRect.left + pieceRect.width / 2;
   const cy = pieceRect.top + pieceRect.height / 2;
 
   if(cy > poolTop){
-    // プールに落ちた
     handleDropInPool(piece, cx - areaRect.left, cy - areaRect.top);
   }
 }
@@ -915,7 +882,7 @@ function handleDropInPool(piece, dropX, dropY){
     piece.placed = true;
     piece.el.style.display = "none";
 
-    // 沈むアニメーション（レンガは早く沈む、軽いものは浮く）
+    // 沈むアニメーション
     const clone = piece.el.cloneNode(true);
     clone.style.left = dropX + "px";
     clone.style.top = dropY + "px";
@@ -926,7 +893,6 @@ function handleDropInPool(piece, dropX, dropY){
     const isHeavy = piece.data.mass > BRICK_MASS_THRESHOLD;
     if(isHeavy){
       clone.classList.add("sinking");
-      // 重いものは早く沈む
       clone.style.animationDuration = "0.8s";
     } else {
       clone.classList.add("floating");
@@ -994,7 +960,7 @@ function startAnimation(){
 
     const area = document.getElementById("play-area");
     const areaRect = area.getBoundingClientRect();
-    const poolTop = areaRect.height * 0.35;
+    const poolTop = areaRect.height * 0.6;
 
     state.pieces.forEach(piece => {
       if(piece.placed || piece.dragging) return;
@@ -1004,12 +970,10 @@ function startAnimation(){
       const isHeavy = mass > BRICK_MASS_THRESHOLD;
 
       // 物理パラメータ
-      // 水の抵抗・浮力: 軽いほど浮き、重いほど沈む
-      // 質量 < 40 は強く浮く、質量 > 80 は沈む傾向
       const buoyancy = mass < 30 ? -0.25 : mass < 50 ? -0.1 : mass < 70 ? 0.05 : mass < 100 ? 0.15 : 0.3;
       const drag = mass > 150 ? 0.92 : mass > 80 ? 0.94 : 0.96;
 
-      // ランダムな揺らぎ（液体・気体）
+      // ランダムな揺らぎ
       if(piece.data.state === "gas" || mass < 40){
         piece.vx += (Math.random() - 0.5) * 0.2;
         piece.vy += (Math.random() - 0.5) * 0.2;
@@ -1019,32 +983,22 @@ function startAnimation(){
         piece.vy += (Math.random() - 0.5) * 0.4;
       }
 
-      // 浮力適用（画面上部へ）
       piece.vy += buoyancy;
-
-      // 水抵抗
       piece.vx *= drag;
       piece.vy *= drag;
 
-      // 位置更新
       piece.x += piece.vx;
       piece.y += piece.vy;
 
-      // 境界処理
       const w = el.offsetWidth;
       const h = el.offsetHeight;
 
-      // 左右
       if(piece.x < 0){ piece.x = 0; piece.vx *= -0.5; }
       if(piece.x > areaRect.width - w){ piece.x = areaRect.width - w; piece.vx *= -0.5; }
-
-      // 上
       if(piece.y < 0){ piece.y = 0; piece.vy *= -0.3; }
 
-      // 下（プールの底）
       if(piece.y > areaRect.height - h){
         piece.y = areaRect.height - h;
-        // 重いものは底に留まりやすい
         if(isHeavy){
           piece.vy = 0;
           piece.vx *= 0.8;
@@ -1053,9 +1007,7 @@ function startAnimation(){
         }
       }
 
-      // 水面より下では浮力が強く働く
       if(piece.y + h/2 > poolTop){
-        // 水中では浮力が増す
         piece.vy += buoyancy * 0.5;
       }
 
