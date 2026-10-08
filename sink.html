@@ -266,7 +266,6 @@
     background: linear-gradient(180deg, transparent 0%, transparent 55%, var(--water) 75%, var(--water-light) 100%);
   }
 
-  /* 置き場エリア（上部） */
   .storage-area{
     position: absolute;
     top: 0;
@@ -289,7 +288,6 @@
     text-shadow: 0 1px 3px rgba(0,0,0,0.8);
   }
 
-  /* 水面セット位置（横長） */
   .set-line{
     position: absolute;
     left: 5%;
@@ -483,7 +481,7 @@
 <!-- オープニング -->
 <div id="opening" class="screen active">
   <div class="title">周期表ピース運び・沈む順</div>
-  <div class="subtitle">重い元素から順にプールへ落とそう。<br>8つ連続で正しい順なら勝利。間違えたらゲームオーバー。</div>
+  <div class="subtitle">前より重い元素を選んでプールへ。<br>8つ連続で正しい順なら勝利。間違えたらゲームオーバー。</div>
   <button class="btn" id="btn-start">はじめる</button>
 </div>
 
@@ -534,7 +532,7 @@
 <div id="victory" class="screen">
   <div class="panel">
     <h1>勝利！</h1>
-    <p>重い順に8つ正しく並べました。<br>元素の密度、お見事です。</p>
+    <p>前より重い元素を8つ連続で選べました。<br>元素の密度、お見事です。</p>
     <button class="btn" id="btn-again-win">もう一度</button>
     <footer>
       <a href="kick.html">kick.html で復習する</a>
@@ -719,13 +717,11 @@ const state = {
   pieces: [],
   totalElements: 0,
   streak: 0,
-  placedMasses: [],
+  lastMass: null,         // 直前に置いた元素の質量
   gameActive: false,
   dragging: null,
   dragOffset: {x:0, y:0},
   animFrame: null,
-  sortedByMass: [],
-  // 物理状態
   piecesInPool: []
 };
 
@@ -813,7 +809,6 @@ function buildHeaderLegend(){
    ========================================================= */
 function initGame(){
   const area = document.getElementById("play-area");
-  // 置き場・セットラインを残してクリア
   const storage = area.querySelector(".storage-area");
   const setLine = area.querySelector(".set-line");
   area.innerHTML = "";
@@ -823,17 +818,13 @@ function initGame(){
   state.pieces = [];
   state.piecesInPool = [];
   state.streak = 0;
-  state.placedMasses = [];
+  state.lastMass = null;
   state.gameActive = true;
   state.dragging = null;
 
   const selected = pickRandom32();
   state.totalElements = selected.length;
 
-  // 質量降順にソート（正解順）
-  state.sortedByMass = [...selected].sort((a, b) => b.mass - a.mass);
-
-  // ヘッダー凡例
   buildHeaderLegend();
 
   const areaRect = area.getBoundingClientRect();
@@ -841,7 +832,6 @@ function initGame(){
   const topMargin = 50;
   const bottomLimit = areaRect.height * 0.55 - 30;
 
-  // 元素ピースを置き場（上部55%）に固定配置
   selected.forEach(el => {
     const piece = document.createElement("div");
     piece.className = "piece";
@@ -854,28 +844,23 @@ function initGame(){
 
     if(isBrick){
       if(state.mode === "hard"){
-        // むずかしいモード：レンガの色と形
         piece.classList.add("brick-hard");
       } else {
-        // ノーマルモード：レンガ形のみ（色はカテゴリ色のまま）
         piece.classList.add("brick-normal");
         piece.style.background = CAT_COLORS[el.cat];
       }
     } else {
-      // 軽い元素：丸形
       piece.style.background = CAT_COLORS[el.cat];
     }
 
     piece.title = `${el.z} ${el.name}（${CAT_NAMES[el.cat]}）質量:${el.mass}`;
 
-    // レンガ以外はドットを追加
     if(!isBrick){
       const dot = document.createElement("div");
       dot.className = "dot";
       piece.appendChild(dot);
     }
 
-    // 置き場内で固定配置（ランダムだが動かない）
     const x = margin + Math.random() * (areaRect.width - margin * 2);
     const y = topMargin + Math.random() * (bottomLimit - topMargin);
     piece.style.left = x + "px";
@@ -984,12 +969,9 @@ function checkSetLineDrop(piece){
   const cx = pieceRect.left + pieceRect.width / 2;
   const cy = pieceRect.top + pieceRect.height / 2;
 
-  // セットライン付近（±40px）に落としたらセット
   if(Math.abs(cy - setLineY) < 40){
     placeAtSetLine(piece, cx - areaRect.left, setLineY - areaRect.top);
   }
-  // セットラインより上なら置き場に戻る（何もしない）
-  // セットラインより下に落ちた場合も何もしない（置き場に戻る）
 }
 
 function placeAtSetLine(piece, dropX, dropY){
@@ -1005,18 +987,21 @@ function placeAtSetLine(piece, dropX, dropY){
   area.appendChild(ripple);
   setTimeout(() => ripple.remove(), 1200);
 
-  // 正解チェック
-  const nextCorrect = state.sortedByMass[state.streak];
-  const isCorrect = (nextCorrect.z === piece.data.z);
+  // 正解チェック：直前の質量より大きければ正解
+  // 最初の1個は無条件で正解
+  let isCorrect = true;
+  if(state.lastMass !== null){
+    isCorrect = piece.data.mass > state.lastMass;
+  }
 
   if(isCorrect){
     // 正解
     state.streak++;
+    state.lastMass = piece.data.mass;
     piece.placed = true;
     piece.inPool = true;
     piece.settled = false;
 
-    // 物理演算用にプールへ追加
     piece.x = dropX - piece.el.offsetWidth / 2;
     piece.y = dropY - piece.el.offsetHeight / 2;
     piece.vx = (Math.random() - 0.5) * 0.5;
@@ -1050,11 +1035,9 @@ function placeAtSetLine(piece, dropX, dropY){
     area.appendChild(clone);
     setTimeout(() => clone.remove(), 1500);
 
-    // 正解を表示
-    const correct = state.sortedByMass[state.streak];
     document.getElementById("gameover-msg").innerHTML =
       `「${piece.data.name}」（質量${piece.data.mass}）を選びましたが、` +
-      `次に重いのは「${correct.name}」（質量${correct.mass}）でした。<br>` +
+      `直前の元素（質量${state.lastMass}）より軽いため不正解です。<br>` +
       `連続正解：${state.streak} / ${TARGET_STREAK}`;
 
     setTimeout(() => {
@@ -1088,7 +1071,6 @@ function startAnimation(){
     const areaRect = area.getBoundingClientRect();
     const setLineY = areaRect.height * 0.55;
 
-    // プール内の物理演算
     if(state.gameActive){
       state.piecesInPool.forEach(piece => {
         if(piece.dragging || piece.settled) return;
@@ -1097,7 +1079,6 @@ function startAnimation(){
         const mass = piece.data.mass;
         const isHeavy = mass > BRICK_MASS_THRESHOLD;
 
-        // 物理パラメータ
         const buoyancy = mass < 30 ? -0.35 : mass < 60 ? -0.15 : mass < 100 ? 0.05 : mass < 180 ? 0.2 : 0.35;
         const drag = mass > 200 ? 0.88 : mass > 150 ? 0.91 : mass > 100 ? 0.94 : mass > 60 ? 0.96 : 0.97;
 
@@ -1144,7 +1125,6 @@ function startAnimation(){
         el.style.top = piece.y + "px";
       });
 
-      // 置き場のアイドルアニメーション
       state.pieces.forEach(piece => {
         if(piece.inPool || piece.placed || piece.dragging) return;
         const el = piece.el;
