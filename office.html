@@ -54,6 +54,8 @@
   }
   .ui-btn.map-toggle { color:#7ad7ff; border-color:#7ad7ff; box-shadow:0 0 10px #7ad7ff33; }
   .ui-btn.map-toggle:hover { background:#7ad7ff; color:#0a0c0f; }
+  .ui-btn.minimap-toggle { color:#ff8ad8; border-color:#ff8ad8; box-shadow:0 0 10px #ff8ad833; }
+  .ui-btn.minimap-toggle:hover { background:#ff8ad8; color:#0a0c0f; }
   .ui-btn.warn { color:#ff4d6d; border-color:#ff4d6d; box-shadow:0 0 10px #ff4d6d33; }
   .ui-btn.warn:hover { background:#ff4d6d; color:#0a0c0f; }
   .ui-btn.list { color:#ffd166; border-color:#ffd166; box-shadow:0 0 10px #ffd16633; }
@@ -350,12 +352,13 @@
       <div class="status">
         <span>Talked: <span id="talkedDisplay" class="highlight">0</span>/140</span>
         <span>Area: <span id="areaDisplay" class="sp">Reception</span></span>
-        <span id="mapCoordSpan" class="hidden-coord">Map: <span id="mapDisplay" class="map-coord">6,6</span></span>
+        <span id="mapCoordSpan" class="hidden-coord">Map: <span id="mapDisplay" class="map-coord">7,11</span></span>
       </div>
     </div>
 
     <div class="btn-row">
       <button class="ui-btn list" id="checklistBtn">📋 CHECKLIST</button>
+      <button class="ui-btn minimap-toggle" id="minimapBtn">🗺 SHOW MINIMAP</button>
       <button class="ui-btn map-toggle" id="mapToggleBtn">📍 SHOW COORDS</button>
     </div>
 
@@ -408,6 +411,7 @@
   const mapCoordSpan = document.getElementById('mapCoordSpan');
   const hint = document.getElementById('hint');
   const checklistBtn = document.getElementById('checklistBtn');
+  const minimapBtn = document.getElementById('minimapBtn');
   const mapToggleBtn = document.getElementById('mapToggleBtn');
   const checklistPanel = document.getElementById('checklistPanel');
   const checklistScroll = document.getElementById('checklistScroll');
@@ -451,9 +455,11 @@
   let mouseX = W/2, mouseY = H/2;
   let lastTime = 0;
   let showMapCoord = false;
+  let showMinimap = false;   // default hidden
   let talked = new Set();
   let npcs = [];
   let doors = [];
+  let walls = [];
   let areas = [];
   let activeNPC = null;
   let activeDoor = null;
@@ -513,18 +519,48 @@
   }
 
   // ============================================================
-  //  Doors
-  //  Doors DO block movement when closed.
-  //  When open, the player can pass through.
+  //  Walls + Doors
+  //  - Every non-open area gets solid boundary walls.
+  //  - A door gap is cut into each boundary; the door itself
+  //    blocks movement when closed, and lets you pass when open.
   // ============================================================
-  function buildDoors() {
+  const WALL_THICK = 12;
+  const DOOR_LEN = 70;
+
+  function isOutdoor(a) {
+    return a.type === 'garden' || a.type === 'park' ||
+           a.type === 'road' || a.type === 'parking';
+  }
+
+  function buildWallsAndDoors() {
+    walls = [];
     doors = [];
+
     for (const a of areas) {
-      if (a.type === 'garden' || a.type === 'park' || a.type === 'road' || a.type === 'parking') continue;
-      doors.push({ x:a.x + a.w/2 - 30, y:a.y - 8, w:60, h:16, open:false, area:a, side:'top' });
-      doors.push({ x:a.x + a.w/2 - 30, y:a.y + a.h - 8, w:60, h:16, open:false, area:a, side:'bottom' });
-      doors.push({ x:a.x - 8, y:a.y + a.h/2 - 30, w:16, h:60, open:false, area:a, side:'left' });
-      doors.push({ x:a.x + a.w - 8, y:a.y + a.h/2 - 30, w:16, h:60, open:false, area:a, side:'right' });
+      if (isOutdoor(a)) continue;
+
+      const cx = a.x + a.w/2;
+      const cy = a.y + a.h/2;
+
+      // Top edge
+      doors.push({ x:cx - DOOR_LEN/2, y:a.y - 8, w:DOOR_LEN, h:16, open:false, area:a, side:'top' });
+      walls.push({ x:a.x, y:a.y - WALL_THICK/2, w:(a.w - DOOR_LEN)/2, h:WALL_THICK });
+      walls.push({ x:a.x + (a.w + DOOR_LEN)/2, y:a.y - WALL_THICK/2, w:(a.w - DOOR_LEN)/2, h:WALL_THICK });
+
+      // Bottom edge
+      doors.push({ x:cx - DOOR_LEN/2, y:a.y + a.h - 8, w:DOOR_LEN, h:16, open:false, area:a, side:'bottom' });
+      walls.push({ x:a.x, y:a.y + a.h - WALL_THICK/2, w:(a.w - DOOR_LEN)/2, h:WALL_THICK });
+      walls.push({ x:a.x + (a.w + DOOR_LEN)/2, y:a.y + a.h - WALL_THICK/2, w:(a.w - DOOR_LEN)/2, h:WALL_THICK });
+
+      // Left edge
+      doors.push({ x:a.x - 8, y:cy - DOOR_LEN/2, w:16, h:DOOR_LEN, open:false, area:a, side:'left' });
+      walls.push({ x:a.x - WALL_THICK/2, y:a.y, w:WALL_THICK, h:(a.h - DOOR_LEN)/2 });
+      walls.push({ x:a.x - WALL_THICK/2, y:a.y + (a.h + DOOR_LEN)/2, w:WALL_THICK, h:(a.h - DOOR_LEN)/2 });
+
+      // Right edge
+      doors.push({ x:a.x + a.w - 8, y:cy - DOOR_LEN/2, w:16, h:DOOR_LEN, open:false, area:a, side:'right' });
+      walls.push({ x:a.x + a.w - WALL_THICK/2, y:a.y, w:WALL_THICK, h:(a.h - DOOR_LEN)/2 });
+      walls.push({ x:a.x + a.w - WALL_THICK/2, y:a.y + (a.h + DOOR_LEN)/2, w:WALL_THICK, h:(a.h - DOOR_LEN)/2 });
     }
   }
 
@@ -816,8 +852,8 @@
 
         const areaCandidates = areas.filter(a => a.type === areaType);
         const area = areaCandidates.length ? pick(areaCandidates) : pick(areas);
-        const x = rand(area.x + 60, area.x + area.w - 60);
-        const y = rand(area.y + 60, area.y + area.h - 60);
+        const x = rand(area.x + 80, area.x + area.w - 80);
+        const y = rand(area.y + 80, area.y + area.h - 80);
 
         let behavior = 'idle';
         if (areaType === 'hall' || areaType === 'garden' || areaType === 'park' || areaType === 'road' || areaType === 'rooftop') {
@@ -854,8 +890,8 @@
       const first = pick(FIRST_NAMES);
       const last = pick(LAST_NAMES);
       const area = pick(areas);
-      const x = rand(area.x + 60, area.x + area.w - 60);
-      const y = rand(area.y + 60, area.y + area.h - 60);
+      const x = rand(area.x + 80, area.x + area.w - 80);
+      const y = rand(area.y + 80, area.y + area.h - 80);
       const role = pick(ROLES);
       const baseLines = EN_LINES[role] || EN_LINES['Analyst'];
       npcs.push({
@@ -902,10 +938,12 @@
   // ============================================================
   function initGame() {
     buildAreas();
-    buildDoors();
+    buildWallsAndDoors();
     buildNPCs();
-    player.x = WORLD_W / 2;
-    player.y = WORLD_H / 2;
+    // Start at Map 7,11 (1-based) Garden center
+    // col=6, row=10 -> x = 6*800 + 400 = 5200, y = 10*600 + 300 = 6300
+    player.x = 6 * MAP_W + MAP_W / 2;
+    player.y = 10 * MAP_H + MAP_H / 2;
     loadTalked();
     updateHUD();
     buildChecklist();
@@ -986,6 +1024,11 @@
     checklistPanel.classList.toggle('open');
     buildChecklist();
   });
+  minimapBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    showMinimap = !showMinimap;
+    minimapBtn.textContent = showMinimap ? '🗺 HIDE MINIMAP' : '🗺 SHOW MINIMAP';
+  });
   clClose.addEventListener('click', (e) => { e.preventDefault(); closeChecklist(); });
   clReset.addEventListener('click', (e) => {
     e.preventDefault();
@@ -1064,15 +1107,6 @@
   // ============================================================
   //  Collision helpers
   // ============================================================
-  function circleRectCollide(cx, cy, r, rx, ry, rw, rh) {
-    const nx = clamp(cx, rx, rx + rw);
-    const ny = clamp(cy, ry, ry + rh);
-    const dx = cx - nx;
-    const dy = cy - ny;
-    return dx*dx + dy*dy < r*r;
-  }
-
-  // Push player out of a rect if overlapping
   function resolveRectCollision(cx, cy, r, rx, ry, rw, rh) {
     const nx = clamp(cx, rx, rx + rw);
     const ny = clamp(cy, ry, ry + rh);
@@ -1086,7 +1120,6 @@
       const overlap = r - d;
       return { x: cx + (dx / d) * overlap, y: cy + (dy / d) * overlap };
     } else {
-      // Center is inside the rect: push out to the nearest edge
       const left   = cx - rx;
       const right  = rx + rw - cx;
       const top    = cy - ry;
@@ -1099,9 +1132,23 @@
     }
   }
 
+  // Resolve collisions against all solid rects.
+  function resolveAllCollisions() {
+    // Walls are always solid
+    for (const w of walls) {
+      const res = resolveRectCollision(player.x, player.y, player.radius, w.x, w.y, w.w, w.h);
+      if (res) { player.x = res.x; player.y = res.y; }
+    }
+    // Closed doors are solid
+    for (const dr of doors) {
+      if (dr.open) continue;
+      const res = resolveRectCollision(player.x, player.y, player.radius, dr.x, dr.y, dr.w, dr.h);
+      if (res) { player.x = res.x; player.y = res.y; }
+    }
+  }
+
   // ============================================================
   //  Update
-  //  Doors block movement when closed; open doors let you pass.
   // ============================================================
   function update(dt) {
     const sp = player.speed * 0.4;
@@ -1114,21 +1161,13 @@
     nx = clamp(nx, 20, WORLD_W - 20);
     ny = clamp(ny, 20, WORLD_H - 20);
 
-    // Apply X movement first, then resolve collisions
+    // Move X, resolve
     player.x = nx;
-    for (const dr of doors) {
-      if (dr.open) continue;
-      const res = resolveRectCollision(player.x, player.y, player.radius, dr.x, dr.y, dr.w, dr.h);
-      if (res) { player.x = res.x; player.y = res.y; }
-    }
+    resolveAllCollisions();
 
-    // Then Y movement, then resolve collisions again
+    // Move Y, resolve
     player.y = ny;
-    for (const dr of doors) {
-      if (dr.open) continue;
-      const res = resolveRectCollision(player.x, player.y, player.radius, dr.x, dr.y, dr.w, dr.h);
-      if (res) { player.x = res.x; player.y = res.y; }
-    }
+    resolveAllCollisions();
 
     for (const n of npcs) {
       if (n.behavior === 'walk') {
@@ -1184,6 +1223,16 @@
       drawArea(a);
     }
 
+    // Draw walls (visible)
+    for (const w of walls) {
+      if (w.x > camX + W || w.x + w.w < camX || w.y > camY + H || w.y + w.h < camY) continue;
+      ctx.fillStyle = '#2a3a4a';
+      ctx.fillRect(w.x, w.y, w.w, w.h);
+      ctx.strokeStyle = '#00e6b0';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(w.x, w.y, w.w, w.h);
+    }
+
     for (const dr of doors) {
       if (dr.x > camX + W || dr.x + dr.w < camX || dr.y > camY + H || dr.y + dr.h < camY) continue;
       drawDoor(dr);
@@ -1211,7 +1260,7 @@
     }
 
     ctx.restore();
-    drawMinimap();
+    if (showMinimap) drawMinimap();
   }
 
   function drawArea(a) {
@@ -1438,8 +1487,6 @@
     ctx.beginPath(); ctx.arc(x + 80, y + 50, 10, 0, Math.PI*2); ctx.fill();
   }
   function drawDoor(dr) {
-    // Closed door: solid brown with golden outline.
-    // Open door: greenish and slightly transparent.
     if (dr.open) {
       ctx.fillStyle = 'rgba(42,90,58,0.55)';
       ctx.fillRect(dr.x, dr.y, dr.w, dr.h);
@@ -1534,6 +1581,11 @@
                       (a.type === 'trading') ? '#1a2a3a' :
                       (a.type === 'executive') ? '#3a1a2a' : '#1a222c';
       ctx.fillRect(mx + a.x*sx, my + a.y*sy, a.w*sx, a.h*sy);
+    }
+    // Doors on minimap
+    for (const dr of doors) {
+      ctx.fillStyle = dr.open ? '#00e6b0' : '#ffd166';
+      ctx.fillRect(mx + dr.x*sx, my + dr.y*sy, Math.max(1, dr.w*sx), Math.max(1, dr.h*sy));
     }
     ctx.fillStyle = '#00e6b0';
     ctx.fillRect(mx + player.x*sx - 2, my + player.y*sy - 2, 4, 4);
