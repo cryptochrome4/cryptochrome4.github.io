@@ -519,10 +519,10 @@
 
   // ============================================================
   //  Walls + Doors
-  //  - Non-outdoor areas get boundary walls with a door gap.
-  //  - Walls block movement always.
-  //  - Doors block movement only when closed.
-  //  - Walls are functional only. They are NOT drawn.
+  //  - Each shared boundary is processed only once.
+  //  - Boundary is only built between two indoor areas, OR
+  //    between an indoor area and the outside world.
+  //  - Two adjacent indoor areas share one wall + one door.
   // ============================================================
   const WALL_THICK = 20;
   const DOOR_LEN = 80;
@@ -536,31 +536,91 @@
     walls = [];
     doors = [];
 
+    // Track visited boundaries by a unique key.
+    // Key = "x1,y1-x2,y2" of the boundary line.
+    const visited = new Set();
+
+    function boundaryKey(x1, y1, x2, y2) {
+      // Ensure consistent ordering
+      if (x1 > x2 || (x1 === x2 && y1 > y2)) {
+        return `${x2},${y2}-${x1},${y1}`;
+      }
+      return `${x1},${y1}-${x2},${y2}`;
+    }
+
+    // Build boundary between two cells (a and neighbor).
+    // boundaryType: 'top' | 'bottom' | 'left' | 'right' relative to a.
+    function buildBoundary(a, side) {
+      // Determine the boundary line coordinates
+      let x1, y1, x2, y2;
+      let horizontal;
+      if (side === 'top') {
+        x1 = a.x; y1 = a.y; x2 = a.x + a.w; y2 = a.y;
+        horizontal = true;
+      } else if (side === 'bottom') {
+        x1 = a.x; y1 = a.y + a.h; x2 = a.x + a.w; y2 = a.y + a.h;
+        horizontal = true;
+      } else if (side === 'left') {
+        x1 = a.x; y1 = a.y; x2 = a.x; y2 = a.y + a.h;
+        horizontal = false;
+      } else {
+        x1 = a.x + a.w; y1 = a.y; x2 = a.x + a.w; y2 = a.y + a.h;
+        horizontal = false;
+      }
+
+      const key = boundaryKey(x1, y1, x2, y2);
+      if (visited.has(key)) return;
+      visited.add(key);
+
+      // Center of the boundary
+      const cx = (x1 + x2) / 2;
+      const cy = (y1 + y2) / 2;
+
+      if (horizontal) {
+        // Top edge of a (or bottom edge when side='bottom')
+        const wallY = (side === 'top') ? a.y : a.y + a.h;
+        // Left wall segment
+        walls.push({ x:a.x, y:wallY - WALL_THICK/2, w:(a.w - DOOR_LEN)/2, h:WALL_THICK });
+        // Right wall segment
+        walls.push({ x:a.x + (a.w + DOOR_LEN)/2, y:wallY - WALL_THICK/2, w:(a.w - DOOR_LEN)/2, h:WALL_THICK });
+        // Door
+        doors.push({
+          x: cx - DOOR_LEN/2,
+          y: wallY - 8,
+          w: DOOR_LEN,
+          h: 16,
+          open: false,
+          area: a,
+          side: side,
+        });
+      } else {
+        // Left or right edge
+        const wallX = (side === 'left') ? a.x : a.x + a.w;
+        // Top wall segment
+        walls.push({ x:wallX - WALL_THICK/2, y:a.y, w:WALL_THICK, h:(a.h - DOOR_LEN)/2 });
+        // Bottom wall segment
+        walls.push({ x:wallX - WALL_THICK/2, y:a.y + (a.h + DOOR_LEN)/2, w:WALL_THICK, h:(a.h - DOOR_LEN)/2 });
+        // Door
+        doors.push({
+          x: wallX - 8,
+          y: cy - DOOR_LEN/2,
+          w: 16,
+          h: DOOR_LEN,
+          open: false,
+          area: a,
+          side: side,
+        });
+      }
+    }
+
+    // For each indoor area, build walls on all four sides.
+    // Shared boundaries are deduplicated by the visited set.
     for (const a of areas) {
       if (isOutdoor(a)) continue;
-
-      const cx = a.x + a.w/2;
-      const cy = a.y + a.h/2;
-
-      // Top edge (y = a.y)
-      doors.push({ x:cx - DOOR_LEN/2, y:a.y - 8, w:DOOR_LEN, h:16, open:false, area:a, side:'top' });
-      walls.push({ x:a.x, y:a.y - WALL_THICK/2, w:(a.w - DOOR_LEN)/2, h:WALL_THICK });
-      walls.push({ x:a.x + (a.w + DOOR_LEN)/2, y:a.y - WALL_THICK/2, w:(a.w - DOOR_LEN)/2, h:WALL_THICK });
-
-      // Bottom edge (y = a.y + a.h)
-      doors.push({ x:cx - DOOR_LEN/2, y:a.y + a.h - 8, w:DOOR_LEN, h:16, open:false, area:a, side:'bottom' });
-      walls.push({ x:a.x, y:a.y + a.h - WALL_THICK/2, w:(a.w - DOOR_LEN)/2, h:WALL_THICK });
-      walls.push({ x:a.x + (a.w + DOOR_LEN)/2, y:a.y + a.h - WALL_THICK/2, w:(a.w - DOOR_LEN)/2, h:WALL_THICK });
-
-      // Left edge (x = a.x)
-      doors.push({ x:a.x - 8, y:cy - DOOR_LEN/2, w:16, h:DOOR_LEN, open:false, area:a, side:'left' });
-      walls.push({ x:a.x - WALL_THICK/2, y:a.y, w:WALL_THICK, h:(a.h - DOOR_LEN)/2 });
-      walls.push({ x:a.x - WALL_THICK/2, y:a.y + (a.h + DOOR_LEN)/2, w:WALL_THICK, h:(a.h - DOOR_LEN)/2 });
-
-      // Right edge (x = a.x + a.w)
-      doors.push({ x:a.x + a.w - 8, y:cy - DOOR_LEN/2, w:16, h:DOOR_LEN, open:false, area:a, side:'right' });
-      walls.push({ x:a.x + a.w - WALL_THICK/2, y:a.y, w:WALL_THICK, h:(a.h - DOOR_LEN)/2 });
-      walls.push({ x:a.x + a.w - WALL_THICK/2, y:a.y + (a.h + DOOR_LEN)/2, w:WALL_THICK, h:(a.h - DOOR_LEN)/2 });
+      buildBoundary(a, 'top');
+      buildBoundary(a, 'bottom');
+      buildBoundary(a, 'left');
+      buildBoundary(a, 'right');
     }
   }
 
@@ -796,7 +856,6 @@
     ],
   };
 
-  // Starting position (Map 7,11 center)
   const START_X = 6 * MAP_W + MAP_W / 2;
   const START_Y = 10 * MAP_H + MAP_H / 2;
 
@@ -859,7 +918,6 @@
         let x = rand(area.x + 80, area.x + area.w - 80);
         let y = rand(area.y + 80, area.y + area.h - 80);
 
-        // Keep away from player start
         const dStart = dist(x, y, START_X, START_Y);
         if (dStart < 120) {
           const ang = Math.atan2(y - START_Y, x - START_X);
@@ -1125,7 +1183,6 @@
   // ============================================================
   //  Collision
   // ============================================================
-  // Returns new {x, y} if the circle overlaps the rect, else null.
   function resolveRectCollision(cx, cy, r, rx, ry, rw, rh) {
     const nx = clamp(cx, rx, rx + rw);
     const ny = clamp(cy, ry, ry + rh);
@@ -1139,7 +1196,6 @@
       const overlap = r - d;
       return { x: cx + (dx / d) * overlap, y: cy + (dy / d) * overlap };
     }
-    // Center inside rect: push out to nearest edge
     const left   = cx - rx;
     const right  = rx + rw - cx;
     const top    = cy - ry;
@@ -1152,7 +1208,6 @@
   }
 
   function tryMovePlayer(dx, dy) {
-    // Attempt X movement
     let nx = clamp(player.x + dx, 20, WORLD_W - 20);
     player.x = nx;
     for (const w of walls) {
@@ -1165,7 +1220,6 @@
       if (res) { player.x = res.x; player.y = res.y; }
     }
 
-    // Attempt Y movement
     let ny = clamp(player.y + dy, 20, WORLD_H - 20);
     player.y = ny;
     for (const w of walls) {
@@ -1183,10 +1237,8 @@
   //  Update
   // ============================================================
   function update(dt) {
-    // Movement speed per frame
     const baseSpeed = player.speed * 0.4;
 
-    // Direction from keys
     let dx = 0, dy = 0;
     if (keys.ArrowUp)    dy -= 1;
     if (keys.ArrowDown)  dy += 1;
@@ -1194,13 +1246,10 @@
     if (keys.ArrowRight) dx += 1;
 
     if (dx !== 0 || dy !== 0) {
-      // Normalize diagonal
       const len = Math.hypot(dx, dy);
       dx = dx / len * baseSpeed;
       dy = dy / len * baseSpeed;
 
-      // Sub-step the movement so we never tunnel through walls.
-      // Max step per sub-iteration is 4px.
       const total = Math.hypot(dx, dy);
       const steps = Math.max(1, Math.ceil(total / 4));
       const stepX = dx / steps;
@@ -1210,14 +1259,12 @@
       }
     }
 
-    // Player angle from mouse position (world coords)
     const camX = clamp(player.x - W/2, 0, WORLD_W - W);
     const camY = clamp(player.y - H/2, 0, WORLD_H - H);
     const wmx = mouseX + camX;
     const wmy = mouseY + camY;
     player.angle = Math.atan2(wmy - player.y, wmx - player.x);
 
-    // NPC walk
     for (const n of npcs) {
       if (n.behavior === 'walk') {
         n.phase += 0.02 * n.speed;
@@ -1226,7 +1273,6 @@
       }
     }
 
-    // Find nearby NPC
     activeNPC = null;
     let bestD = 60;
     for (const n of npcs) {
@@ -1234,7 +1280,6 @@
       if (d < bestD) { bestD = d; activeNPC = n; }
     }
 
-    // Find nearby door
     activeDoor = null;
     let bestDoorD = 55;
     for (const dr of doors) {
@@ -1271,8 +1316,6 @@
       if (a.x > camX + W || a.x + a.w < camX || a.y > camY + H || a.y + a.h < camY) continue;
       drawArea(a);
     }
-
-    // Walls are NOT drawn (functional only).
 
     for (const dr of doors) {
       if (dr.x > camX + W || dr.x + dr.w < camX || dr.y > camY + H || dr.y + dr.h < camY) continue;
@@ -1623,7 +1666,6 @@
                       (a.type === 'executive') ? '#3a1a2a' : '#1a222c';
       ctx.fillRect(mx + a.x*sx, my + a.y*sy, a.w*sx, a.h*sy);
     }
-    // Player
     ctx.fillStyle = '#00e6b0';
     ctx.fillRect(mx + player.x*sx - 2, my + player.y*sy - 2, 4, 4);
     ctx.fillStyle = '#ffd166';
