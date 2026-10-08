@@ -363,17 +363,30 @@
     50%{ border-radius: 55% 45% 40% 60% / 45% 55% 45% 55%; transform: rotate(4deg); }
   }
 
-  /* レンガ型（難しいモード） */
-  .piece.brick{
+  /* ノーマルモード：レンガ形のみ（色はカテゴリ色のまま） */
+  .piece.brick-normal{
     border-radius: 4px;
     width: 54px;
     height: 32px;
     font-size: 10px;
+    background-image: repeating-linear-gradient(45deg, rgba(0,0,0,0.06) 0px, rgba(0,0,0,0.06) 4px, transparent 4px, transparent 8px);
+    border: 2px solid rgba(0,0,0,0.25);
+    box-shadow: inset -2px -2px 4px rgba(0,0,0,0.4), inset 2px 2px 4px rgba(255,255,255,0.15), 0 4px 8px rgba(0,0,0,0.5);
+  }
+  .piece.brick-normal .dot{ display: none; }
+
+  /* むずかしいモード：レンガの色と形 */
+  .piece.brick-hard{
+    border-radius: 4px;
+    width: 54px;
+    height: 32px;
+    font-size: 10px;
+    background: linear-gradient(135deg, #b85c3a, #8a3e22) !important;
     background-image: repeating-linear-gradient(45deg, rgba(0,0,0,0.1) 0px, rgba(0,0,0,0.1) 4px, transparent 4px, transparent 8px);
     border: 2px solid rgba(0,0,0,0.35);
     box-shadow: inset -2px -2px 4px rgba(0,0,0,0.5), inset 2px 2px 4px rgba(255,255,255,0.2), 0 4px 8px rgba(0,0,0,0.5);
   }
-  .piece.brick .dot{ display: none; }
+  .piece.brick-hard .dot{ display: none; }
 
   .piece .dot{
     position: absolute;
@@ -456,7 +469,7 @@
   @media (max-width: 600px){
     .theme-list, .mode-list{ grid-template-columns: 1fr; }
     .piece{ width: 38px; height: 38px; font-size: 10px; }
-    .piece.brick{ width: 46px; height: 28px; font-size: 8px; }
+    .piece.brick-normal, .piece.brick-hard{ width: 46px; height: 28px; font-size: 8px; }
     #cat-legend{ gap: 4px; }
     .cat-legend-item{ font-size: 9px; padding: 2px 6px; }
   }
@@ -489,7 +502,7 @@
 
     <h3>難易度</h3>
     <div class="mode-list">
-      <div class="mode-option selected" data-mode="normal">ノーマル<span class="desc">色分け・丸い形</span></div>
+      <div class="mode-option selected" data-mode="normal">ノーマル<span class="desc">カテゴリ色・レンガ形</span></div>
       <div class="mode-option" data-mode="hard">むずかしい<span class="desc">レンガの色と形</span></div>
     </div>
 
@@ -688,10 +701,6 @@ const CAT_NAMES = {
   noble:      "貴ガス"
 };
 
-/* レンガの色（むずかしいモード） */
-const BRICK_COLOR = "#b85c3a";
-const BRICK_DARK = "#8a3e22";
-
 /* 背景画像 */
 const BG_IMAGES = ["img99aria.jpg", "img122fleet.jpg"];
 
@@ -717,8 +726,7 @@ const state = {
   animFrame: null,
   sortedByMass: [],
   // 物理状態
-  physicsActive: false,  // プールに落ちた後だけ物理ON
-  piecesInPool: []       // 物理演算対象
+  piecesInPool: []
 };
 
 /* =========================================================
@@ -817,7 +825,6 @@ function initGame(){
   state.streak = 0;
   state.placedMasses = [];
   state.gameActive = true;
-  state.physicsActive = false;
   state.dragging = null;
 
   const selected = pickRandom32();
@@ -844,20 +851,25 @@ function initGame(){
     piece.textContent = el.sym;
 
     const isBrick = el.mass > BRICK_MASS_THRESHOLD;
-    const isHardMode = state.mode === "hard";
 
-    if(isHardMode && isBrick){
-      // むずかしいモード：レンガの色と形
-      piece.classList.add("brick");
-      piece.style.background = `linear-gradient(135deg, ${BRICK_COLOR}, ${BRICK_DARK})`;
+    if(isBrick){
+      if(state.mode === "hard"){
+        // むずかしいモード：レンガの色と形
+        piece.classList.add("brick-hard");
+      } else {
+        // ノーマルモード：レンガ形のみ（色はカテゴリ色のまま）
+        piece.classList.add("brick-normal");
+        piece.style.background = CAT_COLORS[el.cat];
+      }
     } else {
-      // ノーマルモード：カテゴリ色・丸形
+      // 軽い元素：丸形
       piece.style.background = CAT_COLORS[el.cat];
     }
 
     piece.title = `${el.z} ${el.name}（${CAT_NAMES[el.cat]}）質量:${el.mass}`;
 
-    if(!(isHardMode && isBrick)){
+    // レンガ以外はドットを追加
+    if(!isBrick){
       const dot = document.createElement("div");
       dot.className = "dot";
       piece.appendChild(dot);
@@ -915,7 +927,6 @@ function onPointerDown(e){
   state.dragOffset.x = e.clientX - rect.left;
   state.dragOffset.y = e.clientY - rect.top;
 
-  // セットラインをアクティブに
   document.getElementById("set-line").classList.add("active");
 
   pieceEl.addEventListener("pointermove", onPointerMove);
@@ -938,7 +949,6 @@ function onPointerMove(e){
   nx = Math.max(0, Math.min(areaRect.width - el.offsetWidth, nx));
   ny = Math.max(0, Math.min(areaRect.height - el.offsetHeight, ny));
 
-  // ドラッグ中は自由移動（質量の影響なし）
   piece.x = nx;
   piece.y = ny;
 
@@ -970,23 +980,16 @@ function checkSetLineDrop(piece){
   const areaRect = document.getElementById("play-area").getBoundingClientRect();
   const pieceRect = el.getBoundingClientRect();
 
-  // セットラインのY座標
   const setLineY = areaRect.top + areaRect.height * 0.55;
   const cx = pieceRect.left + pieceRect.width / 2;
   const cy = pieceRect.top + pieceRect.height / 2;
 
   // セットライン付近（±40px）に落としたらセット
   if(Math.abs(cy - setLineY) < 40){
-    // セット成功 → 物理演算開始
     placeAtSetLine(piece, cx - areaRect.left, setLineY - areaRect.top);
-  } else if(cy > setLineY + 40){
-    // セットラインを越えて下に落ちた → ミス（元に戻す）
-    piece.x = piece.el.dataset.origX ? parseFloat(piece.el.dataset.origX) : piece.x;
-    // 元の位置に戻す
-    piece.vx = 0;
-    piece.vy = 0;
   }
-  // セットラインより上なら何もしない（置き場に戻る）
+  // セットラインより上なら置き場に戻る（何もしない）
+  // セットラインより下に落ちた場合も何もしない（置き場に戻る）
 }
 
 function placeAtSetLine(piece, dropX, dropY){
@@ -1095,15 +1098,9 @@ function startAnimation(){
         const isHeavy = mass > BRICK_MASS_THRESHOLD;
 
         // 物理パラメータ
-        // 重いほど沈む、軽いほど浮く
-        // 質量1.008〜294を正規化して浮力係数に
-        const massNorm = Math.min(mass / 294, 1);
-        // buoyancy: 軽い(<30)は強く浮く、重い(>150)は沈む
         const buoyancy = mass < 30 ? -0.35 : mass < 60 ? -0.15 : mass < 100 ? 0.05 : mass < 180 ? 0.2 : 0.35;
-        // 水抵抗
         const drag = mass > 200 ? 0.88 : mass > 150 ? 0.91 : mass > 100 ? 0.94 : mass > 60 ? 0.96 : 0.97;
 
-        // ランダムな揺らぎ
         if(piece.data.state === "gas" || mass < 40){
           piece.vx += (Math.random() - 0.5) * 0.3;
           piece.vy += (Math.random() - 0.5) * 0.3;
@@ -1113,33 +1110,23 @@ function startAnimation(){
           piece.vy += (Math.random() - 0.5) * 0.5;
         }
 
-        // 浮力適用
         piece.vy += buoyancy;
-
-        // 水抵抗
         piece.vx *= drag;
         piece.vy *= drag;
 
-        // 質量が大きいほど重力加速（沈降速度）
         if(isHeavy && piece.y > setLineY){
           piece.vy += 0.08 * Math.min(mass / 200, 1.5);
         }
 
-        // 位置更新
         piece.x += piece.vx;
         piece.y += piece.vy;
 
         const w = el.offsetWidth;
         const h = el.offsetHeight;
 
-        // 左右の壁
         if(piece.x < 0){ piece.x = 0; piece.vx *= -0.5; }
         if(piece.x > areaRect.width - w){ piece.x = areaRect.width - w; piece.vx *= -0.5; }
-
-        // 上面（セットラインより上には行かない）
         if(piece.y < setLineY - 20){ piece.y = setLineY - 20; piece.vy *= -0.3; }
-
-        // 底面
         if(piece.y > areaRect.height - h){
           piece.y = areaRect.height - h;
           if(isHeavy){
@@ -1157,7 +1144,7 @@ function startAnimation(){
         el.style.top = piece.y + "px";
       });
 
-      // 置き場のアイドルアニメーション（浮遊）
+      // 置き場のアイドルアニメーション
       state.pieces.forEach(piece => {
         if(piece.inPool || piece.placed || piece.dragging) return;
         const el = piece.el;
@@ -1171,7 +1158,6 @@ function startAnimation(){
           piece.x += piece.vx;
           piece.y += piece.vy;
 
-          // 置き場内に留める
           const storageBottom = areaRect.height * 0.55 - 30;
           if(piece.x < 0){ piece.x = 0; piece.vx *= -0.8; }
           if(piece.x > areaRect.width - el.offsetWidth){ piece.x = areaRect.width - el.offsetWidth; piece.vx *= -0.8; }
