@@ -1,0 +1,1847 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GREEK SECURITIES — TRADE</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Anton&family=Archivo+Black&family=Oswald:wght@400;700&family=Noto+Sans+JP:wght@400;700;900&display=swap');
+
+  :root {
+    --concrete: #2b2b2b;
+    --concrete-light: #3a3a3a;
+    --concrete-dark: #1a1a1a;
+    --paper: #e8e4d8;
+    --paper-dark: #c8c4b8;
+    --black: #0a0a0a;
+    --white: #f4f4f4;
+    --yellow: #ffea00;
+    --yellow-dark: #d4c000;
+    --red: #e63946;
+    --blue: #3a7bd5;
+    --green: #4ade80;
+    --orange: #ff7a00;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    font-family: 'Oswald', 'Noto Sans JP', sans-serif;
+    background: var(--concrete);
+    color: var(--white);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    overflow-x: hidden;
+    overflow-y: auto;
+    background-image:
+      /* コンクリートのノイズ */
+      radial-gradient(circle at 15% 20%, rgba(0,0,0,0.3), transparent 40%),
+      radial-gradient(circle at 85% 70%, rgba(0,0,0,0.25), transparent 45%),
+      /* スプレーの斑点 */
+      radial-gradient(circle at 40% 30%, rgba(255,234,0,0.05) 0%, transparent 2%),
+      radial-gradient(circle at 70% 60%, rgba(255,234,0,0.04) 0%, transparent 1.5%),
+      radial-gradient(circle at 25% 80%, rgba(230,57,70,0.04) 0%, transparent 2%),
+      /* 横罫線 */
+      repeating-linear-gradient(0deg,
+        transparent 0px, transparent 80px,
+        rgba(0,0,0,0.15) 80px, rgba(0,0,0,0.15) 82px);
+  }
+
+  .dude-wrap {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-height: 100vh;
+  }
+
+  /* ============================================================
+     ストリート風ボタン
+     ============================================================ */
+  button {
+    font-family: inherit;
+    cursor: pointer;
+    background: var(--paper);
+    color: var(--black);
+    border: 3px solid var(--black);
+    border-radius: 2px;
+    padding: 7px 14px;
+    font-weight: 900;
+    font-size: 0.78rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    transition: all 0.1s;
+    box-shadow: 3px 3px 0 var(--black);
+  }
+  button:hover {
+    background: var(--yellow);
+    transform: translate(-2px, -2px);
+    box-shadow: 5px 5px 0 var(--black);
+  }
+  button:active {
+    transform: translate(1px, 1px);
+    box-shadow: 1px 1px 0 var(--black);
+  }
+
+  /* ============================================================
+     HEADER（黒・警告テープ）
+     ============================================================ */
+  .zone-header {
+    background: var(--black);
+    border-bottom: 5px solid var(--yellow);
+    color: var(--white);
+    position: relative;
+  }
+  /* 警告テープ（上端） */
+  .zone-header::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 8px;
+    background: repeating-linear-gradient(45deg,
+      var(--yellow) 0px, var(--yellow) 12px,
+      var(--black) 12px, var(--black) 24px);
+  }
+
+  .header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 20px 12px;
+    flex-wrap: wrap;
+    gap: 10px;
+    border-bottom: 2px dashed #444;
+  }
+
+  .title-area {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  h1.site-title {
+    font-family: 'Anton', 'Noto Sans JP', sans-serif;
+    font-size: 2rem;
+    font-weight: 400;
+    letter-spacing: 0.15em;
+    color: var(--yellow);
+    text-shadow: 4px 4px 0 var(--red), 6px 6px 0 var(--black);
+    text-transform: uppercase;
+    transform: skew(-3deg);
+  }
+
+  .menu-btn {
+    background: var(--yellow);
+    color: var(--black);
+    border: 3px solid var(--black);
+    width: 44px;
+    height: 44px;
+    font-size: 1.3rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 900;
+  }
+
+  .header-links {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .header-links button {
+    background: var(--paper);
+    font-size: 0.72rem;
+    padding: 5px 10px;
+  }
+
+  .menu-panel {
+    display: none;
+    background: var(--paper);
+    color: var(--black);
+    border-bottom: 5px solid var(--red);
+    padding: 10px 20px;
+  }
+  .menu-panel.open { display: block; }
+  .menu-panel > button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: none;
+    border-bottom: 2px solid var(--black);
+    border-radius: 0;
+    padding: 10px 6px;
+    background: transparent;
+    box-shadow: none;
+    font-size: 0.85rem;
+    color: var(--black);
+  }
+  .menu-panel > button:hover { background: var(--yellow); padding-left: 14px; }
+
+  .service-sub {
+    display: none;
+    border-left: 5px solid var(--red);
+    padding-left: 12px;
+    margin: 6px 0;
+    background: rgba(0,0,0,0.08);
+  }
+  .service-sub.open { display: block; }
+  .service-sub h4 {
+    font-size: 0.68rem;
+    color: var(--red);
+    letter-spacing: 0.2em;
+    margin: 10px 0 4px;
+    font-weight: 900;
+    text-transform: uppercase;
+  }
+  .service-sub button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: none;
+    border-radius: 0;
+    padding: 6px 4px;
+    background: transparent;
+    box-shadow: none;
+    font-size: 0.75rem;
+    color: var(--black);
+  }
+
+  .nav-primary {
+    display: flex;
+    gap: 6px;
+    padding: 10px 20px;
+    flex-wrap: wrap;
+    border-bottom: 2px solid #444;
+  }
+  .nav-primary button {
+    background: var(--paper);
+    font-size: 0.75rem;
+  }
+
+  .nav-secondary {
+    display: flex;
+    gap: 6px;
+    padding: 10px 20px;
+    flex-wrap: wrap;
+    position: relative;
+  }
+  .nav-secondary button {
+    background: var(--paper);
+    font-size: 0.72rem;
+  }
+
+  .other-sub {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 20px;
+    background: var(--paper);
+    border: 3px solid var(--black);
+    border-radius: 2px;
+    z-index: 100;
+    min-width: 240px;
+    padding: 6px 0;
+    box-shadow: 5px 5px 0 var(--yellow);
+  }
+  .other-sub.open { display: block; }
+  .other-sub button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: none;
+    border-radius: 0;
+    border-bottom: 1px solid #aaa;
+    padding: 8px 14px;
+    background: transparent;
+    box-shadow: none;
+    color: var(--black);
+  }
+  .other-sub button:hover { background: var(--yellow); }
+  .other-sub button:last-child { border-bottom: none; }
+
+  .product-select {
+    position: relative;
+    display: inline-flex;
+    align-items: stretch;
+  }
+  .product-label { border-radius: 2px 0 0 2px; border-right: none; }
+  .product-arrow { padding: 7px 10px; font-size: 0.7rem; border-radius: 0 2px 2px 0; }
+  .product-options {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: var(--paper);
+    border: 3px solid var(--black);
+    border-radius: 2px;
+    z-index: 150;
+    min-width: 180px;
+    box-shadow: 5px 5px 0 var(--yellow);
+  }
+  .product-options.open { display: block; }
+  .product-options button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: none;
+    border-radius: 0;
+    border-bottom: 1px solid #aaa;
+    background: transparent;
+    box-shadow: none;
+    color: var(--black);
+  }
+  .product-options button:last-child { border-bottom: none; }
+
+  /* ============================================================
+     TRADE MENU ROW（ストリート・ステッカー風）
+     ============================================================ */
+  .trade-menu-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 14px 20px;
+    background: var(--concrete-dark);
+    border-top: 3px solid var(--yellow);
+    border-bottom: 2px solid #444;
+  }
+  .trade-menu-row button {
+    background: var(--yellow);
+    color: var(--black);
+    border: 3px solid var(--black);
+    font-size: 0.75rem;
+    padding: 7px 14px;
+    transform: rotate(-1deg);
+  }
+  .trade-menu-row button:nth-child(even) { transform: rotate(1deg); background: var(--white); }
+  .trade-menu-row button:hover { transform: rotate(0deg) translate(-2px,-2px); }
+
+  .trade-time-row {
+    display: flex;
+    justify-content: flex-end;
+    padding: 10px 20px 14px;
+    font-size: 0.85rem;
+    letter-spacing: 0.15em;
+    color: var(--yellow);
+    font-family: 'Oswald', monospace;
+    background: var(--concrete-dark);
+    border-bottom: 5px solid var(--yellow);
+    cursor: pointer;
+    text-shadow: 2px 2px 0 var(--red);
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+  .trade-time-row:hover { color: var(--white); }
+
+  /* ============================================================
+     MIDDLE
+     ============================================================ */
+  .zone-middle {
+    display: flex;
+    flex-direction: row;
+    border-top: 5px solid var(--black);
+    border-bottom: 5px solid var(--black);
+  }
+
+  .zone-left {
+    flex: 0 0 auto;
+    width: 320px;
+    background: var(--concrete-light);
+    border-right: 5px solid var(--yellow);
+    padding: 16px 0;
+    position: relative;
+  }
+  /* サイドバー左端の赤ステッカー */
+  .zone-left::before {
+    content: '';
+    position: absolute;
+    top: 20px;
+    left: -8px;
+    width: 16px;
+    height: 60px;
+    background: var(--red);
+    transform: skew(-5deg);
+    box-shadow: 2px 2px 0 var(--black);
+  }
+
+  .sidebar-title {
+    font-family: 'Anton', sans-serif;
+    font-size: 1.1rem;
+    letter-spacing: 0.15em;
+    color: var(--yellow);
+    padding: 8px 18px 14px;
+    border-bottom: 3px solid var(--yellow);
+    font-weight: 400;
+    cursor: pointer;
+    text-transform: uppercase;
+    text-shadow: 2px 2px 0 var(--black);
+  }
+  .sidebar-title:hover { color: var(--white); }
+
+  .sidebar-label {
+    font-family: 'Anton', sans-serif;
+    font-size: 1.1rem;
+    letter-spacing: 0.15em;
+    color: var(--yellow);
+    padding: 16px 18px 14px;
+    border-bottom: 3px solid var(--yellow);
+    font-weight: 400;
+    cursor: pointer;
+    text-transform: uppercase;
+    text-shadow: 2px 2px 0 var(--black);
+  }
+  .sidebar-label:hover { color: var(--white); }
+
+  .cat {
+    border-bottom: 2px solid #333;
+  }
+  .cat-header {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 12px 18px;
+    font-size: 0.8rem;
+    font-weight: 900;
+    color: var(--white);
+    text-align: left;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    box-shadow: none;
+    position: relative;
+  }
+  .cat-header::before {
+    content: '+';
+    font-size: 1.1rem;
+    color: var(--yellow);
+    margin-right: 10px;
+    font-weight: 900;
+    font-family: 'Anton', sans-serif;
+  }
+  .cat.open .cat-header::before { content: '−'; }
+  .cat-header:hover { background: var(--yellow); color: var(--black); }
+  .cat-header:hover::before { color: var(--black); }
+
+  .cat-items { display: none; background: var(--concrete-dark); }
+  .cat.open .cat-items { display: block; }
+
+  .cat-items button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: none;
+    border-radius: 0;
+    border-bottom: 1px solid #333;
+    padding: 9px 18px 9px 36px;
+    font-size: 0.72rem;
+    color: #bbb;
+    background: transparent;
+    box-shadow: none;
+    position: relative;
+    text-transform: none;
+    letter-spacing: 0.03em;
+  }
+  .cat-items button::before {
+    content: '▸';
+    position: absolute;
+    left: 20px;
+    color: #666;
+    font-size: 0.7rem;
+  }
+  .cat-items button:hover {
+    background: var(--yellow);
+    color: var(--black);
+  }
+
+  .cat-items button.marker-blue {
+    background: var(--red);
+    color: #fff;
+    font-weight: 900;
+  }
+  .cat-items button.marker-blue::before { color: #fff; }
+  .cat-items button.marker-blue:hover { background: var(--yellow); color: var(--black); }
+
+  .zone-center {
+    flex: 1 1 auto;
+    background: var(--concrete);
+    padding: 24px;
+    min-width: 0;
+    position: relative;
+  }
+
+  .c-container { max-width: 1100px; margin: 0 auto; }
+
+  .order-top-bar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .order-top-bar button { font-size: 0.75rem; }
+
+  .quote-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+  .quote-row button { font-size: 0.75rem; }
+
+  .user-name {
+    font-size: 0.85rem;
+    color: var(--white);
+    margin-bottom: 16px;
+    padding: 10px 14px;
+    background: var(--black);
+    border-left: 5px solid var(--yellow);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  .user-name strong { color: var(--yellow); }
+
+  .order-form {
+    background: var(--paper);
+    color: var(--black);
+    border: 4px solid var(--black);
+    border-radius: 3px;
+    padding: 20px;
+    box-shadow: 8px 8px 0 var(--yellow);
+  }
+
+  .form-section {
+    padding: 14px 0;
+    border-bottom: 2px dashed #999;
+  }
+  .form-section:last-child { border-bottom: none; }
+
+  .form-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .form-row:last-child { margin-bottom: 0; }
+
+  .form-label {
+    font-weight: 900;
+    font-size: 0.82rem;
+    color: var(--black);
+    min-width: 90px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .radio-group {
+    display: inline-flex;
+    gap: 14px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .radio-group label {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.82rem;
+    cursor: pointer;
+    font-weight: 700;
+  }
+  .radio-group input[type="radio"] {
+    accent-color: var(--red);
+    width: 16px;
+    height: 16px;
+  }
+
+  .text-input {
+    border: 3px solid var(--black);
+    border-radius: 2px;
+    padding: 6px 10px;
+    font-family: inherit;
+    font-size: 0.82rem;
+    color: var(--black);
+    background: #fff;
+    min-width: 100px;
+    outline: none;
+  }
+  .text-input:focus {
+    border-color: var(--red);
+    box-shadow: 0 0 0 3px rgba(230,57,70,0.3);
+  }
+
+  .cond-select {
+    position: relative;
+    display: inline-flex;
+    align-items: stretch;
+  }
+  .cond-label {
+    background: var(--paper);
+    border: 3px solid var(--black);
+    border-right: none;
+    border-radius: 2px 0 0 2px;
+    padding: 6px 10px;
+    font-size: 0.75rem;
+    font-weight: 900;
+    white-space: nowrap;
+    text-transform: uppercase;
+  }
+  .cond-arrow {
+    background: var(--paper);
+    border: 3px solid var(--black);
+    border-radius: 0 2px 2px 0;
+    padding: 6px 8px;
+    font-size: 0.7rem;
+    box-shadow: none;
+  }
+  .cond-arrow:hover { background: var(--yellow); }
+  .cond-options {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: var(--paper);
+    border: 3px solid var(--black);
+    border-radius: 2px;
+    z-index: 200;
+    min-width: 140px;
+    box-shadow: 4px 4px 0 var(--yellow);
+  }
+  .cond-options.open { display: block; }
+  .cond-options button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: none;
+    border-radius: 0;
+    border-bottom: 1px solid #aaa;
+    padding: 7px 12px;
+    background: transparent;
+    box-shadow: none;
+    font-size: 0.75rem;
+    color: var(--black);
+  }
+  .cond-options button:hover { background: var(--yellow); }
+  .cond-options button:last-child { border-bottom: none; }
+
+  .market-select {
+    position: relative;
+    display: inline-flex;
+    align-items: stretch;
+  }
+  .market-label {
+    background: var(--paper);
+    border: 3px solid var(--black);
+    border-right: none;
+    border-radius: 2px 0 0 2px;
+    padding: 6px 10px;
+    font-size: 0.78rem;
+    font-weight: 900;
+    white-space: nowrap;
+  }
+  .market-arrow {
+    background: var(--paper);
+    border: 3px solid var(--black);
+    border-radius: 0 2px 2px 0;
+    padding: 6px 8px;
+    font-size: 0.7rem;
+    box-shadow: none;
+  }
+  .market-arrow:hover { background: var(--yellow); }
+  .market-options {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: var(--paper);
+    border: 3px solid var(--black);
+    border-radius: 2px;
+    z-index: 200;
+    min-width: 180px;
+    box-shadow: 4px 4px 0 var(--yellow);
+  }
+  .market-options.open { display: block; }
+  .market-options button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: none;
+    border-radius: 0;
+    border-bottom: 1px solid #aaa;
+    padding: 7px 12px;
+    background: transparent;
+    box-shadow: none;
+    font-size: 0.75rem;
+    color: var(--black);
+  }
+  .market-options button:hover { background: var(--yellow); }
+  .market-options button:last-child { border-bottom: none; }
+
+  .period-select {
+    position: relative;
+    display: inline-flex;
+    align-items: stretch;
+  }
+  .period-label {
+    background: var(--paper);
+    border: 3px solid var(--black);
+    border-right: none;
+    border-radius: 2px 0 0 2px;
+    padding: 6px 10px;
+    font-size: 0.78rem;
+    font-weight: 900;
+    white-space: nowrap;
+  }
+  .period-arrow {
+    background: var(--paper);
+    border: 3px solid var(--black);
+    border-radius: 0 2px 2px 0;
+    padding: 6px 8px;
+    font-size: 0.7rem;
+    box-shadow: none;
+  }
+  .period-arrow:hover { background: var(--yellow); }
+  .period-options {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: var(--paper);
+    border: 3px solid var(--black);
+    border-radius: 2px;
+    z-index: 200;
+    min-width: 160px;
+    box-shadow: 4px 4px 0 var(--yellow);
+  }
+  .period-options.open { display: block; }
+  .period-options button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: none;
+    border-radius: 0;
+    border-bottom: 1px solid #aaa;
+    padding: 7px 12px;
+    background: transparent;
+    box-shadow: none;
+    font-size: 0.75rem;
+    color: var(--black);
+  }
+  .period-options button:hover { background: var(--yellow); }
+  .period-options button:last-child { border-bottom: none; }
+
+  .caution-box {
+    background: var(--yellow);
+    border: 3px solid var(--black);
+    border-radius: 2px;
+    padding: 12px;
+    font-size: 0.78rem;
+    margin: 14px 0;
+    line-height: 1.6;
+    color: var(--black);
+    font-weight: 700;
+  }
+  .caution-box strong { color: var(--red); }
+
+  .password-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: 14px;
+  }
+  .order-confirm-btn {
+    background: var(--red);
+    color: #fff;
+    border: 3px solid var(--black);
+    font-size: 0.9rem;
+    padding: 10px 22px;
+    font-weight: 900;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .order-confirm-btn:hover { background: var(--yellow); color: var(--black); }
+
+  .skip-confirm {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78rem;
+    cursor: pointer;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  .skip-confirm input {
+    accent-color: var(--red);
+    width: 16px;
+    height: 16px;
+  }
+
+  /* ============================================================
+     FOOTER（ストリート・黒）
+     ============================================================ */
+  .zone-footer {
+    background: var(--black);
+    border-top: 5px solid var(--yellow);
+    padding: 30px 20px;
+    color: var(--white);
+    position: relative;
+  }
+  .zone-footer::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 8px;
+    background: repeating-linear-gradient(-45deg,
+      var(--yellow) 0px, var(--yellow) 12px,
+      var(--black) 12px, var(--black) 24px);
+  }
+
+  .footer-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding-top: 10px;
+  }
+
+  .section-title {
+    font-family: 'Anton', sans-serif;
+    font-size: 1.2rem;
+    letter-spacing: 0.15em;
+    color: var(--yellow);
+    margin-bottom: 14px;
+    font-weight: 400;
+    text-transform: uppercase;
+    text-shadow: 3px 3px 0 var(--red);
+    transform: skew(-3deg);
+  }
+  .section-title::before { content: '/// '; color: var(--red); }
+
+  .contact-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  @media (max-width: 480px) {
+    .contact-grid { grid-template-columns: 1fr; }
+  }
+
+  .link-btn {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 0.78rem;
+    background: var(--paper);
+    color: var(--black);
+    border: 3px solid var(--black);
+    border-radius: 2px;
+    box-shadow: 3px 3px 0 var(--yellow);
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .copyright {
+    text-align: center;
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 2px solid #444;
+    font-size: 0.72rem;
+    letter-spacing: 0.25em;
+    color: #888;
+    text-transform: uppercase;
+  }
+
+  @media (max-width: 900px) {
+    .zone-middle { flex-direction: column; }
+    .zone-left {
+      width: 100%;
+      border-right: none;
+      border-bottom: 5px solid var(--yellow);
+    }
+    h1.site-title { font-size: 1.3rem; text-shadow: 2px 2px 0 var(--red), 3px 3px 0 var(--black); }
+  }
+
+  /* ============================================================
+     漫才CM OVERLAY
+     ============================================================ */
+  .manzai-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: #0a0a0a;
+    z-index: 99999;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 30px;
+    font-family: 'Noto Sans JP', sans-serif;
+  }
+  .manzai-overlay.active { display: flex; }
+
+  .manzai-stage {
+    display: flex;
+    gap: 80px;
+    justify-content: center;
+    align-items: flex-end;
+    margin-bottom: 40px;
+    flex-wrap: wrap;
+  }
+
+  .manzai-actor {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transition: transform 0.2s;
+  }
+  .manzai-actor.speaking {
+    transform: translateY(-10px) scale(1.08);
+  }
+
+  .actor-body { position: relative; width: 100px; height: 140px; }
+
+  .actor-head {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 70px;
+    height: 70px;
+    background: #e8e4d8;
+    border: 4px solid #000;
+    border-radius: 4px;
+  }
+
+  .actor-head .eye {
+    position: absolute;
+    top: 22px;
+    width: 8px;
+    height: 8px;
+    background: #000;
+    border-radius: 0;
+  }
+  .actor-head .eye.left { left: 14px; }
+  .actor-head .eye.right { right: 14px; }
+
+  .actor-head .mouth {
+    position: absolute;
+    bottom: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 22px;
+    height: 4px;
+    background: #000;
+  }
+  .manzai-actor.speaking .actor-head .mouth {
+    height: 12px;
+    width: 20px;
+    border-radius: 0;
+  }
+
+  .actor-torso {
+    position: absolute;
+    top: 66px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60px;
+    height: 70px;
+    border: 4px solid #000;
+    border-radius: 4px;
+  }
+  .manzai-actor.boke .actor-torso { background: #e63946; }
+  .manzai-actor.tsukkomi .actor-torso { background: #3a7bd5; }
+
+  .actor-name {
+    margin-top: 12px;
+    font-size: 0.85rem;
+    letter-spacing: 0.2em;
+    color: #fff;
+    background: #000;
+    padding: 4px 14px;
+    border: 2px solid #fff;
+    font-weight: 900;
+  }
+
+  .manzai-speech {
+    min-height: 80px;
+    font-size: 1.4rem;
+    color: #fff;
+    text-align: center;
+    letter-spacing: 0.05em;
+    line-height: 1.6;
+    max-width: 800px;
+    font-weight: 900;
+    text-shadow: 2px 2px 0 #000;
+    padding: 20px;
+    border: 3px solid #fff;
+    background: #1a1a1a;
+    border-radius: 8px;
+    width: 100%;
+    max-width: 900px;
+  }
+
+  .manzai-progress {
+    width: 100%;
+    max-width: 900px;
+    height: 8px;
+    background: #333;
+    border: 2px solid #fff;
+    border-radius: 4px;
+    margin-top: 20px;
+    overflow: hidden;
+  }
+  .manzai-progress-bar {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #ffea00, #e63946);
+    transition: width 0.1s linear;
+  }
+
+  .manzai-skip {
+    position: absolute;
+    bottom: 24px;
+    right: 24px;
+    background: #000;
+    color: #fff;
+    border: 3px solid #fff;
+    padding: 10px 20px;
+    font-size: 0.9rem;
+    font-weight: 900;
+    letter-spacing: 0.15em;
+    cursor: pointer;
+    box-shadow: 4px 4px 0 #ffea00;
+  }
+  .manzai-skip:hover { background: #ffea00; color: #000; }
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     漫才CM OVERLAY
+     ============================================================ -->
+<div class="manzai-overlay" id="manzaiOverlay">
+  <div class="manzai-stage">
+    <div class="manzai-actor boke" id="actorBoke">
+      <div class="actor-body">
+        <div class="actor-head">
+          <div class="eye left"></div>
+          <div class="eye right"></div>
+          <div class="mouth"></div>
+        </div>
+        <div class="actor-torso"></div>
+      </div>
+      <div class="actor-name">ボケ</div>
+    </div>
+
+    <div class="manzai-actor tsukkomi" id="actorTsukkomi">
+      <div class="actor-body">
+        <div class="actor-head">
+          <div class="eye left"></div>
+          <div class="eye right"></div>
+          <div class="mouth"></div>
+        </div>
+        <div class="actor-torso"></div>
+      </div>
+      <div class="actor-name">ツッコミ</div>
+    </div>
+  </div>
+
+  <div class="manzai-speech" id="manzaiSpeech"></div>
+
+  <div class="manzai-progress">
+    <div class="manzai-progress-bar" id="manzaiProgressBar"></div>
+  </div>
+
+  <button class="manzai-skip" id="manzaiSkip">SKIP ▶▶</button>
+</div>
+
+<div class="dude-wrap">
+
+  <!-- ============================================================
+       HEADER
+       ============================================================ -->
+  <div class="zone-header">
+    <div class="header-top">
+      <div class="title-area">
+        <h1 class="site-title">GREEK SECURITIES</h1>
+        <button class="menu-btn" id="menuBtn" aria-label="MENU">☰</button>
+      </div>
+
+      <div class="header-links">
+        <button>3 PRODUCT SEARCH</button>
+        <div class="product-select">
+          <button class="product-label" id="productLabel">DOMESTIC STOCKS</button>
+          <button class="product-arrow" id="productToggle" aria-label="Switch product">▼</button>
+          <div class="product-options" id="productOptions">
+            <button data-product="DOMESTIC STOCKS">DOMESTIC STOCKS</button>
+            <button data-product="FOREIGN STOCKS">FOREIGN STOCKS</button>
+            <button data-product="INVESTMENT TRUSTS">INVESTMENT TRUSTS</button>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:6px;border:3px solid var(--black);border-radius:2px;padding:4px 8px;background:#fff;">
+          <span>🔍</span>
+          <input type="text" placeholder="TICKER, CODE" readonly style="border:none;outline:none;font-family:inherit;font-size:0.75rem;width:110px;color:var(--black);">
+        </div>
+        <span style="font-size:0.68rem;color:#aaa;">SEARCH『』</span>
+
+        <button>BANKING</button>
+        <button>INSURANCE</button>
+      </div>
+    </div>
+
+    <div class="menu-panel" id="menuPanel">
+      <button>MESSAGES</button>
+      <button>MY SETTINGS</button>
+      <button id="serviceToggle">SERVICES ▸</button>
+      <div class="service-sub" id="serviceSub">
+        <h4>SMART INVESTING</h4>
+        <button>CARD ACCUMULATION</button>
+        <button>POINTS SERVICE</button>
+        <h4>LOAN SERVICES</h4>
+        <button>MONEY ASSISTANT</button>
+        <h4>ASSET ADVISORY</h4>
+        <button>INHERITANCE TERMINAL</button>
+        <button>INHERITANCE PROCEDURES</button>
+        <button>ASSET CONSULTATION</button>
+        <h4>SECURITY & TRUST</h4>
+        <button>SECURITY</button>
+        <button>FEES</button>
+        <button>PRODUCTS OVERVIEW</button>
+        <button>TOOLS & APPS</button>
+        <button>LEARN INVESTING</button>
+        <button>SEMINARS & EVENTS</button>
+        <button>NOTICES</button>
+      </div>
+      <button>SUPPORT</button>
+      <button>LOGOUT</button>
+    </div>
+
+    <div class="nav-primary">
+      <button>PORTFOLIO</button>
+      <button>ACCOUNT</button>
+      <button>TRADE</button>
+      <button>DEPOSITS</button>
+    </div>
+
+    <div class="nav-secondary">
+      <button>HOME</button>
+      <button>MARKETS</button>
+      <button>NISA</button>
+      <button>DOMESTIC STOCKS</button>
+      <button>FOREIGN STOCKS</button>
+      <button>INVESTMENT TRUSTS</button>
+      <button>BONDS</button>
+      <button>FX</button>
+      <button>MANAGED INVESTING</button>
+      <button id="otherToggle">OTHER PRODUCTS ▾</button>
+
+      <div class="other-sub" id="otherSub">
+        <button>EQUITY OPTIONS</button>
+        <button>FUTURES & OPTIONS</button>
+        <button>COMMODITY FUTURES</button>
+        <button>GOLD / SILVER / PLATINUM</button>
+        <button>FX MMF</button>
+        <button>EXCHANGE CFD</button>
+        <button>OTC CFD</button>
+        <button>SECURITY TOKEN</button>
+        <button>SBI WRAP</button>
+        <button>ROBO ADVISOR</button>
+        <button>iDeCo</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       TRADE MENU ROW
+       ============================================================ -->
+  <div class="trade-menu-row">
+    <button>DOMESTIC STOCK TOP</button>
+    <button>TRADE</button>
+    <button>ACCUMULATION</button>
+    <button>RANKINGS</button>
+    <button>IPO / PO</button>
+    <button>SHAREHOLDER BENEFITS</button>
+    <button>STOCK LENDING</button>
+    <button>ACCOUNT STATUS</button>
+    <button>ORDER INQUIRY</button>
+    <button>EXECUTIONS TODAY</button>
+  </div>
+
+  <div class="trade-time-row">
+    <span id="liveClock">20XX / XX / XX — XX:XX:XX</span>
+  </div>
+
+  <!-- ============================================================
+       MIDDLE
+       ============================================================ -->
+  <div class="zone-middle">
+
+    <div class="zone-left">
+      <div class="sidebar-title">DOMESTIC STOCKS — TRADE MENU</div>
+
+      <div class="cat" data-cat>
+        <button class="cat-header"><span>SYMBOL SEARCH</span></button>
+        <div class="cat-items">
+          <button>SYMBOL SEARCH &gt;</button>
+          <button>SHAREHOLDER BENEFIT SEARCH &gt;</button>
+          <button>SHORT SELLING LIST &gt;</button>
+          <button>HYPER SHORT LIST &gt;</button>
+          <button>SCREENING &gt;</button>
+          <button>CHART PATTERN SEARCH ↗</button>
+          <button>LENDING RATES &gt;</button>
+          <button>ETF / ETN LIST &gt;</button>
+          <button>REIT LIST &gt;</button>
+          <button>THEME INVESTING &gt;</button>
+          <button>ACCUMULATION RANKING &gt;</button>
+        </div>
+      </div>
+
+      <div class="cat" data-cat>
+        <button class="cat-header"><span>TRADE</span></button>
+        <div class="cat-items">
+          <button class="marker-blue">TRADE (EXCHANGE) &gt;</button>
+          <button>TRADE (PTS) &gt;</button>
+          <button>ODD LOT (S-SHARE) &gt;</button>
+          <button>ACCUMULATION &gt;</button>
+          <button>MARGIN REPAY &amp; DELIVERY &gt;</button>
+          <button>IPO / PO &gt;</button>
+          <button>OFF-AUCTION &gt;</button>
+        </div>
+      </div>
+
+      <div class="cat" data-cat>
+        <button class="cat-header"><span>MY MENU</span></button>
+        <div class="cat-items">
+          <button>HOLDINGS &gt;</button>
+          <button>MARGIN POSITIONS &gt;</button>
+          <button>ORDER INQUIRY &gt;</button>
+          <button>ACCUMULATION SETTINGS &gt;</button>
+          <button>ACCUMULATION HISTORY &gt;</button>
+          <button>DAY TRADE REPORT &gt;</button>
+          <button>SOR REPORT &gt;</button>
+        </div>
+      </div>
+
+      <div class="cat" data-cat>
+        <button class="cat-header"><span>FOR BEGINNERS</span></button>
+        <div class="cat-items">
+          <button>FIRST CASH TRADE ↗</button>
+        </div>
+      </div>
+
+      <div class="sidebar-label">DOMESTIC STOCKS — GUIDE</div>
+
+      <div class="cat" data-cat>
+        <button class="cat-header"><span>TRADE &amp; PRODUCTS</span></button>
+        <div class="cat-items">
+          <button>CASH TRADING &gt;</button>
+          <button>MARGIN TRADING &gt;</button>
+          <button>FIRST MARGIN &gt;</button>
+          <button>ETF / ETN &gt;</button>
+          <button>IPO &gt;</button>
+          <button>REIT &gt;</button>
+        </div>
+      </div>
+
+      <div class="cat" data-cat>
+        <button class="cat-header"><span>RELATED SERVICES</span></button>
+        <div class="cat-items">
+          <button>OVERVIEW &gt;</button>
+          <button>DAILY ACCUMULATION &gt;</button>
+          <button>S-SHARE &gt;</button>
+          <button>POINTS INVESTING ↗</button>
+          <button>THEME INVESTING &gt;</button>
+          <button>SHAREHOLDER BENEFITS &gt;</button>
+          <button>DIVIDENDS &gt;</button>
+          <button>STOCK LENDING &gt;</button>
+          <button>TOB &gt;</button>
+        </div>
+      </div>
+
+      <div class="cat" data-cat>
+        <button class="cat-header"><span>TOOLS &amp; APPS</span></button>
+        <div class="cat-items">
+          <button>HYPER SBI 2 ↗</button>
+          <button>STOCK APP &gt;</button>
+          <button>SCREENING &gt;</button>
+          <button>HEATMAP &gt;</button>
+        </div>
+      </div>
+
+      <div class="cat" data-cat>
+        <button class="cat-header"><span>MARKET INFO</span></button>
+        <div class="cat-items">
+          <button>MORNING / EVENING ↗</button>
+          <button>REPORTS &amp; VIDEO ↗</button>
+          <button>EARNINGS CALENDAR &gt;</button>
+          <button>NEW EQUITY REPORTS &gt;</button>
+        </div>
+      </div>
+
+      <div class="cat" data-cat>
+        <button class="cat-header"><span>TRADE FLOW</span></button>
+        <div class="cat-items">
+          <button>OPERATION GUIDE ↗</button>
+        </div>
+      </div>
+
+      <div class="cat" data-cat>
+        <button class="cat-header"><span>SERVICE OVERVIEW</span></button>
+        <div class="cat-items">
+          <button>CASH &gt;</button>
+          <button>MARGIN &gt;</button>
+          <button>PTS &gt;</button>
+          <button>DAILY ACCUMULATION &gt;</button>
+          <button>OFF-AUCTION SALE &gt;</button>
+          <button>OFF-AUCTION TRADE &gt;</button>
+          <button>STOCK LENDING &gt;</button>
+          <button>S-SHARE &gt;</button>
+          <button>THEME INVESTING &gt;</button>
+          <button>ETF / ETN &gt;</button>
+          <button>REIT &gt;</button>
+        </div>
+      </div>
+
+      <div class="cat" data-cat>
+        <button class="cat-header"><span>SYSTEM RECOVERY</span></button>
+        <div class="cat-items">
+          <button>SYSTEM RECOVERY &gt;</button>
+        </div>
+      </div>
+
+      <div class="cat" data-cat>
+        <button class="cat-header"><span>IMPORTANT NOTICE</span></button>
+        <div class="cat-items">
+          <button>CASH WATCHLIST ↗</button>
+          <button>MARGIN WATCHLIST ↗</button>
+          <button>TRADING NOTES ↗</button>
+          <button>CAPITAL DIVIDENDS ↗</button>
+          <button>CORPORATE ACTIONS &gt;</button>
+        </div>
+      </div>
+
+      <div class="cat" data-cat>
+        <button class="cat-header"><span>SUPPORT</span></button>
+        <div class="cat-items">
+          <button>SECURITY / AUTH &gt;</button>
+          <button>HELP ↗</button>
+          <button>EQUITY INFO ↗</button>
+          <button>FEEDBACK &gt;</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="zone-center">
+      <div class="c-container">
+
+        <div class="order-top-bar">
+          <button>ORDER ENTRY</button>
+          <button>EXECUTION STATUS ↗</button>
+          <button>BUYING POWER</button>
+        </div>
+
+        <div class="quote-row">
+          <button>QUOTE</button>
+          <button>FULL BOOK</button>
+          <button>EXCHANGE / PTS COMPARE</button>
+        </div>
+
+        <div class="user-name">
+          WELCOME, <strong>USERNAME</strong>
+        </div>
+
+        <div class="order-form">
+
+          <div class="form-section">
+            <div class="form-row">
+              <span class="form-label">SIDE:</span>
+              <div class="radio-group">
+                <label><input type="radio" name="trade-type" checked> CASH BUY</label>
+                <label><input type="radio" name="trade-type"> CASH SELL</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <div class="form-row">
+              <span class="form-label">TICKER:</span>
+              <input type="text" class="text-input" placeholder="----" style="width:120px;">
+              <button>SEARCH TICKER</button>
+            </div>
+
+            <div class="form-row">
+              <span class="form-label">MARKET:</span>
+              <div class="market-select">
+                <button class="market-label" id="marketLabel">PRIORITY / SOR</button>
+                <button class="market-arrow" id="marketToggle">▼</button>
+                <div class="market-options" id="marketOptions">
+                  <button data-market="PRIORITY / SOR">PRIORITY / SOR</button>
+                  <button data-market="TSE">TSE</button>
+                  <button data-market="NSE">NSE</button>
+                  <button data-market="FSE">FSE</button>
+                  <button data-market="SSE">SSE</button>
+                </div>
+              </div>
+              <button>SHOW QUOTE</button>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <div class="form-row">
+              <span class="form-label">QTY:</span>
+              <input type="text" class="text-input" placeholder="----" style="width:120px;">
+              <span>SHARES</span>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <div class="form-row">
+              <span class="form-label">PRICE:</span>
+              <div class="radio-group">
+                <label><input type="radio" name="price-type" checked> LIMIT</label>
+              </div>
+              <div class="cond-select">
+                <button class="cond-label" id="condLabel1">NONE</button>
+                <button class="cond-arrow" id="condToggle1">▼</button>
+                <div class="cond-options" id="condOptions1">
+                  <button data-cond="NONE">NONE</button>
+                  <button data-cond="OPEN LIMIT">OPEN LIMIT</button>
+                  <button data-cond="CLOSE LIMIT">CLOSE LIMIT</button>
+                  <button data-cond="FOK">FOK</button>
+                  <button data-cond="IOC LIMIT">IOC LIMIT</button>
+                </div>
+              </div>
+              <input type="text" class="text-input" placeholder="----" style="width:120px;">
+              <span>JPY</span>
+            </div>
+
+            <div class="form-row">
+              <div class="radio-group">
+                <label><input type="radio" name="price-type"> MARKET</label>
+              </div>
+              <div class="cond-select">
+                <button class="cond-label" id="condLabel2">NONE</button>
+                <button class="cond-arrow" id="condToggle2">▼</button>
+                <div class="cond-options" id="condOptions2">
+                  <button data-cond="NONE">NONE</button>
+                  <button data-cond="OPEN MKT">OPEN MKT</button>
+                  <button data-cond="CLOSE MKT">CLOSE MKT</button>
+                  <button data-cond="IOC MKT">IOC MKT</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="radio-group">
+                <label><input type="radio" name="price-type"> STOP</label>
+              </div>
+              <span style="font-size:0.78rem;">WHEN LAST ≥</span>
+              <input type="text" class="text-input" placeholder="----" style="width:100px;">
+              <span style="font-size:0.78rem;">JPY</span>
+            </div>
+
+            <div class="form-row">
+              <div class="radio-group">
+                <label><input type="radio" name="price-type"> LIMIT</label>
+              </div>
+              <div class="cond-select">
+                <button class="cond-label" id="condLabel3">NONE</button>
+                <button class="cond-arrow" id="condToggle3">▼</button>
+                <div class="cond-options" id="condOptions3">
+                  <button data-cond="NONE">NONE</button>
+                  <button data-cond="CLOSE LIMIT">CLOSE LIMIT</button>
+                  <button data-cond="FOK">FOK</button>
+                </div>
+              </div>
+              <input type="text" class="text-input" placeholder="----" style="width:100px;">
+              <span style="font-size:0.78rem;">JPY EXEC</span>
+            </div>
+
+            <div class="form-row">
+              <div class="radio-group">
+                <label><input type="radio" name="price-type"> MARKET</label>
+              </div>
+              <div class="cond-select">
+                <button class="cond-label" id="condLabel4">NONE</button>
+                <button class="cond-arrow" id="condToggle4">▼</button>
+                <div class="cond-options" id="condOptions4">
+                  <button data-cond="NONE">NONE</button>
+                  <button data-cond="CLOSE MKT">CLOSE MKT</button>
+                </div>
+              </div>
+              <span style="font-size:0.78rem;">EXEC</span>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <div class="form-row">
+              <span class="form-label">PERIOD:</span>
+              <div class="radio-group">
+                <label><input type="radio" name="period" checked> DAY</label>
+                <label><input type="radio" name="period"> WEEK</label>
+                <label><input type="radio" name="period"> SPECIFY</label>
+              </div>
+              <div class="period-select">
+                <button class="period-label" id="periodLabel">26/10/08</button>
+                <button class="period-arrow" id="periodToggle">▼</button>
+                <div class="period-options" id="periodOptions">
+                  <button data-period="26/10/08">26/10/08</button>
+                  <button data-period="~26/10/28">~26/10/28</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <div class="form-row" style="align-items:flex-start;">
+              <span class="form-label">ACCOUNT:</span>
+              <div style="display:flex;flex-direction:column;gap:8px;">
+                <label style="display:inline-flex;align-items:center;gap:5px;font-size:0.82rem;cursor:pointer;">
+                  <input type="radio" name="account-type" checked style="accent-color:var(--red);width:16px;height:16px;"> SPECIFIC
+                </label>
+                <label style="display:inline-flex;align-items:center;gap:5px;font-size:0.82rem;cursor:pointer;">
+                  <input type="radio" name="account-type" style="accent-color:var(--red);width:16px;height:16px;"> GENERAL
+                </label>
+                <label style="display:inline-flex;align-items:center;gap:5px;font-size:0.82rem;cursor:pointer;">
+                  <input type="radio" name="account-type" style="accent-color:var(--red);width:16px;height:16px;"> NISA
+                </label>
+                <label style="display:inline-flex;align-items:center;gap:5px;font-size:0.82rem;cursor:pointer;">
+                  <input type="radio" name="account-type" style="accent-color:var(--red);width:16px;height:16px;"> OLD NISA
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="caution-box">
+            PLEASE REVIEW <strong>IMPORTANT NOTICES</strong> BEFORE PLACING AN ORDER.<br>
+            ⚠ FOR SOR ELIGIBLE SYMBOLS, REVIEW THE SOR ORDER NOTICES.
+          </div>
+
+          <div class="password-row">
+            <span class="form-label">TRADE PASSWORD:</span>
+            <input type="password" class="text-input" placeholder="----" style="width:160px;">
+            <button class="order-confirm-btn">CONFIRM ORDER</button>
+            <label class="skip-confirm">
+              <input type="checkbox"> SKIP CONFIRMATION
+            </label>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============================================================
+       FOOTER
+       ============================================================ -->
+  <div class="zone-footer">
+    <div class="footer-inner">
+      <h2 class="section-title">CONTACT</h2>
+      <div class="contact-grid">
+        <button class="link-btn">INVESTMENT DISCLAIMER</button>
+        <button class="link-btn">EARNINGS NOTICES</button>
+        <button class="link-btn">FIEA DISCLOSURES</button>
+        <button class="link-btn">SCHEDULED MAINTENANCE</button>
+        <button class="link-btn">DISASTER PREPAREDNESS</button>
+        <button class="link-btn">INCIDENT RESPONSE</button>
+      </div>
+      <div class="copyright">
+        GREEK SECURITIES — TRADE REFERENCE
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  /* ============================================================
+     UI制御
+     ============================================================ */
+  const menuBtn = document.getElementById('menuBtn');
+  const menuPanel = document.getElementById('menuPanel');
+  menuBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    menuPanel.classList.toggle('open');
+  });
+  document.addEventListener('click', (e) => {
+    if (!menuPanel.contains(e.target) && e.target !== menuBtn) {
+      menuPanel.classList.remove('open');
+    }
+  });
+
+  const serviceToggle = document.getElementById('serviceToggle');
+  const serviceSub = document.getElementById('serviceSub');
+  serviceToggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    serviceSub.classList.toggle('open');
+    serviceToggle.textContent = serviceSub.classList.contains('open') ? 'SERVICES ▾' : 'SERVICES ▸';
+  });
+
+  const otherToggle = document.getElementById('otherToggle');
+  const otherSub = document.getElementById('otherSub');
+  otherToggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    otherSub.classList.toggle('open');
+    otherToggle.textContent = otherSub.classList.contains('open') ? 'OTHER PRODUCTS ▴' : 'OTHER PRODUCTS ▾';
+  });
+  document.addEventListener('click', (e) => {
+    if (!otherSub.contains(e.target) && e.target !== otherToggle) {
+      otherSub.classList.remove('open');
+      otherToggle.textContent = 'OTHER PRODUCTS ▾';
+    }
+  });
+
+  const productLabel = document.getElementById('productLabel');
+  const productToggle = document.getElementById('productToggle');
+  const productOptions = document.getElementById('productOptions');
+  productToggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    productOptions.classList.toggle('open');
+  });
+  productOptions.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      productLabel.textContent = btn.dataset.product;
+      productOptions.classList.remove('open');
+    });
+  });
+  document.addEventListener('click', (e) => {
+    if (!productOptions.contains(e.target) && e.target !== productToggle) {
+      productOptions.classList.remove('open');
+    }
+  });
+
+  document.querySelectorAll('.cat[data-cat]').forEach(cat => {
+    const header = cat.querySelector('.cat-header');
+    header.addEventListener('click', (e) => {
+      e.stopPropagation();
+      cat.classList.toggle('open');
+    });
+  });
+
+  const marketLabel = document.getElementById('marketLabel');
+  const marketToggle = document.getElementById('marketToggle');
+  const marketOptions = document.getElementById('marketOptions');
+  marketToggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    marketOptions.classList.toggle('open');
+  });
+  marketOptions.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      marketLabel.textContent = btn.dataset.market;
+      marketOptions.classList.remove('open');
+    });
+  });
+  document.addEventListener('click', (e) => {
+    if (!marketOptions.contains(e.target) && e.target !== marketToggle) {
+      marketOptions.classList.remove('open');
+    }
+  });
+
+  function setupCond(labelId, toggleId, optionsId) {
+    const label = document.getElementById(labelId);
+    const toggle = document.getElementById(toggleId);
+    const options = document.getElementById(optionsId);
+    toggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      options.classList.toggle('open');
+    });
+    options.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        label.textContent = btn.dataset.cond;
+        options.classList.remove('open');
+      });
+    });
+    document.addEventListener('click', (e) => {
+      if (!options.contains(e.target) && e.target !== toggle) {
+        options.classList.remove('open');
+      }
+    });
+  }
+  setupCond('condLabel1', 'condToggle1', 'condOptions1');
+  setupCond('condLabel2', 'condToggle2', 'condOptions2');
+  setupCond('condLabel3', 'condToggle3', 'condOptions3');
+  setupCond('condLabel4', 'condToggle4', 'condOptions4');
+
+  const periodLabel = document.getElementById('periodLabel');
+  const periodToggle = document.getElementById('periodToggle');
+  const periodOptions = document.getElementById('periodOptions');
+  periodToggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    periodOptions.classList.toggle('open');
+  });
+  periodOptions.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      periodLabel.textContent = btn.dataset.period;
+      periodOptions.classList.remove('open');
+    });
+  });
+  document.addEventListener('click', (e) => {
+    if (!periodOptions.contains(e.target) && e.target !== periodToggle) {
+      periodOptions.classList.remove('open');
+    }
+  });
+
+  function updateClock() {
+    const now = new Date();
+    const y = now.getFullYear();
+    const mo = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    const h = String(now.getHours()).padStart(2, '0');
+    const mi = String(now.getMinutes()).padStart(2, '0');
+    const s = String(now.getSeconds()).padStart(2, '0');
+    document.getElementById('liveClock').textContent =
+      `${y} / ${mo} / ${d} — ${h}:${mi}:${s}`;
+  }
+  updateClock();
+  setInterval(updateClock, 1000);
+
+  /* ============================================================
+     漫才CM（新ネタ3本・証券と無関係）
+     ============================================================ */
+  const MANZAI_LINES = [
+    /* 漫才1：名前の話 */
+    [
+      ['ボケ', 'なあ、この前初対面の人に名前聞かれたんよ。'],
+      ['ツッコミ', 'うん。で、なんて言うたん？'],
+      ['ボケ', '「田中の田に、中の字です」って言うた。'],
+      ['ツッコミ', 'そのまんまや！ 説明になってへんやろ！'],
+      ['ボケ', 'いや、相手も「あ、田中さんね」って納得してくれた。'],
+      ['ツッコミ', '納得するわ！ 当たり前や！'],
+      ['ボケ', 'せやけど、次の日その人に「たなかさん」って呼ばれた。'],
+      ['ツッコミ', '普通や！ 田中やから！'],
+      ['ボケ', 'いや、「たなか」じゃなくて、「たなか」って。'],
+      ['ツッコミ', '一緒や！ どこが違うん！'],
+      ['ボケ', 'アクセントが違うねん。「た」が低いか高いか。'],
+      ['ツッコミ', 'そんなもん、どっちでもええわ！']
+    ],
+    /* 漫才2：コンビニの袋 */
+    [
+      ['ボケ', 'なあ、コンビニでさ、レジで「袋いりますか？」って聞かれるやん。'],
+      ['ツッコミ', 'うん、毎回聞かれるな。'],
+      ['ボケ', '俺、毎回違う返ししてんねん。'],
+      ['ツッコミ', 'なんでやねん！ 素直に「いります」か「大丈夫です」でええやろ！'],
+      ['ボケ', 'いや、それがな、その日の気分で変わるねん。'],
+      ['ツッコミ', '気分で変えんな！ レジ混むやろ！'],
+      ['ボケ', 'この前は「袋という概念を超えたい」って言うた。'],
+      ['ツッコミ', '店員さん困るわ！ 何それ！'],
+      ['ボケ', 'そしたら店員さん、「では袋はお付けしませんね」って。'],
+      ['ツッコミ', 'そらそうや！ 概念を超えたんやから！'],
+      ['ボケ', 'しかも次の日、同じ店行ったら、その店員さんが俺のこと覚えてた。'],
+      ['ツッコミ', 'そら忘れへんわ！ インパクトありすぎや！']
+    ],
+    /* 漫才3：引っ越し */
+    [
+      ['ボケ', 'なあ、この前引っ越したんよ。'],
+      ['ツッコミ', 'お、ええやん。新生活や。'],
+      ['ボケ', 'で、引っ越し初日に隣に挨拶行ったんよ。'],
+      ['ツッコミ', '大事やな、ご近所付き合い。'],
+      ['ボケ', 'そしたら、出てきたのが俺の元カノやった。'],
+      ['ツッコミ', 'なんでやねん！ 偶然すぎるやろ！'],
+      ['ボケ', 'いや、マジで。3年ぶりくらいに会うた。'],
+      ['ツッコミ', 'で、なんて言うたん？'],
+      ['ボケ', '「お、久しぶり」って言うた。'],
+      ['ツッコミ', 'それだけ！？ もっとあるやろ！'],
+      ['ボケ', 'いや、相手も「久しぶり」って言うて、そのままドア閉めた。'],
+      ['ツッコミ', 'そのまま新生活が始まるんか！ 気まずすぎるやろ！']
+    ]
+  ];
+
+  function shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  const manzaiOverlay = document.getElementById('manzaiOverlay');
+  const actorBoke = document.getElementById('actorBoke');
+  const actorTsukkomi = document.getElementById('actorTsukkomi');
+  const speechEl = document.getElementById('manzaiSpeech');
+  const progressBar = document.getElementById('manzaiProgressBar');
+  const skipBtn = document.getElementById('manzaiSkip');
+
+  const playOrder = shuffle(MANZAI_LINES);
+
+  let currentShowIndex = 0;
+  let lineIndex = 0;
+  let lineTimer = null;
+  let skipRequested = false;
+
+  const LINE_DURATION = 3600;
+  const SITE_INTERVAL = 10 * 60 * 1000;
+
+  function startManzai(index) {
+    currentShowIndex = index;
+    lineIndex = 0;
+    skipRequested = false;
+    const script = playOrder[index];
+    manzaiOverlay.classList.add('active');
+    speechEl.textContent = '';
+    progressBar.style.width = '0%';
+    updateProgress(0, script.length);
+    showLine();
+  }
+
+  function showLine() {
+    if (skipRequested) {
+      endManzai();
+      return;
+    }
+    const script = playOrder[currentShowIndex];
+
+    if (lineIndex >= script.length) {
+      setTimeout(endManzai, 800);
+      return;
+    }
+
+    const [who, text] = script[lineIndex];
+    actorBoke.classList.toggle('speaking', who === 'ボケ');
+    actorTsukkomi.classList.toggle('speaking', who === 'ツッコミ');
+    speechEl.textContent = text;
+    updateProgress(lineIndex + 1, script.length);
+    lineIndex++;
+    lineTimer = setTimeout(showLine, LINE_DURATION);
+  }
+
+  function updateProgress(current, total) {
+    const pct = (current / total) * 100;
+    progressBar.style.width = pct + '%';
+  }
+
+  function endManzai() {
+    manzaiOverlay.classList.remove('active');
+    actorBoke.classList.remove('speaking');
+    actorTsukkomi.classList.remove('speaking');
+    if (lineTimer) clearTimeout(lineTimer);
+    if (currentShowIndex + 1 < playOrder.length) {
+      setTimeout(() => {
+        startManzai(currentShowIndex + 1);
+      }, SITE_INTERVAL);
+    }
+  }
+
+  skipBtn.addEventListener('click', () => {
+    skipRequested = true;
+    if (lineTimer) clearTimeout(lineTimer);
+    endManzai();
+  });
+
+  window.addEventListener('load', () => {
+    setTimeout(() => {
+      startManzai(0);
+    }, 500);
+  });
+</script>
+
+</body>
+</html>
