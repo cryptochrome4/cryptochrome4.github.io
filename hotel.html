@@ -1,0 +1,1626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hotel Day - Walk &amp; Talk</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; user-select:none; }
+  body {
+    background:#0a0c0f; font-family:'Segoe UI','Helvetica Neue',sans-serif;
+    display:flex; justify-content:center; align-items:flex-start;
+    min-height:100vh; color:#e0e0e0; padding:20px 0; overflow-y:auto;
+  }
+  .game-wrapper {
+    background:#11161c; border-radius:24px; padding:20px 20px 14px;
+    box-shadow:0 20px 40px rgba(0,0,0,0.8), 0 0 0 1px #2a3a4a inset;
+    display:flex; flex-direction:column; align-items:center; gap:12px; width:fit-content;
+  }
+  canvas { display:block; border-radius:16px; background:#0b0f14;
+    box-shadow:0 0 30px rgba(0,255,200,0.1); cursor:crosshair; width:800px; height:600px; }
+  .footer { display:flex; flex-direction:column; gap:6px; width:100%; padding:4px 8px 0;
+    font-size:13px; color:#7a8b9b; letter-spacing:0.5px; }
+  .footer .status { display:flex; gap:16px; flex-wrap:wrap; }
+  .footer .status span { color:#b0c8d8; font-weight:500; }
+  .footer .status .highlight { color:#00e6b0; text-shadow:0 0 8px #00e6b088; }
+  .footer .status .sp { color:#ffd166; text-shadow:0 0 8px #ffd16688; }
+  .footer .status .clock { color:#7ad7ff; text-shadow:0 0 8px #7ad7ff88; }
+  .footer .status .money { color:#ff8ad8; text-shadow:0 0 8px #ff8ad888; }
+  .btn-row { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; width:100%; padding:4px 0; }
+  .ui-btn { background:#1a2530; color:#00e6b0; border:2px solid #00e6b0;
+    border-radius:40px; padding:7px 16px; font-size:13px; font-weight:700;
+    letter-spacing:1px; cursor:pointer; transition:all 0.15s ease;
+    box-shadow:0 0 10px #00e6b033; font-family:inherit; }
+  .ui-btn:hover { background:#00e6b0; color:#0a0c0f; box-shadow:0 0 20px #00e6b0aa; }
+  .ui-btn:active { transform:scale(0.96); }
+  .ui-btn:disabled { opacity:0.35; cursor:not-allowed; border-color:#4a5a6a;
+    color:#4a5a6a; background:#151b22; box-shadow:none; }
+  .ui-btn.info-toggle { color:#7ad7ff; border-color:#7ad7ff; box-shadow:0 0 10px #7ad7ff33; }
+  .ui-btn.info-toggle:hover { background:#7ad7ff; color:#0a0c0f; }
+  .ui-btn.warn { color:#ff4d6d; border-color:#ff4d6d; box-shadow:0 0 10px #ff4d6d33; }
+  .ui-btn.warn:hover { background:#ff4d6d; color:#0a0c0f; }
+  .ui-btn.list { color:#ffd166; border-color:#ffd166; box-shadow:0 0 10px #ffd16633; }
+  .ui-btn.list:hover { background:#ffd166; color:#0a0c0f; }
+  .hidden { display:none !important; }
+  .hint { font-size:11px; color:#4a5a6a; margin-top:2px; text-align:center; width:100%; }
+  .info-panel { position:fixed; top:0; right:0; bottom:0; width:340px;
+    background:#0d131a; border-left:2px solid #7ad7ff;
+    box-shadow:-10px 0 40px rgba(0,0,0,0.8); z-index:9000;
+    display:flex; flex-direction:column; padding:16px;
+    transform:translateX(100%); transition:transform 0.25s ease; }
+  .info-panel.open { transform:translateX(0); }
+  .info-panel h2 { color:#7ad7ff; font-size:18px; letter-spacing:2px;
+    margin-bottom:12px; text-shadow:0 0 10px #7ad7ff88; }
+  .info-section { margin-bottom:14px; border-top:1px solid #1e3a4a; padding-top:10px; }
+  .info-section h3 { color:#00e6b0; font-size:13px; letter-spacing:1.5px; margin-bottom:8px; }
+  .item-row { display:flex; align-items:center; justify-content:space-between;
+    gap:8px; background:#111a24; border:1px solid #1e3a4a; border-radius:8px;
+    padding:8px 10px; font-size:13px; color:#b0c8d8; margin-bottom:6px; }
+  .item-row .item-name { color:#ffd166; }
+  .item-row .item-actions { display:flex; gap:6px; }
+  .item-row .mini-btn { background:#1a2530; color:#00e6b0; border:1px solid #00e6b0;
+    border-radius:20px; padding:3px 10px; font-size:11px; font-weight:700;
+    cursor:pointer; font-family:inherit; }
+  .item-row .mini-btn:hover { background:#00e6b0; color:#0a0c0f; }
+  .item-row .mini-btn.warn { color:#ff4d6d; border-color:#ff4d6d; }
+  .item-row .mini-btn.warn:hover { background:#ff4d6d; color:#0a0c0f; }
+  .info-panel .panel-btns { display:flex; gap:8px; margin-top:auto; }
+  .info-panel .panel-btns button { flex:1; }
+  .empty-note { color:#4a5a6a; font-size:12px; font-style:italic; }
+  .dialogue { position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(20px);
+    width:720px; max-width:92vw; background:#0d131aee; border:2px solid #00e6b0;
+    border-radius:16px; padding:18px 22px; z-index:9500;
+    box-shadow:0 0 40px #00e6b055; opacity:0; pointer-events:none;
+    transition:opacity 0.2s ease, transform 0.2s ease; }
+  .dialogue.open { opacity:1; pointer-events:auto; transform:translateX(-50%) translateY(0); }
+  .dialogue .d-head { display:flex; align-items:center; gap:12px; margin-bottom:10px; flex-wrap:wrap; }
+  .dialogue .d-name { color:#00e6b0; font-size:18px; font-weight:800; letter-spacing:1px; }
+  .dialogue .d-meta { color:#7a8b9b; font-size:12px; }
+  .dialogue .d-meta b { color:#ffd166; }
+  .dialogue .d-text { color:#e0e0e0; font-size:16px; line-height:1.6; min-height:60px; letter-spacing:0.3px; }
+  .dialogue .d-foot { display:flex; gap:10px; margin-top:14px; justify-content:flex-end; flex-wrap:wrap; }
+  .dialogue .d-page { color:#7a8b9b; font-size:12px; margin-right:auto; align-self:center; }
+  .dialogue .choice-row { display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; }
+  .dialogue .choice-row .ui-btn { flex:1; min-width:120px; }
+  .npc-panel { position:fixed; left:24px; bottom:24px; background:#0d131aee;
+    border:2px solid #7ad7ff; border-radius:14px; padding:12px 16px; z-index:9400;
+    color:#e0e0e0; font-size:13px; line-height:1.5; box-shadow:0 0 30px #7ad7ff44;
+    opacity:0; pointer-events:none; transition:opacity 0.15s ease; max-width:280px; }
+  .npc-panel.open { opacity:1; }
+  .npc-panel .n-name { color:#7ad7ff; font-weight:800; font-size:15px; }
+  .npc-panel .n-hint { color:#00e6b0; font-size:11px; margin-top:6px; }
+  .pres-viewer { position:fixed; inset:0; background:#000000ee; z-index:9800;
+    display:flex; flex-direction:column; justify-content:center; align-items:center; gap:16px; }
+  .pres-viewer canvas { background:#0d131a; border:2px solid #00e6b0;
+    border-radius:12px; box-shadow:0 0 40px #00e6b055; width:640px; height:400px; }
+  .pres-viewer .pres-title { color:#00e6b0; font-size:18px; letter-spacing:2px; }
+  .pres-viewer .pres-controls { display:flex; gap:12px; }
+  .opening { position:fixed; inset:0; background-image:url('img222office.jpg');
+    background-size:cover; background-position:center; background-repeat:no-repeat;
+    display:flex; flex-direction:column; justify-content:center; align-items:center;
+    gap:30px; z-index:9999; transition:opacity 0.5s ease; }
+  .opening::before { content:''; position:absolute; inset:0; background:rgba(0,0,0,0.55); z-index:0; }
+  .opening h1 { position:relative; z-index:1; color:#00e6b0; font-size:72px; font-weight:800;
+    letter-spacing:8px; text-shadow:0 0 30px #00e6b0aa, 0 0 60px #00e6b055;
+    font-family:'Segoe UI','Helvetica Neue',sans-serif; }
+  .opening .subtitle { position:relative; z-index:1; color:#b0c8d8; font-size:16px;
+    letter-spacing:4px; margin-top:-20px; }
+  .opening .opening-btns { position:relative; z-index:1; display:flex; gap:16px;
+    flex-wrap:wrap; justify-content:center; }
+  .start-btn { background:#00e6b0; color:#0a0c0f; border:none; border-radius:50px;
+    padding:18px 72px; font-size:22px; font-weight:800; letter-spacing:4px;
+    cursor:pointer; font-family:inherit; box-shadow:0 0 30px #00e6b0cc, 0 0 60px #00e6b066;
+    transition:all 0.2s ease; }
+  .start-btn:hover { transform:scale(1.06); box-shadow:0 0 50px #00e6b0ff, 0 0 100px #00e6b0aa; background:#1affc0; }
+  .start-btn:active { transform:scale(0.98); }
+  .bgview-btn { background:transparent; color:#7ad7ff; border:2px solid #7ad7ff;
+    border-radius:50px; padding:16px 40px; font-size:16px; font-weight:700;
+    letter-spacing:3px; cursor:pointer; font-family:inherit;
+    box-shadow:0 0 20px #7ad7ff55; transition:all 0.2s ease; }
+  .bgview-btn:hover { background:#7ad7ff; color:#0a0c0f; box-shadow:0 0 40px #7ad7ffaa; }
+  .opening.hidden-opening { opacity:0; pointer-events:none; }
+  .bg-viewer { position:fixed; inset:0; background:#000; z-index:10000;
+    display:flex; flex-direction:column; justify-content:center; align-items:center; }
+  .bg-viewer img { width:100%; height:100%; object-fit:contain; background:#000; }
+  .bg-viewer .close-bg { position:absolute; top:20px; right:20px; background:#ff4d6d;
+    color:#fff; border:none; border-radius:40px; padding:10px 24px; font-size:16px;
+    font-weight:700; cursor:pointer; font-family:inherit; box-shadow:0 0 20px #ff4d6daa; }
+  .bg-viewer .close-bg:hover { background:#ff8ad8; }
+  .victory { position:fixed; inset:0; z-index:11000; background:#000000ee;
+    display:flex; flex-direction:column; justify-content:center; align-items:center; gap:24px; }
+  .victory h1 { color:#ffd166; font-size:64px; font-weight:800; letter-spacing:6px;
+    text-shadow:0 0 40px #ffd166aa; }
+  .victory p { color:#b0c8d8; font-size:18px; letter-spacing:2px; }
+  .victory .vfoot { color:#4a5a6a; font-size:12px; margin-top:20px; }
+  .victory .vfoot a { color:#00e6b0; text-decoration:none; font-weight:700; }
+  .victory .vfoot a:hover { text-shadow:0 0 10px #00e6b0; }
+  .toast { position:fixed; top:24px; left:50%; transform:translateX(-50%);
+    background:#0d131aee; border:2px solid #00e6b0; color:#00e6b0;
+    border-radius:40px; padding:10px 24px; font-size:14px; font-weight:700;
+    letter-spacing:1px; z-index:12000; box-shadow:0 0 30px #00e6b055;
+    opacity:0; transition:opacity 0.25s ease; pointer-events:none; }
+  .toast.show { opacity:1; }
+</style>
+</head>
+<body>
+
+  <div class="opening" id="opening">
+    <h1>HOTEL DAY</h1>
+    <div class="subtitle">- WALK &amp; TALK -</div>
+    <div class="opening-btns">
+      <button class="start-btn" id="startBtn">START</button>
+      <button class="bgview-btn" id="bgViewBtn">VIEW BACKGROUND</button>
+    </div>
+  </div>
+
+  <div class="bg-viewer hidden" id="bgViewer">
+    <button class="close-bg" id="closeBgBtn">CLOSE ✕</button>
+    <img src="img222office.jpg" alt="background">
+  </div>
+
+  <div class="game-wrapper">
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <div class="footer" id="footer">
+      <div class="status">
+        <span>Time: <span id="timeDisplay" class="clock">4:00</span></span>
+        <span>Money: ¥<span id="moneyDisplay" class="money">10000</span></span>
+        <span>Room: <span id="roomDisplay" class="sp">???</span></span>
+        <span>Floor: <span id="floorDisplay" class="highlight">Outside</span></span>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="ui-btn info-toggle" id="infoBtn">📋 INFO PANEL</button>
+      <button class="ui-btn list" id="helpBtn">❓ HELP</button>
+    </div>
+    <div class="hint" id="hint">
+      Move: Arrow Keys / Talk: Approach &amp; click / Elevator: Stand in front &amp; click
+    </div>
+  </div>
+
+  <div class="info-panel" id="infoPanel">
+    <h2>INFO PANEL</h2>
+    <div class="info-section">
+      <h3>STATUS</h3>
+      <div class="item-row"><span>Time</span><span class="item-name" id="ipTime">4:00</span></div>
+      <div class="item-row"><span>Money</span><span class="item-name" id="ipMoney">¥10000</span></div>
+      <div class="item-row"><span>My Room</span><span class="item-name" id="ipRoom">???</span></div>
+      <div class="item-row"><span>Sleep</span><span class="item-name" id="ipSleep">Awake</span></div>
+    </div>
+    <div class="info-section">
+      <h3>ITEMS</h3>
+      <div id="itemsList"></div>
+    </div>
+    <div class="info-section">
+      <h3>ACTIONS</h3>
+      <div id="actionsList"></div>
+    </div>
+    <div class="panel-btns">
+      <button class="ui-btn" id="ipClose">CLOSE</button>
+      <button class="ui-btn warn" id="ipReset">RESET</button>
+    </div>
+  </div>
+
+  <div class="dialogue" id="dialogue">
+    <div class="d-head">
+      <div class="d-name" id="dName">Name</div>
+      <div class="d-meta" id="dMeta"></div>
+    </div>
+    <div class="d-text" id="dText"></div>
+    <div class="choice-row hidden" id="choiceRow"></div>
+    <div class="d-foot">
+      <div class="d-page" id="dPage">1 / 1</div>
+      <button class="ui-btn" id="dNext">NEXT ▶</button>
+      <button class="ui-btn warn" id="dClose">CLOSE</button>
+    </div>
+  </div>
+
+  <div class="npc-panel" id="npcPanel">
+    <div class="n-name" id="npName">Name</div>
+    <div id="npInfo">Info</div>
+    <div class="n-hint" id="npHint">Click to talk</div>
+  </div>
+
+  <div class="pres-viewer hidden" id="presViewer">
+    <div class="pres-title" id="presTitle">Presentation</div>
+    <canvas id="presCanvas" width="640" height="400"></canvas>
+    <div class="pres-controls">
+      <button class="ui-btn" id="presPrev">◀ PREV</button>
+      <button class="ui-btn" id="presNext">NEXT ▶</button>
+      <button class="ui-btn warn" id="presClose">CLOSE</button>
+    </div>
+    <div class="d-page" id="presPage">1 / 4</div>
+  </div>
+
+  <div class="victory hidden" id="victory">
+    <h1>DAY CLEARED</h1>
+    <p id="victoryText">You slept well and woke up refreshed.</p>
+    <div class="vfoot">Next: <a href="dude.html">dude.html</a></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  // ============================================================
+  //  Basic setup
+  // ============================================================
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = 800, H = 600;
+
+  const timeDisplay = document.getElementById('timeDisplay');
+  const moneyDisplay = document.getElementById('moneyDisplay');
+  const roomDisplay = document.getElementById('roomDisplay');
+  const floorDisplay = document.getElementById('floorDisplay');
+
+  const infoBtn = document.getElementById('infoBtn');
+  const helpBtn = document.getElementById('helpBtn');
+  const infoPanel = document.getElementById('infoPanel');
+  const ipTime = document.getElementById('ipTime');
+  const ipMoney = document.getElementById('ipMoney');
+  const ipRoom = document.getElementById('ipRoom');
+  const ipSleep = document.getElementById('ipSleep');
+  const itemsList = document.getElementById('itemsList');
+  const actionsList = document.getElementById('actionsList');
+  const ipClose = document.getElementById('ipClose');
+  const ipReset = document.getElementById('ipReset');
+
+  const dialogue = document.getElementById('dialogue');
+  const dName = document.getElementById('dName');
+  const dMeta = document.getElementById('dMeta');
+  const dText = document.getElementById('dText');
+  const dPage = document.getElementById('dPage');
+  const dNext = document.getElementById('dNext');
+  const dClose = document.getElementById('dClose');
+  const choiceRow = document.getElementById('choiceRow');
+
+  const npcPanel = document.getElementById('npcPanel');
+  const npName = document.getElementById('npName');
+  const npInfo = document.getElementById('npInfo');
+  const npHint = document.getElementById('npHint');
+
+  const presViewer = document.getElementById('presViewer');
+  const presTitle = document.getElementById('presTitle');
+  const presCanvas = document.getElementById('presCanvas');
+  const presCtx = presCanvas.getContext('2d');
+  const presPrev = document.getElementById('presPrev');
+  const presNext = document.getElementById('presNext');
+  const presClose = document.getElementById('presClose');
+  const presPage = document.getElementById('presPage');
+
+  const victory = document.getElementById('victory');
+  const victoryText = document.getElementById('victoryText');
+  const toast = document.getElementById('toast');
+
+  // ============================================================
+  //  Constants
+  // ============================================================
+  const FLOOR_OUTSIDE = -1;
+  const FLOORS = [1,2,3,4];
+  const HOUR_SECONDS = 7;   // 1 hour = 7 real seconds
+  const OUTSIDE_W = 1600, OUTSIDE_H = 1200;
+
+  const ELEVATOR_RECT = { x: 340, y: 480, w: 120, h: 80 };
+  const STAIRS_RECT   = { x: 680, y: 480, w: 80, h: 80 };
+  const HOTEL_ENTRANCE = { x: 760, y: 180, w: 80, h: 60 };
+  const PRESENTATION_ROOM = { x: 200, y: 850, w: 220, h: 160 };
+  const MONEY_PERSON_POS = { x: 950, y: 800 };
+  const RECEPTIONIST_POS = { x: 800, y: 300 };
+
+  // ============================================================
+  //  Game state
+  // ============================================================
+  const player = { x: 800, y: 1100, speed: 90, angle: 0, radius: 16 };
+  const keys = { ArrowUp:false, ArrowDown:false, ArrowLeft:false, ArrowRight:false };
+  let mouseX = W/2, mouseY = H/2;
+  let lastTime = 0;
+
+  let gameHours = 4, gameMinutes = 0, timeAccum = 0;
+  let money = 10000;
+  let myRoom = null;
+  let hotelPaid = false;
+  let hasKey = false;
+  let keysOwned = [];
+  let slept = false;
+  let cleared = false;
+
+  let currentFloor = FLOOR_OUTSIDE;
+
+  let guests = [];
+  let guestRooms = {};
+  let roomNumbers = [];
+  let roomsByFloor = {};
+
+  let presenter = null;
+  let presenterState = 'idle';
+  let invested = false;
+  let investReturnHour = null;
+  let investResult = null;
+  let currentPresentation = null;
+  let presSlideIndex = 0;
+
+  let comedians = [];
+  let comedyState = 'before';
+  let currentComedy = null;
+  let comedyProgress = 0;
+
+  let activeNPC = null;
+  let activeElevator = false;
+  let conversation = null;
+
+  let toastTimer = 0;
+
+  // ============================================================
+  //  Utilities
+  // ============================================================
+  const rand = (a,b)=>Math.random()*(b-a)+a;
+  const randInt = (a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+  const dist = (x1,y1,x2,y2)=>Math.hypot(x2-x1,y2-y1);
+  const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+  const pick = arr => arr[Math.floor(Math.random()*arr.length)];
+  const shuffle = arr => { const a=arr.slice(); for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; };
+  const fmt = (h,m)=>`${h}:${String(m).padStart(2,'0')}`;
+
+  function showToast(msg, dur) {
+    toast.textContent = msg;
+    toast.classList.add('show');
+    toastTimer = (dur || 2) * 60;
+  }
+
+  // ============================================================
+  //  Data
+  // ============================================================
+  const FIRST_NAMES = ['David','Sarah','Michael','Emily','James','Jessica','Robert','Ashley','John','Amanda','William','Melissa','Richard','Stephanie','Joseph','Nicole','Thomas','Elizabeth','Charles','Rebecca','Daniel','Laura','Matthew','Rachel','Anthony','Jennifer','Mark','Linda','Donald','Patricia','Steven','Barbara','Paul','Susan','Andrew','Karen','Joshua','Nancy','Kenneth','Betty','Kevin','Helen','Brian','Sandra','George','Donna','Edward','Carol','Ronald','Ruth'];
+  const LAST_NAMES = ['Smith','Johnson','Williams','Brown','Jones','Garcia','Miller','Davis','Rodriguez','Martinez','Hernandez','Lopez','Gonzalez','Wilson','Anderson','Thomas','Taylor','Moore','Jackson','Martin','Lee','Perez','Thompson','White','Harris','Sanchez','Clark','Ramirez','Lewis','Robinson','Walker','Young','Allen','King','Wright','Scott','Torres','Nguyen','Hill','Flores','Green','Adams','Nelson','Baker','Hall','Rivera','Campbell','Mitchell'];
+  const GENDERS = ['Male','Female'];
+
+  const ROOM_LINES = [
+    "Oh, you have a key to my room? How unusual.",
+    "I was just resting. This hotel is quite nice.",
+    "The bed here is surprisingly comfortable.",
+    "Did you need something from me?",
+    "I'm on vacation. Just relaxing in my room.",
+    "The view from this floor is lovely.",
+    "I heard there's an onsen on the 2nd floor.",
+    "Have you tried the gachapon on the 3rd floor?",
+    "I'm here for the banquet tonight.",
+    "The lobby has a nice rest area.",
+    "I always stay at this hotel when I visit.",
+    "The elevator is convenient, isn't it?",
+    "I prefer the stairs. Good exercise.",
+    "My room key is a nice souvenir.",
+    "I wonder what's for dinner.",
+    "The staff here are very polite.",
+    "This room has a clock, which is handy.",
+    "I'm reading a book. It's very quiet here.",
+    "Do you know when the banquet starts?",
+    "I'm looking forward to the comedy show.",
+    "I hope I don't oversleep tomorrow.",
+    "The hotel has four floors, I heard.",
+    "I'm on the top floor. The view is great.",
+    "I always lock my door when I'm inside.",
+  ];
+  const REST_LINES = [
+    "Ah, the rest room. So relaxing.",
+    "I come here every morning to unwind.",
+    "The chairs here are very comfortable.",
+    "Care for a cup of tea?",
+    "The morning light is beautiful here.",
+    "I like to read the newspaper here.",
+    "This is my favorite spot in the hotel.",
+    "The rest room is open from 7 to 11.",
+    "I met some interesting people here.",
+    "It's nice to have a quiet place.",
+    "The staff keeps this place spotless.",
+    "I could stay here all day.",
+    "Have you seen the garden outside?",
+    "The rest room has a lovely atmosphere.",
+  ];
+  const ONSEN_LINES = [
+    "The onsen is wonderful this time of day.",
+    "Ah, nothing beats a hot bath.",
+    "The water temperature is perfect.",
+    "I come here every evening.",
+    "The steam is so relaxing.",
+    "This onsen is a hidden gem.",
+    "I feel so refreshed.",
+    "The onsen is open until 10 PM.",
+    "Have you tried the outdoor bath?",
+    "The minerals in the water are great for skin.",
+    "I could soak here for hours.",
+    "The onsen is quieter in the evening.",
+    "It's the perfect way to end the day.",
+    "I always sleep well after the onsen.",
+  ];
+  const BANQUET_LINES = [
+    "The banquet hall is beautifully decorated.",
+    "I'm here for the celebration.",
+    "The food looks delicious.",
+    "What a lovely gathering.",
+    "I know the host. Great person.",
+    "The speeches were touching.",
+    "I'm glad I came tonight.",
+    "The banquet starts at 8 PM.",
+    "This hall can hold many people.",
+    "The cake is amazing.",
+    "I'm seated near the front.",
+    "The music is nice, isn't it?",
+    "I'll stay until the end.",
+    "What a wonderful evening.",
+  ];
+
+  // --- 日本語：下手くそなビジネスプレゼン 3パターン ---
+  const PRES_BAD = [
+    { title:"ドローンでパンを配達",
+      slides:[
+        {t:"課題", l:["パンは冷める。","人は温かいパンを求める。","ドローンはかっこいい。"]},
+        {t:"解決策", l:["ドローン＋パン＝温かいパン。","空からパンを落とす。","店はいらない。"]},
+        {t:"市場規模", l:["みんなパンを食べる。","つまり数十億人。","1%取れば大金持ち。"]},
+        {t:"お願い", l:["お金をください。","残りは後で考えます。","信じてください。"]},
+      ]},
+    { title:"スマート傘シェアリング",
+      slides:[
+        {t:"課題", l:["雨は突然降る。","傘はなくなる。","悲しい。"]},
+        {t:"解決策", l:["傘アプリ。","スキャンして使う。","どこでも返せる。"]},
+        {t:"収益", l:["傘に広告。","プレミアム乾燥モード。","フランチャイズ。"]},
+        {t:"お願い", l:["シードラウンド。","プランBはない。","でも心はある。"]},
+      ]},
+    { title:"AIペット翻訳機",
+      slides:[
+        {t:"ビジョン", l:["ペットは喋っている。","人間にはわからない。","問題だ。"]},
+        {t:"製品", l:["マイク付き首輪。","AIが鳴き声を翻訳。","ニャーを英語に。"]},
+        {t:"実績", l:["うちの猫で試した。","彼女は『餌をくれ』と言った。","実話。"]},
+        {t:"お願い", l:["投資が必要。","後でピボットする。","たぶん。"]},
+      ]},
+  ];
+
+  // --- 日本語：プロのビジネスプレゼン 3パターン ---
+  const PRES_PRO = [
+    { title:"再生可能エネルギー・マイクログリッド",
+      slides:[
+        {t:"市場機会", l:["世界の電力需要は30%増。","マイクログリッドは送電ロスを削減。","TAM：2030年までに1200億ドル。"]},
+        {t:"独自技術", l:["モジュール型の太陽光＋蓄電池。","AIによる負荷分散。","設置コスト40%削減。"]},
+        {t:"ビジネスモデル", l:["SaaS＋ハードウェアリース。","継続収益。","粗利率62%。"]},
+        {t:"実績と調達", l:["3カ国で12件の実証。","ARR 800万ドル。","シリーズBで2500万ドル調達中。"]},
+      ]},
+    { title:"精密農業プラットフォーム",
+      slides:[
+        {t:"課題", l:["作物の30%が無駄に。","気候が予測不能。","農家にデータがない。"]},
+        {t:"解決策", l:["IoT土壌センサー。","衛星＋ドローン画像。","実行可能なインサイト。"]},
+        {t:"市場戦略", l:["獲得して拡大。","農業組合との提携。","CAC 1200ドル、LTV 1万8000ドル。"]},
+        {t:"財務", l:["ARR 600万ドル、前月比20%成長。","粗利率71%。","シリーズAで1500万ドル調達中。"]},
+      ]},
+    { title:"デジタル医療記録",
+      slides:[
+        {t:"課題", l:["患者データが分断。","医療過誤。","管理コスト高騰。"]},
+        {t:"プラットフォーム", l:["統一患者記録。","HIPAA準拠。","相互運用API。"]},
+        {t:"実績", l:["200クリニック導入。","稼働率99.9%。","NRR 130%。"]},
+        {t:"お願い", l:["シリーズBで2000万ドル。","5市場へ拡大。","ARR1億ドルへの道。"]},
+      ]},
+  ];
+
+  // --- 日本語：漫才 4パターン ---
+  const COMEDY_THEMES = [
+    { title:"ホテル生活", lines:[
+      "A：昨日このホテルにチェックインしたんや。",
+      "B：どうやった？",
+      "A：カードキーが全然効かへんくて、部屋の前で20分立ちっぱなしや。",
+      "B：フロントに電話したん？",
+      "A：したわ。そしたら『本当にあなたの部屋ですか？』って言われた。",
+      "B：なんて答えたん？",
+      "A：『1万円払ったんや、間違いないやろ！』って。",
+      "B：それで？",
+      "A：階を間違えてたんや。俺は3階、部屋は4階やった。",
+      "B：あるある。エレベーターに裏切られたな。",
+      "A：このホテルで動いてるのはエレベーターだけや。",
+      "B：温泉は？",
+      "A：熱すぎて走馬灯が見えたわ。",
+      "B：それはただの湯気や。",
+      "A：いや、間違いなく人生やった。",
+      "B：まあ、ガチャガチャは楽しかったやろ。",
+      "A：100円で他人の部屋の鍵が出てきた。",
+      "B：入ったん？",
+      "A：もちろん！今では大親友や。",
+      "B：ホテルってそういうもんちゃうで。",
+      "A：今からそうなるんや。おやすみなさい！",
+    ]},
+    { title:"披露宴", lines:[
+      "A：今夜は披露宴に行くんや。",
+      "B：へえ、何のお祝い？",
+      "A：知らん。人混みについて行っただけや。",
+      "B：誰も知らんの？",
+      "A：今はみんな知っとる。ケーキも食べたし。",
+      "B：それで友情が生まれるん？",
+      "A：披露宴ではな。",
+      "B：スピーチは何の話やった？",
+      "A：30分ずっと『シナジー』の話やった。",
+      "B：どういう意味？",
+      "A：今もわからん。でも拍手したわ。",
+      "B：わからんのに拍手したん？",
+      "A：それが披露宴の流儀や。",
+      "B：料理は？",
+      "A：エビが小さすぎて顕微鏡が要るわ。",
+      "B：それは高級やな。",
+      "A：高級やなくて高額や。別もんや。",
+      "B：来年も行くん？",
+      "A：まだおる。出てへん。",
+      "B：3時間も披露宴におるん？",
+      "A：ケーキが本当に美味かったんや。おやすみ！",
+    ]},
+    { title:"温泉の冒険", lines:[
+      "A：2階の温泉に行ったんや。",
+      "B：どうやった？",
+      "A：タオルを忘れた。",
+      "B：あらら。",
+      "A：ハンドドライヤーを使うしかなかった。",
+      "B：それはハンドドライヤーの用途ちゃうやろ。",
+      "A：それかカーテンか、二択やった。",
+      "B：ハンドドライヤーを選んだと言ってくれ。",
+      "A：カーテンを選んだ。大きいカーテンやった。",
+      "B：カーテン着たん？",
+      "A：トーガみたいに着たわ。完全にローマ人や。",
+      "B：誰か見たん？",
+      "A：全員見た。今や有名人や。",
+      "B：何の有名人？",
+      "A：2階のトーガ男や。",
+      "B：それは伝説やな。",
+      "A：湯は最高やったで。とても癒された。",
+      "B：カーテン騒動があっても？",
+      "A：カーテン騒動があったからこそや。",
+      "B：お前とは絶対温泉に行かへん。",
+      "A：損するで。おやすみ！",
+    ]},
+    { title:"ガチャガチャ狂騒曲", lines:[
+      "A：3階のガチャガチャが大好きなんや。",
+      "B：何が出た？",
+      "A：207号室の鍵や。",
+      "B：なんでガチャガチャから部屋の鍵が出るん？",
+      "A：それが謎や。",
+      "B：207号室に行ったん？",
+      "A：行ったわ。男が寝てた。",
+      "B：他人の部屋に入ったん？",
+      "A：鍵持ってたんや！不法侵入ちゃうわ。",
+      "B": "間違いなく侵入や。",
+      "A：彼はとても優しかったで。",
+      "B：寝てたやろ！",
+      "A：起きたわ。お茶も飲んだ。",
+      "B：起こした他人とお茶したん？",
+      "A：それがおもてなしや。",
+      "B：それは犯罪や。",
+      "A：お茶はハーブティーやった。とても落ち着く。",
+      "B：警備呼ぶぞ。",
+      "A：警備も友達や。彼の鍵も持っとる。",
+      "B：全員の鍵を持ってるんかい！",
+      "A：それがガチャガチャの魔法や。おやすみ！",
+    ]},
+  ];
+
+  // ============================================================
+  //  Build rooms
+  // ============================================================
+  function buildRooms() {
+    roomsByFloor = {};
+    roomNumbers = [];
+    for (const floor of FLOORS) {
+      const arr = [];
+      const startX = 60, spacing = 72, doorY = 100;
+      for (let i = 1; i <= 10; i++) {
+        const num = floor*100 + i;
+        const x = startX + (i-1)*spacing;
+        const r = {
+          num, floor,
+          x, y: doorY, w: 56, h: 50,
+          doorX: x + 18, doorY: doorY + 50, doorW: 20, doorH: 10,
+          open: false,
+        };
+        arr.push(r);
+        roomNumbers.push(num);
+      }
+      roomsByFloor[floor] = arr;
+    }
+  }
+
+  // ============================================================
+  //  Assign rooms (random each load)
+  // ============================================================
+  function assignRooms() {
+    buildRooms();
+    const shuffled = shuffle(roomNumbers);
+    myRoom = shuffled[0];
+    const guestRoomAssign = shuffled.slice(1, 40);
+
+    guests = [];
+    const usedNames = new Set();
+    for (let i = 0; i < 39; i++) {
+      let name, guard = 0;
+      do { name = `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`; guard++; }
+      while (usedNames.has(name) && guard < 200);
+      usedNames.add(name);
+      const gender = pick(GENDERS);
+      const room = guestRoomAssign[i];
+      const floor = Math.floor(room/100);
+      const idx = (room%100)-1;
+      const r = roomsByFloor[floor][idx];
+      const g = {
+        id:i, name, gender, room, floor,
+        x: r.x + r.w/2, y: r.y + r.h/2,
+        baseX: r.x + r.w/2, baseY: r.y + r.h/2,
+        radius:14, phase: Math.random()*Math.PI*2,
+        color: pick(['#1a2a4a','#2a3a4a','#3a4a5a','#2a4a3a','#4a3a2a']),
+        hair: pick(['#1a1a1a','#3a2a1a','#5a4a2a','#7a6a3a']),
+        talkedRoom:false, talkedEvent:false,
+        location:'room', eventType:null,
+      };
+      guests.push(g);
+      guestRooms[room] = g;
+    }
+
+    const ids = shuffle(guests.map(g=>g.id));
+    const banquetIds = ids.slice(0,15);
+    const onsenIds = ids.slice(15,30);
+    const restIds = ids.slice(30,39);
+    for (const id of banquetIds) guests[id].eventType = 'banquet';
+    for (const id of onsenIds) guests[id].eventType = 'onsen';
+    for (const id of restIds) guests[id].eventType = 'rest';
+  }
+
+  // ============================================================
+  //  Presenter / Comedians
+  // ============================================================
+  function buildPresenter() {
+    presenter = {
+      id:'presenter',
+      name: pick(['Bob','Steve','Greg','Dave','Tony','Mike']),
+      x: MONEY_PERSON_POS.x, y: MONEY_PERSON_POS.y,
+      radius:16,
+      color:'#4a3a2a', hair:'#3a2a1a',
+    };
+    presenterState = 'idle';
+  }
+
+  function buildComedians() {
+    const pairs = [['Ken','Yuki'],['Taro','Hanako'],['Jiro','Mika'],['Satoshi','Aya']];
+    const pair = pick(pairs);
+    comedians = [];
+    for (let i = 0; i < 2; i++) {
+      comedians.push({
+        id:'comedian'+i, name: pair[i],
+        x: 100 + i*60, y: 1100, radius:14,
+        color: i===0 ? '#4a2a3a' : '#2a3a4a',
+        hair:'#1a1a1a', state:'taxi',
+      });
+    }
+  }
+
+  // ============================================================
+  //  Init
+  // ============================================================
+  function initGame() {
+    assignRooms();
+    buildPresenter();
+    buildComedians();
+    player.x = 800; player.y = 1100;
+    currentFloor = FLOOR_OUTSIDE;
+    gameHours = 4; gameMinutes = 0; timeAccum = 0;
+    money = 10000; hotelPaid = false; hasKey = false;
+    keysOwned = []; slept = false; cleared = false;
+    invested = false; investReturnHour = null; investResult = null;
+    comedyState = 'before'; currentComedy = null; comedyProgress = 0;
+    updateGuestLocations();
+    updateHUD();
+    buildInfoPanel();
+    victory.classList.add('hidden');
+  }
+
+  // ============================================================
+  //  HUD
+  // ============================================================
+  function updateHUD() {
+    timeDisplay.textContent = fmt(gameHours, gameMinutes);
+    moneyDisplay.textContent = money;
+    roomDisplay.textContent = myRoom || '???';
+    floorDisplay.textContent = currentFloor === FLOOR_OUTSIDE ? 'Outside' : currentFloor + 'F';
+    ipTime.textContent = fmt(gameHours, gameMinutes);
+    ipMoney.textContent = '¥' + money;
+    ipRoom.textContent = myRoom || '???';
+    ipSleep.textContent = slept ? 'Slept' : 'Awake';
+  }
+
+  function buildInfoPanel() {
+    itemsList.innerHTML = '';
+    if (hasKey) {
+      const row = document.createElement('div');
+      row.className = 'item-row';
+      row.innerHTML = `<span class="item-name">🔑 Key (My Room ${myRoom})</span>
+        <span class="item-actions">
+          <button class="mini-btn" data-action="use-my-key">USE</button>
+          <button class="mini-btn warn" data-action="cancel-key">CANCEL</button>
+        </span>`;
+      itemsList.appendChild(row);
+    }
+    for (const rn of keysOwned) {
+      const row = document.createElement('div');
+      row.className = 'item-row';
+      row.innerHTML = `<span class="item-name">🔑 Key (Room ${rn})</span>
+        <span class="item-actions">
+          <button class="mini-btn" data-action="use-guest-key" data-room="${rn}">USE</button>
+          <button class="mini-btn warn" data-action="cancel-key">CANCEL</button>
+        </span>`;
+      itemsList.appendChild(row);
+    }
+    if (!hasKey && keysOwned.length === 0) {
+      const n = document.createElement('div');
+      n.className = 'empty-note'; n.textContent = 'No items.';
+      itemsList.appendChild(n);
+    }
+
+    actionsList.innerHTML = '';
+    if (!hotelPaid && currentFloor === FLOOR_OUTSIDE) {
+      const row = document.createElement('div');
+      row.className = 'item-row';
+      row.innerHTML = `<span class="item-name">Pay Hotel ¥10,000</span>
+        <span class="item-actions">
+          <button class="mini-btn" data-action="pay-hotel">USE</button>
+          <button class="mini-btn warn" data-action="cancel-key">CANCEL</button>
+        </span>`;
+      actionsList.appendChild(row);
+    }
+    if (money >= 100) {
+      const row = document.createElement('div');
+      row.className = 'item-row';
+      row.innerHTML = `<span class="item-name">Gachapon ¥100 (3F)</span>
+        <span class="item-actions">
+          <button class="mini-btn" data-action="gachapon">USE</button>
+        </span>`;
+      actionsList.appendChild(row);
+    }
+    if (isPlayerInMyRoom() && (gameHours >= 19 || gameHours < 3) && !slept) {
+      const row = document.createElement('div');
+      row.className = 'item-row';
+      row.innerHTML = `<span class="item-name">Sleep (7 hours)</span>
+        <span class="item-actions">
+          <button class="mini-btn" data-action="sleep">SLEEP</button>
+        </span>`;
+      actionsList.appendChild(row);
+    }
+    if (actionsList.children.length === 0) {
+      const n = document.createElement('div');
+      n.className = 'empty-note'; n.textContent = 'No actions available.';
+      actionsList.appendChild(n);
+    }
+  }
+
+  function isPlayerInMyRoom() {
+    if (!myRoom) return false;
+    const floor = Math.floor(myRoom/100);
+    if (currentFloor !== floor) return false;
+    const idx = (myRoom%100)-1;
+    const r = roomsByFloor[floor][idx];
+    return dist(player.x, player.y, r.x + r.w/2, r.y + r.h/2) < 70;
+  }
+
+  // ============================================================
+  //  Time
+  // ============================================================
+  function updateTime(dt) {
+    if (slept) return;
+    timeAccum += dt / (HOUR_SECONDS * 60);
+    while (timeAccum >= 1) {
+      timeAccum -= 1;
+      gameHours++;
+      if (gameHours >= 24) gameHours -= 24;
+      onHourChanged();
+    }
+  }
+
+  function onHourChanged() {
+    if (gameHours === 7) showToast('It is 7:00. The rest room is open.', 2.5);
+    if (gameHours === 11) showToast('It is 11:00. The rest room closes.', 2);
+    if (gameHours === 18) {
+      showToast('The comedians arrive by taxi.', 2.5);
+      comedyState = 'arriving';
+      for (const c of comedians) { c.x = 100; c.y = 1100; c.state = 'walking'; }
+    }
+    if (gameHours === 19) {
+      comedyState = 'onstage';
+      currentComedy = pick(COMEDY_THEMES);
+      comedyProgress = 0;
+      showToast('The comedy show begins in the banquet hall (4F)!', 3);
+      for (const c of comedians) { c.x = 400; c.y = 500; c.state = 'onstage'; }
+    }
+    if (gameHours === 21) {
+      comedyState = 'leaving';
+      showToast('The comedy show ends.', 2);
+      for (const c of comedians) c.state = 'leaving';
+    }
+    if (gameHours === 22) {
+      comedyState = 'done';
+      for (const c of comedians) c.state = 'done';
+    }
+    updateGuestLocations();
+    updateHUD();
+    buildInfoPanel();
+  }
+
+  function updateGuestLocations() {
+    for (const g of guests) {
+      let loc = 'room';
+      if (g.eventType === 'rest' && gameHours >= 7 && gameHours < 11) loc = 'rest';
+      else if (g.eventType === 'onsen' && gameHours >= 18 && gameHours < 22) loc = 'onsen';
+      else if (g.eventType === 'banquet' && gameHours >= 20 && gameHours < 22) loc = 'banquet';
+      g.location = loc;
+      g.floor = Math.floor(g.room/100);
+      if (loc === 'room') {
+        const idx = (g.room%100)-1;
+        const r = roomsByFloor[g.floor][idx];
+        g.baseX = r.x + r.w/2; g.baseY = r.y + r.h/2;
+      } else if (loc === 'rest') {
+        g.floor = 1;
+        g.baseX = 180 + (g.id%4)*60; g.baseY = 280 + Math.floor(g.id/4)*50;
+      } else if (loc === 'onsen') {
+        g.floor = 2;
+        g.baseX = 280 + (g.id%4)*80; g.baseY = 300 + Math.floor(g.id/4)*50;
+      } else if (loc === 'banquet') {
+        g.floor = 4;
+        g.baseX = 250 + (g.id%5)*80; g.baseY = 380 + Math.floor(g.id/5)*50;
+      }
+      g.x = g.baseX; g.y = g.baseY;
+    }
+  }
+
+  // ============================================================
+  //  Input
+  // ============================================================
+  window.addEventListener('keydown', e => {
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) {
+      e.preventDefault(); keys[e.key] = true;
+    }
+    if (e.key === 'Escape') { closeDialogue(); closeInfoPanel(); closePresViewer(); }
+  });
+  window.addEventListener('keyup', e => {
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) {
+      e.preventDefault(); keys[e.key] = false;
+    }
+  });
+  canvas.addEventListener('mousemove', e => {
+    const rect = canvas.getBoundingClientRect();
+    const sx = canvas.width / rect.width;
+    const sy = canvas.height / rect.height;
+    mouseX = (e.clientX - rect.left) * sx;
+    mouseY = (e.clientY - rect.top) * sy;
+  });
+  canvas.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    if (conversation) { nextDialogue(); return; }
+    if (!presViewer.classList.contains('hidden')) return;
+    if (activeElevator) { handleElevatorClick(); return; }
+    if (activeNPC) { startDialogue(activeNPC); return; }
+  });
+
+  infoBtn.addEventListener('click', e => {
+    e.preventDefault();
+    infoPanel.classList.toggle('open');
+    buildInfoPanel();
+  });
+  helpBtn.addEventListener('click', e => {
+    e.preventDefault();
+    showToast('Arrows: move | Click NPC: talk | Elevator: click to cycle floors | Info Panel: items & actions', 5);
+  });
+  ipClose.addEventListener('click', e => { e.preventDefault(); closeInfoPanel(); });
+  ipReset.addEventListener('click', e => {
+    e.preventDefault();
+    if (confirm('Reset the whole day?')) { initGame(); closeInfoPanel(); showToast('Day reset.', 2); }
+  });
+  function closeInfoPanel() { infoPanel.classList.remove('open'); }
+
+  infoPanel.addEventListener('click', e => {
+    const btn = e.target.closest('button[data-action]');
+    if (!btn) return;
+    const action = btn.dataset.action;
+    const room = btn.dataset.room ? parseInt(btn.dataset.room) : null;
+    if (action === 'use-my-key') tryUseKey(myRoom);
+    else if (action === 'cancel-key') showToast('Key kept.', 1.2);
+    else if (action === 'use-guest-key') tryUseKey(room);
+    else if (action === 'pay-hotel') payHotel();
+    else if (action === 'gachapon') doGachapon();
+    else if (action === 'sleep') doSleep();
+    buildInfoPanel();
+  });
+
+  // ============================================================
+  //  Actions
+  // ============================================================
+  function tryUseKey(roomNum) {
+    if (!roomNum) return;
+    const floor = Math.floor(roomNum/100);
+    const idx = (roomNum%100)-1;
+    const r = roomsByFloor[floor][idx];
+    if (currentFloor !== floor) { showToast('You are not on the right floor.', 2); return; }
+    if (dist(player.x, player.y, r.x + r.w/2, r.y + r.h/2) > 90) {
+      showToast('Stand in front of the room door.', 2); return;
+    }
+    r.open = true;
+    if (roomNum === myRoom) {
+      showToast('Your room is open. You can rest here.', 2);
+    } else {
+      const g = guestRooms[roomNum];
+      if (g) {
+        showToast(`Room ${roomNum} opened. ${g.name} is inside.`, 2.5);
+        startDialogue(g);
+      }
+    }
+  }
+
+  function payHotel() {
+    if (hotelPaid) return;
+    if (money < 10000) { showToast('Not enough money.', 2); return; }
+    if (currentFloor !== FLOOR_OUTSIDE) { showToast('Go to the reception outside.', 2); return; }
+    if (dist(player.x, player.y, RECEPTIONIST_POS.x, RECEPTIONIST_POS.y) > 120) {
+      showToast('Stand in front of the receptionist.', 2); return;
+    }
+    money -= 10000;
+    hotelPaid = true;
+    hasKey = true;
+    showToast('Paid ¥10,000. Received key to room ' + myRoom + '.', 3);
+    updateHUD(); buildInfoPanel();
+  }
+
+  function doGachapon() {
+    if (money < 100) { showToast('Not enough money.', 2); return; }
+    if (currentFloor !== 3) { showToast('The gachapon is on the 3rd floor.', 2); return; }
+    if (dist(player.x, player.y, 400, 300) > 120) {
+      showToast('Stand in front of the gachapon machine.', 2); return;
+    }
+    money -= 100;
+    const available = guests.filter(g => g.room !== myRoom && !keysOwned.includes(g.room));
+    if (available.length === 0) { showToast('No more keys available.', 2); return; }
+    const g = pick(available);
+    keysOwned.push(g.room);
+    showToast(`Gachapon! You got the key to room ${g.room}.`, 2.5);
+    updateHUD(); buildInfoPanel();
+  }
+
+  function doSleep() {
+    if (slept) return;
+    if (!isPlayerInMyRoom()) { showToast('You must be in your own room.', 2); return; }
+    if (!(gameHours >= 19 || gameHours < 3)) {
+      showToast('You can only sleep between 19:00 and 3:00.', 2); return;
+    }
+    slept = true;
+    gameHours = (gameHours + 7) % 24;
+    showToast('You slept for 7 hours...', 2);
+    updateHUD(); buildInfoPanel();
+    setTimeout(() => {
+      if (!cleared) {
+        cleared = true;
+        victory.classList.remove('hidden');
+        victoryText.textContent = `You woke up at ${fmt(gameHours,0)} and spent a full day at the hotel.`;
+      }
+    }, HOUR_SECONDS * 1000);
+  }
+
+  // ============================================================
+  //  Elevator
+  // ============================================================
+  let elevatorDoorsOpen = false;
+  let elevatorMoving = false;
+  function handleElevatorClick() {
+    if (elevatorMoving) return;
+    if (!elevatorDoorsOpen) {
+      elevatorDoorsOpen = true;
+      showToast('Elevator doors open. Click again to choose floor.', 1.5);
+      return;
+    }
+    let next = currentFloor + 1;
+    if (next > 4) next = 1;
+    elevatorMoving = true;
+    elevatorDoorsOpen = false;
+    showToast(`Elevator moving to ${next}F...`, 1.5);
+    setTimeout(() => {
+      currentFloor = next;
+      player.x = ELEVATOR_RECT.x + ELEVATOR_RECT.w/2;
+      player.y = ELEVATOR_RECT.y + ELEVATOR_RECT.h/2 + 50;
+      elevatorMoving = false;
+      showToast(`Arrived at ${next}F.`, 1.5);
+      updateGuestLocations();
+      updateHUD();
+    }, 1200);
+  }
+
+  // ============================================================
+  //  Dialogue
+  // ============================================================
+  function startDialogue(npc) {
+    if (!npc) return;
+    conversation = { npc, page:0, lines:[], choices:null };
+    if (npc.id === 'presenter') {
+      if (presenterState === 'idle') {
+        conversation.lines = [
+          "Hey! You look like someone who could use some money.",
+          "I'm giving a business presentation nearby.",
+          "Follow me to the presentation room!",
+        ];
+        conversation.onEnd = () => {
+          presenterState = 'walking';
+          presenter.targetX = PRESENTATION_ROOM.x + PRESENTATION_ROOM.w/2;
+          presenter.targetY = PRESENTATION_ROOM.y + PRESENTATION_ROOM.h/2;
+          showToast('Follow the presenter to the presentation room.', 2.5);
+        };
+      } else if (presenterState === 'walking') {
+        conversation.lines = ["Follow me! The presentation room is this way."];
+      } else if (presenterState === 'atRoom') {
+        conversation.lines = ["You made it! Ready for my presentation?"];
+        conversation.choices = [
+          { label:'Yes, begin', action: () => { openPresentation(); } },
+          { label:'No', action: () => {} },
+        ];
+      } else if (presenterState === 'done') {
+        if (investReturnHour !== null && gameHours >= investReturnHour && investResult === null) {
+          const result = pick([0, 13000]);
+          investResult = result;
+          if (result > 0) {
+            money += result;
+            conversation.lines = [
+              `Great news! Your investment returned ¥${result}.`,
+              "Thank you for believing in me.",
+            ];
+          } else {
+            conversation.lines = [
+              "I'm sorry... the investment returned ¥0.",
+              "The market is unpredictable.",
+            ];
+          }
+          investReturnHour = null;
+        } else if (investReturnHour !== null) {
+          conversation.lines = [`Your investment returns at ${investReturnHour}:00. Come back then.`];
+        } else {
+          conversation.lines = [
+            "Thanks for watching my presentation.",
+            "Feel free to promote or invest next time.",
+          ];
+          conversation.choices = [
+            { label:'Promote (+¥100)', action: () => { money += 100; showToast('You promoted. +¥100', 2); updateHUD(); buildInfoPanel(); } },
+            { label:'Invest (¥10,000 / 4h)', action: () => {
+              if (hotelPaid) { showToast('You already paid the hotel. Investment not available.', 2); }
+              else if (money >= 10000) {
+                money -= 10000; invested = true;
+                investReturnHour = (gameHours + 4) % 24;
+                showToast('You invested ¥10,000. Return in 4 hours.', 3);
+                updateHUD(); buildInfoPanel();
+              } else { showToast('You need ¥10,000 to invest.', 2); }
+            } },
+          ];
+        }
+      } else {
+        conversation.lines = ["I'm busy preparing my presentation."];
+      }
+    } else if (npc.id && npc.id.startsWith('comedian')) {
+      conversation.lines = [
+        "We're the comedy duo!",
+        comedyState === 'onstage' ? "Enjoy the show!" : "We perform at 19:00 in the banquet hall (4F).",
+      ];
+    } else if (npc.isGuest || npc.room) {
+      let lines;
+      if (npc.location === 'rest') lines = REST_LINES;
+      else if (npc.location === 'onsen') lines = ONSEN_LINES;
+      else if (npc.location === 'banquet') lines = BANQUET_LINES;
+      else lines = ROOM_LINES;
+      const len = randInt(1, Math.min(4, lines.length));
+      conversation.lines = shuffle(lines).slice(0, len);
+      npc.talkedRoom = true;
+    } else {
+      conversation.lines = ["Hello there."];
+    }
+    renderDialogue();
+    dialogue.classList.add('open');
+  }
+
+  function renderDialogue() {
+    if (!conversation) return;
+    const { npc, page, lines } = conversation;
+    dName.textContent = npc.name || '???';
+    if (npc.room) dMeta.textContent = `Room ${npc.room} / ${npc.gender || ''}`;
+    else dMeta.textContent = '';
+    dText.textContent = lines[page] || '';
+    dPage.textContent = `${page+1} / ${lines.length}`;
+    dNext.textContent = (page < lines.length - 1) ? 'NEXT ▶' : 'FINISH';
+    choiceRow.innerHTML = '';
+    if (page === lines.length - 1 && conversation.choices) {
+      choiceRow.classList.remove('hidden');
+      for (const ch of conversation.choices) {
+        const btn = document.createElement('button');
+        btn.className = 'ui-btn';
+        btn.textContent = ch.label;
+        btn.addEventListener('click', e => {
+          e.preventDefault();
+          const act = ch.action;
+          closeDialogue();
+          if (act) act();
+        });
+        choiceRow.appendChild(btn);
+      }
+    } else {
+      choiceRow.classList.add('hidden');
+    }
+  }
+
+  function nextDialogue() {
+    if (!conversation) return;
+    if (conversation.page < conversation.lines.length - 1) {
+      conversation.page++;
+      renderDialogue();
+    } else {
+      const onEnd = conversation.onEnd;
+      closeDialogue();
+      if (onEnd) onEnd();
+    }
+  }
+
+  function closeDialogue() {
+    conversation = null;
+    dialogue.classList.remove('open');
+    choiceRow.classList.add('hidden');
+  }
+
+  // ============================================================
+  //  Presentation
+  // ============================================================
+  function openPresentation() {
+    const isPro = Math.random() < 0.5;
+    currentPresentation = isPro ? pick(PRES_PRO) : pick(PRES_BAD);
+    presSlideIndex = 0;
+    presViewer.classList.remove('hidden');
+    renderPresentation();
+  }
+
+  function renderPresentation() {
+    if (!currentPresentation) return;
+    presTitle.textContent = currentPresentation.title;
+    presPage.textContent = `${presSlideIndex+1} / ${currentPresentation.slides.length}`;
+    drawPresentationSlide();
+  }
+
+  function drawPresentationSlide() {
+    const slide = currentPresentation.slides[presSlideIndex];
+    const w = presCanvas.width, h = presCanvas.height;
+    presCtx.fillStyle = '#0d131a';
+    presCtx.fillRect(0,0,w,h);
+    presCtx.strokeStyle = '#00e6b0';
+    presCtx.lineWidth = 3;
+    presCtx.strokeRect(4,4,w-8,h-8);
+    presCtx.fillStyle = '#00e6b0';
+    presCtx.font = 'bold 28px "Hiragino Sans","Yu Gothic",sans-serif';
+    presCtx.textAlign = 'center';
+    presCtx.fillText(slide.t, w/2, 60);
+    presCtx.fillStyle = '#7ad7ff';
+    presCtx.font = '18px "Hiragino Sans","Yu Gothic",sans-serif';
+    presCtx.textAlign = 'left';
+    for (let i = 0; i < slide.l.length; i++) {
+      presCtx.fillText('• ' + slide.l[i], 60, 140 + i*50);
+    }
+    // Dot art
+    for (let i = 0; i < 20; i++) {
+      const x = 60 + (i*37) % (w-120);
+      const y = h - 60 - (i*23) % 80;
+      presCtx.fillStyle = i % 2 === 0 ? '#00e6b0' : '#ffd166';
+      presCtx.beginPath();
+      presCtx.arc(x, y, 3 + (i%3), 0, Math.PI*2);
+      presCtx.fill();
+    }
+    // Chart
+    presCtx.strokeStyle = '#ff8ad8';
+    presCtx.lineWidth = 2;
+    presCtx.beginPath();
+    presCtx.moveTo(w-200, h-80);
+    for (let i = 0; i <= 8; i++) {
+      presCtx.lineTo(w-200 + i*20, h-80 - Math.sin(i*0.8)*40 - i*3);
+    }
+    presCtx.stroke();
+  }
+
+  presPrev.addEventListener('click', e => {
+    e.preventDefault();
+    if (presSlideIndex > 0) { presSlideIndex--; renderPresentation(); }
+  });
+  presNext.addEventListener('click', e => {
+    e.preventDefault();
+    if (!currentPresentation) return;
+    if (presSlideIndex < currentPresentation.slides.length - 1) {
+      presSlideIndex++; renderPresentation();
+    } else {
+      closePresViewer();
+      presenterState = 'done';
+      conversation = { npc: presenter, page:0, lines:[
+        "以上でプレゼンは終わりです。",
+        "宣伝しますか？それとも投資しますか？",
+      ], choices:[
+        { label:'宣伝する (+¥100)', action: () => { money += 100; showToast('宣伝した。+¥100', 2); updateHUD(); buildInfoPanel(); } },
+        { label:'投資する (¥10,000 / 4時間)', action: () => {
+          if (hotelPaid) { showToast('すでにホテルに支払い済み。投資はできません。', 2); }
+          else if (money >= 10000) {
+            money -= 10000; invested = true;
+            investReturnHour = (gameHours + 4) % 24;
+            showToast('¥10,000を投資した。4時間後に戻ってくる。', 3);
+            updateHUD(); buildInfoPanel();
+          } else { showToast('投資には¥10,000必要です。', 2); }
+        } },
+      ]};
+      dialogue.classList.add('open');
+      renderDialogue();
+    }
+  });
+  presClose.addEventListener('click', e => { e.preventDefault(); closePresViewer(); });
+  function closePresViewer() { presViewer.classList.add('hidden'); }
+
+  // ============================================================
+  //  Update
+  // ============================================================
+  function update(dt) {
+    updateTime(dt);
+
+    const spd = player.speed * 0.4;
+    let dx = 0, dy = 0;
+    if (keys.ArrowUp)    dy -= 1;
+    if (keys.ArrowDown)  dy += 1;
+    if (keys.ArrowLeft)  dx -= 1;
+    if (keys.ArrowRight) dx += 1;
+    if (dx !== 0 || dy !== 0) {
+      const len = Math.hypot(dx, dy);
+      dx = dx/len*spd; dy = dy/len*spd;
+      player.x += dx; player.y += dy;
+    }
+    if (currentFloor === FLOOR_OUTSIDE) {
+      player.x = clamp(player.x, 20, OUTSIDE_W-20);
+      player.y = clamp(player.y, 20, OUTSIDE_H-20);
+    } else {
+      player.x = clamp(player.x, 20, W-20);
+      player.y = clamp(player.y, 20, H-20);
+    }
+    player.angle = Math.atan2(mouseY - player.y, mouseX - player.x);
+
+    if (presenter && presenterState === 'walking') {
+      const dx = presenter.targetX - presenter.x;
+      const dy = presenter.targetY - presenter.y;
+      const d = Math.hypot(dx, dy);
+      if (d < 8) {
+        presenterState = 'atRoom';
+        showToast('The presenter is ready. Talk to him.', 2.5);
+      } else {
+        presenter.x += dx/d * 1.5;
+        presenter.y += dy/d * 1.5;
+      }
+    }
+
+    for (const c of comedians) {
+      if (c.state === 'walking') {
+        c.y -= 0.8;
+        if (c.y < 200) c.state = 'waiting';
+      }
+      if (c.state === 'leaving') {
+        c.y += 0.8;
+        if (c.y > 1100) c.state = 'done';
+      }
+    }
+
+    if (comedyState === 'onstage' && currentComedy) {
+      comedyProgress += dt / 60 * 1.5;
+    }
+
+    for (const g of guests) {
+      g.phase += 0.01;
+      g.x = g.baseX + Math.cos(g.phase) * 15;
+      g.y = g.baseY + Math.sin(g.phase * 0.8) * 8;
+    }
+
+    activeNPC = null;
+    let bestD = 65;
+    const candidates = [];
+    if (currentFloor === FLOOR_OUTSIDE) {
+      if (presenter) candidates.push(presenter);
+      for (const c of comedians) {
+        if (c.state === 'walking' || c.state === 'waiting') candidates.push(c);
+      }
+    } else {
+      for (const g of guests) {
+        if (g.floor === currentFloor) candidates.push(g);
+      }
+    }
+    for (const n of candidates) {
+      const d = dist(n.x, n.y, player.x, player.y);
+      if (d < bestD) { bestD = d; activeNPC = n; }
+    }
+
+    activeElevator = false;
+    if (currentFloor !== FLOOR_OUTSIDE) {
+      const ex = ELEVATOR_RECT.x + ELEVATOR_RECT.w/2;
+      const ey = ELEVATOR_RECT.y + ELEVATOR_RECT.h/2;
+      if (dist(player.x, player.y, ex, ey) < 70) activeElevator = true;
+    }
+
+    if (activeNPC && !conversation) {
+      npName.textContent = activeNPC.name || '???';
+      if (activeNPC.room) npInfo.textContent = `Room ${activeNPC.room} / ${activeNPC.gender||''}`;
+      else if (activeNPC.id === 'presenter') npInfo.textContent = presenterState === 'done' ? 'Presented' : 'Presenter';
+      else npInfo.textContent = 'Comedian';
+      npHint.textContent = activeNPC.id === 'presenter' && presenterState === 'idle' ? 'Click to talk (follow)' : 'Click to talk';
+      npcPanel.classList.add('open');
+    } else {
+      npcPanel.classList.remove('open');
+    }
+
+    if (toastTimer > 0) {
+      toastTimer -= dt;
+      if (toastTimer <= 0) toast.classList.remove('show');
+    }
+
+    updateHUD();
+  }
+
+  // ============================================================
+  //  Draw
+  // ============================================================
+  function draw() {
+    ctx.clearRect(0,0,W,H);
+    if (currentFloor === FLOOR_OUTSIDE) drawOutside();
+    else drawFloor(currentFloor);
+    drawPlayer();
+    drawOverlay();
+  }
+
+  function drawOutside() {
+    const camX = clamp(player.x - W/2, 0, OUTSIDE_W - W);
+    const camY = clamp(player.y - H/2, 0, OUTSIDE_H - H);
+    ctx.save();
+    ctx.translate(-camX, -camY);
+
+    ctx.fillStyle = '#1a2a1e';
+    ctx.fillRect(0,0,OUTSIDE_W,OUTSIDE_H);
+    ctx.fillStyle = '#2a2a2a';
+    ctx.fillRect(600,0,400,OUTSIDE_H);
+    ctx.fillRect(0,700,OUTSIDE_W,200);
+
+    ctx.fillStyle = '#1a1e2a';
+    ctx.fillRect(500,50,600,400);
+    ctx.strokeStyle = '#3a4a5a';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(500,50,600,400);
+    for (let r = 0; r < 4; r++) {
+      for (let c = 0; c < 8; c++) {
+        const lit = ((r*8+c) % 3 === 0);
+        ctx.fillStyle = lit ? '#ffd166' : '#2a3a4a';
+        ctx.fillRect(530 + c*70, 80 + r*80, 40, 50);
+      }
+    }
+    ctx.fillStyle = '#0d131a';
+    ctx.fillRect(HOTEL_ENTRANCE.x, HOTEL_ENTRANCE.y, HOTEL_ENTRANCE.w, HOTEL_ENTRANCE.h);
+    ctx.strokeStyle = '#00e6b0';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(HOTEL_ENTRANCE.x, HOTEL_ENTRANCE.y, HOTEL_ENTRANCE.w, HOTEL_ENTRANCE.h);
+    ctx.fillStyle = '#00e6b0';
+    ctx.font = 'bold 14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('HOTEL ENTRANCE', HOTEL_ENTRANCE.x + HOTEL_ENTRANCE.w/2, HOTEL_ENTRANCE.y - 8);
+
+    drawPerson(RECEPTIONIST_POS.x, RECEPTIONIST_POS.y, '#7ad7ff', '#ffd166', 'Receptionist');
+
+    ctx.fillStyle = '#1a1e2a';
+    ctx.fillRect(PRESENTATION_ROOM.x, PRESENTATION_ROOM.y, PRESENTATION_ROOM.w, PRESENTATION_ROOM.h);
+    ctx.strokeStyle = '#7ad7ff';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(PRESENTATION_ROOM.x, PRESENTATION_ROOM.y, PRESENTATION_ROOM.w, PRESENTATION_ROOM.h);
+    ctx.fillStyle = '#7ad7ff';
+    ctx.font = 'bold 14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('PRESENTATION ROOM', PRESENTATION_ROOM.x + PRESENTATION_ROOM.w/2, PRESENTATION_ROOM.y - 8);
+
+    if (presenter) {
+      drawPerson(presenter.x, presenter.y, presenter.color, presenter.hair, presenter.name);
+      if (presenterState === 'idle') {
+        ctx.fillStyle = '#00e6b0';
+        ctx.font = 'bold 12px sans-serif';
+        ctx.fillText('Talk to me!', presenter.x, presenter.y - 34);
+      }
+    }
+
+    for (const c of comedians) {
+      if (c.state !== 'done') drawPerson(c.x, c.y, c.color, c.hair, c.name);
+    }
+
+    ctx.restore();
+  }
+
+  function drawFloor(floor) {
+    if (floor === 1) {
+      ctx.fillStyle = '#1a222c'; ctx.fillRect(0,0,W,H);
+      ctx.fillStyle = '#2a3a4a'; ctx.fillRect(600,200,160,100);
+      ctx.fillStyle = '#00e6b0'; ctx.fillRect(600,200,160,6);
+      ctx.fillStyle = '#7ad7ff'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('RECEPTION', 680, 260);
+      ctx.fillStyle = '#221a14'; ctx.fillRect(80,200,200,200);
+      ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 2; ctx.strokeRect(80,200,200,200);
+      ctx.fillStyle = '#ffd166'; ctx.fillText('REST ROOM', 180, 230);
+      for (let i = 0; i < 4; i++) {
+        ctx.fillStyle = '#2a3a5a';
+        ctx.fillRect(100 + (i%2)*100, 260 + Math.floor(i/2)*80, 70, 40);
+      }
+    } else if (floor === 2) {
+      ctx.fillStyle = '#0d1a1a'; ctx.fillRect(0,0,W,H);
+      ctx.fillStyle = '#1a3a4a';
+      ctx.beginPath(); ctx.arc(400,350,200,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle = '#7ad7ff'; ctx.lineWidth = 3; ctx.stroke();
+      ctx.fillStyle = '#7ad7ff'; ctx.font = 'bold 20px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('ONSEN', 400, 360);
+      for (let i = 0; i < 6; i++) {
+        ctx.fillStyle = 'rgba(200,230,255,0.12)';
+        ctx.beginPath(); ctx.arc(300 + i*40, 250 - (i%3)*20, 30, 0, Math.PI*2); ctx.fill();
+      }
+    } else if (floor === 3) {
+      ctx.fillStyle = '#1a1a24'; ctx.fillRect(0,0,W,H);
+      ctx.fillStyle = '#3a1a2a'; ctx.fillRect(300,220,200,160);
+      ctx.strokeStyle = '#ff8ad8'; ctx.lineWidth = 3; ctx.strokeRect(300,220,200,160);
+      ctx.fillStyle = '#ff8ad8'; ctx.font = 'bold 20px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('GACHAPON', 400, 260);
+      for (let i = 0; i < 12; i++) {
+        ctx.fillStyle = ['#ff4d6d','#00e6b0','#ffd166','#7ad7ff','#ff8ad8'][i%5];
+        ctx.beginPath(); ctx.arc(330 + (i%4)*45, 290 + Math.floor(i/4)*35, 14, 0, Math.PI*2); ctx.fill();
+      }
+    } else if (floor === 4) {
+      ctx.fillStyle = '#1a1218'; ctx.fillRect(0,0,W,H);
+      ctx.fillStyle = '#3a1a2a'; ctx.fillRect(200,150,400,100);
+      ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 3; ctx.strokeRect(200,150,400,100);
+      ctx.fillStyle = '#ffd166'; ctx.font = 'bold 20px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('BANQUET HALL', 400, 200);
+      for (let i = 0; i < 6; i++) {
+        ctx.fillStyle = '#3a2a1a';
+        ctx.beginPath(); ctx.arc(150 + (i%3)*250, 350 + Math.floor(i/3)*150, 45, 0, Math.PI*2); ctx.fill();
+      }
+    }
+
+    const rooms = roomsByFloor[floor] || [];
+    for (const r of rooms) {
+      ctx.fillStyle = '#2a2a3a';
+      ctx.fillRect(r.x, r.y, r.w, r.h);
+      ctx.strokeStyle = '#4a5a6a'; ctx.lineWidth = 2;
+      ctx.strokeRect(r.x, r.y, r.w, r.h);
+      ctx.fillStyle = '#b0c8d8';
+      ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(r.num, r.x + r.w/2, r.y + r.h/2 + 4);
+      ctx.fillStyle = r.open ? '#00e6b0' : '#5a3a1a';
+      ctx.fillRect(r.doorX, r.doorY, r.doorW, r.doorH);
+      if (r.num === myRoom) {
+        ctx.fillStyle = '#ffd166';
+        ctx.font = 'bold 10px sans-serif';
+        ctx.fillText('MY ROOM', r.x + r.w/2, r.y - 6);
+      }
+    }
+
+    ctx.fillStyle = '#1a2a3a';
+    ctx.fillRect(ELEVATOR_RECT.x, ELEVATOR_RECT.y, ELEVATOR_RECT.w, ELEVATOR_RECT.h);
+    ctx.strokeStyle = elevatorDoorsOpen ? '#00e6b0' : '#7ad7ff';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(ELEVATOR_RECT.x, ELEVATOR_RECT.y, ELEVATOR_RECT.w, ELEVATOR_RECT.h);
+    ctx.fillStyle = '#7ad7ff';
+    ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('ELEVATOR', ELEVATOR_RECT.x + ELEVATOR_RECT.w/2, ELEVATOR_RECT.y - 8);
+    ctx.fillStyle = '#ffd166';
+    ctx.font = 'bold 12px sans-serif';
+    ctx.fillText(`Floor ${floor}`, ELEVATOR_RECT.x + ELEVATOR_RECT.w/2, ELEVATOR_RECT.y + ELEVATOR_RECT.h/2 + 4);
+
+    ctx.fillStyle = '#1a2a1a';
+    ctx.fillRect(STAIRS_RECT.x, STAIRS_RECT.y, STAIRS_RECT.w, STAIRS_RECT.h);
+    ctx.strokeStyle = '#00e6b0'; ctx.lineWidth = 2;
+    ctx.strokeRect(STAIRS_RECT.x, STAIRS_RECT.y, STAIRS_RECT.w, STAIRS_RECT.h);
+    ctx.fillStyle = '#00e6b0'; ctx.font = 'bold 12px sans-serif';
+    ctx.fillText('STAIRS', STAIRS_RECT.x + STAIRS_RECT.w/2, STAIRS_RECT.y - 6);
+
+    for (const g of guests) {
+      if (g.floor === floor) {
+        drawPerson(g.x, g.y, g.color, g.hair, g.name);
+        if (g.talkedRoom) {
+          ctx.fillStyle = '#00e6b0';
+          ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center';
+          ctx.fillText('✔', g.x + 14, g.y - 20);
+        }
+      }
+    }
+
+    if (floor === 4 && comedyState === 'onstage') {
+      for (const c of comedians) drawPerson(c.x, c.y, c.color, c.hair, c.name);
+      if (currentComedy) {
+        const idx = Math.floor(comedyProgress) % currentComedy.lines.length;
+        ctx.fillStyle = '#ffd166';
+        ctx.font = 'bold 15px "Hiragino Sans","Yu Gothic",sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(currentComedy.lines[idx], 400, 500);
+      }
+    }
+  }
+
+  function drawPerson(x, y, bodyColor, hairColor, name) {
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.beginPath(); ctx.ellipse(x, y+16, 12, 4, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = bodyColor;
+    ctx.fillRect(x-8, y-4, 16, 20);
+    ctx.fillStyle = '#e0b090';
+    ctx.beginPath(); ctx.arc(x, y-12, 8, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = hairColor;
+    ctx.beginPath(); ctx.arc(x, y-15, 8, Math.PI, Math.PI*2); ctx.fill();
+    if (name) {
+      ctx.fillStyle = '#b0c8d8';
+      ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(name, x, y - 26);
+    }
+  }
+
+  function drawPlayer() {
+    const x = player.x, y = player.y;
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.beginPath(); ctx.ellipse(x, y+16, 12, 4, 0, 0, Math.PI*2); ctx.fill();
+    ctx.shadowColor = '#00e6b0'; ctx.shadowBlur = 18;
+    ctx.fillStyle = '#0a1a1a';
+    ctx.beginPath(); ctx.arc(x, y, player.radius, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#00e6b0'; ctx.lineWidth = 2.5; ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#00e6b0'; ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + Math.cos(player.angle)*24, y + Math.sin(player.angle)*24);
+    ctx.stroke();
+  }
+
+  function drawOverlay() {
+    if (activeElevator && !conversation) {
+      ctx.fillStyle = '#7ad7ff';
+      ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('Click to ' + (elevatorDoorsOpen ? 'choose floor' : 'open elevator'), W/2, 40);
+    }
+    ctx.fillStyle = '#00e6b0';
+    ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'left';
+    const label = currentFloor === FLOOR_OUTSIDE ? 'Outside' : `Floor ${currentFloor}`;
+    ctx.fillText(label, 20, 30);
+  }
+
+  // ============================================================
+  //  Loop
+  // ============================================================
+  function gameLoop(timestamp) {
+    const dt = Math.min(2, (timestamp - lastTime) / (1000/60));
+    lastTime = timestamp;
+    update(dt);
+    draw();
+    requestAnimationFrame(gameLoop);
+  }
+
+  // ============================================================
+  //  Opening
+  // ============================================================
+  const opening = document.getElementById('opening');
+  const startBtn = document.getElementById('startBtn');
+  const bgViewBtn = document.getElementById('bgViewBtn');
+  const bgViewer = document.getElementById('bgViewer');
+  const closeBgBtn = document.getElementById('closeBgBtn');
+
+  startBtn.addEventListener('click', e => {
+    e.preventDefault();
+    opening.classList.add('hidden-opening');
+    setTimeout(() => { opening.style.display = 'none'; }, 500);
+  });
+  bgViewBtn.addEventListener('click', e => {
+    e.preventDefault();
+    bgViewer.classList.remove('hidden');
+  });
+  closeBgBtn.addEventListener('click', e => {
+    e.preventDefault();
+    bgViewer.classList.add('hidden');
+  });
+
+  // ============================================================
+  //  Start
+  // ============================================================
+  initGame();
+  requestAnimationFrame(gameLoop);
+})();
+</script>
+</body>
+</html>
