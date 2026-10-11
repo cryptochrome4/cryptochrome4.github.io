@@ -496,7 +496,6 @@
         cell.floorTag = fr.floor;
         cell.roomNum = num;
         cell.areaName = 'Room ' + num;
-        // Bedside lamp (clickable to toggle)
         cell.lamp = { x: cell.x + 415, y: cell.y + 200, on: false };
         rooms.push({
           num, floor: fr.floor, col: i, row: fr.roomsRow,
@@ -547,15 +546,11 @@
     walls = [];
     doors = [];
 
-    // Rooms: 4 sides with door on the bottom
+    // Rooms: 4 sides with door on bottom
     for (const r of rooms) {
-      // Top
       walls.push({ x: r.x, y: r.y, w: r.w, h: WALL_THICK });
-      // Left
       walls.push({ x: r.x, y: r.y, w: WALL_THICK, h: r.h });
-      // Right
       walls.push({ x: r.x + r.w - WALL_THICK, y: r.y, w: WALL_THICK, h: r.h });
-      // Bottom with door gap
       const wallY = r.y + r.h - WALL_THICK;
       walls.push({ x: r.x, y: wallY, w: (r.w - DOOR_LEN)/2, h: WALL_THICK });
       walls.push({ x: r.x + (r.w + DOOR_LEN)/2, y: wallY, w: (r.w - DOOR_LEN)/2, h: WALL_THICK });
@@ -571,15 +566,11 @@
       });
     }
 
-    // Presentation room: all 4 sides, door only on bottom
+    // Presentation room: all 4 sides, door on bottom
     const pcell = grid[11][2];
-    // Top
     walls.push({ x: pcell.x, y: pcell.y, w: pcell.w, h: WALL_THICK });
-    // Left
     walls.push({ x: pcell.x, y: pcell.y, w: WALL_THICK, h: pcell.h });
-    // Right
     walls.push({ x: pcell.x + pcell.w - WALL_THICK, y: pcell.y, w: WALL_THICK, h: pcell.h });
-    // Bottom with door gap
     const pWallY = pcell.y + pcell.h - WALL_THICK;
     walls.push({ x: pcell.x, y: pWallY, w: (pcell.w - DOOR_LEN)/2, h: WALL_THICK });
     walls.push({ x: pcell.x + (pcell.w + DOOR_LEN)/2, y: pWallY, w: (pcell.w - DOOR_LEN)/2, h: WALL_THICK });
@@ -599,9 +590,6 @@
     }
   }
 
-  // ============================================================
-  //  Stairs maze
-  // ============================================================
   function buildStairsMaze(cell) {
     const MW = 8, MH = 6;
     const cw = cell.w / MW;
@@ -637,7 +625,6 @@
       stack.push(nxt);
     }
 
-    // Top: free entrance; Bottom: free exit
     for (let c = 0; c < MW; c++) mg[0][c].n = false;
     for (let c = 0; c < MW; c++) mg[MH-1][c].s = false;
 
@@ -1309,7 +1296,7 @@
     const wClickX = clickX + camX;
     const wClickY = clickY + camY;
 
-    // Find character nearest to the click (guests, presenter, comedians)
+    // 1) Characters (guests, presenter, comedians) — highest priority
     const chars = [];
     if (presenter) chars.push(presenter);
     for (const c of comedians) {
@@ -1318,9 +1305,11 @@
     for (const g of guests) chars.push(g);
 
     let bestChar = null;
-    let bestCharDist = 60;
+    let bestCharDist = 80;
     for (const ch of chars) {
-      const d = dist(ch.x, ch.y, wClickX, wClickY);
+      const cx = (ch.baseX !== undefined) ? ch.baseX : ch.x;
+      const cy = (ch.baseY !== undefined) ? ch.baseY : ch.y;
+      const d = dist(cx, cy, wClickX, wClickY);
       if (d < bestCharDist) {
         bestCharDist = d;
         bestChar = ch;
@@ -1332,10 +1321,10 @@
       return;
     }
 
-    // Try clicking on a room lamp (bedside lamp)
+    // 2) Room lamps
     const clickedCell = cellAt(wClickX, wClickY);
     if (clickedCell.type === CELL.ROOM && clickedCell.lamp) {
-      if (dist(wClickX, wClickY, clickedCell.lamp.x, clickedCell.lamp.y) < 45) {
+      if (dist(wClickX, wClickY, clickedCell.lamp.x, clickedCell.lamp.y) < 50) {
         e.preventDefault();
         clickedCell.lamp.on = !clickedCell.lamp.on;
         showToast(clickedCell.lamp.on ? 'Light ON' : 'Light OFF', 1.2);
@@ -1343,7 +1332,7 @@
       }
     }
 
-    // Otherwise elevator / stairs / door
+    // 3) Elevator / stairs / doors
     if (activeElevator) { e.preventDefault(); handleElevatorClick(); return; }
     if (activeStairs) { e.preventDefault(); handleStairsClick(); return; }
     if (activeDoor) { e.preventDefault(); tryToggleDoor(activeDoor); return; }
@@ -1663,14 +1652,13 @@
         conversation.onEnd = () => {
           presenterState = 'walking';
           const target = grid[11][2];
-          // Walk directly to the presentation room door, open it, then enter
           const doorX = target.x + target.w/2;
-          const doorOutY = target.y + target.h + 60;   // just outside the door
-          const insideY = target.y + target.h/2;        // room center
+          const doorOutY = target.y + target.h + 60;
+          const insideY = target.y + target.h/2;
           presenterPath = [
-            { x: doorX, y: doorOutY },                 // 1: go to door outside
-            { x: doorX, y: doorOutY, openDoor: true },  // 2: open the door
-            { x: doorX, y: insideY },                   // 3: step inside
+            { x: doorX, y: doorOutY },
+            { x: doorX, y: doorOutY, openDoor: true },
+            { x: doorX, y: insideY },
           ];
           presenterPathIdx = 0;
           showToast('The presenter is heading to the presentation room. Follow him.', 3);
@@ -1729,7 +1717,6 @@
         comedyState === 'onstage' ? "Enjoy the show!" : "We perform at 19:00 in the banquet hall (4F).",
       ];
     } else if (npc.groupId !== undefined) {
-      // Guest lines: room vs event
       let lines;
       if (npc.location === 'rest') lines = REST_LINES;
       else if (npc.location === 'onsen') lines = ONSEN_LINES;
@@ -1870,7 +1857,6 @@
     const wmy = mouseY + camY;
     player.angle = Math.atan2(wmy - player.y, wmx - player.x);
 
-    // Presenter path
     if (presenter && presenterState === 'walking' && presenterPath) {
       const target = presenterPath[presenterPathIdx];
       if (!target) {
@@ -2103,10 +2089,32 @@
       drawPerson(stageCx - 60, stageCy, comedians[0].color, comedians[0].hair, comedians[0].name, 0);
       drawPerson(stageCx + 60, stageCy, comedians[1].color, comedians[1].hair, comedians[1].name, 0);
       const idx = Math.min(currentComedy.lines.length-1, Math.floor(comedyProgress / 40));
-      ctx.fillStyle = '#ffd166';
+      const lineText = currentComedy.lines[idx];
+
+      // Subtitle box with background for readability
       ctx.font = 'bold 18px "Hiragino Sans","Yu Gothic",sans-serif';
+      const textW = ctx.measureText(lineText).width;
+      const boxW = Math.max(textW + 80, 400);
+      const boxH = 50;
+      const boxX = stageCx - boxW/2;
+      const boxY = c.y + c.h - 90;
+
+      // Shadow
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.fillRect(boxX + 4, boxY + 4, boxW, boxH);
+      // Background
+      ctx.fillStyle = 'rgba(0,0,0,0.92)';
+      ctx.fillRect(boxX, boxY, boxW, boxH);
+      // Border
+      ctx.strokeStyle = '#ffd166';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(boxX, boxY, boxW, boxH);
+      // Text
+      ctx.fillStyle = '#ffd166';
       ctx.textAlign = 'center';
-      ctx.fillText(currentComedy.lines[idx], stageCx, c.y + c.h - 40);
+      ctx.textBaseline = 'middle';
+      ctx.fillText(lineText, stageCx, boxY + boxH/2 + 2);
+      ctx.textBaseline = 'alphabetic';
     }
 
     if (presViewOpen && currentPresentation) {
@@ -2124,7 +2132,6 @@
   function applyNightDarkness(camX, camY) {
     const sx = player.x - camX;
     const sy = player.y - camY;
-    // Base darkness
     const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, 180);
     grad.addColorStop(0, 'rgba(0,0,0,0)');
     grad.addColorStop(0.6, 'rgba(0,0,0,0.55)');
@@ -2132,7 +2139,7 @@
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, W, H);
 
-    // Lit rooms: soft glow to reduce darkness around them
+    // Lit rooms
     for (const room of rooms) {
       const c = grid[room.row][room.col];
       if (!c.lamp || !c.lamp.on) continue;
@@ -2404,7 +2411,6 @@
       ctx.lineTo(x + w - 20, y + 60 + i*60);
       ctx.stroke();
     }
-    // Window
     ctx.fillStyle = '#0d1a2a'; ctx.fillRect(x + w - 180, y + 60, 140, 110);
     ctx.strokeStyle = '#7ad7ff'; ctx.lineWidth = 3;
     ctx.strokeRect(x + w - 180, y + 60, 140, 110);
@@ -2417,38 +2423,32 @@
       ctx.arc(x + w - 170 + i*30, y + 90 + (i%2)*30, 2, 0, Math.PI*2);
       ctx.fill();
     }
-    // Bed
     ctx.fillStyle = '#5a4a3a'; ctx.fillRect(x + 80, y + 200, 280, 200);
     ctx.fillStyle = '#e0e0e0'; ctx.fillRect(x + 80, y + 200, 280, 60);
     ctx.fillStyle = '#7ad7ff'; ctx.fillRect(x + 80, y + 260, 280, 140);
     ctx.fillStyle = '#ffffff'; ctx.fillRect(x + 100, y + 215, 80, 35);
-    // Nightstand
     ctx.fillStyle = '#3a2a1a'; ctx.fillRect(x + 380, y + 220, 70, 70);
-    // Bedside lamp (clickable)
+    // Lamp with glow
     const lampOn = cell.lamp && cell.lamp.on;
     ctx.fillStyle = '#3a2a1a'; ctx.fillRect(x + 412, y + 200, 6, 22);
     ctx.fillStyle = lampOn ? '#fff4b0' : '#ffd166';
     ctx.beginPath(); ctx.arc(x + 415, y + 200, 15, 0, Math.PI*2); ctx.fill();
     if (lampOn) {
-      // Glow around the lamp
       const g = ctx.createRadialGradient(x + 415, y + 200, 0, x + 415, y + 200, 140);
       g.addColorStop(0, 'rgba(255,244,176,0.45)');
       g.addColorStop(1, 'rgba(255,244,176,0)');
       ctx.fillStyle = g;
       ctx.beginPath(); ctx.arc(x + 415, y + 200, 140, 0, Math.PI*2); ctx.fill();
     }
-    // TV
     ctx.fillStyle = '#0a0c0f'; ctx.fillRect(x + 200, y + 80, 160, 90);
     ctx.strokeStyle = '#00e6b0'; ctx.lineWidth = 2;
     ctx.strokeRect(x + 200, y + 80, 160, 90);
     ctx.fillStyle = '#00e6b0'; ctx.fillRect(x + 210, y + 90, 140, 70);
-    // Clock
     ctx.fillStyle = '#00e6b0';
     ctx.beginPath(); ctx.arc(x + w - 80, y + 220, 30, 0, Math.PI*2); ctx.fill();
     ctx.fillStyle = '#0a0c0f';
     ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center';
     ctx.fillText(fmt(gameHours, gameMinutes), x + w - 80, y + 226);
-    // Room number plate
     ctx.fillStyle = '#2a2a3a';
     ctx.fillRect(x + 30, y + 30, 180, 50);
     ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 2;
@@ -2461,7 +2461,6 @@
       ctx.font = 'bold 16px sans-serif';
       ctx.fillText('MY ROOM', x + 120, y + 100);
     }
-    // Plant
     ctx.fillStyle = '#3a2a1a'; ctx.fillRect(x + 30, y + h - 130, 40, 40);
     ctx.fillStyle = '#1a5a2a';
     ctx.beginPath(); ctx.arc(x + 50, y + h - 150, 30, 0, Math.PI*2); ctx.fill();
@@ -2651,7 +2650,6 @@
 
   function drawStairsCell(cell) {
     const x = cell.x, y = cell.y, w = cell.w, h = cell.h;
-    // Bright stone floor (no torches)
     ctx.fillStyle = '#2a2a2a';
     ctx.fillRect(x, y, w, h);
     ctx.fillStyle = '#3a3a3a';
@@ -2660,20 +2658,17 @@
       const ry = y + (i*89)%h;
       ctx.fillRect(rx, ry, 20, 20);
     }
-    // Entrance marker (top)
     ctx.fillStyle = 'rgba(0,230,176,0.2)';
     ctx.fillRect(x, y, w, 40);
     ctx.fillStyle = '#00e6b0';
     ctx.font = 'bold 16px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('▼ ENTRANCE ▼', x + w/2, y + 26);
-    // Exit marker (bottom)
     ctx.fillStyle = 'rgba(255,209,102,0.2)';
     ctx.fillRect(x, y + h - 40, w, 40);
     ctx.fillStyle = '#ffd166';
     ctx.font = 'bold 16px sans-serif';
     ctx.fillText('▼ EXIT ▼', x + w/2, y + h - 14);
-    // Stairs icon at exit
     ctx.fillStyle = '#00e6b0';
     ctx.font = 'bold 20px sans-serif';
     ctx.textAlign = 'center';
