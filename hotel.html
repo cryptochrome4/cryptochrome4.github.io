@@ -248,7 +248,7 @@
       <button class="ui-btn list" id="helpBtn">❓ HELP</button>
     </div>
     <div class="hint" id="hint">
-      Move: Arrow Keys / Talk: Click a person / Door: Stand in front &amp; click
+      Move: Arrow Keys / Talk: Approach a person &amp; click / Door: Stand in front &amp; click
     </div>
   </div>
 
@@ -546,7 +546,6 @@
     walls = [];
     doors = [];
 
-    // Rooms: 4 sides with door on bottom
     for (const r of rooms) {
       walls.push({ x: r.x, y: r.y, w: r.w, h: WALL_THICK });
       walls.push({ x: r.x, y: r.y, w: WALL_THICK, h: r.h });
@@ -566,7 +565,6 @@
       });
     }
 
-    // Presentation room: all 4 sides, door on bottom
     const pcell = grid[11][2];
     walls.push({ x: pcell.x, y: pcell.y, w: pcell.w, h: WALL_THICK });
     walls.push({ x: pcell.x, y: pcell.y, w: WALL_THICK, h: pcell.h });
@@ -584,7 +582,6 @@
       locked: false,
     });
 
-    // Stairs mazes (random each load)
     for (const c of stairsCells) {
       buildStairsMaze(c);
     }
@@ -1104,9 +1101,11 @@
     }
     actionsList.innerHTML = '';
     if (!hotelPaid) {
+      const canPay = (gameHours >= 7 && gameHours < 19);
+      const suffix = canPay ? '' : ' (7:00-19:00)';
       const row = document.createElement('div');
       row.className = 'item-row';
-      row.innerHTML = `<span class="item-name">Pay Hotel ¥10,000</span>
+      row.innerHTML = `<span class="item-name">Pay Hotel ¥10,000${suffix}</span>
         <span class="item-actions">
           <button class="mini-btn" data-action="pay-hotel">USE</button>
           <button class="mini-btn warn" data-action="cancel-key">CANCEL</button>
@@ -1160,7 +1159,7 @@
   }
 
   function onHourChanged() {
-    if (gameHours === 7) showToast('It is 7:00. The rest room is open.', 2.5);
+    if (gameHours === 7) showToast('It is 7:00. The rest room and reception are open.', 2.5);
     if (gameHours === 11) showToast('It is 11:00. The rest room closes.', 2);
     if (gameHours === 18) {
       showToast('The comedians arrive by taxi.', 3);
@@ -1173,6 +1172,7 @@
       currentComedy = pick(COMEDY_THEMES);
       comedyProgress = 0;
       showToast('The banquet begins and the comedy show starts in the banquet hall (4F)!', 3);
+      showToast('The reception is now closed.', 2);
     }
     if (gameHours === 21) {
       comedyState = 'finished';
@@ -1285,7 +1285,15 @@
       return;
     }
 
-    // Compute world coords of the click
+    // Priority 1: active NPC (nearest character to the player)
+    // This is the same simple scheme as the GS Office original.
+    if (activeNPC) {
+      e.preventDefault();
+      startDialogue(activeNPC);
+      return;
+    }
+
+    // Priority 2: room lamp (use mouse position for precision)
     const rect = canvas.getBoundingClientRect();
     const sx = canvas.width / rect.width;
     const sy = canvas.height / rect.height;
@@ -1295,33 +1303,6 @@
     const camY = clamp(player.y - H/2, 0, WORLD_H - H);
     const wClickX = clickX + camX;
     const wClickY = clickY + camY;
-
-    // 1) Characters (guests, presenter, comedians) — highest priority
-    const chars = [];
-    if (presenter) chars.push(presenter);
-    for (const c of comedians) {
-      if (c.state !== 'taxi' && c.state !== 'done') chars.push(c);
-    }
-    for (const g of guests) chars.push(g);
-
-    let bestChar = null;
-    let bestCharDist = 80;
-    for (const ch of chars) {
-      const cx = (ch.baseX !== undefined) ? ch.baseX : ch.x;
-      const cy = (ch.baseY !== undefined) ? ch.baseY : ch.y;
-      const d = dist(cx, cy, wClickX, wClickY);
-      if (d < bestCharDist) {
-        bestCharDist = d;
-        bestChar = ch;
-      }
-    }
-    if (bestChar) {
-      e.preventDefault();
-      startDialogue(bestChar);
-      return;
-    }
-
-    // 2) Room lamps
     const clickedCell = cellAt(wClickX, wClickY);
     if (clickedCell.type === CELL.ROOM && clickedCell.lamp) {
       if (dist(wClickX, wClickY, clickedCell.lamp.x, clickedCell.lamp.y) < 50) {
@@ -1332,7 +1313,7 @@
       }
     }
 
-    // 3) Elevator / stairs / doors
+    // Priority 3: elevator / stairs / doors
     if (activeElevator) { e.preventDefault(); handleElevatorClick(); return; }
     if (activeStairs) { e.preventDefault(); handleStairsClick(); return; }
     if (activeDoor) { e.preventDefault(); tryToggleDoor(activeDoor); return; }
@@ -1351,7 +1332,7 @@
   });
   helpBtn.addEventListener('click', e => {
     e.preventDefault();
-    showToast('Move: Arrows / Talk: click a person / Door: stand & click / EV: choose floor / Stairs: maze!', 5);
+    showToast('Move: Arrows / Talk: Approach a person & click / Door: stand & click / EV: choose floor / Stairs: maze!', 5);
   });
   minimapBtn.addEventListener('click', e => {
     e.preventDefault();
@@ -1439,6 +1420,9 @@
 
   function payHotel() {
     if (hotelPaid) return;
+    if (!(gameHours >= 7 && gameHours < 19)) {
+      showToast('Reception is open from 7:00 to 19:00.', 2.5); return;
+    }
     if (money < 10000) { showToast('Not enough money.', 2); return; }
     const recCell = grid[10][6];
     const recX = recCell.x + recCell.w/2;
@@ -1954,8 +1938,13 @@
       g.y = g.baseY + Math.sin(g.phase * 0.8) * 4;
     }
 
+    // ============================================================
+    //  Active NPC: nearest character to the PLAYER (GS Office style)
+    //  250px radius includes guests inside rooms (through the door).
+    //  Priority order: presenter > comedians > guests (by proximity).
+    // ============================================================
     activeNPC = null;
-    let bestD = 90;
+    let bestD = 250;
     const candidates = [];
     if (presenter) candidates.push(presenter);
     for (const c of comedians) {
@@ -2139,7 +2128,6 @@
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, W, H);
 
-    // Lit rooms
     for (const room of rooms) {
       const c = grid[room.row][room.col];
       if (!c.lamp || !c.lamp.on) continue;
@@ -2428,7 +2416,6 @@
     ctx.fillStyle = '#7ad7ff'; ctx.fillRect(x + 80, y + 260, 280, 140);
     ctx.fillStyle = '#ffffff'; ctx.fillRect(x + 100, y + 215, 80, 35);
     ctx.fillStyle = '#3a2a1a'; ctx.fillRect(x + 380, y + 220, 70, 70);
-    // Lamp with glow
     const lampOn = cell.lamp && cell.lamp.on;
     ctx.fillStyle = '#3a2a1a'; ctx.fillRect(x + 412, y + 200, 6, 22);
     ctx.fillStyle = lampOn ? '#fff4b0' : '#ffd166';
@@ -2810,6 +2797,12 @@
     ctx.font = 'bold 20px sans-serif';
     ctx.textAlign = 'left';
     ctx.fillText(currentAreaName(), 20, 30);
+    if (activeNPC && !conversation) {
+      ctx.fillStyle = '#00e6b0';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Click to talk', activeNPC.x, activeNPC.y - 50);
+    }
     if (presViewOpen && currentPresentation) {
       ctx.fillStyle = 'rgba(13,19,26,0.9)';
       ctx.fillRect(W/2 - 300, H - 80, 600, 60);
@@ -2846,7 +2839,7 @@
     gameStarted = true;
     opening.style.display = 'none';
     lastTime = performance.now();
-    showToast('Welcome to the hotel! Pay ¥10,000 at the reception (Lobby).', 4);
+    showToast('Welcome to the hotel! Pay ¥10,000 at the reception (Lobby, 7:00-19:00).', 4);
   });
   bgViewBtn.addEventListener('click', e => {
     e.preventDefault();
