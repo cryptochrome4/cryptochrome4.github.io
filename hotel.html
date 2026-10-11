@@ -464,6 +464,7 @@
           x:c*MAP_W, y:r*MAP_H,
           w:MAP_W, h:MAP_H,
           type:CELL.OUTSIDE, floorTag:null, roomNum:null, areaName:'Outside',
+          mazeMW:0, mazeMH:0, mazeCw:0, mazeCh:0, mazeTorches:null,
         });
       }
       grid.push(row);
@@ -536,7 +537,7 @@
   }
 
   // ============================================================
-  //  Walls + Doors
+  //  Walls + Doors + Stairs mazes
   // ============================================================
   const WALL_THICK = 14;
   const DOOR_LEN = 70;
@@ -578,6 +579,100 @@
       open: false,
       locked: false,
     });
+
+    // Stairs mazes (random each load, one per floor)
+    for (const c of stairsCells) {
+      buildStairsMaze(c);
+    }
+  }
+
+  // ============================================================
+  //  Stairs maze generator
+  //  - 8x6 grid inside the stairs cell
+  //  - Top edge: no wall (free entrance from hallway/info panel side)
+  //  - Bottom edge: no wall (free exit)
+  //  - Left/Right: solid walls
+  //  - DFS perfect maze
+  // ============================================================
+  function buildStairsMaze(cell) {
+    const MW = 8, MH = 6;
+    const cw = cell.w / MW;
+    const ch = cell.h / MH;
+
+    const mg = [];
+    for (let r = 0; r < MH; r++) {
+      const row = [];
+      for (let c = 0; c < MW; c++) {
+        row.push({ n:true, e:true, s:true, w:true, visited:false });
+      }
+      mg.push(row);
+    }
+
+    // DFS
+    const stack = [];
+    const start = { r: Math.floor(MH/2), c: 0 };
+    mg[start.r][start.c].visited = true;
+    stack.push(start);
+    while (stack.length > 0) {
+      const c0 = stack[stack.length-1];
+      const neigh = [];
+      if (c0.r > 0 && !mg[c0.r-1][c0.c].visited) neigh.push({ r:c0.r-1, c:c0.c, dir:'n' });
+      if (c0.c < MW-1 && !mg[c0.r][c0.c+1].visited) neigh.push({ r:c0.r, c:c0.c+1, dir:'e' });
+      if (c0.r < MH-1 && !mg[c0.r+1][c0.c].visited) neigh.push({ r:c0.r+1, c:c0.c, dir:'s' });
+      if (c0.c > 0 && !mg[c0.r][c0.c-1].visited) neigh.push({ r:c0.r, c:c0.c-1, dir:'w' });
+      if (neigh.length === 0) { stack.pop(); continue; }
+      const nxt = pick(neigh);
+      if (nxt.dir === 'n') { mg[c0.r][c0.c].n = false; mg[nxt.r][nxt.c].s = false; }
+      if (nxt.dir === 's') { mg[c0.r][c0.c].s = false; mg[nxt.r][nxt.c].n = false; }
+      if (nxt.dir === 'e') { mg[c0.r][c0.c].e = false; mg[nxt.r][nxt.c].w = false; }
+      if (nxt.dir === 'w') { mg[c0.r][c0.c].w = false; mg[nxt.r][nxt.c].e = false; }
+      mg[nxt.r][nxt.c].visited = true;
+      stack.push(nxt);
+    }
+
+    // Top row: remove north walls (free entrance)
+    for (let c = 0; c < MW; c++) mg[0][c].n = false;
+    // Bottom row: remove south walls (free exit)
+    for (let c = 0; c < MW; c++) mg[MH-1][c].s = false;
+
+    // Convert walls to world rects
+    const TH = 10;
+    for (let r = 0; r < MH; r++) {
+      for (let c = 0; c < MW; c++) {
+        const x = cell.x + c * cw;
+        const y = cell.y + r * ch;
+        const m = mg[r][c];
+        // North wall (skip top row)
+        if (m.n && r > 0) {
+          walls.push({ x: x, y: y - TH/2, w: cw + TH/2, h: TH, isMaze: true });
+        }
+        // West wall
+        if (m.w) {
+          walls.push({ x: x - TH/2, y: y, w: TH, h: ch + TH/2, isMaze: true });
+        }
+        // East wall (only last col)
+        if (m.e && c === MW-1) {
+          walls.push({ x: x + cw - TH/2, y: y, w: TH, h: ch + TH/2, isMaze: true });
+        }
+        // South walls: skip bottom row (r === MH-1)
+      }
+    }
+
+    // Left/Right solid walls
+    walls.push({ x: cell.x - TH/2, y: cell.y, w: TH, h: cell.h, isMaze: true });
+    walls.push({ x: cell.x + cell.w - TH/2, y: cell.y, w: TH, h: cell.h, isMaze: true });
+
+    // Store maze metadata
+    cell.mazeMW = MW;
+    cell.mazeMH = MH;
+    cell.mazeCw = cw;
+    cell.mazeCh = ch;
+    cell.mazeTorches = [
+      { x: cell.x + 20, y: cell.y + 20 },
+      { x: cell.x + cell.w - 20, y: cell.y + 20 },
+      { x: cell.x + 20, y: cell.y + cell.h - 20 },
+      { x: cell.x + cell.w - 20, y: cell.y + cell.h - 20 },
+    ];
   }
 
   // ============================================================
@@ -1117,6 +1212,10 @@
     if (gameHours === 22) {
       comedyState = 'done';
       taxiVisible = false;
+      showToast('The hotel lights dim for the night.', 2.5);
+    }
+    if (gameHours === 5) {
+      showToast('The morning light returns.', 2.5);
     }
     updateGuestLocations();
     updateHUD();
@@ -1237,7 +1336,7 @@
   });
   helpBtn.addEventListener('click', e => {
     e.preventDefault();
-    showToast('Move: Arrows / Talk: approach & click / Door: stand & click / EV: choose floor / Stairs: next floor', 5);
+    showToast('Move: Arrows / Talk: approach & click / Door: stand & click / EV: choose floor / Stairs: maze!', 5);
   });
   minimapBtn.addEventListener('click', e => {
     e.preventDefault();
@@ -1376,7 +1475,7 @@
   }
 
   // ============================================================
-  //  Elevator — floor selection panel
+  //  Elevator
   // ============================================================
   function handleElevatorClick() {
     if (walkingTo) return;
@@ -1384,7 +1483,6 @@
     buildElevatorPanel();
     elevatorPanel.classList.remove('hidden');
   }
-
   function buildElevatorPanel() {
     epFloors.innerHTML = '';
     const cur = cellAt(player.x, player.y).floorTag || 1;
@@ -1395,16 +1493,12 @@
       if (f === cur) btn.classList.add('current');
       btn.addEventListener('click', () => {
         elevatorPanel.classList.add('hidden');
-        if (f === cur) {
-          showToast(`You are already on ${f}F.`, 1.5);
-          return;
-        }
+        if (f === cur) { showToast(`You are already on ${f}F.`, 1.5); return; }
         goToFloorByElevator(f);
       });
       epFloors.appendChild(btn);
     }
   }
-
   function goToFloorByElevator(targetFloor) {
     if (walkingTo) return;
     const target = elevatorCells.find(c => c.floorTag === targetFloor);
@@ -1417,14 +1511,13 @@
       speed: 8,
     };
   }
-
   epClose.addEventListener('click', e => {
     e.preventDefault();
     elevatorPanel.classList.add('hidden');
   });
 
   // ============================================================
-  //  Stairs — next floor only (slower)
+  //  Stairs (maze) — using the exit side triggers the floor change
   // ============================================================
   function handleStairsClick() {
     if (walkingTo) return;
@@ -1434,6 +1527,7 @@
     const target = stairsCells.find(c => c.floorTag === next);
     if (!target) return;
     showToast(`Taking stairs to ${next}F...`, 1.5);
+    // Land on the target stairs cell's exit (bottom) -> into hallway
     walkingTo = {
       x: target.x + target.w/2,
       y: target.y + target.h + 80,
@@ -1695,6 +1789,13 @@
   }
 
   // ============================================================
+  //  Night / darkness helpers
+  // ============================================================
+  function isNight() {
+    return gameHours >= 22 || gameHours < 5;
+  }
+
+  // ============================================================
   //  Update
   // ============================================================
   function update(dt) {
@@ -1859,12 +1960,15 @@
     }
 
     activeElevator = null;
-    activeStairs = null;
     for (const c of elevatorCells) {
       if (dist(player.x, player.y, c.x + c.w/2, c.y + c.h/2) < 200) activeElevator = c;
     }
+    activeStairs = null;
     for (const c of stairsCells) {
-      if (dist(player.x, player.y, c.x + c.w/2, c.y + c.h/2) < 200) activeStairs = c;
+      // Active only on exit side (bottom)
+      const ex = c.x + c.w/2;
+      const ey = c.y + c.h - 60;
+      if (dist(player.x, player.y, ex, ey) < 120) activeStairs = c;
     }
 
     if (activeNPC && !conversation) {
@@ -1916,9 +2020,9 @@
 
     for (const w of walls) {
       if (w.x > camX + W || w.x + w.w < camX || w.y > camY + H || w.y + w.h < camY) continue;
-      ctx.fillStyle = '#3a4a5a';
+      ctx.fillStyle = w.isMaze ? '#1a1a1a' : '#3a4a5a';
       ctx.fillRect(w.x, w.y, w.w, w.h);
-      ctx.strokeStyle = '#5a6a7a';
+      ctx.strokeStyle = w.isMaze ? '#2a2a2a' : '#5a6a7a';
       ctx.lineWidth = 1;
       ctx.strokeRect(w.x, w.y, w.w, w.h);
     }
@@ -1982,8 +2086,55 @@
     drawPlayer();
     ctx.restore();
 
+    // Overlay UI
     drawOverlay();
+
+    // Night darkness (whole map)
+    if (isNight()) {
+      applyNightDarkness(camX, camY);
+    }
+    // Stairs maze darkness (always, if player inside a stairs cell)
+    applyStairsDarkness(camX, camY);
+
     if (showMinimap) drawMinimap();
+  }
+
+  function applyNightDarkness(camX, camY) {
+    const sx = player.x - camX;
+    const sy = player.y - camY;
+    const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, 180);
+    grad.addColorStop(0, 'rgba(0,0,0,0)');
+    grad.addColorStop(0.6, 'rgba(0,0,0,0.55)');
+    grad.addColorStop(1, 'rgba(0,0,20,0.9)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  function applyStairsDarkness(camX, camY) {
+    const c = cellAt(player.x, player.y);
+    if (c.type !== CELL.STAIRS) return;
+    const sx = player.x - camX;
+    const sy = player.y - camY;
+    const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, 100);
+    grad.addColorStop(0, 'rgba(0,0,0,0)');
+    grad.addColorStop(0.5, 'rgba(0,0,0,0.6)');
+    grad.addColorStop(1, 'rgba(0,0,0,0.95)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+    // Torch glows
+    for (const t of (c.mazeTorches || [])) {
+      const tx = t.x - camX;
+      const ty = t.y - camY;
+      if (tx < -80 || tx > W+80 || ty < -80 || ty > H+80) continue;
+      const g2 = ctx.createRadialGradient(tx, ty, 0, tx, ty, 70);
+      g2.addColorStop(0, 'rgba(255,180,80,0.55)');
+      g2.addColorStop(0.5, 'rgba(255,120,40,0.25)');
+      g2.addColorStop(1, 'rgba(255,80,0,0)');
+      ctx.fillStyle = g2;
+      ctx.beginPath();
+      ctx.arc(tx, ty, 70, 0, Math.PI*2);
+      ctx.fill();
+    }
   }
 
   function drawPresentationSlide() {
@@ -2117,7 +2268,7 @@
         else if (c.type === CELL.GACHA || c.type === CELL.BANQUET) color = '#3a1a2a';
         else if (c.type === CELL.LOBBY) color = '#1e2833';
         else if (c.type === CELL.ELEVATOR) color = '#1a2a3a';
-        else if (c.type === CELL.STAIRS) color = '#1a2a1a';
+        else if (c.type === CELL.STAIRS) color = '#1a1a1a';
         else if (c.type === CELL.PRESENTATION) color = '#1a1e2a';
         ctx.fillStyle = color;
         ctx.fillRect(mx + c.x*sx, my + c.y*sy, c.w*sx, c.h*sy);
@@ -2467,22 +2618,59 @@
     ctx.fillText('ELEVATOR', x + w/2, y + h/2 + 40);
   }
 
+  // ============================================================
+  //  Stairs cell (maze + torches)
+  // ============================================================
   function drawStairsCell(cell) {
     const x = cell.x, y = cell.y, w = cell.w, h = cell.h;
-    ctx.fillStyle = '#1a2a1a'; ctx.fillRect(x, y, w, h);
-    for (let i = 0; i < 8; i++) {
-      ctx.fillStyle = i % 2 === 0 ? '#3a4a3a' : '#2a3a2a';
-      ctx.fillRect(x + 100 + i*60, y + 200, 60, h - 400);
+    // Dark stone floor
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(x, y, w, h);
+    // Stone texture
+    ctx.fillStyle = '#2a2a2a';
+    for (let i = 0; i < 40; i++) {
+      const rx = x + (i*137)%w;
+      const ry = y + (i*89)%h;
+      ctx.fillRect(rx, ry, 20, 20);
     }
-    ctx.strokeStyle = '#00e6b0'; ctx.lineWidth = 4;
-    ctx.strokeRect(x + 100, y + 200, 480, h - 400);
-    ctx.strokeStyle = '#00e6b0'; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.moveTo(x + 80, y + 250); ctx.lineTo(x + 600, y + 250); ctx.stroke();
+    // Entrance marker (top edge)
+    ctx.fillStyle = 'rgba(0,230,176,0.15)';
+    ctx.fillRect(x, y, w, 40);
     ctx.fillStyle = '#00e6b0';
-    ctx.font = 'bold 24px sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText('STAIRS', x + w/2, y + 100);
+    ctx.font = 'bold 16px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('▼ ENTRANCE ▼', x + w/2, y + 26);
+    // Exit marker (bottom edge)
+    ctx.fillStyle = 'rgba(255,209,102,0.15)';
+    ctx.fillRect(x, y + h - 40, w, 40);
+    ctx.fillStyle = '#ffd166';
+    ctx.font = 'bold 16px sans-serif';
+    ctx.fillText('▼ EXIT ▼', x + w/2, y + h - 14);
+    // Torches
+    for (const t of (cell.mazeTorches || [])) {
+      ctx.fillStyle = '#5a3a1a';
+      ctx.fillRect(t.x - 4, t.y - 8, 8, 24);
+      const flick = 1 + Math.sin(Date.now()/120 + t.x) * 0.2;
+      ctx.fillStyle = '#ffd166';
+      ctx.beginPath();
+      ctx.ellipse(t.x, t.y - 14, 6*flick, 12*flick, 0, 0, Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle = '#ff8a3a';
+      ctx.beginPath();
+      ctx.ellipse(t.x, t.y - 10, 3*flick, 7*flick, 0, 0, Math.PI*2);
+      ctx.fill();
+    }
+    // Stairs icon at exit
+    ctx.fillStyle = '#00e6b0';
     ctx.font = 'bold 20px sans-serif';
-    ctx.fillText((cell.floorTag||1) + 'F', x + w/2, y + h - 60);
+    ctx.textAlign = 'center';
+    ctx.fillText('STAIRS ' + (cell.floorTag||1) + 'F', x + w/2, y + h - 50);
+    ctx.beginPath();
+    ctx.moveTo(x + w/2 - 20, y + h - 80);
+    ctx.lineTo(x + w/2 + 20, y + h - 80);
+    ctx.lineTo(x + w/2, y + h - 60);
+    ctx.closePath();
+    ctx.fill();
   }
 
   function drawPresentationCell(cell) {
