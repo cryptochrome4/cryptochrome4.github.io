@@ -95,8 +95,7 @@
     border-radius:12px; box-shadow:0 0 40px #00e6b055; width:640px; height:400px; }
   .pres-viewer .pres-title { color:#00e6b0; font-size:18px; letter-spacing:2px; }
   .pres-viewer .pres-controls { display:flex; gap:12px; }
-  .opening { position:fixed; inset:0; background-image:url('img222office.jpg');
-    background-size:cover; background-position:center; background-repeat:no-repeat;
+  .opening { position:fixed; inset:0; background:#0a0c0f;
     display:flex; flex-direction:column; justify-content:center; align-items:center;
     gap:30px; z-index:9999; transition:opacity 0.5s ease; }
   .opening::before { content:''; position:absolute; inset:0; background:rgba(0,0,0,0.55); z-index:0; }
@@ -118,7 +117,7 @@
     letter-spacing:3px; cursor:pointer; font-family:inherit;
     box-shadow:0 0 20px #7ad7ff55; transition:all 0.2s ease; }
   .bgview-btn:hover { background:#7ad7ff; color:#0a0c0f; box-shadow:0 0 40px #7ad7ffaa; }
-  .opening.hidden-opening { opacity:0; pointer-events:none; }
+  .opening.hidden-opening { opacity:0; pointer-events:none; display:none; }
   .bg-viewer { position:fixed; inset:0; background:#000; z-index:10000;
     display:flex; flex-direction:column; justify-content:center; align-items:center; }
   .bg-viewer img { width:100%; height:100%; object-fit:contain; background:#000; }
@@ -149,13 +148,7 @@
     <div class="subtitle">- WALK &amp; TALK -</div>
     <div class="opening-btns">
       <button class="start-btn" id="startBtn">START</button>
-      <button class="bgview-btn" id="bgViewBtn">VIEW BACKGROUND</button>
     </div>
-  </div>
-
-  <div class="bg-viewer hidden" id="bgViewer">
-    <button class="close-bg" id="closeBgBtn">CLOSE ✕</button>
-    <img src="img222office.jpg" alt="background">
   </div>
 
   <div class="game-wrapper">
@@ -297,7 +290,7 @@
   // ============================================================
   const FLOOR_OUTSIDE = -1;
   const FLOORS = [1,2,3,4];
-  const HOUR_SECONDS = 7;   // 1 hour = 7 real seconds
+  const HOUR_SECONDS = 7;
   const OUTSIDE_W = 1600, OUTSIDE_H = 1200;
 
   const ELEVATOR_RECT = { x: 340, y: 480, w: 120, h: 80 };
@@ -310,7 +303,7 @@
   // ============================================================
   //  Game state
   // ============================================================
-  const player = { x: 800, y: 1100, speed: 90, angle: 0, radius: 16 };
+  const player = { x: 800, y: 500, speed: 90, angle: 0, radius: 16 };
   const keys = { ArrowUp:false, ArrowDown:false, ArrowLeft:false, ArrowRight:false };
   let mouseX = W/2, mouseY = H/2;
   let lastTime = 0;
@@ -349,6 +342,7 @@
   let conversation = null;
 
   let toastTimer = 0;
+  let gameStarted = false;
 
   // ============================================================
   //  Utilities
@@ -580,7 +574,7 @@
       "A：行ったわ。男が寝てた。",
       "B：他人の部屋に入ったん？",
       "A：鍵持ってたんや！不法侵入ちゃうわ。",
-      "B": "間違いなく侵入や。",
+      "B：間違いなく侵入や。",
       "A：彼はとても優しかったで。",
       "B：寝てたやろ！",
       "A：起きたわ。お茶も飲んだ。",
@@ -699,7 +693,7 @@
     assignRooms();
     buildPresenter();
     buildComedians();
-    player.x = 800; player.y = 1100;
+    player.x = 800; player.y = 500;
     currentFloor = FLOOR_OUTSIDE;
     gameHours = 4; gameMinutes = 0; timeAccum = 0;
     money = 10000; hotelPaid = false; hasKey = false;
@@ -1199,7 +1193,6 @@
     for (let i = 0; i < slide.l.length; i++) {
       presCtx.fillText('• ' + slide.l[i], 60, 140 + i*50);
     }
-    // Dot art
     for (let i = 0; i < 20; i++) {
       const x = 60 + (i*37) % (w-120);
       const y = h - 60 - (i*23) % 80;
@@ -1208,7 +1201,6 @@
       presCtx.arc(x, y, 3 + (i%3), 0, Math.PI*2);
       presCtx.fill();
     }
-    // Chart
     presCtx.strokeStyle = '#ff8ad8';
     presCtx.lineWidth = 2;
     presCtx.beginPath();
@@ -1257,6 +1249,7 @@
   //  Update
   // ============================================================
   function update(dt) {
+    if (!gameStarted) return;
     updateTime(dt);
 
     const spd = player.speed * 0.4;
@@ -1362,6 +1355,11 @@
   // ============================================================
   function draw() {
     ctx.clearRect(0,0,W,H);
+    if (!gameStarted) {
+      ctx.fillStyle = '#0a0c0f';
+      ctx.fillRect(0,0,W,H);
+      return;
+    }
     if (currentFloor === FLOOR_OUTSIDE) drawOutside();
     else drawFloor(currentFloor);
     drawPlayer();
@@ -1597,22 +1595,13 @@
   // ============================================================
   const opening = document.getElementById('opening');
   const startBtn = document.getElementById('startBtn');
-  const bgViewBtn = document.getElementById('bgViewBtn');
-  const bgViewer = document.getElementById('bgViewer');
-  const closeBgBtn = document.getElementById('closeBgBtn');
 
   startBtn.addEventListener('click', e => {
     e.preventDefault();
-    opening.classList.add('hidden-opening');
-    setTimeout(() => { opening.style.display = 'none'; }, 500);
-  });
-  bgViewBtn.addEventListener('click', e => {
-    e.preventDefault();
-    bgViewer.classList.remove('hidden');
-  });
-  closeBgBtn.addEventListener('click', e => {
-    e.preventDefault();
-    bgViewer.classList.add('hidden');
+    gameStarted = true;
+    opening.style.display = 'none';
+    lastTime = performance.now();
+    showToast('Welcome to the Hotel! Pay ¥10,000 at the reception.', 4);
   });
 
   // ============================================================
