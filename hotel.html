@@ -122,7 +122,7 @@
 
   .opening {
     position:fixed; inset:0;
-    background-image:url('img222office.jpg');
+    background-image:url('img224hotel.jpg');
     background-size:cover; background-position:center; background-repeat:no-repeat;
     display:flex; flex-direction:column; justify-content:center;
     align-items:center; gap:30px; z-index:9999;
@@ -183,6 +183,35 @@
     opacity:0; transition:opacity 0.25s ease; pointer-events:none;
   }
   .toast.show { opacity:1; }
+
+  .elevator-panel {
+    position:fixed; top:50%; left:50%;
+    transform:translate(-50%,-50%);
+    background:#0d131aee; border:2px solid #7ad7ff;
+    border-radius:16px; padding:20px 24px;
+    z-index:9600; box-shadow:0 0 50px #7ad7ff55;
+    display:flex; flex-direction:column; gap:14px; align-items:center;
+    min-width:280px;
+  }
+  .elevator-panel .ep-title {
+    color:#7ad7ff; font-size:16px; font-weight:800; letter-spacing:3px;
+    text-shadow:0 0 10px #7ad7ff88;
+  }
+  .elevator-panel .ep-floors {
+    display:grid; grid-template-columns:1fr 1fr; gap:10px; width:100%;
+  }
+  .elevator-panel .ep-floors button {
+    background:#1a2530; color:#7ad7ff; border:2px solid #7ad7ff;
+    border-radius:12px; padding:14px 0; font-size:20px; font-weight:800;
+    cursor:pointer; font-family:inherit; transition:all 0.15s ease;
+  }
+  .elevator-panel .ep-floors button:hover {
+    background:#7ad7ff; color:#0a0c0f; box-shadow:0 0 20px #7ad7ffaa;
+  }
+  .elevator-panel .ep-floors button.current {
+    background:#00e6b0; color:#0a0c0f; border-color:#00e6b0;
+    box-shadow:0 0 20px #00e6b0aa;
+  }
 </style>
 </head>
 <body>
@@ -198,7 +227,7 @@
 
   <div class="bg-viewer hidden" id="bgViewer">
     <button class="close-bg" id="closeBgBtn">CLOSE ✕</button>
-    <img src="img222office.jpg" alt="background">
+    <img src="img224hotel.jpg" alt="background">
   </div>
 
   <div class="game-wrapper">
@@ -274,6 +303,12 @@
 
   <div class="toast" id="toast"></div>
 
+  <div class="elevator-panel hidden" id="elevatorPanel">
+    <div class="ep-title">SELECT FLOOR</div>
+    <div class="ep-floors" id="epFloors"></div>
+    <button class="ui-btn warn" id="epClose">CANCEL</button>
+  </div>
+
 <script>
 (function(){
   // ============================================================
@@ -322,6 +357,9 @@
   const victory = document.getElementById('victory');
   const victoryText = document.getElementById('victoryText');
   const toast = document.getElementById('toast');
+  const elevatorPanel = document.getElementById('elevatorPanel');
+  const epFloors = document.getElementById('epFloors');
+  const epClose = document.getElementById('epClose');
 
   // ============================================================
   //  Utilities
@@ -373,7 +411,7 @@
   let presenter = null;
   let presenterState = 'idle';
   let presenterTarget = null;
-  let presenterPath = null;   // list of waypoints
+  let presenterPath = null;
   let presenterPathIdx = 0;
 
   let comedians = [];
@@ -383,7 +421,6 @@
   let taxiX = -300;
   let taxiY = 0;
   let taxiVisible = false;
-  // Comedian path waypoints (walk from taxi to banquet hall and back)
   let comedianPath = null;
   let comedianPathIdx = 0;
 
@@ -400,6 +437,8 @@
   let activeStairs = null;
   let conversation = null;
   let toastTimer = 0;
+
+  let walkingTo = null;
 
   // ============================================================
   //  Cell types
@@ -430,14 +469,12 @@
       grid.push(row);
     }
 
-    // Row 0-1: outside
     for (let c = 0; c < MAP_COLS; c++) {
       grid[0][c].type = CELL.PARKING; grid[0][c].areaName = 'Parking';
       grid[1][c].type = CELL.ROAD;    grid[1][c].areaName = 'Road';
     }
     grid[1][6].type = CELL.ENTRANCE; grid[1][6].areaName = 'Hotel Entrance';
 
-    // Floors
     const floorRows = [
       { roomsRow: 2, hallRow: 3, floor: 4, special: CELL.BANQUET },
       { roomsRow: 4, hallRow: 5, floor: 3, special: CELL.GACHA },
@@ -500,10 +537,6 @@
 
   // ============================================================
   //  Walls + Doors
-  //  - Each room is a closed box: walls on all 4 sides with a door on the bottom
-  //  - Rooms are separated by walls, so you can't enter from a neighboring room
-  //  - Room doors are locked by default (need key)
-  //  - Presentation room: door on bottom edge, unlocked but click-to-open
   // ============================================================
   const WALL_THICK = 14;
   const DOOR_LEN = 70;
@@ -512,16 +545,11 @@
     walls = [];
     doors = [];
 
-    // Room walls: all four edges with a door gap on the bottom
     for (const r of rooms) {
       const topWallY = r.y + WALL_THICK/2;
-      // Top wall (solid)
       walls.push({ x: r.x, y: topWallY - WALL_THICK/2, w: r.w, h: WALL_THICK });
-      // Left wall
       walls.push({ x: r.x + WALL_THICK/2 - WALL_THICK/2, y: r.y, w: WALL_THICK, h: r.h });
-      // Right wall
       walls.push({ x: r.x + r.w - WALL_THICK/2 - WALL_THICK/2, y: r.y, w: WALL_THICK, h: r.h });
-      // Bottom wall with door gap
       const wallY = r.y + r.h - WALL_THICK/2;
       walls.push({ x: r.x, y: wallY - WALL_THICK/2, w: (r.w - DOOR_LEN)/2, h: WALL_THICK });
       walls.push({ x: r.x + (r.w + DOOR_LEN)/2, y: wallY - WALL_THICK/2, w: (r.w - DOOR_LEN)/2, h: WALL_THICK });
@@ -537,7 +565,6 @@
       });
     }
 
-    // Presentation room: bottom door only (unlocked, click to open)
     const pcell = grid[11][2];
     const pWallY = pcell.y + pcell.h - WALL_THICK/2;
     walls.push({ x: pcell.x, y: pWallY - WALL_THICK/2, w: (pcell.w - DOOR_LEN)/2, h: WALL_THICK });
@@ -621,7 +648,7 @@
   ];
 
   // ============================================================
-  //  Guest dialogue (ENGLISH) — room vs event
+  //  Guest dialogue (ENGLISH)
   // ============================================================
   const ROOM_LINES = [
     "Oh, you have a key to my room? How unusual.",
@@ -717,7 +744,7 @@
   ];
 
   // ============================================================
-  //  Business presentation (JAPANESE)
+  //  Presentation (JAPANESE)
   // ============================================================
   const PRES_BAD = [
     { title:"ドローンでパンを配達",
@@ -949,6 +976,8 @@
     invested = false; investReturnHour = null; investResult = null;
     currentComedy = null; comedyProgress = 0;
     presViewOpen = false; presSlideIndex = 0; currentPresentation = null;
+    walkingTo = null;
+    elevatorPanel.classList.add('hidden');
     updateGuestLocations();
     updateHUD();
     buildInfoPanel();
@@ -1083,7 +1112,6 @@
     if (gameHours === 21) {
       comedyState = 'finished';
       showToast('The comedy show ends.', 2);
-      // Comedians start walking back to taxi
       startComediansLeave();
     }
     if (gameHours === 22) {
@@ -1096,7 +1124,7 @@
   }
 
   // ============================================================
-  //  Guest locations — banquet seating faces the stage
+  //  Guest locations
   // ============================================================
   function updateGuestLocations() {
     for (const g of guests) {
@@ -1122,7 +1150,6 @@
         g.baseX = c.x + 150 + (g.id % 4) * 150;
         g.baseY = c.y + 220 + Math.floor((g.id/4) % 3) * 110;
       } else if (loc === 'banquet') {
-        // Seat guests in rows facing the stage (stage is at top)
         const c = grid[2][0];
         const cols = 5;
         const idx = g.id % (cols * 3);
@@ -1143,7 +1170,10 @@
     if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) {
       e.preventDefault(); keys[e.key] = true;
     }
-    if (e.key === 'Escape') { closeDialogue(); closeInfoPanel(); }
+    if (e.key === 'Escape') {
+      closeDialogue(); closeInfoPanel();
+      elevatorPanel.classList.add('hidden');
+    }
   });
   window.addEventListener('keyup', e => {
     if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) {
@@ -1159,6 +1189,7 @@
   });
   canvas.addEventListener('mousedown', e => {
     if (e.button !== 0) return;
+    if (elevatorPanel.classList.contains('hidden') === false) return;
     if (conversation) { e.preventDefault(); nextDialogue(); return; }
     if (presViewOpen && currentPresentation) {
       e.preventDefault();
@@ -1193,7 +1224,6 @@
     if (activeNPC) { e.preventDefault(); startDialogue(activeNPC); return; }
   });
 
-  // Dialogue click anywhere advances
   dialogue.addEventListener('click', e => {
     if (e.target.closest('.choice-row')) return;
     e.preventDefault();
@@ -1207,7 +1237,7 @@
   });
   helpBtn.addEventListener('click', e => {
     e.preventDefault();
-    showToast('Move: Arrows / Talk: approach & click / Door: stand & click / EV & Stairs: stand & click', 5);
+    showToast('Move: Arrows / Talk: approach & click / Door: stand & click / EV: choose floor / Stairs: next floor', 5);
   });
   minimapBtn.addEventListener('click', e => {
     e.preventDefault();
@@ -1346,21 +1376,56 @@
   }
 
   // ============================================================
-  //  Elevator / Stairs — walk to target
+  //  Elevator — floor selection panel
   // ============================================================
-  let walkingTo = null;
-  function walkTo(x, y, msg) { walkingTo = { x, y, msg }; }
-
   function handleElevatorClick() {
     if (walkingTo) return;
-    const cur = cellAt(player.x, player.y).floorTag || 1;
-    let next = cur + 1;
-    if (next > 4) next = 1;
-    const target = elevatorCells.find(c => c.floorTag === next);
-    if (!target) return;
-    showToast(`Elevator moving to ${next}F...`, 1.5);
-    walkTo(target.x + target.w/2, target.y + target.h + 80, `Arrived at ${next}F.`);
+    if (!elevatorPanel.classList.contains('hidden')) return;
+    buildElevatorPanel();
+    elevatorPanel.classList.remove('hidden');
   }
+
+  function buildElevatorPanel() {
+    epFloors.innerHTML = '';
+    const cur = cellAt(player.x, player.y).floorTag || 1;
+    const floorsAvailable = elevatorCells.map(c => c.floorTag).sort();
+    for (const f of floorsAvailable) {
+      const btn = document.createElement('button');
+      btn.textContent = f + 'F';
+      if (f === cur) btn.classList.add('current');
+      btn.addEventListener('click', () => {
+        elevatorPanel.classList.add('hidden');
+        if (f === cur) {
+          showToast(`You are already on ${f}F.`, 1.5);
+          return;
+        }
+        goToFloorByElevator(f);
+      });
+      epFloors.appendChild(btn);
+    }
+  }
+
+  function goToFloorByElevator(targetFloor) {
+    if (walkingTo) return;
+    const target = elevatorCells.find(c => c.floorTag === targetFloor);
+    if (!target) return;
+    showToast(`Elevator moving to ${targetFloor}F...`, 1.5);
+    walkingTo = {
+      x: target.x + target.w/2,
+      y: target.y + target.h + 80,
+      msg: `Arrived at ${targetFloor}F.`,
+      speed: 8,
+    };
+  }
+
+  epClose.addEventListener('click', e => {
+    e.preventDefault();
+    elevatorPanel.classList.add('hidden');
+  });
+
+  // ============================================================
+  //  Stairs — next floor only (slower)
+  // ============================================================
   function handleStairsClick() {
     if (walkingTo) return;
     const cur = cellAt(player.x, player.y).floorTag || 1;
@@ -1369,7 +1434,12 @@
     const target = stairsCells.find(c => c.floorTag === next);
     if (!target) return;
     showToast(`Taking stairs to ${next}F...`, 1.5);
-    walkTo(target.x + target.w/2, target.y + target.h + 80, `Arrived at ${next}F.`);
+    walkingTo = {
+      x: target.x + target.w/2,
+      y: target.y + target.h + 80,
+      msg: `Arrived at ${next}F.`,
+      speed: 4,
+    };
   }
 
   // ============================================================
@@ -1424,16 +1494,15 @@
   }
 
   // ============================================================
-  //  Comedian pathfinding (walk to banquet, then back to taxi)
+  //  Comedian path
   // ============================================================
   function startComediansToBanquet() {
-    // Path: taxi stop -> entrance -> lobby -> elevator -> 4F hall -> banquet
-    const stopX = grid[1][6].x - 400;
     const enterX = grid[1][6].x + grid[1][6].w/2;
     const lobbyX = grid[10][6].x + grid[10][6].w/2;
     const lobbyY = grid[10][6].y + grid[10][6].h/2;
-    const evX = elevatorCells.find(c => c.floorTag === 4).x + 400;
-    const evY = elevatorCells.find(c => c.floorTag === 4).y + 300;
+    const ev4 = elevatorCells.find(c => c.floorTag === 4);
+    const evX = ev4.x + ev4.w/2;
+    const evY = ev4.y + ev4.h + 80;
     const banX = grid[2][0].x + grid[2][0].w/2;
     const banY = grid[2][0].y + 160;
     comedianPath = [
@@ -1445,14 +1514,13 @@
     comedianPathIdx = 0;
   }
   function startComediansLeave() {
-    const stopX = grid[1][6].x - 400;
     const enterX = grid[1][6].x + grid[1][6].w/2;
     const lobbyX = grid[10][6].x + grid[10][6].w/2;
     const lobbyY = grid[10][6].y + grid[10][6].h/2;
-    const evX = elevatorCells.find(c => c.floorTag === 4).x + 400;
-    const evY = elevatorCells.find(c => c.floorTag === 4).y + 300;
-    const banX = grid[2][0].x + grid[2][0].w/2;
-    const banY = grid[2][0].y + 160;
+    const ev4 = elevatorCells.find(c => c.floorTag === 4);
+    const evX = ev4.x + ev4.w/2;
+    const evY = ev4.y + ev4.h + 80;
+    const stopX = grid[1][6].x - 400;
     comedianPath = [
       { x: evX, y: evY },
       { x: lobbyX, y: lobbyY },
@@ -1479,8 +1547,6 @@
         conversation.onEnd = () => {
           presenterState = 'walking';
           const target = grid[11][2];
-          presenterTarget = { x: target.x + target.w/2, y: target.y + target.h/2 };
-          // Path via the entrance then into the presentation room
           const enterX = grid[1][6].x + grid[1][6].w/2;
           const enterY = grid[1][6].y + grid[1][6].h/2;
           presenterPath = [
@@ -1545,7 +1611,6 @@
         comedyState === 'onstage' ? "Enjoy the show!" : "We perform at 19:00 in the banquet hall (4F).",
       ];
     } else if (npc.groupId !== undefined) {
-      // Room vs event lines (different content)
       let lines;
       if (npc.location === 'rest') lines = REST_LINES;
       else if (npc.location === 'onsen') lines = ONSEN_LINES;
@@ -1636,7 +1701,6 @@
     if (!gameStarted) return;
     updateTime(dt);
 
-    // Walking to a target (elevator/stairs)
     if (walkingTo) {
       const dx = walkingTo.x - player.x;
       const dy = walkingTo.y - player.y;
@@ -1651,14 +1715,13 @@
         updateHUD();
         return;
       }
-      const spd = 4;
+      const spd = walkingTo.speed || 4;
       tryMovePlayer(dx/d * spd, dy/d * spd);
       player.angle = Math.atan2(dy, dx);
       updateHUD();
       return;
     }
 
-    // Player movement
     const spd = player.speed * 0.4;
     let dx = 0, dy = 0;
     if (keys.ArrowUp)    dy -= 1;
@@ -1681,7 +1744,6 @@
     const wmy = mouseY + camY;
     player.angle = Math.atan2(wmy - player.y, wmx - player.x);
 
-    // Presenter walk with waypoints
     if (presenter && presenterState === 'walking' && presenterPath) {
       const target = presenterPath[presenterPathIdx];
       if (!target) {
@@ -1702,7 +1764,6 @@
       }
     }
 
-    // Taxi animation
     if (taxiVisible) {
       const stopX = grid[1][6].x - 400;
       if (comedyState === 'arriving') {
@@ -1731,11 +1792,9 @@
       }
     }
 
-    // Comedian walking along path
     if (comedianPath && comedians[0].state === 'walking') {
       const target = comedianPath[comedianPathIdx];
       if (!target) {
-        // Arrived at destination
         comedianPath = null;
         if (comedyState === 'waiting') {
           comedyState = 'ready';
@@ -1763,7 +1822,6 @@
       }
     }
 
-    // Comedy progress — single run of 14 seconds
     if (comedyState === 'onstage' && currentComedy) {
       const total = 14 * 60;
       comedyProgress += dt;
@@ -1772,14 +1830,12 @@
       }
     }
 
-    // Guest wander
     for (const g of guests) {
       g.phase += 0.01;
       g.x = g.baseX + Math.cos(g.phase) * 6;
       g.y = g.baseY + Math.sin(g.phase * 0.8) * 4;
     }
 
-    // Active NPC: nearest among presenter, comedians, guests
     activeNPC = null;
     let bestD = 90;
     const candidates = [];
@@ -1793,7 +1849,6 @@
       if (d < bestD) { bestD = d; activeNPC = n; }
     }
 
-    // Active door
     activeDoor = null;
     let bestDoorD = 70;
     for (const dr of doors) {
@@ -1803,7 +1858,6 @@
       if (d < bestDoorD) { bestDoorD = d; activeDoor = dr; }
     }
 
-    // Active elevator / stairs
     activeElevator = null;
     activeStairs = null;
     for (const c of elevatorCells) {
@@ -1813,7 +1867,6 @@
       if (dist(player.x, player.y, c.x + c.w/2, c.y + c.h/2) < 200) activeStairs = c;
     }
 
-    // NPC panel
     if (activeNPC && !conversation) {
       npName.textContent = activeNPC.name || '???';
       if (activeNPC.groupId !== undefined) {
@@ -1861,7 +1914,6 @@
       for (let c = c0; c <= c1; c++) drawCell(grid[r][c]);
     }
 
-    // Walls
     for (const w of walls) {
       if (w.x > camX + W || w.x + w.w < camX || w.y > camY + H || w.y + w.h < camY) continue;
       ctx.fillStyle = '#3a4a5a';
@@ -1871,13 +1923,11 @@
       ctx.strokeRect(w.x, w.y, w.w, w.h);
     }
 
-    // Doors
     for (const dr of doors) {
       if (dr.x > camX + W || dr.x + dr.w < camX || dr.y > camY + H || dr.y + dr.h < camY) continue;
       drawDoor(dr, dr.open);
     }
 
-    // Guests
     for (const g of guests) {
       if (g.x < camX - 60 || g.x > camX + W + 60 || g.y < camY - 60 || g.y > camY + H + 60) continue;
       drawPerson(g.x, g.y, g.color, g.hair, g.name, g.angle || 0);
@@ -1895,7 +1945,6 @@
       }
     }
 
-    // Presenter
     if (presenter) {
       drawPerson(presenter.x, presenter.y, presenter.color, presenter.hair, presenter.name, presenter.angle);
       if (presenterState === 'idle') {
@@ -1906,16 +1955,13 @@
       }
     }
 
-    // Taxi
     if (taxiVisible) drawTaxi(taxiX, taxiY - 30);
 
-    // Comedians
     for (const c of comedians) {
       if (c.state === 'taxi' || c.state === 'done') continue;
       drawPerson(c.x, c.y, c.color, c.hair, c.name, c.angle);
     }
 
-    // Comedy subtitles
     if (comedyState === 'onstage' && currentComedy) {
       const c = grid[2][0];
       const stageCx = c.x + c.w/2;
@@ -1929,7 +1975,6 @@
       ctx.fillText(currentComedy.lines[idx], stageCx, c.y + c.h - 40);
     }
 
-    // Presentation slide on projector (dot-art + text)
     if (presViewOpen && currentPresentation) {
       drawPresentationSlide();
     }
@@ -1944,7 +1989,6 @@
   function drawPresentationSlide() {
     const c = grid[11][2];
     const slide = currentPresentation.slides[presSlideIndex];
-    // Draw slide panel
     ctx.fillStyle = '#0d131a';
     ctx.fillRect(c.x + 80, c.y + 60, c.w - 160, c.h - 200);
     ctx.strokeStyle = '#00e6b0';
@@ -1960,7 +2004,6 @@
     for (let i = 0; i < slide.l.length; i++) {
       ctx.fillText('• ' + slide.l[i], c.x + 130, c.y + 170 + i*28);
     }
-    // Dot-art / shapes on the right
     const ax = c.x + c.w - 260;
     const ay = c.y + 180;
     drawSlideArt(slide.art, ax, ay);
@@ -2104,7 +2147,6 @@
         ctx.fillStyle = '#1a1d22'; ctx.fillRect(x, y, w, h);
         ctx.fillStyle = '#e0e0e0';
         for (let i = 0; i < 8; i++) ctx.fillRect(x + 40 + i*90, y + h/2 - 3, 50, 6);
-        // Street lamps
         for (let i = 0; i < 4; i++) {
           ctx.fillStyle = '#3a4a5a'; ctx.fillRect(x + 80 + i*180, y + h/2 - 40, 4, 30);
           ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(x + 82 + i*180, y + h/2 - 42, 6, 0, Math.PI*2); ctx.fill();
@@ -2118,7 +2160,6 @@
           const ty = y + 80 + Math.floor(i / 3) * 200;
           drawTree(tx, ty);
         }
-        // Flowers
         for (let i = 0; i < 8; i++) {
           ctx.fillStyle = ['#ff8ad8','#ffd166','#ff4d6d'][i%3];
           ctx.beginPath(); ctx.arc(x + 60 + i*90, y + h - 80, 5, 0, Math.PI*2); ctx.fill();
@@ -2131,7 +2172,6 @@
         ctx.fillStyle = '#00e6b0';
         ctx.font = 'bold 24px sans-serif'; ctx.textAlign = 'center';
         ctx.fillText('HOTEL ENTRANCE', x + w/2, y + 60);
-        // Two potted plants
         drawTree(x + 120, y + 350);
         drawTree(x + w - 120, y + 350);
         break;
@@ -2143,11 +2183,9 @@
         break;
       case CELL.LOBBY:
         ctx.fillStyle = '#1e2833'; ctx.fillRect(x, y, w, h);
-        // Carpet pattern
         ctx.fillStyle = '#2a3a4a';
         for (let i = 0; i < 8; i++) for (let j = 0; j < 4; j++)
           ctx.fillRect(x + 40 + i*90, y + 40 + j*130, 60, 60);
-        // Chandelier
         ctx.fillStyle = '#ffd166';
         ctx.beginPath(); ctx.arc(x + w/2, y + 60, 20, 0, Math.PI*2); ctx.fill();
         if (cell.col === 6 && cell.row === 10) {
@@ -2185,7 +2223,6 @@
       case CELL.OUTSIDE:
       default:
         ctx.fillStyle = '#1a2a1e'; ctx.fillRect(x, y, w, h);
-        // Path
         ctx.fillStyle = '#2a2a2a';
         ctx.fillRect(x + w/2 - 80, y, 160, h);
         break;
@@ -2194,11 +2231,8 @@
 
   function drawRoomCell(cell) {
     const x = cell.x, y = cell.y, w = cell.w, h = cell.h;
-    // Wallpaper
     ctx.fillStyle = '#3a3040'; ctx.fillRect(x, y, w, h);
-    // Floor
     ctx.fillStyle = '#4a3a2a'; ctx.fillRect(x + 20, y + 20, w - 40, h - 40);
-    // Wood plank lines
     ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 1;
     for (let i = 0; i < 8; i++) {
       ctx.beginPath();
@@ -2206,43 +2240,34 @@
       ctx.lineTo(x + w - 20, y + 60 + i*60);
       ctx.stroke();
     }
-    // Window
     ctx.fillStyle = '#0d1a2a'; ctx.fillRect(x + w - 180, y + 60, 140, 110);
     ctx.strokeStyle = '#7ad7ff'; ctx.lineWidth = 3;
     ctx.strokeRect(x + w - 180, y + 60, 140, 110);
     ctx.strokeStyle = '#7ad7ff'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(x + w - 110, y + 60); ctx.lineTo(x + w - 110, y + 170); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(x + w - 180, y + 115); ctx.lineTo(x + w - 40, y + 115); ctx.stroke();
-    // Stars
     ctx.fillStyle = '#ffd166';
     for (let i = 0; i < 5; i++) {
       ctx.beginPath();
       ctx.arc(x + w - 170 + i*30, y + 90 + (i%2)*30, 2, 0, Math.PI*2);
       ctx.fill();
     }
-    // Bed
     ctx.fillStyle = '#5a4a3a'; ctx.fillRect(x + 80, y + 200, 280, 200);
     ctx.fillStyle = '#e0e0e0'; ctx.fillRect(x + 80, y + 200, 280, 60);
     ctx.fillStyle = '#7ad7ff'; ctx.fillRect(x + 80, y + 260, 280, 140);
-    // Pillow
     ctx.fillStyle = '#ffffff'; ctx.fillRect(x + 100, y + 215, 80, 35);
-    // Nightstand
     ctx.fillStyle = '#3a2a1a'; ctx.fillRect(x + 380, y + 220, 70, 70);
-    // Lamp
     ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(x + 415, y + 200, 15, 0, Math.PI*2); ctx.fill();
     ctx.fillStyle = '#3a2a1a'; ctx.fillRect(x + 412, y + 210, 6, 20);
-    // TV
     ctx.fillStyle = '#0a0c0f'; ctx.fillRect(x + 200, y + 80, 160, 90);
     ctx.strokeStyle = '#00e6b0'; ctx.lineWidth = 2;
     ctx.strokeRect(x + 200, y + 80, 160, 90);
     ctx.fillStyle = '#00e6b0'; ctx.fillRect(x + 210, y + 90, 140, 70);
-    // Clock on wall
     ctx.fillStyle = '#00e6b0';
     ctx.beginPath(); ctx.arc(x + w - 80, y + 220, 30, 0, Math.PI*2); ctx.fill();
     ctx.fillStyle = '#0a0c0f';
     ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center';
     ctx.fillText(fmt(gameHours, gameMinutes), x + w - 80, y + 226);
-    // Room number plate
     ctx.fillStyle = '#2a2a3a';
     ctx.fillRect(x + 30, y + 30, 180, 50);
     ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 2;
@@ -2255,7 +2280,6 @@
       ctx.font = 'bold 16px sans-serif';
       ctx.fillText('MY ROOM', x + 120, y + 100);
     }
-    // Plant
     ctx.fillStyle = '#3a2a1a'; ctx.fillRect(x + 30, y + h - 130, 40, 40);
     ctx.fillStyle = '#1a5a2a';
     ctx.beginPath(); ctx.arc(x + 50, y + h - 150, 30, 0, Math.PI*2); ctx.fill();
@@ -2263,24 +2287,17 @@
 
   function drawHallCell(cell) {
     const x = cell.x, y = cell.y, w = cell.w, h = cell.h;
-    // Carpet
     ctx.fillStyle = '#2a2030'; ctx.fillRect(x, y, w, h);
-    // Carpet pattern
     ctx.fillStyle = '#3a2a40';
-    for (let i = 0; i < 5; i++) {
-      ctx.fillRect(x + 40 + i*160, y + 40, 80, h - 80);
-    }
-    // Gold trim
+    for (let i = 0; i < 5; i++) ctx.fillRect(x + 40 + i*160, y + 40, 80, h - 80);
     ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(x, y + 30); ctx.lineTo(x + w, y + 30); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(x, y + h - 30); ctx.lineTo(x + w, y + h - 30); ctx.stroke();
-    // Wall sconces
     for (let i = 0; i < 3; i++) {
       ctx.fillStyle = '#ffd166';
       ctx.beginPath(); ctx.arc(x + 150 + i*250, y + 60, 8, 0, Math.PI*2); ctx.fill();
       ctx.beginPath(); ctx.arc(x + 150 + i*250, y + h - 60, 8, 0, Math.PI*2); ctx.fill();
     }
-    // Paintings on the wall (top)
     ctx.fillStyle = '#3a1a2a';
     ctx.fillRect(x + 80, y + 10, 80, 50);
     ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 2;
@@ -2290,40 +2307,32 @@
     ctx.fillRect(x + 300, y + 10, 80, 50);
     ctx.strokeStyle = '#ffd166'; ctx.strokeRect(x + 300, y + 10, 80, 50);
     ctx.fillStyle = '#7ad7ff'; ctx.beginPath(); ctx.arc(x + 340, y + 35, 15, 0, Math.PI*2); ctx.fill();
-    // Direction sign
     ctx.fillStyle = '#0a0c0f';
     ctx.fillRect(x + 500, y + 20, 200, 40);
     ctx.strokeStyle = '#00e6b0'; ctx.lineWidth = 2;
     ctx.strokeRect(x + 500, y + 20, 200, 40);
     ctx.fillStyle = '#00e6b0';
     ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText('← Rooms  ' + '  Elevator →', x + 600, y + 46);
+    ctx.fillText('← Rooms  Elevator →', x + 600, y + 46);
   }
 
   function drawRestCell(cell) {
     const x = cell.x, y = cell.y, w = cell.w, h = cell.h;
     ctx.fillStyle = '#3a2a1a'; ctx.fillRect(x, y, w, h);
     ctx.fillStyle = '#4a3a2a'; ctx.fillRect(x + 20, y + 20, w - 40, h - 40);
-    // Carpet
     ctx.fillStyle = '#5a2a3a'; ctx.fillRect(x + 40, y + 60, w - 80, h - 120);
-    // Sofas
     for (let i = 0; i < 3; i++) {
       ctx.fillStyle = '#2a3a5a';
       ctx.fillRect(x + 80 + i*220, y + 130, 180, 80);
       ctx.fillStyle = '#1a2a4a';
       ctx.fillRect(x + 80 + i*220, y + 130, 180, 20);
     }
-    // Coffee table
-    ctx.fillStyle = '#3a2a1a';
-    ctx.fillRect(x + 200, y + 300, 400, 80);
-    ctx.fillStyle = '#5a4a3a';
-    ctx.fillRect(x + 220, y + 320, 360, 40);
-    // Tea cups
+    ctx.fillStyle = '#3a2a1a'; ctx.fillRect(x + 200, y + 300, 400, 80);
+    ctx.fillStyle = '#5a4a3a'; ctx.fillRect(x + 220, y + 320, 360, 40);
     for (let i = 0; i < 3; i++) {
       ctx.fillStyle = '#e0e0e0';
       ctx.beginPath(); ctx.arc(x + 280 + i*120, y + 340, 12, 0, Math.PI*2); ctx.fill();
     }
-    // Potted plants
     drawTree(x + 50, y + h - 100);
     drawTree(x + w - 50, y + h - 100);
     ctx.fillStyle = '#ffd166';
@@ -2334,30 +2343,25 @@
   function drawOnsenCell(cell) {
     const x = cell.x, y = cell.y, w = cell.w, h = cell.h;
     ctx.fillStyle = '#0d1a1a'; ctx.fillRect(x, y, w, h);
-    // Rock walls
     ctx.fillStyle = '#2a3a3a';
     for (let i = 0; i < 30; i++) {
       const rx = x + (i*137)%w;
       const ry = y + (i*89)%h;
       ctx.beginPath(); ctx.arc(rx, ry, 20, 0, Math.PI*2); ctx.fill();
     }
-    // Pool
     ctx.fillStyle = '#1a3a4a';
     ctx.beginPath(); ctx.arc(x + w/2, y + h/2 + 60, 220, 0, Math.PI*2); ctx.fill();
     ctx.strokeStyle = '#7ad7ff'; ctx.lineWidth = 4; ctx.stroke();
-    // Water sparkles
     ctx.fillStyle = 'rgba(200,230,255,0.4)';
     for (let i = 0; i < 12; i++) {
       ctx.beginPath();
       ctx.arc(x + w/2 - 150 + (i%4)*100, y + h/2 + 20 + Math.floor(i/4)*60, 4, 0, Math.PI*2);
       ctx.fill();
     }
-    // Steam clouds
     for (let i = 0; i < 6; i++) {
       ctx.fillStyle = 'rgba(200,230,255,0.15)';
       ctx.beginPath(); ctx.arc(x + 200 + i*80, y + 200 - (i%3)*30, 50, 0, Math.PI*2); ctx.fill();
     }
-    // Bamboo fence
     for (let i = 0; i < 8; i++) {
       ctx.fillStyle = '#5a4a2a';
       ctx.fillRect(x + 40 + i*100, y + 50, 8, 60);
@@ -2370,25 +2374,19 @@
   function drawGachaCell(cell) {
     const x = cell.x, y = cell.y, w = cell.w, h = cell.h;
     ctx.fillStyle = '#1a1a24'; ctx.fillRect(x, y, w, h);
-    // Neon floor
     ctx.fillStyle = '#2a1a2a'; ctx.fillRect(x + 20, y + 20, w - 40, h - 40);
-    // Machine
     ctx.fillStyle = '#3a1a2a';
     ctx.fillRect(x + w/2 - 220, y + h/2 - 120, 440, 260);
     ctx.strokeStyle = '#ff8ad8'; ctx.lineWidth = 4;
     ctx.strokeRect(x + w/2 - 220, y + h/2 - 120, 440, 260);
-    // Glass front
     ctx.fillStyle = '#1a0a14';
     ctx.fillRect(x + w/2 - 180, y + h/2 - 80, 360, 180);
-    // Capsules
     for (let i = 0; i < 12; i++) {
       ctx.fillStyle = ['#ff4d6d','#00e6b0','#ffd166','#7ad7ff','#ff8ad8'][i%5];
       ctx.beginPath(); ctx.arc(x + w/2 - 160 + (i%4)*100, y + h/2 - 40 + Math.floor(i/4)*60, 26, 0, Math.PI*2); ctx.fill();
     }
-    // Handle
     ctx.fillStyle = '#ffd166';
     ctx.beginPath(); ctx.arc(x + w/2 + 180, y + h/2 + 40, 20, 0, Math.PI*2); ctx.fill();
-    // Sign
     ctx.fillStyle = '#ff8ad8';
     ctx.font = 'bold 28px sans-serif'; ctx.textAlign = 'center';
     ctx.fillText('GACHAPON', x + w/2, y + 80);
@@ -2397,14 +2395,11 @@
   function drawBanquetCell(cell) {
     const x = cell.x, y = cell.y, w = cell.w, h = cell.h;
     ctx.fillStyle = '#1a1218'; ctx.fillRect(x, y, w, h);
-    // Carpet
     ctx.fillStyle = '#2a1a2a'; ctx.fillRect(x + 20, y + 20, w - 40, h - 40);
-    // Stage
     ctx.fillStyle = '#3a1a2a';
     ctx.fillRect(x + w/2 - 280, y + 80, 560, 160);
     ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 3;
     ctx.strokeRect(x + w/2 - 280, y + 80, 560, 160);
-    // Stage curtain
     ctx.fillStyle = '#5a2a3a';
     for (let i = 0; i < 8; i++) {
       ctx.beginPath();
@@ -2414,7 +2409,6 @@
       ctx.closePath();
       ctx.fill();
     }
-    // Spotlight
     ctx.fillStyle = 'rgba(255,209,102,0.15)';
     ctx.beginPath();
     ctx.moveTo(x + w/2 - 100, y + 80);
@@ -2426,7 +2420,6 @@
     ctx.fillStyle = '#ffd166';
     ctx.font = 'bold 28px sans-serif'; ctx.textAlign = 'center';
     ctx.fillText('BANQUET HALL', x + w/2, y + 50);
-    // Round tables with white tablecloths
     for (let i = 0; i < 6; i++) {
       const tx = x + 130 + (i%3)*260;
       const ty = y + 400 + Math.floor(i/3)*130;
@@ -2434,7 +2427,6 @@
       ctx.beginPath(); ctx.arc(tx, ty, 55, 0, Math.PI*2); ctx.fill();
       ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 2;
       ctx.stroke();
-      // Chairs
       for (let j = 0; j < 6; j++) {
         const ang = j / 6 * Math.PI * 2;
         ctx.fillStyle = '#3a2a1a';
@@ -2448,21 +2440,17 @@
   function drawElevatorCell(cell) {
     const x = cell.x, y = cell.y, w = cell.w, h = cell.h;
     ctx.fillStyle = '#1a2a3a'; ctx.fillRect(x, y, w, h);
-    // Doors
     ctx.fillStyle = '#2a4a6a';
     ctx.fillRect(x + w/2 - 140, y + h/2 - 140, 280, 280);
     ctx.strokeStyle = '#7ad7ff'; ctx.lineWidth = 4;
     ctx.strokeRect(x + w/2 - 140, y + h/2 - 140, 280, 280);
-    // Split line
     ctx.fillStyle = '#0a0c0f';
     ctx.fillRect(x + w/2 - 2, y + h/2 - 140, 4, 280);
-    // Floor indicator
     ctx.fillStyle = '#0a0c0f';
     ctx.fillRect(x + w/2 - 60, y + h/2 - 220, 120, 50);
     ctx.fillStyle = '#7ad7ff';
     ctx.font = 'bold 32px sans-serif'; ctx.textAlign = 'center';
     ctx.fillText((cell.floorTag||1) + 'F', x + w/2, y + h/2 - 180);
-    // Up/down arrows
     ctx.fillStyle = '#ffd166';
     ctx.beginPath();
     ctx.moveTo(x + w/2 - 30, y + h/2 - 220);
@@ -2482,14 +2470,12 @@
   function drawStairsCell(cell) {
     const x = cell.x, y = cell.y, w = cell.w, h = cell.h;
     ctx.fillStyle = '#1a2a1a'; ctx.fillRect(x, y, w, h);
-    // Steps
     for (let i = 0; i < 8; i++) {
       ctx.fillStyle = i % 2 === 0 ? '#3a4a3a' : '#2a3a2a';
       ctx.fillRect(x + 100 + i*60, y + 200, 60, h - 400);
     }
     ctx.strokeStyle = '#00e6b0'; ctx.lineWidth = 4;
     ctx.strokeRect(x + 100, y + 200, 480, h - 400);
-    // Handrail
     ctx.strokeStyle = '#00e6b0'; ctx.lineWidth = 3;
     ctx.beginPath(); ctx.moveTo(x + 80, y + 250); ctx.lineTo(x + 600, y + 250); ctx.stroke();
     ctx.fillStyle = '#00e6b0';
@@ -2507,13 +2493,11 @@
     ctx.fillStyle = '#7ad7ff';
     ctx.font = 'bold 26px sans-serif'; ctx.textAlign = 'center';
     ctx.fillText('PRESENTATION ROOM', x + w/2, y + 50);
-    // Whiteboard-like projector screen
     ctx.fillStyle = '#0d131a';
     ctx.fillRect(x + 80, y + 60, w - 160, h - 200);
     ctx.strokeStyle = '#00e6b0';
     ctx.lineWidth = 3;
     ctx.strokeRect(x + 80, y + 60, w - 160, h - 200);
-    // Chairs facing the screen
     for (let i = 0; i < 3; i++) {
       for (let j = 0; j < 4; j++) {
         ctx.fillStyle = '#2a3a4a';
@@ -2534,7 +2518,6 @@
       ctx.strokeStyle = dr.locked ? '#ff4d6d' : '#ffd166';
       ctx.lineWidth = 2;
       ctx.strokeRect(dr.x, dr.y, dr.w, dr.h);
-      // Keyhole
       ctx.fillStyle = dr.locked ? '#ff4d6d' : '#ffd166';
       ctx.beginPath();
       ctx.arc(dr.x + dr.w/2, dr.y + dr.h/2, 3, 0, Math.PI*2);
@@ -2573,7 +2556,6 @@
     ctx.beginPath(); ctx.arc(x, y-16, 10, 0, Math.PI*2); ctx.fill();
     ctx.fillStyle = hairColor;
     ctx.beginPath(); ctx.arc(x, y-20, 10, Math.PI, Math.PI*2); ctx.fill();
-    // Facing line
     if (angle !== undefined) {
       ctx.strokeStyle = bodyColor; ctx.lineWidth = 2;
       ctx.beginPath();
@@ -2598,7 +2580,6 @@
     ctx.beginPath(); ctx.arc(x, y, player.radius, 0, Math.PI*2); ctx.fill();
     ctx.strokeStyle = '#00e6b0'; ctx.lineWidth = 2.5; ctx.stroke();
     ctx.shadowBlur = 0;
-    // Facing direction (muzzle)
     ctx.strokeStyle = '#00e6b0'; ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.moveTo(x, y);
@@ -2623,18 +2604,16 @@
     }
     if (activeElevator && !conversation) {
       ctx.fillStyle = '#7ad7ff'; ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText('Click to ride the elevator', W/2, 40);
+      ctx.fillText('Click to choose a floor', W/2, 40);
     }
     if (activeStairs && !conversation) {
       ctx.fillStyle = '#00e6b0'; ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText('Click to use the stairs', W/2, 70);
+      ctx.fillText('Click to use the stairs (next floor)', W/2, 70);
     }
-    // Area label
     ctx.fillStyle = '#00e6b0';
     ctx.font = 'bold 20px sans-serif';
     ctx.textAlign = 'left';
     ctx.fillText(currentAreaName(), 20, 30);
-    // Presentation hint
     if (presViewOpen && currentPresentation) {
       ctx.fillStyle = 'rgba(13,19,26,0.9)';
       ctx.fillRect(W/2 - 300, H - 80, 600, 60);
