@@ -149,7 +149,6 @@
     box-shadow:0 0 20px #7ad7ff55; transition:all 0.2s ease;
   }
   .bgview-btn:hover { background:#7ad7ff; color:#0a0c0f; box-shadow:0 0 40px #7ad7ffaa; }
-  .opening.hidden-opening { opacity:0; pointer-events:none; display:none; }
 
   .bg-viewer {
     position:fixed; inset:0; background:#000; z-index:10000;
@@ -943,7 +942,7 @@
       "A：引っ越ししたんや。","B：おめでとう。",
       "A：挨拶回りに行ったら、隣の人が「前の住人は挨拶に来なかった」って。","B：へえ。",
       "A：「じゃあ私は来たので」って言ったら「でも前の人は静かだった」って。","B：嫌味やな。",
-      "A：次の日、引っ越しの段ボールが全部外に出されてた。","B": "追い出されたん？",
+      "A：次の日、引っ越しの段ボールが全部外に出されてた。","B：追い出されたん？",
       "A：いや、隣の人が「邪魔だから」って。","B：それは追い出しや。",
       "A：おやすみなさい。",
     ]},
@@ -1287,15 +1286,12 @@
       return;
     }
 
-    // Priority 1: active NPC (nearest valid character to the player)
-    // Click = open conversation, then close the NPC hint panel.
     if (activeNPC) {
       e.preventDefault();
       startDialogue(activeNPC);
       return;
     }
 
-    // Priority 2: room lamp (use mouse position for precision)
     const rect = canvas.getBoundingClientRect();
     const sx = canvas.width / rect.width;
     const sy = canvas.height / rect.height;
@@ -1315,7 +1311,6 @@
       }
     }
 
-    // Priority 3: elevator / stairs / doors
     if (activeElevator) { e.preventDefault(); handleElevatorClick(); return; }
     if (activeStairs) { e.preventDefault(); handleStairsClick(); return; }
     if (activeDoor) { e.preventDefault(); tryToggleDoor(activeDoor); return; }
@@ -1627,7 +1622,6 @@
   // ============================================================
   function startDialogue(npc) {
     if (!npc) return;
-    // IMPORTANT: Close the NPC hint panel so it doesn't overlap with the dialogue.
     npcPanel.classList.remove('open');
     conversation = { npc, page:0, lines:[], choices:null };
     if (npc.id === 'presenter') {
@@ -1942,12 +1936,6 @@
       g.y = g.baseY + Math.sin(g.phase * 0.8) * 4;
     }
 
-    // ============================================================
-    //  Active NPC
-    //  - Guests outside rooms (event locations): normal proximity
-    //  - Guests inside rooms: only if their door is open AND player is inside the room
-    //  - Presenter / comedians: always via proximity
-    // ============================================================
     activeNPC = null;
     let bestD = 260;
     const candidates = [];
@@ -1995,11 +1983,6 @@
       if (dist(player.x, player.y, ex, ey) < 120) activeStairs = c;
     }
 
-    // ============================================================
-    //  NPC hint panel
-    //  Show when near a character AND not in a conversation.
-    //  When a conversation is open, hide the panel.
-    // ============================================================
     if (activeNPC && !conversation) {
       npName.textContent = activeNPC.name || '???';
       if (activeNPC.groupId !== undefined) {
@@ -2857,13 +2840,18 @@
 
   startBtn.addEventListener('click', e => {
     e.preventDefault();
+    e.stopPropagation();
     gameStarted = true;
-    opening.style.display = 'none';
+    // Remove the opening element from the DOM entirely
+    if (opening && opening.parentNode) {
+      opening.parentNode.removeChild(opening);
+    }
     lastTime = performance.now();
     showToast('Welcome to the hotel! Pay ¥10,000 at the reception (Lobby, 7:00-19:00).', 4);
   });
   bgViewBtn.addEventListener('click', e => {
     e.preventDefault();
+    e.stopPropagation();
     bgViewer.classList.remove('hidden');
   });
   closeBgBtn.addEventListener('click', e => {
