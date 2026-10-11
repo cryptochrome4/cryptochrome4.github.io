@@ -1285,8 +1285,7 @@
       return;
     }
 
-    // Priority 1: active NPC (nearest character to the player)
-    // This is the same simple scheme as the GS Office original.
+    // Priority 1: active NPC (nearest valid character to the player)
     if (activeNPC) {
       e.preventDefault();
       startDialogue(activeNPC);
@@ -1939,20 +1938,35 @@
     }
 
     // ============================================================
-    //  Active NPC: nearest character to the PLAYER (GS Office style)
-    //  250px radius includes guests inside rooms (through the door).
-    //  Priority order: presenter > comedians > guests (by proximity).
+    //  Active NPC
+    //  - Guests outside rooms (event locations): normal proximity
+    //  - Guests inside rooms: only if their door is open AND player is inside the room
+    //  - Presenter / comedians: always via proximity
     // ============================================================
     activeNPC = null;
-    let bestD = 250;
+    let bestD = 260;
     const candidates = [];
     if (presenter) candidates.push(presenter);
     for (const c of comedians) {
       if (c.state !== 'taxi' && c.state !== 'done') candidates.push(c);
     }
-    for (const g of guests) candidates.push(g);
+    for (const g of guests) {
+      if (g.location === 'room') {
+        const room = rooms.find(rr => rr.num === g.room);
+        if (!room) continue;
+        const dr = doors.find(d => d.roomNum === room.num);
+        const doorOpen = room.doorOpen || (dr && dr.open);
+        if (!doorOpen) continue;
+        const inRoom = (player.x > room.x && player.x < room.x + room.w &&
+                        player.y > room.y && player.y < room.y + room.h);
+        if (!inRoom) continue;
+      }
+      candidates.push(g);
+    }
     for (const n of candidates) {
-      const d = dist(n.x, n.y, player.x, player.y);
+      const nx = (n.baseX !== undefined) ? n.baseX : n.x;
+      const ny = (n.baseY !== undefined) ? n.baseY : n.y;
+      const d = dist(nx, ny, player.x, player.y);
       if (d < bestD) { bestD = d; activeNPC = n; }
     }
 
@@ -2080,7 +2094,6 @@
       const idx = Math.min(currentComedy.lines.length-1, Math.floor(comedyProgress / 40));
       const lineText = currentComedy.lines[idx];
 
-      // Subtitle box with background for readability
       ctx.font = 'bold 18px "Hiragino Sans","Yu Gothic",sans-serif';
       const textW = ctx.measureText(lineText).width;
       const boxW = Math.max(textW + 80, 400);
@@ -2088,17 +2101,13 @@
       const boxX = stageCx - boxW/2;
       const boxY = c.y + c.h - 90;
 
-      // Shadow
       ctx.fillStyle = 'rgba(0,0,0,0.5)';
       ctx.fillRect(boxX + 4, boxY + 4, boxW, boxH);
-      // Background
       ctx.fillStyle = 'rgba(0,0,0,0.92)';
       ctx.fillRect(boxX, boxY, boxW, boxH);
-      // Border
       ctx.strokeStyle = '#ffd166';
       ctx.lineWidth = 3;
       ctx.strokeRect(boxX, boxY, boxW, boxH);
-      // Text
       ctx.fillStyle = '#ffd166';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -2801,7 +2810,9 @@
       ctx.fillStyle = '#00e6b0';
       ctx.font = 'bold 14px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('Click to talk', activeNPC.x, activeNPC.y - 50);
+      const nx = (activeNPC.baseX !== undefined) ? activeNPC.baseX : activeNPC.x;
+      const ny = (activeNPC.baseY !== undefined) ? activeNPC.baseY : activeNPC.y;
+      ctx.fillText('Click to talk', nx, ny - 50);
     }
     if (presViewOpen && currentPresentation) {
       ctx.fillStyle = 'rgba(13,19,26,0.9)';
