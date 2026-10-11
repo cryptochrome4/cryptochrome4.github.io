@@ -7,9 +7,11 @@
 <style>
   * { margin:0; padding:0; box-sizing:border-box; user-select:none; }
   body {
-    background:#0a0c0f; font-family:'Segoe UI','Helvetica Neue',sans-serif;
+    background:#0a0c0f;
+    font-family:'Segoe UI','Helvetica Neue',sans-serif;
     display:flex; justify-content:center; align-items:flex-start;
-    min-height:100vh; color:#e0e0e0; padding:20px 0; overflow-y:auto;
+    min-height:100vh; color:#e0e0e0;
+    padding:20px 0; overflow-y:auto;
   }
   .game-wrapper {
     background:#11161c; border-radius:24px; padding:20px 20px 14px;
@@ -20,7 +22,7 @@
   canvas {
     display:block; border-radius:16px; background:#0b0f14;
     box-shadow:0 0 30px rgba(0,255,200,0.1);
-    cursor:crosshair; width:900px; height:660px;
+    cursor:crosshair; width:800px; height:600px;
   }
   .footer {
     display:flex; flex-direction:column; gap:6px;
@@ -171,7 +173,7 @@
   </div>
 
   <div class="game-wrapper">
-    <canvas id="gameCanvas" width="900" height="660"></canvas>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
     <div class="footer" id="footer">
       <div class="status">
         <span>Time: <span id="timeDisplay" class="clock">4:00</span></span>
@@ -185,7 +187,7 @@
       <button class="ui-btn list" id="helpBtn">❓ HELP</button>
     </div>
     <div class="hint" id="hint">
-      Move: Arrow Keys / Talk: Approach &amp; click / Door: Stand in front &amp; click to open
+      Move: Arrow Keys / Talk: Approach &amp; click / Door: Stand in front &amp; click
     </div>
   </div>
 
@@ -247,7 +249,7 @@
   // ============================================================
   const canvas = document.getElementById('gameCanvas');
   const ctx = canvas.getContext('2d');
-  const W = 900, H = 660;
+  const W = 800, H = 600;
 
   const timeDisplay = document.getElementById('timeDisplay');
   const moneyDisplay = document.getElementById('moneyDisplay');
@@ -289,26 +291,17 @@
   // ============================================================
   const FLOOR_OUTSIDE = -1;
   const FLOORS = [1,2,3,4];
+  const TILE_W = 800, TILE_H = 600;
+  const COLS = 10, ROWS = 3;
+  const OUT_COLS = 3, OUT_ROWS = 3;
+  const OUTSIDE_W = OUT_COLS * TILE_W;
+  const OUTSIDE_H = OUT_ROWS * TILE_H;
   const HOUR_SECONDS = 7;
-  const OUTSIDE_W = 1400, OUTSIDE_H = 1500;
-
-  // Hotel: entrance at top
-  const HOTEL_ENTRANCE = { x: 600, y: 180, w: 120, h: 70 };
-  const RECEPTIONIST_POS = { x: 660, y: 320 };
-  const PRESENTATION_ROOM = { x: 180, y: 1000, w: 280, h: 200 };
-  const PRESENTATION_DOOR = { x: 300, y: 1200, w: 40, h: 20, open: false };
-  const PRESENTER_START = { x: 900, y: 900 };
-  const TAXI_ENTRY = { x: -200, y: 700 };
-  const TAXI_STOP = { x: 300, y: 700 };
-
-  // Floor interiors (rooms along top, elevator/stairs bottom)
-  const ELEVATOR_RECT = { x: 400, y: 540, w: 100, h: 80 };
-  const STAIRS_RECT   = { x: 700, y: 540, w: 100, h: 80 };
 
   // ============================================================
   //  Game state
   // ============================================================
-  const player = { x: 660, y: 500, speed: 90, angle: 0, radius: 16 };
+  const player = { x: 0, y: 0, speed: 90, angle: 0, radius: 16 };
   const keys = { ArrowUp:false, ArrowDown:false, ArrowLeft:false, ArrowRight:false };
   let mouseX = W/2, mouseY = H/2;
   let lastTime = 0;
@@ -318,19 +311,19 @@
   let myRoom = null;
   let hotelPaid = false;
   let hasKey = false;
-  let guestKeys = [];       // guest room numbers whose keys we own
+  let guestKeys = [];
   let slept = false;
   let cleared = false;
   let currentFloor = FLOOR_OUTSIDE;
   let gameStarted = false;
 
-  let guests = [];          // array of guest objects (each person, not each room)
-  let guestGroups = [];     // array of {groupId, room, members[], eventType}
+  let guests = [];
+  let guestGroups = [];
   let roomNumbers = [];
   let roomsByFloor = {};
 
   let presenter = null;
-  let presenterState = 'idle';   // idle | walking | atRoom | presented
+  let presenterState = 'idle';
   let presenterTarget = null;
   let invested = false;
   let investReturnHour = null;
@@ -340,14 +333,16 @@
   let presViewOpen = false;
 
   let comedians = [];
-  let comedyState = 'before';   // before | arriving | waiting | onstage | leaving | done
+  let comedyState = 'before';
   let currentComedy = null;
   let comedyProgress = 0;
-  let taxiX = TAXI_ENTRY.x;
+  let taxiX = -300;
   let taxiVisible = false;
 
   let activeNPC = null;
   let activeDoor = null;
+  let activeElevator = false;
+  let activeStairs = false;
   let conversation = null;
 
   let toastTimer = 0;
@@ -372,151 +367,156 @@
   // ============================================================
   //  Guest data (39 rooms = 51 people; 5 family groups)
   // ============================================================
-  // Each group: { id, members: [{name, gender, age}], eventType }
   const GUEST_GROUPS_DATA = [
-    { members:[{name:'高橋 陽一', gender:'男', age:45}], eventType:'banquet' },
-    { members:[{name:'中村 由美', gender:'女', age:38}], eventType:'banquet' },
-    { members:[{name:'小林 翔太', gender:'男', age:29}], eventType:'banquet' },
-    { members:[{name:'加藤 さくら', gender:'女', age:33}], eventType:'banquet' },
-    { members:[{name:'吉田 大輔', gender:'男', age:41}], eventType:'banquet' },
+    { members:[{name:'高橋 陽一', gender:'M', age:45}], eventType:'banquet' },
+    { members:[{name:'中村 由美', gender:'F', age:38}], eventType:'banquet' },
+    { members:[{name:'小林 翔太', gender:'M', age:29}], eventType:'banquet' },
+    { members:[{name:'加藤 さくら', gender:'F', age:33}], eventType:'banquet' },
+    { members:[{name:'吉田 大輔', gender:'M', age:41}], eventType:'banquet' },
     { members:[
-        {name:'山本 健一', gender:'男', age:42},
-        {name:'山本 由紀', gender:'女', age:39},
-        {name:'山本 蓮', gender:'男', age:8},
+        {name:'山本 健一', gender:'M', age:42},
+        {name:'山本 由紀', gender:'F', age:39},
+        {name:'山本 蓮', gender:'M', age:8},
       ], eventType:'banquet' },
-    { members:[{name:'木村 拓也', gender:'男', age:36}], eventType:'banquet' },
-    { members:[{name:'林 香織', gender:'女', age:31}], eventType:'banquet' },
-    { members:[{name:'清水 涼介', gender:'男', age:48}], eventType:'banquet' },
-    { members:[{name:'渡辺 智子', gender:'女', age:47}], eventType:'banquet' },
+    { members:[{name:'木村 拓也', gender:'M', age:36}], eventType:'banquet' },
+    { members:[{name:'林 香織', gender:'F', age:31}], eventType:'banquet' },
+    { members:[{name:'清水 涼介', gender:'M', age:48}], eventType:'banquet' },
+    { members:[{name:'渡辺 智子', gender:'F', age:47}], eventType:'banquet' },
     { members:[
-        {name:'中島 修', gender:'男', age:50},
-        {name:'中島 香', gender:'女', age:48},
-        {name:'中島 大和', gender:'男', age:15},
-        {name:'中島 美月', gender:'女', age:10},
+        {name:'中島 修', gender:'M', age:50},
+        {name:'中島 香', gender:'F', age:48},
+        {name:'中島 大和', gender:'M', age:15},
+        {name:'中島 美月', gender:'F', age:10},
       ], eventType:'banquet' },
-    { members:[{name:'前田 浩二', gender:'男', age:51}], eventType:'onsen' },
-    { members:[{name:'藤田 麻衣', gender:'女', age:34}], eventType:'onsen' },
-    { members:[{name:'後藤 誠', gender:'男', age:46}], eventType:'onsen' },
-    { members:[{name:'岡田 彩', gender:'女', age:23}], eventType:'onsen' },
-    { members:[{name:'長谷川 亮', gender:'男', age:37}], eventType:'onsen' },
-    { members:[{name:'村上 有希', gender:'女', age:30}], eventType:'onsen' },
+    { members:[{name:'前田 浩二', gender:'M', age:51}], eventType:'onsen' },
+    { members:[{name:'藤田 麻衣', gender:'F', age:34}], eventType:'onsen' },
+    { members:[{name:'後藤 誠', gender:'M', age:46}], eventType:'onsen' },
+    { members:[{name:'岡田 彩', gender:'F', age:23}], eventType:'onsen' },
+    { members:[{name:'長谷川 亮', gender:'M', age:37}], eventType:'onsen' },
+    { members:[{name:'村上 有希', gender:'F', age:30}], eventType:'onsen' },
     { members:[
-        {name:'佐々木 隆', gender:'男', age:45},
-        {name:'佐々木 真理', gender:'女', age:43},
-        {name:'佐々木 結衣', gender:'女', age:12},
-        {name:'佐々木 悠斗', gender:'男', age:6},
+        {name:'佐々木 隆', gender:'M', age:45},
+        {name:'佐々木 真理', gender:'F', age:43},
+        {name:'佐々木 結衣', gender:'F', age:12},
+        {name:'佐々木 悠斗', gender:'M', age:6},
       ], eventType:'onsen' },
-    { members:[{name:'藤井 学', gender:'男', age:40}], eventType:'onsen' },
-    { members:[{name:'西村 綾', gender:'女', age:35}], eventType:'onsen' },
-    { members:[{name:'福田 剛', gender:'男', age:54}], eventType:'onsen' },
-    { members:[{name:'太田 沙織', gender:'女', age:32}], eventType:'onsen' },
-    { members:[{name:'三浦 洋平', gender:'男', age:47}], eventType:'rest' },
-    { members:[{name:'藤原 奈々', gender:'女', age:29}], eventType:'rest' },
+    { members:[{name:'藤井 学', gender:'M', age:40}], eventType:'onsen' },
+    { members:[{name:'西村 綾', gender:'F', age:35}], eventType:'onsen' },
+    { members:[{name:'福田 剛', gender:'M', age:54}], eventType:'onsen' },
+    { members:[{name:'太田 沙織', gender:'F', age:32}], eventType:'onsen' },
+    { members:[{name:'三浦 洋平', gender:'M', age:47}], eventType:'rest' },
+    { members:[{name:'藤原 奈々', gender:'F', age:29}], eventType:'rest' },
     { members:[
-        {name:'伊藤 浩', gender:'男', age:38},
-        {name:'伊藤 沙耶', gender:'女', age:36},
-        {name:'伊藤 陽菜', gender:'女', age:4},
+        {name:'伊藤 浩', gender:'M', age:38},
+        {name:'伊藤 沙耶', gender:'F', age:36},
+        {name:'伊藤 陽菜', gender:'F', age:4},
       ], eventType:'rest' },
-    { members:[{name:'中野 優子', gender:'女', age:41}], eventType:'rest' },
-    { members:[{name:'原田 慎一', gender:'男', age:56}], eventType:'rest' },
-    { members:[{name:'小川 杏奈', gender:'女', age:26}], eventType:'rest' },
-    { members:[{name:'竹内 陽介', gender:'男', age:33}], eventType:'rest' },
-    { members:[{name:'森 雄大', gender:'男', age:26}], eventType:'banquet' },
-    { members:[{name:'池田 直美', gender:'女', age:42}], eventType:'banquet' },
-    { members:[{name:'橋本 竜也', gender:'男', age:39}], eventType:'banquet' },
-    { members:[{name:'石川 千夏', gender:'女', age:28}], eventType:'onsen' },
-    { members:[{name:'近藤 隆', gender:'男', age:58}], eventType:'onsen' },
-    { members:[{name:'大野 加奈子', gender:'女', age:46}], eventType:'onsen' },
-    { members:[{name:'遠藤 淳', gender:'男', age:43}], eventType:'onsen' },
-    { members:[{name:'青木 舞', gender:'女', age:25}], eventType:'onsen' },
+    { members:[{name:'中野 優子', gender:'F', age:41}], eventType:'rest' },
+    { members:[{name:'原田 慎一', gender:'M', age:56}], eventType:'rest' },
+    { members:[{name:'小川 杏奈', gender:'F', age:26}], eventType:'rest' },
+    { members:[{name:'竹内 陽介', gender:'M', age:33}], eventType:'rest' },
+    { members:[{name:'森 雄大', gender:'M', age:26}], eventType:'banquet' },
+    { members:[{name:'池田 直美', gender:'F', age:42}], eventType:'banquet' },
+    { members:[{name:'橋本 竜也', gender:'M', age:39}], eventType:'banquet' },
+    { members:[{name:'石川 千夏', gender:'F', age:28}], eventType:'onsen' },
+    { members:[{name:'近藤 隆', gender:'M', age:58}], eventType:'onsen' },
+    { members:[{name:'大野 加奈子', gender:'F', age:46}], eventType:'onsen' },
+    { members:[{name:'遠藤 淳', gender:'M', age:43}], eventType:'onsen' },
+    { members:[{name:'青木 舞', gender:'F', age:25}], eventType:'onsen' },
     { members:[
-        {name:'松本 健一', gender:'男', age:52},
-        {name:'松本 美咲', gender:'女', age:49},
-        {name:'松本 翔', gender:'男', age:17},
+        {name:'松本 健一', gender:'M', age:52},
+        {name:'松本 美咲', gender:'F', age:49},
+        {name:'松本 翔', gender:'M', age:17},
       ], eventType:'banquet' },
-    { members:[{name:'井上 真由美', gender:'女', age:44}], eventType:'rest' },
+    { members:[{name:'井上 真由美', gender:'F', age:44}], eventType:'rest' },
   ];
 
   // ============================================================
-  //  日本語会話（イベント別）
+  //  Guest dialogue (ENGLISH)
   // ============================================================
   const ROOM_LINES = [
-    "あ、私の部屋の鍵を持ってるんですか？珍しいですね。",
-    "ちょうど休んでいたところです。このホテル、なかなかいいですね。",
-    "ベッドが思いのほか快適です。",
-    "何かご用でしょうか？",
-    "休暇中です。部屋でのんびりしています。",
-    "この階からの眺めは素敵です。",
-    "2階に温泉があると聞きました。",
-    "3階のガチャガチャは試しましたか？",
-    "今夜の披露宴のために来ました。",
-    "ロビーに休憩室があって便利ですね。",
-    "このホテルにはいつも泊まっています。",
-    "エレベーターは便利ですよね。",
-    "私は階段派です。いい運動になります。",
-    "部屋の鍵はいいお土産になります。",
-    "夕食は何かなあ。",
-    "ここのスタッフはとても丁寧です。",
-    "この部屋には時計があって助かります。",
-    "本を読んでいます。とても静かです。",
-    "披露宴はいつ始まりますか？",
-    "漫才が楽しみです。",
-    "明日寝坊しないといいのですが。",
-    "このホテルは4階まであるそうです。",
-    "最上階に泊まっています。眺めが最高です。",
-    "中にいるときはいつも鍵をかけています。",
+    "Oh, you have a key to my room? How unusual.",
+    "I was just resting. This hotel is quite nice.",
+    "The bed here is surprisingly comfortable.",
+    "Did you need something from me?",
+    "I'm on vacation. Just relaxing in my room.",
+    "The view from this floor is lovely.",
+    "I heard there's an onsen on the 2nd floor.",
+    "Have you tried the gachapon on the 3rd floor?",
+    "I'm here for the banquet tonight.",
+    "The lobby has a nice rest area.",
+    "I always stay at this hotel when I visit.",
+    "The elevator is convenient, isn't it?",
+    "I prefer the stairs. Good exercise.",
+    "My room key is a nice souvenir.",
+    "I wonder what's for dinner.",
+    "The staff here are very polite.",
+    "This room has a clock, which is handy.",
+    "I'm reading a book. It's very quiet here.",
+    "Do you know when the banquet starts?",
+    "I'm looking forward to the comedy show.",
+    "I hope I don't oversleep tomorrow.",
+    "The hotel has four floors, I heard.",
+    "I'm on the top floor. The view is great.",
+    "I always lock my door when I'm inside.",
   ];
   const REST_LINES = [
-    "ああ、休憩室。とても落ち着きます。",
-    "毎朝ここで一息ついています。",
-    "ここの椅子はとても快適です。",
-    "お茶でもいかがですか？",
-    "朝の光がここは美しいですね。",
-    "ここで新聞を読むのが好きです。",
-    "ホテルで一番のお気に入りの場所です。",
-    "休憩室は7時から11時まで開いています。",
-    "ここで面白い人に会いました。",
-    "静かな場所があるのはいいですね。",
-    "スタッフがいつもきれいにしてくれています。",
-    "一日中ここにいたいです。",
-    "外の庭を見ましたか？",
-    "休憩室は素敵な雰囲気です。",
+    "Ah, the rest room. So relaxing.",
+    "I come here every morning to unwind.",
+    "The chairs here are very comfortable.",
+    "Care for a cup of tea?",
+    "The morning light is beautiful here.",
+    "I like to read the newspaper here.",
+    "This is my favorite spot in the hotel.",
+    "The rest room is open from 7 to 11.",
+    "I met some interesting people here.",
+    "It's nice to have a quiet place.",
+    "The staff keeps this place spotless.",
+    "I could stay here all day.",
+    "Have you seen the garden outside?",
+    "The rest room has a lovely atmosphere.",
   ];
   const ONSEN_LINES = [
-    "この時間の温泉は最高です。",
-    "ああ、熱いお湯には勝てません。",
-    "お湯の温度がちょうどいいです。",
-    "毎晩ここに来ています。",
-    "湯気がとても気持ちいいです。",
-    "この温泉は穴場です。",
-    "とてもさっぱりしました。",
-    "温泉は夜10時まで開いています。",
-    "露天風呂は試しましたか？",
-    "お湯のミネラルが肌にいいんです。",
-    "何時間でも浸かっていられます。",
-    "夜の温泉は静かでいいですね。",
-    "一日の終わりにぴったりです。",
-    "温泉の後はいつもよく眠れます。",
+    "The onsen is wonderful this time of day.",
+    "Ah, nothing beats a hot bath.",
+    "The water temperature is perfect.",
+    "I come here every evening.",
+    "The steam is so relaxing.",
+    "This onsen is a hidden gem.",
+    "I feel so refreshed.",
+    "The onsen is open until 10 PM.",
+    "Have you tried the outdoor bath?",
+    "The minerals in the water are great for skin.",
+    "I could soak here for hours.",
+    "The onsen is quieter in the evening.",
+    "It's the perfect way to end the day.",
+    "I always sleep well after the onsen.",
   ];
   const BANQUET_LINES = [
-    "披露宴会場はきれいに飾られていますね。",
-    "お祝いに来ました。",
-    "料理が美味しそうですね。",
-    "素敵な集まりですね。",
-    "主催者を知っています。いい人です。",
-    "スピーチは心に響きました。",
-    "今夜来てよかったです。",
-    "披露宴は8時に始まります。",
-    "この広間はたくさんの人が入れますね。",
-    "ケーキが最高です。",
-    "前の方の席に座っています。",
-    "音楽がいいですね。",
-    "最後までいます。",
-    "素晴らしい夜です。",
+    "The banquet hall is beautifully decorated.",
+    "I'm here for the celebration.",
+    "The food looks delicious.",
+    "What a lovely gathering.",
+    "I know the host. Great person.",
+    "The speeches were touching.",
+    "I'm glad I came tonight.",
+    "The banquet starts at 8 PM.",
+    "This hall can hold many people.",
+    "The cake is amazing.",
+    "I'm seated near the front.",
+    "The music is nice, isn't it?",
+    "I'll stay until the end.",
+    "What a wonderful evening.",
+  ];
+  const CHILD_LINES = [
+    "Hey, do you have any candy?",
+    "The onsen is so warm!",
+    "This place is big!",
+    "I'm going to eat cake later!",
   ];
 
   // ============================================================
-  //  ビジネスプレゼン（日本語・4ページ）
+  //  Business presentation (JAPANESE)
   // ============================================================
   const PRES_BAD = [
     { title:"ドローンでパンを配達",
@@ -566,7 +566,7 @@
   ];
 
   // ============================================================
-  //  漫才 8テーマ（ホテル関係4 + 一般4）
+  //  Comedy themes (JAPANESE, 8 themes)
   // ============================================================
   const COMEDY_THEMES = [
     { title:"ホテル生活", lines:[
@@ -711,7 +711,7 @@
       "B：追い出されたん？",
       "A：いや、隣の人が「邪魔だから」って。",
       "B：それは追い出しや。",
-      "A：おやすみなさい！",
+      "A：おやすみなさい。",
     ]},
   ];
 
@@ -723,14 +723,17 @@
     roomNumbers = [];
     for (const floor of FLOORS) {
       const arr = [];
-      const startX = 60, spacing = 78, doorY = 110;
       for (let i = 1; i <= 10; i++) {
         const num = floor*100 + i;
-        const x = startX + (i-1)*spacing;
+        const col = i - 1;
+        const x = col * TILE_W;
+        const y = 0;
         const r = {
-          num, floor,
-          x, y: doorY, w: 60, h: 55,
-          doorX: x + 20, doorY: doorY + 55, doorW: 20, doorH: 10,
+          num, floor, col,
+          x, y, w: TILE_W, h: TILE_H,
+          doorX: x + TILE_W/2 - 40,
+          doorY: TILE_H - 20,
+          doorW: 80, doorH: 20,
           open: false,
         };
         arr.push(r);
@@ -740,9 +743,6 @@
     }
   }
 
-  // ============================================================
-  //  Assign rooms (random each load)
-  // ============================================================
   function assignRooms() {
     buildRooms();
     const shuffled = shuffle(roomNumbers);
@@ -756,16 +756,16 @@
       const data = GUEST_GROUPS_DATA[i];
       const room = guestRoomAssign[i];
       const floor = Math.floor(room/100);
-      const idx = (room%100)-1;
-      const r = roomsByFloor[floor][idx];
+      const col = (room%100)-1;
       const group = {
         id: i,
         room,
         floor,
+        col,
         eventType: data.eventType,
         members: [],
-        baseX: r.x + r.w/2,
-        baseY: r.y + r.h/2,
+        baseX: col * TILE_W + TILE_W/2,
+        baseY: TILE_H/2,
       };
       for (const m of data.members) {
         const g = {
@@ -801,26 +801,25 @@
     presenter = {
       id: 'presenter',
       name: '山田 太郎',
-      x: PRESENTER_START.x,
-      y: PRESENTER_START.y,
-      targetX: PRESENTER_START.x,
-      targetY: PRESENTER_START.y,
+      x: 200, y: 400,
+      targetX: 200, targetY: 400,
       radius: 16,
       color: '#4a3a2a',
       hair: '#3a2a1a',
     };
     presenterState = 'idle';
+    presenterTarget = null;
   }
 
   function buildComedians() {
     comedians = [
-      { id:'comedian0', name:'田中 健太', x: TAXI_ENTRY.x, y: TAXI_ENTRY.y, radius:14,
-        color:'#4a2a3a', hair:'#1a1a1a', state:'taxi', role:'ボケ' },
-      { id:'comedian1', name:'鈴木 裕介', x: TAXI_ENTRY.x, y: TAXI_ENTRY.y, radius:14,
-        color:'#2a3a4a', hair:'#1a1a1a', state:'taxi', role:'ツッコミ' },
+      { id:'comedian0', name:'田中 健太', x: -300, y: 400, radius:14,
+        color:'#4a2a3a', hair:'#1a1a1a', state:'taxi', role:'Boke' },
+      { id:'comedian1', name:'鈴木 裕介', x: -300, y: 400, radius:14,
+        color:'#2a3a4a', hair:'#1a1a1a', state:'taxi', role:'Tsukkomi' },
     ];
     comedyState = 'before';
-    taxiX = TAXI_ENTRY.x;
+    taxiX = -300;
     taxiVisible = false;
   }
 
@@ -831,20 +830,22 @@
     assignRooms();
     buildPresenter();
     buildComedians();
-    player.x = 660; player.y = 500;
     currentFloor = FLOOR_OUTSIDE;
+    player.x = 0; player.y = 0;
     gameHours = 4; gameMinutes = 0; timeAccum = 0;
     money = 10000; hotelPaid = false; hasKey = false;
     guestKeys = []; slept = false; cleared = false;
     invested = false; investReturnHour = null; investResult = null;
     currentComedy = null; comedyProgress = 0;
     presViewOpen = false; presSlideIndex = 0; currentPresentation = null;
-    PRESENTATION_DOOR.open = false;
     updateGuestLocations();
     updateHUD();
     buildInfoPanel();
     victory.classList.add('hidden');
   }
+
+  function outsideStart() { return { x: TILE_W * 1.5, y: TILE_H * 0.5 }; }
+  function floorStart() { return { x: 4 * TILE_W + TILE_W/2, y: 1 * TILE_H + TILE_H/2 }; }
 
   // ============================================================
   //  HUD
@@ -852,7 +853,6 @@
   function updateHUD() {
     timeDisplay.textContent = fmt(gameHours, gameMinutes);
     moneyDisplay.textContent = money;
-    // Show room number only if we have our key
     roomDisplay.textContent = hasKey ? myRoom : '???';
     floorDisplay.textContent = currentFloor === FLOOR_OUTSIDE ? 'Outside' : currentFloor + 'F';
     ipTime.textContent = fmt(gameHours, gameMinutes);
@@ -866,7 +866,7 @@
     if (hasKey) {
       const row = document.createElement('div');
       row.className = 'item-row';
-      row.innerHTML = `<span class="item-name">🔑 自分の部屋の鍵（${myRoom}号室）</span>
+      row.innerHTML = `<span class="item-name">🔑 Key (My Room ${myRoom})</span>
         <span class="item-actions">
           <button class="mini-btn" data-action="use-my-key">USE</button>
           <button class="mini-btn warn" data-action="cancel-key">CANCEL</button>
@@ -875,10 +875,10 @@
     }
     for (const rn of guestKeys) {
       const g = guestGroups.find(gr => gr.room === rn);
-      const label = g ? g.members[0].name + 'の部屋' : '客室';
+      const label = g ? g.members[0].name + "'s Room" : 'Guest Room';
       const row = document.createElement('div');
       row.className = 'item-row';
-      row.innerHTML = `<span class="item-name">🔑 ${label}（${rn}号室）</span>
+      row.innerHTML = `<span class="item-name">🔑 ${label} (${rn})</span>
         <span class="item-actions">
           <button class="mini-btn" data-action="use-guest-key" data-room="${rn}">USE</button>
           <button class="mini-btn warn" data-action="cancel-key">CANCEL</button>
@@ -887,7 +887,7 @@
     }
     if (!hasKey && guestKeys.length === 0) {
       const n = document.createElement('div');
-      n.className = 'empty-note'; n.textContent = 'アイテムはありません。';
+      n.className = 'empty-note'; n.textContent = 'No items.';
       itemsList.appendChild(n);
     }
 
@@ -895,17 +895,17 @@
     if (!hotelPaid && currentFloor === FLOOR_OUTSIDE) {
       const row = document.createElement('div');
       row.className = 'item-row';
-      row.innerHTML = `<span class="item-name">ホテル代 ¥10,000 を払う</span>
+      row.innerHTML = `<span class="item-name">Pay Hotel ¥10,000</span>
         <span class="item-actions">
           <button class="mini-btn" data-action="pay-hotel">USE</button>
           <button class="mini-btn warn" data-action="cancel-key">CANCEL</button>
         </span>`;
       actionsList.appendChild(row);
     }
-    if (money >= 100) {
+    if (money >= 100 && currentFloor === 3) {
       const row = document.createElement('div');
       row.className = 'item-row';
-      row.innerHTML = `<span class="item-name">ガチャガチャ ¥100（3階）</span>
+      row.innerHTML = `<span class="item-name">Gachapon ¥100 (3F)</span>
         <span class="item-actions">
           <button class="mini-btn" data-action="gachapon">USE</button>
         </span>`;
@@ -914,7 +914,7 @@
     if (isPlayerInMyRoom() && (gameHours >= 19 || gameHours < 3) && !slept) {
       const row = document.createElement('div');
       row.className = 'item-row';
-      row.innerHTML = `<span class="item-name">寝る（7時間）</span>
+      row.innerHTML = `<span class="item-name">Sleep (7 hours)</span>
         <span class="item-actions">
           <button class="mini-btn" data-action="sleep">SLEEP</button>
         </span>`;
@@ -922,7 +922,7 @@
     }
     if (actionsList.children.length === 0) {
       const n = document.createElement('div');
-      n.className = 'empty-note'; n.textContent = 'できることはありません。';
+      n.className = 'empty-note'; n.textContent = 'No actions available.';
       actionsList.appendChild(n);
     }
   }
@@ -931,9 +931,10 @@
     if (!myRoom || !hasKey) return false;
     const floor = Math.floor(myRoom/100);
     if (currentFloor !== floor) return false;
-    const idx = (myRoom%100)-1;
-    const r = roomsByFloor[floor][idx];
-    return dist(player.x, player.y, r.x + r.w/2, r.y + r.h/2) < 70;
+    const col = (myRoom%100)-1;
+    const cx = col * TILE_W + TILE_W/2;
+    const cy = TILE_H/2;
+    return dist(player.x, player.y, cx, cy) < 200;
   }
 
   // ============================================================
@@ -951,23 +952,23 @@
   }
 
   function onHourChanged() {
-    if (gameHours === 7) showToast('7時になりました。休憩室が開きました。', 2.5);
-    if (gameHours === 11) showToast('11時になりました。休憩室が閉まりました。', 2);
+    if (gameHours === 7) showToast('It is 7:00. The rest room is open.', 2.5);
+    if (gameHours === 11) showToast('It is 11:00. The rest room closes.', 2);
     if (gameHours === 18) {
-      showToast('漫才師がタクシーで到着しました。', 3);
+      showToast('The comedians arrive by taxi.', 3);
       comedyState = 'arriving';
       taxiVisible = true;
-      taxiX = TAXI_ENTRY.x;
+      taxiX = -300;
     }
     if (gameHours === 19) {
       comedyState = 'onstage';
       currentComedy = pick(COMEDY_THEMES);
       comedyProgress = 0;
-      showToast('19時。4階の披露宴会場で漫才が始まりました！', 3);
+      showToast('The comedy show begins in the banquet hall (4F)!', 3);
     }
     if (gameHours === 21) {
       comedyState = 'leaving';
-      showToast('漫才が終わりました。', 2);
+      showToast('The comedy show ends.', 2);
     }
     if (gameHours === 22) {
       comedyState = 'done';
@@ -979,7 +980,6 @@
   }
 
   function updateGuestLocations() {
-    // Assign each guest's location based on event and time
     for (const g of guests) {
       const group = guestGroups[g.groupId];
       let loc = 'room';
@@ -990,26 +990,24 @@
 
       if (loc === 'room') {
         g.floor = group.floor;
-        // Spread family members slightly within room
-        const idx = g.groupId % 3;
-        const off = (g.age < 18) ? 20 : 0;
-        g.baseX = group.baseX + (idx - 1) * 12 + (g.age < 18 ? off - 20 : 0);
-        g.baseY = group.baseY + (g.age < 18 ? 10 : 0);
+        const cx = group.col * TILE_W + TILE_W/2;
+        const cy = TILE_H/2;
+        const offX = (g.age < 18 ? 30 : 0);
+        const offY = (g.age < 18 ? 40 : 0);
+        g.baseX = cx + offX;
+        g.baseY = cy + offY;
       } else if (loc === 'rest') {
         g.floor = 1;
-        const i = g.id % 6;
-        g.baseX = 200 + i * 70;
-        g.baseY = 300 + Math.floor((g.id/6) % 3) * 60;
+        g.baseX = 0 * TILE_W + TILE_W/2 + (g.id % 3) * 100;
+        g.baseY = 2 * TILE_H + TILE_H/2 + Math.floor((g.id/3) % 2) * 80;
       } else if (loc === 'onsen') {
         g.floor = 2;
-        const i = g.id % 6;
-        g.baseX = 300 + i * 70;
-        g.baseY = 350 + Math.floor((g.id/6) % 3) * 60;
+        g.baseX = 0 * TILE_W + TILE_W/2 + (g.id % 3) * 100;
+        g.baseY = 2 * TILE_H + TILE_H/2 + Math.floor((g.id/3) % 2) * 80;
       } else if (loc === 'banquet') {
         g.floor = 4;
-        const i = g.id % 8;
-        g.baseX = 200 + i * 60;
-        g.baseY = 420 + Math.floor((g.id/8) % 2) * 60;
+        g.baseX = 0 * TILE_W + TILE_W/2 + (g.id % 5) * 120;
+        g.baseY = 2 * TILE_H + TILE_H/2 + Math.floor((g.id/5) % 2) * 80;
       }
       g.x = g.baseX;
       g.y = g.baseY;
@@ -1039,10 +1037,38 @@
   });
   canvas.addEventListener('mousedown', e => {
     if (e.button !== 0) return;
-    e.preventDefault();
-    if (conversation) { nextDialogue(); return; }
-    if (activeDoor) { tryToggleDoor(activeDoor); return; }
-    if (activeNPC) { startDialogue(activeNPC); return; }
+    if (conversation) { e.preventDefault(); nextDialogue(); return; }
+    if (presViewOpen && currentPresentation) {
+      e.preventDefault();
+      if (presSlideIndex < currentPresentation.slides.length - 1) {
+        presSlideIndex++;
+      } else {
+        presViewOpen = false;
+        presenterState = 'presented';
+        conversation = { npc: presenter, page:0, lines:[
+          "以上でプレゼンは終わりです。",
+          "宣伝しますか？それとも投資しますか？",
+        ], choices:[
+          { label:'Promote (+¥100)', action: () => { money += 100; showToast('You promoted. +¥100', 2); updateHUD(); buildInfoPanel(); } },
+          { label:'Invest (¥10,000 / 4h)', action: () => {
+            if (hotelPaid) { showToast('You already paid the hotel. Investment not available.', 2); }
+            else if (money >= 10000) {
+              money -= 10000; invested = true;
+              investReturnHour = (gameHours + 4) % 24;
+              showToast('You invested ¥10,000. Return in 4 hours.', 3);
+              updateHUD(); buildInfoPanel();
+            } else { showToast('You need ¥10,000 to invest.', 2); }
+          } },
+        ]};
+        dialogue.classList.add('open');
+        renderDialogue();
+      }
+      return;
+    }
+    if (activeElevator) { e.preventDefault(); handleElevatorClick(); return; }
+    if (activeStairs) { e.preventDefault(); handleStairsClick(); return; }
+    if (activeDoor) { e.preventDefault(); tryToggleDoor(activeDoor); return; }
+    if (activeNPC) { e.preventDefault(); startDialogue(activeNPC); return; }
   });
 
   infoBtn.addEventListener('click', e => {
@@ -1052,15 +1078,15 @@
   });
   helpBtn.addEventListener('click', e => {
     e.preventDefault();
-    showToast('移動：矢印キー ／ 話す：近づいてクリック ／ ドア：前に立ってクリック ／ 情報パネル：アイテムと行動', 5);
+    showToast('Move: Arrows / Talk: approach & click / Door: stand & click / EV & Stairs: stand & click', 5);
   });
   ipClose.addEventListener('click', e => { e.preventDefault(); closeInfoPanel(); });
   ipReset.addEventListener('click', e => {
     e.preventDefault();
-    if (confirm('一日を最初からやり直しますか？')) {
+    if (confirm('Reset the whole day?')) {
       initGame();
       closeInfoPanel();
-      showToast('リセットしました。', 2);
+      showToast('Day reset.', 2);
     }
   });
   function closeInfoPanel() { infoPanel.classList.remove('open'); }
@@ -1071,7 +1097,7 @@
     const action = btn.dataset.action;
     const room = btn.dataset.room ? parseInt(btn.dataset.room) : null;
     if (action === 'use-my-key') tryUseKey(myRoom);
-    else if (action === 'cancel-key') showToast('鍵はそのままにしておきます。', 1.2);
+    else if (action === 'cancel-key') showToast('Key kept in inventory.', 1.2);
     else if (action === 'use-guest-key') tryUseKey(room);
     else if (action === 'pay-hotel') payHotel();
     else if (action === 'gachapon') doGachapon();
@@ -1085,20 +1111,21 @@
   function tryUseKey(roomNum) {
     if (!roomNum) return;
     const floor = Math.floor(roomNum/100);
-    const idx = (roomNum%100)-1;
-    const r = roomsByFloor[floor][idx];
-    if (currentFloor !== floor) { showToast('違う階にいます。', 2); return; }
-    if (dist(player.x, player.y, r.x + r.w/2, r.y + r.h/2) > 90) {
-      showToast('部屋のドアの前に立ってください。', 2); return;
+    const col = (roomNum%100)-1;
+    const cx = col * TILE_W + TILE_W/2;
+    const cy = TILE_H/2;
+    if (currentFloor !== floor) { showToast('You are not on the right floor.', 2); return; }
+    if (dist(player.x, player.y, cx, cy) > 250) {
+      showToast('Stand in front of the room door.', 2); return;
     }
+    const r = roomsByFloor[floor][col];
     r.open = true;
     if (roomNum === myRoom) {
-      showToast('自分の部屋を開けました。休めます。', 2);
+      showToast('Your room is open. You can rest here.', 2);
     } else {
       const group = guestGroups.find(gr => gr.room === roomNum);
       if (group) {
-        showToast(`${roomNum}号室を開けました。${group.members[0].name}たちがいます。`, 2.5);
-        // Talk to first adult member
+        showToast(`Room ${roomNum} opened. ${group.members[0].name} is inside.`, 2.5);
         const adult = group.members.find(m => m.age >= 18) || group.members[0];
         startDialogue(adult);
       }
@@ -1106,60 +1133,94 @@
   }
 
   function tryToggleDoor(dr) {
-    // If it's the presentation room door and presenter hasn't opened it
-    if (dr.isPresentationDoor && presenterState !== 'atRoom' && presenterState !== 'presented') {
-      showToast('このドアは鍵がかかっています。', 2);
-      return;
+    if (dr.isRoomDoor) {
+      const r = roomsByFloor[dr.floor][dr.col];
+      r.open = !r.open;
     }
-    dr.open = !dr.open;
   }
 
   function payHotel() {
     if (hotelPaid) return;
-    if (money < 10000) { showToast('お金が足りません。', 2); return; }
-    if (currentFloor !== FLOOR_OUTSIDE) { showToast('外の受付に行ってください。', 2); return; }
-    if (dist(player.x, player.y, RECEPTIONIST_POS.x, RECEPTIONIST_POS.y) > 130) {
-      showToast('受付の前に立ってください。', 2); return;
+    if (money < 10000) { showToast('Not enough money.', 2); return; }
+    if (currentFloor !== FLOOR_OUTSIDE) { showToast('Go to the reception outside.', 2); return; }
+    if (dist(player.x, player.y, TILE_W*1.5, TILE_H*1.5) > 300) {
+      showToast('Stand in front of the receptionist.', 2); return;
     }
     money -= 10000;
     hotelPaid = true;
     hasKey = true;
-    showToast('¥10,000を支払いました。' + myRoom + '号室の鍵を受け取りました。', 3);
+    showToast('Paid ¥10,000. Received key to room ' + myRoom + '.', 3);
     updateHUD(); buildInfoPanel();
   }
 
   function doGachapon() {
-    if (money < 100) { showToast('お金が足りません。', 2); return; }
-    if (currentFloor !== 3) { showToast('ガチャガチャは3階にあります。', 2); return; }
-    if (dist(player.x, player.y, 450, 350) > 130) {
-      showToast('ガチャガチャの前に立ってください。', 2); return;
+    if (money < 100) { showToast('Not enough money.', 2); return; }
+    if (currentFloor !== 3) { showToast('The gachapon is on the 3rd floor.', 2); return; }
+    if (dist(player.x, player.y, 2*TILE_W + TILE_W/2, 2*TILE_H + TILE_H/2) > 300) {
+      showToast('Stand in front of the gachapon machine.', 2); return;
     }
     money -= 100;
     const available = guestGroups.filter(g => g.room !== myRoom && !guestKeys.includes(g.room));
-    if (available.length === 0) { showToast('これ以上鍵は出ません。', 2); return; }
+    if (available.length === 0) { showToast('No more keys available.', 2); return; }
     const g = pick(available);
     guestKeys.push(g.room);
-    showToast(`ガチャガチャ！ ${g.room}号室の鍵が出ました。`, 2.5);
+    showToast(`Gachapon! You got the key to room ${g.room}.`, 2.5);
     updateHUD(); buildInfoPanel();
   }
 
   function doSleep() {
     if (slept) return;
-    if (!isPlayerInMyRoom()) { showToast('自分の部屋にいません。', 2); return; }
+    if (!isPlayerInMyRoom()) { showToast('You must be in your own room.', 2); return; }
     if (!(gameHours >= 19 || gameHours < 3)) {
-      showToast('寝られるのは19時から3時までです。', 2); return;
+      showToast('You can only sleep between 19:00 and 3:00.', 2); return;
     }
     slept = true;
     gameHours = (gameHours + 7) % 24;
-    showToast('7時間眠りました...', 2);
+    showToast('You slept for 7 hours...', 2);
     updateHUD(); buildInfoPanel();
     setTimeout(() => {
       if (!cleared) {
         cleared = true;
         victory.classList.remove('hidden');
-        victoryText.textContent = `${fmt(gameHours,0)}に目を覚まし、ホテルで一日を過ごしました。`;
+        victoryText.textContent = `You woke up at ${fmt(gameHours,0)} and spent a full day at the hotel.`;
       }
     }, HOUR_SECONDS * 1000);
+  }
+
+  // ============================================================
+  //  Elevator / Stairs
+  // ============================================================
+  let elevatorMoving = false;
+  function handleElevatorClick() {
+    if (elevatorMoving) return;
+    let next = currentFloor + 1;
+    if (next > 4) next = 1;
+    elevatorMoving = true;
+    showToast(`Elevator moving to ${next}F...`, 1.5);
+    setTimeout(() => {
+      currentFloor = next;
+      const st = floorStart();
+      player.x = st.x;
+      player.y = st.y;
+      elevatorMoving = false;
+      showToast(`Arrived at ${next}F.`, 1.5);
+      updateGuestLocations();
+      updateHUD();
+    }, 1000);
+  }
+  function handleStairsClick() {
+    let next = currentFloor + 1;
+    if (next > 4) next = 1;
+    showToast(`Taking stairs to ${next}F...`, 1.5);
+    setTimeout(() => {
+      currentFloor = next;
+      const st = floorStart();
+      player.x = st.x;
+      player.y = st.y;
+      showToast(`Arrived at ${next}F.`, 1.5);
+      updateGuestLocations();
+      updateHUD();
+    }, 800);
   }
 
   // ============================================================
@@ -1171,22 +1232,22 @@
     if (npc.id === 'presenter') {
       if (presenterState === 'idle') {
         conversation.lines = [
-          "やあ！君、お金に困ってそうだね。",
-          "この近くでビジネスプレゼンをやるんだ。",
-          "プレゼン部屋までついてきてよ！",
+          "Hey! You look like someone who could use some money.",
+          "I'm giving a business presentation inside the hotel.",
+          "Follow me!",
         ];
         conversation.onEnd = () => {
           presenterState = 'walking';
-          presenterTarget = { x: PRESENTATION_ROOM.x + PRESENTATION_ROOM.w/2, y: PRESENTATION_ROOM.y + PRESENTATION_ROOM.h/2 };
-          showToast('山田がプレゼン部屋へ向かっています。ついていってください。', 3);
+          presenterTarget = { x: TILE_W*1.5, y: TILE_H*1.5 };
+          showToast('The presenter is heading to the hotel. Follow him.', 3);
         };
       } else if (presenterState === 'walking') {
-        conversation.lines = ["ついてきて！プレゼン部屋はこっちだよ。"];
+        conversation.lines = ["Follow me! The presentation is inside the hotel."];
       } else if (presenterState === 'atRoom') {
-        conversation.lines = ["よく来たね！プレゼンを見る準備はいい？"];
+        conversation.lines = ["You made it! Ready for my presentation?"];
         conversation.choices = [
-          { label:'はい、始めてください', action: () => { openPresentation(); } },
-          { label:'いいえ', action: () => {} },
+          { label:'Yes, begin', action: () => { openPresentation(); } },
+          { label:'No', action: () => {} },
         ];
       } else if (presenterState === 'presented') {
         if (investReturnHour !== null && gameHours >= investReturnHour && investResult === null) {
@@ -1195,46 +1256,45 @@
           if (result > 0) {
             money += result;
             conversation.lines = [
-              `朗報です！投資が¥${result}で戻ってきました。`,
-              "信じてくれてありがとう。",
+              `Great news! Your investment returned ¥${result}.`,
+              "Thank you for believing in me.",
             ];
           } else {
             conversation.lines = [
-              "すみません...投資は¥0で戻ってきました。",
-              "市場は予測不能なんです。",
+              "I'm sorry... the investment returned ¥0.",
+              "The market is unpredictable.",
             ];
           }
           investReturnHour = null;
         } else if (investReturnHour !== null) {
-          conversation.lines = [`投資は${investReturnHour}時に戻ってきます。それまで待ってください。`];
+          conversation.lines = [`Your investment returns at ${investReturnHour}:00. Come back then.`];
         } else {
           conversation.lines = [
-            "プレゼンを見てくれてありがとう。",
-            "また宣伝か投資をしてくれると嬉しいな。",
+            "Thanks for watching my presentation.",
+            "Feel free to promote or invest next time.",
           ];
           conversation.choices = [
-            { label:'宣伝する（+¥100）', action: () => { money += 100; showToast('宣伝しました。+¥100', 2); updateHUD(); buildInfoPanel(); } },
-            { label:'投資する（¥10,000 / 4時間）', action: () => {
-              if (hotelPaid) { showToast('すでにホテルに支払い済みです。投資できません。', 2); }
+            { label:'Promote (+¥100)', action: () => { money += 100; showToast('You promoted. +¥100', 2); updateHUD(); buildInfoPanel(); } },
+            { label:'Invest (¥10,000 / 4h)', action: () => {
+              if (hotelPaid) { showToast('You already paid the hotel. Investment not available.', 2); }
               else if (money >= 10000) {
                 money -= 10000; invested = true;
                 investReturnHour = (gameHours + 4) % 24;
-                showToast('¥10,000を投資しました。4時間後に戻ってきます。', 3);
+                showToast('You invested ¥10,000. Return in 4 hours.', 3);
                 updateHUD(); buildInfoPanel();
-              } else { showToast('投資には¥10,000必要です。', 2); }
+              } else { showToast('You need ¥10,000 to invest.', 2); }
             } },
           ];
         }
       } else {
-        conversation.lines = ["プレゼンの準備で忙しいんだ。"];
+        conversation.lines = ["I'm busy preparing my presentation."];
       }
     } else if (npc.id && npc.id.startsWith('comedian')) {
       conversation.lines = [
-        `私たちは漫才コンビです！`,
-        comedyState === 'onstage' ? "漫才をお楽しみください！" : "19時に4階の披露宴会場で漫才をやります。",
+        "We're the comedy duo!",
+        comedyState === 'onstage' ? "Enjoy the show!" : "We perform at 19:00 in the banquet hall (4F).",
       ];
     } else if (npc.groupId !== undefined) {
-      // Guest
       let lines;
       if (npc.location === 'rest') lines = REST_LINES;
       else if (npc.location === 'onsen') lines = ONSEN_LINES;
@@ -1242,18 +1302,12 @@
       else lines = ROOM_LINES;
       const len = randInt(1, Math.min(4, lines.length));
       conversation.lines = shuffle(lines).slice(0, len);
-      // Child-specific first line
       if (npc.age < 18) {
-        conversation.lines.unshift(pick([
-          "ねえねえ、お菓子持ってる？",
-          "温泉ってあったかいね！",
-          "ここ、ひろいね！",
-          "あとでケーキ食べるんだ！",
-        ]));
+        conversation.lines.unshift(pick(CHILD_LINES));
       }
       npc.talkedRoom = true;
     } else {
-      conversation.lines = ["こんにちは。"];
+      conversation.lines = ["Hello there."];
     }
     renderDialogue();
     dialogue.classList.add('open');
@@ -1264,7 +1318,7 @@
     const { npc, page, lines } = conversation;
     dName.textContent = npc.name || '???';
     if (npc.groupId !== undefined) {
-      dMeta.textContent = `${npc.gender} / ${npc.age}歳 / Room ${npc.room}`;
+      dMeta.textContent = `${npc.gender} / Age ${npc.age} / Room ${npc.room}`;
     } else if (npc.role) {
       dMeta.textContent = npc.role;
     } else {
@@ -1312,14 +1366,14 @@
   }
 
   // ============================================================
-  //  Presentation (same-map projector)
+  //  Presentation
   // ============================================================
   function openPresentation() {
     const isPro = Math.random() < 0.5;
     currentPresentation = isPro ? pick(PRES_PRO) : pick(PRES_BAD);
     presSlideIndex = 0;
     presViewOpen = true;
-    showToast('プロジェクターに資料が映りました。クリックでページを進めます。', 3);
+    showToast('The projector shows the first slide. Click to advance.', 3);
   }
 
   // ============================================================
@@ -1329,7 +1383,6 @@
     if (!gameStarted) return;
     updateTime(dt);
 
-    // Player movement
     const spd = player.speed * 0.4;
     let dx = 0, dy = 0;
     if (keys.ArrowUp)    dy -= 1;
@@ -1345,53 +1398,49 @@
       player.x = clamp(player.x, 20, OUTSIDE_W-20);
       player.y = clamp(player.y, 20, OUTSIDE_H-20);
     } else {
-      player.x = clamp(player.x, 20, W-20);
-      player.y = clamp(player.y, 20, H-20);
+      player.x = clamp(player.x, 20, COLS*TILE_W - 20);
+      player.y = clamp(player.y, 20, ROWS*TILE_H - 20);
     }
     player.angle = Math.atan2(mouseY - player.y, mouseX - player.x);
 
-    // Presenter walking
     if (presenter && presenterState === 'walking' && presenterTarget) {
       const dx = presenterTarget.x - presenter.x;
       const dy = presenterTarget.y - presenter.y;
       const d = Math.hypot(dx, dy);
       if (d < 8) {
         presenterState = 'atRoom';
-        PRESENTATION_DOOR.open = true;
-        showToast('山田がプレゼン部屋に入りました。ドアが開きました。', 2.5);
+        showToast('The presenter is ready. Talk to him.', 2.5);
       } else {
         presenter.x += dx/d * 1.5;
         presenter.y += dy/d * 1.5;
       }
     }
 
-    // Taxi / comedians
     if (taxiVisible) {
       if (comedyState === 'arriving') {
-        taxiX += 3;
-        if (taxiX >= TAXI_STOP.x) {
-          taxiX = TAXI_STOP.x;
+        taxiX += 4;
+        if (taxiX >= TILE_W * 1.0) {
+          taxiX = TILE_W * 1.0;
           comedyState = 'waiting';
           for (const c of comedians) {
-            c.x = TAXI_STOP.x + 40 + (c.id === 'comedian0' ? -20 : 20);
-            c.y = TAXI_STOP.y + 40;
+            c.x = taxiX + 60 + (c.id === 'comedian0' ? -30 : 30);
+            c.y = TILE_H * 2.5;
             c.state = 'waiting';
           }
-          showToast('漫才師がタクシーから降りました。', 2);
+          showToast('The comedians got out of the taxi.', 2);
         } else {
           for (const c of comedians) {
-            c.x = taxiX + 20;
-            c.y = TAXI_STOP.y - 10;
+            c.x = taxiX + 30;
+            c.y = TILE_H * 2.5;
           }
         }
       } else if (comedyState === 'leaving') {
-        // Comedians back in taxi
         for (const c of comedians) {
-          c.x = taxiX + 20;
-          c.y = TAXI_STOP.y - 10;
+          c.x = taxiX + 30;
+          c.y = TILE_H * 2.5;
         }
-        taxiX -= 3;
-        if (taxiX < TAXI_ENTRY.x - 400) {
+        taxiX -= 4;
+        if (taxiX < -400) {
           taxiVisible = false;
           comedyState = 'done';
           for (const c of comedians) c.state = 'done';
@@ -1399,26 +1448,23 @@
       }
     }
 
-    // Comedy progress
     if (comedyState === 'onstage' && currentComedy) {
       comedyProgress += dt / 60 * 1.5;
     }
 
-    // Guest animation
     for (const g of guests) {
       g.phase += 0.01;
       g.x = g.baseX + Math.cos(g.phase) * 10;
       g.y = g.baseY + Math.sin(g.phase * 0.8) * 6;
     }
 
-    // Find active NPC
     activeNPC = null;
-    let bestD = 65;
+    let bestD = 80;
     const candidates = [];
     if (currentFloor === FLOOR_OUTSIDE) {
       if (presenter) candidates.push(presenter);
       for (const c of comedians) {
-        if (c.state === 'waiting' || c.state === 'taxi') candidates.push(c);
+        if (c.state === 'waiting') candidates.push(c);
       }
     } else {
       for (const g of guests) {
@@ -1430,9 +1476,8 @@
       if (d < bestD) { bestD = d; activeNPC = n; }
     }
 
-    // Find active door (room doors + presentation door)
     activeDoor = null;
-    let bestDoorD = 60;
+    let bestDoorD = 80;
     if (currentFloor !== FLOOR_OUTSIDE) {
       const rooms = roomsByFloor[currentFloor] || [];
       for (const r of rooms) {
@@ -1443,44 +1488,43 @@
           bestDoorD = d;
           activeDoor = {
             x: r.doorX, y: r.doorY, w: r.doorW, h: r.doorH,
-            open: r.open, roomNum: r.num,
+            open: r.open, floor: r.floor, col: r.col,
             isRoomDoor: true,
           };
         }
       }
-    } else {
-      // Presentation door
-      const dx = PRESENTATION_DOOR.x + PRESENTATION_DOOR.w/2;
-      const dy = PRESENTATION_DOOR.y + PRESENTATION_DOOR.h/2;
-      const d = dist(dx, dy, player.x, player.y);
-      if (d < 60) {
-        activeDoor = {
-          x: PRESENTATION_DOOR.x, y: PRESENTATION_DOOR.y,
-          w: PRESENTATION_DOOR.w, h: PRESENTATION_DOOR.h,
-          open: PRESENTATION_DOOR.open,
-          isPresentationDoor: true,
-        };
-      }
     }
 
-    // NPC panel
+    activeElevator = false;
+    if (currentFloor !== FLOOR_OUTSIDE) {
+      const ex = 4 * TILE_W + TILE_W/2;
+      const ey = 2 * TILE_H + TILE_H/2;
+      if (dist(player.x, player.y, ex, ey) < 150) activeElevator = true;
+    }
+
+    activeStairs = false;
+    if (currentFloor !== FLOOR_OUTSIDE) {
+      const sx = 7 * TILE_W + TILE_W/2;
+      const sy = 2 * TILE_H + TILE_H/2;
+      if (dist(player.x, player.y, sx, sy) < 150) activeStairs = true;
+    }
+
     if (activeNPC && !conversation) {
       npName.textContent = activeNPC.name || '???';
       if (activeNPC.groupId !== undefined) {
-        npInfo.textContent = `${activeNPC.gender} / ${activeNPC.age}歳 / ${activeNPC.room}号室`;
+        npInfo.textContent = `${activeNPC.gender} / Age ${activeNPC.age} / Room ${activeNPC.room}`;
       } else if (activeNPC.id === 'presenter') {
-        npInfo.textContent = presenterState === 'presented' ? 'プレゼン終了' : 'プレゼンター';
+        npInfo.textContent = presenterState === 'presented' ? 'Presented' : 'Presenter';
       } else {
-        npInfo.textContent = '漫才師';
+        npInfo.textContent = 'Comedian';
       }
       npHint.textContent = activeNPC.id === 'presenter' && presenterState === 'idle'
-        ? 'クリックで話す（ついていく）' : 'クリックで話す';
+        ? 'Click to talk (follow)' : 'Click to talk';
       npcPanel.classList.add('open');
     } else {
       npcPanel.classList.remove('open');
     }
 
-    // Toast
     if (toastTimer > 0) {
       toastTimer -= dt;
       if (toastTimer <= 0) toast.classList.remove('show');
@@ -1503,7 +1547,7 @@
     else drawFloor(currentFloor);
     drawPlayer();
     drawOverlay();
-    if (presViewOpen) drawPresentationOverlay();
+    if (presViewOpen && currentPresentation) drawPresentationOverlay();
   }
 
   function drawOutside() {
@@ -1512,105 +1556,48 @@
     ctx.save();
     ctx.translate(-camX, -camY);
 
-    // Ground
     ctx.fillStyle = '#1a2a1e';
     ctx.fillRect(0,0,OUTSIDE_W,OUTSIDE_H);
-    // Paths
     ctx.fillStyle = '#2a2a2a';
-    ctx.fillRect(500, 0, 500, OUTSIDE_H);
-    ctx.fillRect(0, 600, OUTSIDE_W, 120);
+    ctx.fillRect(0, TILE_H*1.4, OUTSIDE_W, TILE_H*0.2);
 
-    // Hotel building
     ctx.fillStyle = '#1a1e2a';
-    ctx.fillRect(400, 40, 600, 440);
+    ctx.fillRect(TILE_W*0.5, TILE_H*0.2, TILE_W*2, TILE_H*0.8);
     ctx.strokeStyle = '#3a4a5a';
     ctx.lineWidth = 3;
-    ctx.strokeRect(400, 40, 600, 440);
+    ctx.strokeRect(TILE_W*0.5, TILE_H*0.2, TILE_W*2, TILE_H*0.8);
     for (let r = 0; r < 4; r++) {
-      for (let c = 0; c < 8; c++) {
-        const lit = ((r*8+c) % 3 === 0);
+      for (let c = 0; c < 6; c++) {
+        const lit = ((r*6+c) % 3 === 0);
         ctx.fillStyle = lit ? '#ffd166' : '#2a3a4a';
-        ctx.fillRect(430 + c*70, 70 + r*90, 44, 54);
+        ctx.fillRect(TILE_W*0.5 + 40 + c*90, TILE_H*0.2 + 30 + r*80, 50, 45);
       }
     }
-    // Hotel entrance
     ctx.fillStyle = '#0d131a';
-    ctx.fillRect(HOTEL_ENTRANCE.x, HOTEL_ENTRANCE.y, HOTEL_ENTRANCE.w, HOTEL_ENTRANCE.h);
+    ctx.fillRect(TILE_W*1.3, TILE_H*0.9, 160, 80);
     ctx.strokeStyle = '#00e6b0';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(HOTEL_ENTRANCE.x, HOTEL_ENTRANCE.y, HOTEL_ENTRANCE.w, HOTEL_ENTRANCE.h);
+    ctx.lineWidth = 3;
+    ctx.strokeRect(TILE_W*1.3, TILE_H*0.9, 160, 80);
     ctx.fillStyle = '#00e6b0';
-    ctx.font = 'bold 16px sans-serif';
+    ctx.font = 'bold 18px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('HOTEL ENTRANCE', HOTEL_ENTRANCE.x + HOTEL_ENTRANCE.w/2, HOTEL_ENTRANCE.y - 10);
+    ctx.fillText('HOTEL ENTRANCE', TILE_W*1.5, TILE_H*0.9 - 12);
 
-    // Receptionist
-    drawPerson(RECEPTIONIST_POS.x, RECEPTIONIST_POS.y, '#7ad7ff', '#ffd166', '佐藤 美咲');
+    drawPerson(TILE_W*1.5, TILE_H*1.5, '#7ad7ff', '#ffd166', '佐藤 美咲');
 
-    // Presentation room
-    ctx.fillStyle = '#1a1e2a';
-    ctx.fillRect(PRESENTATION_ROOM.x, PRESENTATION_ROOM.y, PRESENTATION_ROOM.w, PRESENTATION_ROOM.h);
-    ctx.strokeStyle = '#7ad7ff';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(PRESENTATION_ROOM.x, PRESENTATION_ROOM.y, PRESENTATION_ROOM.w, PRESENTATION_ROOM.h);
-    ctx.fillStyle = '#7ad7ff';
-    ctx.font = 'bold 15px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('PRESENTATION ROOM', PRESENTATION_ROOM.x + PRESENTATION_ROOM.w/2, PRESENTATION_ROOM.y - 10);
-    // Door
-    ctx.fillStyle = PRESENTATION_DOOR.open ? '#00e6b0' : '#5a3a1a';
-    ctx.fillRect(PRESENTATION_DOOR.x, PRESENTATION_DOOR.y, PRESENTATION_DOOR.w, PRESENTATION_DOOR.h);
-    ctx.strokeStyle = PRESENTATION_DOOR.open ? '#00e6b0' : '#ffd166';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(PRESENTATION_DOOR.x, PRESENTATION_DOOR.y, PRESENTATION_DOOR.w, PRESENTATION_DOOR.h);
-
-    // Projector screen inside room
-    if (PRESENTATION_DOOR.open) {
-      ctx.fillStyle = '#0d131a';
-      ctx.fillRect(PRESENTATION_ROOM.x + 30, PRESENTATION_ROOM.y + 30, PRESENTATION_ROOM.w - 60, PRESENTATION_ROOM.h - 100);
-      ctx.strokeStyle = '#00e6b0';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(PRESENTATION_ROOM.x + 30, PRESENTATION_ROOM.y + 30, PRESENTATION_ROOM.w - 60, PRESENTATION_ROOM.h - 100);
-      if (presViewOpen && currentPresentation) {
-        // Draw slide content on the projector
-        const slide = currentPresentation.slides[presSlideIndex];
-        ctx.fillStyle = '#00e6b0';
-        ctx.font = 'bold 14px "Hiragino Sans","Yu Gothic",sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(slide.t, PRESENTATION_ROOM.x + PRESENTATION_ROOM.w/2, PRESENTATION_ROOM.y + 55);
-        ctx.fillStyle = '#7ad7ff';
-        ctx.font = '11px "Hiragino Sans","Yu Gothic",sans-serif';
-        ctx.textAlign = 'left';
-        for (let i = 0; i < slide.l.length; i++) {
-          ctx.fillText('• ' + slide.l[i], PRESENTATION_ROOM.x + 50, PRESENTATION_ROOM.y + 85 + i*22);
-        }
-      } else {
-        ctx.fillStyle = '#3a5a6a';
-        ctx.font = 'bold 12px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('PROJECTOR', PRESENTATION_ROOM.x + PRESENTATION_ROOM.w/2, PRESENTATION_ROOM.y + 120);
-      }
-    }
-
-    // Presenter
-    if (presenter) {
+    if (presenter && presenterState !== 'atRoom' && presenterState !== 'presented') {
       drawPerson(presenter.x, presenter.y, presenter.color, presenter.hair, presenter.name);
       if (presenterState === 'idle') {
         ctx.fillStyle = '#00e6b0';
-        ctx.font = 'bold 13px sans-serif';
+        ctx.font = 'bold 14px sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('話しかけてね！', presenter.x, presenter.y - 36);
+        ctx.fillText('Talk to me!', presenter.x, presenter.y - 40);
       }
     }
 
-    // Taxi + comedians
-    if (taxiVisible) {
-      drawTaxi(taxiX, TAXI_STOP.y - 30);
-    }
+    if (taxiVisible) drawTaxi(taxiX, TILE_H*2.3);
     for (const c of comedians) {
-      if (c.state === 'waiting') {
-        drawPerson(c.x, c.y, c.color, c.hair, c.name);
-      }
+      if (c.state === 'waiting') drawPerson(c.x, c.y, c.color, c.hair, c.name);
     }
 
     ctx.restore();
@@ -1618,161 +1605,304 @@
 
   function drawTaxi(x, y) {
     ctx.fillStyle = '#ffd166';
-    ctx.fillRect(x, y, 120, 50);
+    ctx.fillRect(x, y, 140, 60);
     ctx.fillStyle = '#1a2a3a';
-    ctx.fillRect(x + 20, y + 8, 80, 22);
+    ctx.fillRect(x + 25, y + 10, 90, 26);
     ctx.fillStyle = '#0a0c0f';
-    ctx.beginPath(); ctx.arc(x + 25, y + 50, 11, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(x + 95, y + 50, 11, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x + 30, y + 60, 13, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x + 110, y + 60, 13, 0, Math.PI*2); ctx.fill();
     ctx.fillStyle = '#000';
-    ctx.font = 'bold 12px sans-serif';
+    ctx.font = 'bold 14px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('TAXI', x + 60, y + 30);
+    ctx.fillText('TAXI', x + 70, y + 36);
   }
 
   function drawFloor(floor) {
-    // Background per floor
-    if (floor === 1) {
-      ctx.fillStyle = '#1a222c'; ctx.fillRect(0,0,W,H);
-      // Reception
-      ctx.fillStyle = '#2a3a4a'; ctx.fillRect(650,220,180,110);
-      ctx.fillStyle = '#00e6b0'; ctx.fillRect(650,220,180,6);
-      ctx.fillStyle = '#7ad7ff'; ctx.font = 'bold 15px sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText('RECEPTION', 740, 285);
-      // Rest room
-      ctx.fillStyle = '#221a14'; ctx.fillRect(80,220,240,240);
-      ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 2; ctx.strokeRect(80,220,240,240);
-      ctx.fillStyle = '#ffd166'; ctx.font='bold 15px sans-serif'; ctx.fillText('REST ROOM', 200, 250);
-      for (let i = 0; i < 6; i++) {
-        ctx.fillStyle = '#2a3a5a';
-        ctx.fillRect(100 + (i%3)*80, 280 + Math.floor(i/3)*90, 60, 40);
-      }
-    } else if (floor === 2) {
-      ctx.fillStyle = '#0d1a1a'; ctx.fillRect(0,0,W,H);
-      ctx.fillStyle = '#1a3a4a';
-      ctx.beginPath(); ctx.arc(450,380,220,0,Math.PI*2); ctx.fill();
-      ctx.strokeStyle = '#7ad7ff'; ctx.lineWidth = 3; ctx.stroke();
-      ctx.fillStyle = '#7ad7ff'; ctx.font = 'bold 22px sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText('ONSEN', 450, 390);
-      for (let i = 0; i < 8; i++) {
-        ctx.fillStyle = 'rgba(200,230,255,0.12)';
-        ctx.beginPath(); ctx.arc(330 + i*40, 260 - (i%3)*20, 32, 0, Math.PI*2); ctx.fill();
-      }
-    } else if (floor === 3) {
-      ctx.fillStyle = '#1a1a24'; ctx.fillRect(0,0,W,H);
-      ctx.fillStyle = '#3a1a2a'; ctx.fillRect(330,240,240,180);
-      ctx.strokeStyle = '#ff8ad8'; ctx.lineWidth = 3; ctx.strokeRect(330,240,240,180);
-      ctx.fillStyle = '#ff8ad8'; ctx.font = 'bold 22px sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText('GACHAPON', 450, 285);
-      for (let i = 0; i < 15; i++) {
-        ctx.fillStyle = ['#ff4d6d','#00e6b0','#ffd166','#7ad7ff','#ff8ad8'][i%5];
-        ctx.beginPath(); ctx.arc(360 + (i%5)*50, 320 + Math.floor(i/5)*40, 16, 0, Math.PI*2); ctx.fill();
-      }
-    } else if (floor === 4) {
-      ctx.fillStyle = '#1a1218'; ctx.fillRect(0,0,W,H);
-      // Banquet hall stage
-      ctx.fillStyle = '#3a1a2a'; ctx.fillRect(250,180,400,110);
-      ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 3; ctx.strokeRect(250,180,400,110);
-      ctx.fillStyle = '#ffd166'; ctx.font = 'bold 22px sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText('BANQUET HALL', 450, 235);
-      // Tables
-      for (let i = 0; i < 6; i++) {
-        ctx.fillStyle = '#3a2a1a';
-        ctx.beginPath(); ctx.arc(180 + (i%3)*250, 400 + Math.floor(i/3)*130, 45, 0, Math.PI*2); ctx.fill();
+    const camX = clamp(player.x - W/2, 0, COLS*TILE_W - W);
+    const camY = clamp(player.y - H/2, 0, ROWS*TILE_H - H);
+    ctx.save();
+    ctx.translate(-camX, -camY);
+
+    // Hallway (row 1)
+    ctx.fillStyle = '#1a222c';
+    ctx.fillRect(0, TILE_H, COLS*TILE_W, TILE_H);
+    ctx.strokeStyle = '#1e3a4a';
+    ctx.lineWidth = 2;
+    for (let c = 0; c <= COLS; c++) {
+      ctx.beginPath();
+      ctx.moveTo(c*TILE_W, TILE_H);
+      ctx.lineTo(c*TILE_W, TILE_H*2);
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#3a5a6a';
+    ctx.font = 'bold 18px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(`Floor ${floor} Hallway`, COLS*TILE_W/2, TILE_H + 40);
+
+    // Facility row (row 2)
+    for (let c = 0; c < COLS; c++) {
+      const x = c * TILE_W;
+      const y = 2 * TILE_H;
+      if (floor === 1) {
+        if (c === 0) {
+          ctx.fillStyle = '#1e2833';
+          ctx.fillRect(x, y, TILE_W, TILE_H);
+          ctx.strokeStyle = '#2a3a4a';
+          ctx.strokeRect(x, y, TILE_W, TILE_H);
+          ctx.fillStyle = '#ffd166';
+          ctx.font = 'bold 22px sans-serif';
+          ctx.fillText('REST ROOM', x + TILE_W/2, y + 60);
+          for (let i = 0; i < 6; i++) {
+            ctx.fillStyle = '#2a3a5a';
+            ctx.fillRect(x + 100 + (i%3)*180, y + 150 + Math.floor(i/3)*120, 120, 60);
+          }
+        } else if (c === 1) {
+          ctx.fillStyle = '#1a222c';
+          ctx.fillRect(x, y, TILE_W, TILE_H);
+          ctx.strokeStyle = '#2a3a4a';
+          ctx.strokeRect(x, y, TILE_W, TILE_H);
+          ctx.fillStyle = '#2a3a4a';
+          ctx.fillRect(x + TILE_W/2 - 150, y + 100, 300, 80);
+          ctx.fillStyle = '#00e6b0';
+          ctx.fillRect(x + TILE_W/2 - 150, y + 100, 300, 6);
+          ctx.fillStyle = '#7ad7ff';
+          ctx.font = 'bold 22px sans-serif';
+          ctx.fillText('LOBBY / RECEPTION', x + TILE_W/2, y + 240);
+        } else if (c === 4) {
+          ctx.fillStyle = '#1a2a3a';
+          ctx.fillRect(x + TILE_W/2 - 100, y + TILE_H/2 - 80, 200, 160);
+          ctx.strokeStyle = '#7ad7ff';
+          ctx.lineWidth = 4;
+          ctx.strokeRect(x + TILE_W/2 - 100, y + TILE_H/2 - 80, 200, 160);
+          ctx.fillStyle = '#7ad7ff';
+          ctx.font = 'bold 26px sans-serif';
+          ctx.fillText('ELEVATOR', x + TILE_W/2, y + TILE_H/2 + 8);
+        } else if (c === 7) {
+          ctx.fillStyle = '#1a2a1a';
+          ctx.fillRect(x + TILE_W/2 - 100, y + TILE_H/2 - 80, 200, 160);
+          ctx.strokeStyle = '#00e6b0';
+          ctx.lineWidth = 4;
+          ctx.strokeRect(x + TILE_W/2 - 100, y + TILE_H/2 - 80, 200, 160);
+          ctx.fillStyle = '#00e6b0';
+          ctx.font = 'bold 26px sans-serif';
+          ctx.fillText('STAIRS', x + TILE_W/2, y + TILE_H/2 + 8);
+        } else {
+          ctx.fillStyle = '#141b22';
+          ctx.fillRect(x, y, TILE_W, TILE_H);
+          ctx.strokeStyle = '#1e3a4a';
+          ctx.strokeRect(x, y, TILE_W, TILE_H);
+        }
+      } else if (floor === 2) {
+        if (c === 1) {
+          ctx.fillStyle = '#0d1a1a';
+          ctx.fillRect(x, y, TILE_W, TILE_H);
+          ctx.strokeStyle = '#1e3a4a';
+          ctx.strokeRect(x, y, TILE_W, TILE_H);
+          ctx.fillStyle = '#1a3a4a';
+          ctx.beginPath(); ctx.arc(x + TILE_W/2, y + TILE_H/2, 180, 0, Math.PI*2); ctx.fill();
+          ctx.strokeStyle = '#7ad7ff'; ctx.lineWidth = 3; ctx.stroke();
+          ctx.fillStyle = '#7ad7ff';
+          ctx.font = 'bold 28px sans-serif';
+          ctx.fillText('ONSEN', x + TILE_W/2, y + TILE_H/2 + 10);
+        } else if (c === 4) {
+          ctx.fillStyle = '#1a2a3a';
+          ctx.fillRect(x + TILE_W/2 - 100, y + TILE_H/2 - 80, 200, 160);
+          ctx.strokeStyle = '#7ad7ff'; ctx.lineWidth = 4;
+          ctx.strokeRect(x + TILE_W/2 - 100, y + TILE_H/2 - 80, 200, 160);
+          ctx.fillStyle = '#7ad7ff';
+          ctx.font = 'bold 26px sans-serif';
+          ctx.fillText('ELEVATOR', x + TILE_W/2, y + TILE_H/2 + 8);
+        } else if (c === 7) {
+          ctx.fillStyle = '#1a2a1a';
+          ctx.fillRect(x + TILE_W/2 - 100, y + TILE_H/2 - 80, 200, 160);
+          ctx.strokeStyle = '#00e6b0'; ctx.lineWidth = 4;
+          ctx.strokeRect(x + TILE_W/2 - 100, y + TILE_H/2 - 80, 200, 160);
+          ctx.fillStyle = '#00e6b0';
+          ctx.font = 'bold 26px sans-serif';
+          ctx.fillText('STAIRS', x + TILE_W/2, y + TILE_H/2 + 8);
+        } else {
+          ctx.fillStyle = '#0d1a1a';
+          ctx.fillRect(x, y, TILE_W, TILE_H);
+          ctx.strokeStyle = '#1e3a4a';
+          ctx.strokeRect(x, y, TILE_W, TILE_H);
+        }
+      } else if (floor === 3) {
+        if (c === 1) {
+          ctx.fillStyle = '#1a1a24';
+          ctx.fillRect(x, y, TILE_W, TILE_H);
+          ctx.strokeStyle = '#1e3a4a';
+          ctx.strokeRect(x, y, TILE_W, TILE_H);
+          ctx.fillStyle = '#3a1a2a';
+          ctx.fillRect(x + TILE_W/2 - 200, y + TILE_H/2 - 120, 400, 240);
+          ctx.strokeStyle = '#ff8ad8'; ctx.lineWidth = 3;
+          ctx.strokeRect(x + TILE_W/2 - 200, y + TILE_H/2 - 120, 400, 240);
+          ctx.fillStyle = '#ff8ad8';
+          ctx.font = 'bold 26px sans-serif';
+          ctx.fillText('GACHAPON', x + TILE_W/2, y + TILE_H/2 - 60);
+          for (let i = 0; i < 12; i++) {
+            ctx.fillStyle = ['#ff4d6d','#00e6b0','#ffd166','#7ad7ff','#ff8ad8'][i%5];
+            ctx.beginPath(); ctx.arc(x + TILE_W/2 - 150 + (i%4)*80, y + TILE_H/2 + 20 + Math.floor(i/4)*60, 22, 0, Math.PI*2); ctx.fill();
+          }
+        } else if (c === 4) {
+          ctx.fillStyle = '#1a2a3a';
+          ctx.fillRect(x + TILE_W/2 - 100, y + TILE_H/2 - 80, 200, 160);
+          ctx.strokeStyle = '#7ad7ff'; ctx.lineWidth = 4;
+          ctx.strokeRect(x + TILE_W/2 - 100, y + TILE_H/2 - 80, 200, 160);
+          ctx.fillStyle = '#7ad7ff';
+          ctx.font = 'bold 26px sans-serif';
+          ctx.fillText('ELEVATOR', x + TILE_W/2, y + TILE_H/2 + 8);
+        } else if (c === 7) {
+          ctx.fillStyle = '#1a2a1a';
+          ctx.fillRect(x + TILE_W/2 - 100, y + TILE_H/2 - 80, 200, 160);
+          ctx.strokeStyle = '#00e6b0'; ctx.lineWidth = 4;
+          ctx.strokeRect(x + TILE_W/2 - 100, y + TILE_H/2 - 80, 200, 160);
+          ctx.fillStyle = '#00e6b0';
+          ctx.font = 'bold 26px sans-serif';
+          ctx.fillText('STAIRS', x + TILE_W/2, y + TILE_H/2 + 8);
+        } else {
+          ctx.fillStyle = '#1a1a24';
+          ctx.fillRect(x, y, TILE_W, TILE_H);
+          ctx.strokeStyle = '#1e3a4a';
+          ctx.strokeRect(x, y, TILE_W, TILE_H);
+        }
+      } else if (floor === 4) {
+        if (c === 1) {
+          ctx.fillStyle = '#1a1218';
+          ctx.fillRect(x, y, TILE_W, TILE_H);
+          ctx.strokeStyle = '#1e3a4a';
+          ctx.strokeRect(x, y, TILE_W, TILE_H);
+          ctx.fillStyle = '#3a1a2a';
+          ctx.fillRect(x + 60, y + 80, TILE_W - 120, 180);
+          ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 3;
+          ctx.strokeRect(x + 60, y + 80, TILE_W - 120, 180);
+          ctx.fillStyle = '#ffd166';
+          ctx.font = 'bold 28px sans-serif';
+          ctx.fillText('BANQUET HALL', x + TILE_W/2, y + 180);
+          // Projector screen
+          ctx.fillStyle = '#0d131a';
+          ctx.fillRect(x + TILE_W/2 - 200, y + 300, 400, 140);
+          ctx.strokeStyle = '#00e6b0';
+          ctx.lineWidth = 3;
+          ctx.strokeRect(x + TILE_W/2 - 200, y + 300, 400, 140);
+          if (presViewOpen && currentPresentation) {
+            const slide = currentPresentation.slides[presSlideIndex];
+            ctx.fillStyle = '#00e6b0';
+            ctx.font = 'bold 18px "Hiragino Sans","Yu Gothic",sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(slide.t, x + TILE_W/2, y + 335);
+            ctx.fillStyle = '#7ad7ff';
+            ctx.font = '13px "Hiragino Sans","Yu Gothic",sans-serif';
+            ctx.textAlign = 'left';
+            for (let i = 0; i < slide.l.length; i++) {
+              ctx.fillText('• ' + slide.l[i], x + TILE_W/2 - 170, y + 365 + i*22);
+            }
+          } else {
+            ctx.fillStyle = '#3a5a6a';
+            ctx.font = 'bold 16px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('PROJECTOR', x + TILE_W/2, y + 380);
+          }
+        } else if (c === 4) {
+          ctx.fillStyle = '#1a2a3a';
+          ctx.fillRect(x + TILE_W/2 - 100, y + TILE_H/2 - 80, 200, 160);
+          ctx.strokeStyle = '#7ad7ff'; ctx.lineWidth = 4;
+          ctx.strokeRect(x + TILE_W/2 - 100, y + TILE_H/2 - 80, 200, 160);
+          ctx.fillStyle = '#7ad7ff';
+          ctx.font = 'bold 26px sans-serif';
+          ctx.fillText('ELEVATOR', x + TILE_W/2, y + TILE_H/2 + 8);
+        } else if (c === 7) {
+          ctx.fillStyle = '#1a2a1a';
+          ctx.fillRect(x + TILE_W/2 - 100, y + TILE_H/2 - 80, 200, 160);
+          ctx.strokeStyle = '#00e6b0'; ctx.lineWidth = 4;
+          ctx.strokeRect(x + TILE_W/2 - 100, y + TILE_H/2 - 80, 200, 160);
+          ctx.fillStyle = '#00e6b0';
+          ctx.font = 'bold 26px sans-serif';
+          ctx.fillText('STAIRS', x + TILE_W/2, y + TILE_H/2 + 8);
+        } else {
+          ctx.fillStyle = '#1a1218';
+          ctx.fillRect(x, y, TILE_W, TILE_H);
+          ctx.strokeStyle = '#1e3a4a';
+          ctx.strokeRect(x, y, TILE_W, TILE_H);
+        }
       }
     }
 
-    // Rooms along the top
+    // Rooms (row 0)
     const rooms = roomsByFloor[floor] || [];
     for (const r of rooms) {
       ctx.fillStyle = '#2a2a3a';
       ctx.fillRect(r.x, r.y, r.w, r.h);
-      ctx.strokeStyle = '#4a5a6a'; ctx.lineWidth = 2;
+      ctx.strokeStyle = '#4a5a6a';
+      ctx.lineWidth = 2;
       ctx.strokeRect(r.x, r.y, r.w, r.h);
       ctx.fillStyle = '#b0c8d8';
-      ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText(r.num, r.x + r.w/2, r.y + r.h/2 + 4);
-      // Door
+      ctx.font = 'bold 24px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Room ' + r.num, r.x + r.w/2, r.y + 70);
+      if (r.num === myRoom && hasKey) {
+        ctx.fillStyle = '#ffd166';
+        ctx.font = 'bold 18px sans-serif';
+        ctx.fillText('MY ROOM', r.x + r.w/2, r.y + 110);
+      }
       ctx.fillStyle = r.open ? '#00e6b0' : '#5a3a1a';
       ctx.fillRect(r.doorX, r.doorY, r.doorW, r.doorH);
       ctx.strokeStyle = r.open ? '#00e6b0' : '#ffd166';
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = 2;
       ctx.strokeRect(r.doorX, r.doorY, r.doorW, r.doorH);
-      if (r.num === myRoom && hasKey) {
-        ctx.fillStyle = '#ffd166';
-        ctx.font = 'bold 11px sans-serif';
-        ctx.fillText('MY ROOM', r.x + r.w/2, r.y - 6);
-      }
     }
 
-    // Elevator
-    ctx.fillStyle = '#1a2a3a';
-    ctx.fillRect(ELEVATOR_RECT.x, ELEVATOR_RECT.y, ELEVATOR_RECT.w, ELEVATOR_RECT.h);
-    ctx.strokeStyle = '#7ad7ff';
-    ctx.lineWidth = 3;
-    ctx.strokeRect(ELEVATOR_RECT.x, ELEVATOR_RECT.y, ELEVATOR_RECT.w, ELEVATOR_RECT.h);
-    ctx.fillStyle = '#7ad7ff';
-    ctx.font = 'bold 15px sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText('ELEVATOR', ELEVATOR_RECT.x + ELEVATOR_RECT.w/2, ELEVATOR_RECT.y - 10);
-    ctx.fillStyle = '#ffd166';
-    ctx.font = 'bold 14px sans-serif';
-    ctx.fillText(`${floor}F`, ELEVATOR_RECT.x + ELEVATOR_RECT.w/2, ELEVATOR_RECT.y + ELEVATOR_RECT.h/2 + 6);
-
-    // Stairs
-    ctx.fillStyle = '#1a2a1a';
-    ctx.fillRect(STAIRS_RECT.x, STAIRS_RECT.y, STAIRS_RECT.w, STAIRS_RECT.h);
-    ctx.strokeStyle = '#00e6b0'; ctx.lineWidth = 2;
-    ctx.strokeRect(STAIRS_RECT.x, STAIRS_RECT.y, STAIRS_RECT.w, STAIRS_RECT.h);
-    ctx.fillStyle = '#00e6b0'; ctx.font = 'bold 14px sans-serif';
-    ctx.fillText('STAIRS', STAIRS_RECT.x + STAIRS_RECT.w/2, STAIRS_RECT.y - 8);
-
-    // Guests on this floor
     for (const g of guests) {
       if (g.floor === floor) {
         drawPerson(g.x, g.y, g.color, g.hair, g.name);
         if (g.age < 18) {
           ctx.fillStyle = '#ff8ad8';
-          ctx.font = 'bold 10px sans-serif';
+          ctx.font = 'bold 14px sans-serif';
           ctx.textAlign = 'center';
-          ctx.fillText('👶', g.x, g.y - 22);
+          ctx.fillText('👶', g.x, g.y - 28);
         }
         if (g.talkedRoom) {
           ctx.fillStyle = '#00e6b0';
-          ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
-          ctx.fillText('✔', g.x + 14, g.y - 20);
+          ctx.font = 'bold 14px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('✔', g.x + 16, g.y - 24);
         }
       }
     }
 
-    // Comedians on 4F during show
     if (floor === 4 && comedyState === 'onstage') {
       for (const c of comedians) {
-        drawPerson(400 + (c.id === 'comedian0' ? -40 : 40), 220, c.color, c.hair, c.name);
+        drawPerson(TILE_W*1.5 + (c.id === 'comedian0' ? -50 : 50), TILE_H*2.4, c.color, c.hair, c.name);
       }
       if (currentComedy) {
         const idx = Math.floor(comedyProgress) % currentComedy.lines.length;
         ctx.fillStyle = '#ffd166';
-        ctx.font = 'bold 16px "Hiragino Sans","Yu Gothic",sans-serif';
+        ctx.font = 'bold 18px "Hiragino Sans","Yu Gothic",sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText(currentComedy.lines[idx], 450, 580);
+        ctx.fillText(currentComedy.lines[idx], TILE_W*1.5, TILE_H*2.9);
       }
     }
+
+    if (floor === 4 && presenterState === 'presented') {
+      drawPerson(TILE_W*1.5, TILE_H*2.7, presenter.color, presenter.hair, presenter.name);
+    }
+
+    ctx.restore();
   }
 
   function drawPerson(x, y, bodyColor, hairColor, name) {
     ctx.fillStyle = 'rgba(0,0,0,0.3)';
-    ctx.beginPath(); ctx.ellipse(x, y+16, 12, 4, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(x, y+18, 14, 5, 0, 0, Math.PI*2); ctx.fill();
     ctx.fillStyle = bodyColor;
-    ctx.fillRect(x-8, y-4, 16, 20);
+    ctx.fillRect(x-10, y-6, 20, 26);
     ctx.fillStyle = '#e0b090';
-    ctx.beginPath(); ctx.arc(x, y-12, 8, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x, y-16, 10, 0, Math.PI*2); ctx.fill();
     ctx.fillStyle = hairColor;
-    ctx.beginPath(); ctx.arc(x, y-15, 8, Math.PI, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x, y-20, 10, Math.PI, Math.PI*2); ctx.fill();
     if (name) {
       ctx.fillStyle = '#b0c8d8';
-      ctx.font = 'bold 11px "Hiragino Sans","Yu Gothic",sans-serif';
+      ctx.font = 'bold 14px "Hiragino Sans","Yu Gothic",sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(name, x, y - 26);
+      ctx.fillText(name, x, y - 34);
     }
   }
 
@@ -1793,34 +1923,42 @@
   }
 
   function drawOverlay() {
-    // Door hint
     if (activeDoor && !conversation) {
       ctx.fillStyle = '#7ad7ff';
-      ctx.font = 'bold 13px "Hiragino Sans","Yu Gothic",sans-serif';
+      ctx.font = 'bold 14px sans-serif';
       ctx.textAlign = 'center';
-      const label = activeDoor.isPresentationDoor
-        ? (activeDoor.open ? '鍵は開いています' : '鍵がかかっています')
-        : (activeDoor.open ? 'クリックで閉める' : 'クリックで開ける');
+      const label = activeDoor.open ? 'Click to close' : 'Click to open';
       ctx.fillText(label, activeDoor.x + activeDoor.w/2, activeDoor.y - 10);
     }
-    // Floor label
+    if (activeElevator && !conversation) {
+      ctx.fillStyle = '#7ad7ff';
+      ctx.font = 'bold 16px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Click to ride the elevator', W/2, 40);
+    }
+    if (activeStairs && !conversation) {
+      ctx.fillStyle = '#00e6b0';
+      ctx.font = 'bold 16px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Click to use the stairs', W/2, 70);
+    }
     ctx.fillStyle = '#00e6b0';
-    ctx.font = 'bold 18px sans-serif'; ctx.textAlign = 'left';
+    ctx.font = 'bold 20px sans-serif';
+    ctx.textAlign = 'left';
     const label = currentFloor === FLOOR_OUTSIDE ? 'Outside' : `Floor ${currentFloor}`;
     ctx.fillText(label, 20, 30);
   }
 
   function drawPresentationOverlay() {
     if (!currentPresentation) return;
-    // Small hint on screen
-    ctx.fillStyle = 'rgba(13,19,26,0.85)';
-    ctx.fillRect(W/2 - 260, H - 70, 520, 50);
+    ctx.fillStyle = 'rgba(13,19,26,0.9)';
+    ctx.fillRect(W/2 - 300, H - 80, 600, 60);
     ctx.strokeStyle = '#00e6b0'; ctx.lineWidth = 2;
-    ctx.strokeRect(W/2 - 260, H - 70, 520, 50);
+    ctx.strokeRect(W/2 - 300, H - 80, 600, 60);
     ctx.fillStyle = '#00e6b0';
-    ctx.font = 'bold 14px "Hiragino Sans","Yu Gothic",sans-serif';
+    ctx.font = 'bold 16px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(`プレゼン中 ページ ${presSlideIndex+1} / ${currentPresentation.slides.length} ／ クリックで次へ`, W/2, H - 40);
+    ctx.fillText(`Presentation ${presSlideIndex+1} / ${currentPresentation.slides.length} — Click to advance`, W/2, H - 45);
   }
 
   // ============================================================
@@ -1845,40 +1983,11 @@
     gameStarted = true;
     opening.style.display = 'none';
     lastTime = performance.now();
-    showToast('ホテルへようこそ！受付で¥10,000を支払ってください。', 4);
+    const st = outsideStart();
+    player.x = st.x;
+    player.y = st.y;
+    showToast('Welcome to the hotel! Pay ¥10,000 at the reception.', 4);
   });
-
-  // Presentation next-page handling: when presViewOpen, clicking advances slide
-  canvas.addEventListener('mousedown', e => {
-    if (e.button !== 0) return;
-    if (presViewOpen && currentPresentation) {
-      e.preventDefault();
-      if (presSlideIndex < currentPresentation.slides.length - 1) {
-        presSlideIndex++;
-      } else {
-        presViewOpen = false;
-        presenterState = 'presented';
-        conversation = { npc: presenter, page:0, lines:[
-          "以上でプレゼンは終わりです。",
-          "宣伝しますか？それとも投資しますか？",
-        ], choices:[
-          { label:'宣伝する（+¥100）', action: () => { money += 100; showToast('宣伝しました。+¥100', 2); updateHUD(); buildInfoPanel(); } },
-          { label:'投資する（¥10,000 / 4時間）', action: () => {
-            if (hotelPaid) { showToast('すでにホテルに支払い済みです。投資できません。', 2); }
-            else if (money >= 10000) {
-              money -= 10000; invested = true;
-              investReturnHour = (gameHours + 4) % 24;
-              showToast('¥10,000を投資しました。4時間後に戻ってきます。', 3);
-              updateHUD(); buildInfoPanel();
-            } else { showToast('投資には¥10,000必要です。', 2); }
-          } },
-        ]};
-        dialogue.classList.add('open');
-        renderDialogue();
-      }
-      return;
-    }
-  }, true);
 
   // ============================================================
   //  Start
