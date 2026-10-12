@@ -1,0 +1,1576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GS Library - Walk &amp; Read</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; user-select:none; }
+  body {
+    background:#0a0c0f;
+    font-family:'Segoe UI','Helvetica Neue',sans-serif;
+    display:flex; justify-content:center; align-items:flex-start;
+    min-height:100vh; color:#e0e0e0;
+    padding:20px 0; overflow-y:auto;
+  }
+  .game-wrapper {
+    background:#11161c; border-radius:24px; padding:20px 20px 14px;
+    box-shadow:0 20px 40px rgba(0,0,0,0.8), 0 0 0 1px #2a3a4a inset;
+    display:flex; flex-direction:column; align-items:center; gap:12px;
+    width:fit-content;
+  }
+  canvas {
+    display:block; border-radius:16px; background:#0b0f14;
+    box-shadow:0 0 30px rgba(0,255,200,0.1);
+    cursor:crosshair; width:800px; height:600px;
+  }
+  .footer {
+    display:flex; flex-direction:column; gap:6px;
+    width:100%; padding:4px 8px 0; font-size:13px; color:#7a8b9b;
+    letter-spacing:0.5px;
+  }
+  .footer .status { display:flex; gap:16px; flex-wrap:wrap; }
+  .footer .status span { color:#b0c8d8; font-weight:500; }
+  .footer .status .highlight { color:#00e6b0; text-shadow:0 0 8px #00e6b088; }
+  .footer .status .sp { color:#ffd166; text-shadow:0 0 8px #ffd16688; }
+  .footer .status .map-coord { color:#7ad7ff; text-shadow:0 0 8px #7ad7ff88; }
+  .footer .status .hidden-coord { display:none; }
+
+  .btn-row {
+    display:flex; gap:8px; flex-wrap:wrap; justify-content:center;
+    width:100%; padding:4px 0;
+  }
+  .ui-btn {
+    background:#1a2530; color:#00e6b0; border:2px solid #00e6b0;
+    border-radius:40px; padding:7px 16px; font-size:13px; font-weight:700;
+    letter-spacing:1px; cursor:pointer; transition:all 0.15s ease;
+    box-shadow:0 0 10px #00e6b033; font-family:inherit;
+  }
+  .ui-btn:hover { background:#00e6b0; color:#0a0c0f; box-shadow:0 0 20px #00e6b0aa; }
+  .ui-btn:active { transform:scale(0.96); }
+  .ui-btn:disabled { opacity:0.35; cursor:not-allowed; }
+  .ui-btn.map-toggle { color:#7ad7ff; border-color:#7ad7ff; }
+  .ui-btn.map-toggle:hover { background:#7ad7ff; color:#0a0c0f; }
+  .ui-btn.minimap-toggle { color:#ff8ad8; border-color:#ff8ad8; }
+  .ui-btn.minimap-toggle:hover { background:#ff8ad8; color:#0a0c0f; }
+  .ui-btn.warn { color:#ff4d6d; border-color:#ff4d6d; }
+  .ui-btn.warn:hover { background:#ff4d6d; color:#0a0c0f; }
+  .ui-btn.list { color:#ffd166; border-color:#ffd166; }
+  .ui-btn.list:hover { background:#ffd166; color:#0a0c0f; }
+
+  .hidden { display:none !important; }
+  .hint { font-size:11px; color:#4a5a6a; margin-top:2px; text-align:center; width:100%; }
+
+  .opening {
+    position: fixed; inset: 0;
+    background:#0a0c0f;
+    display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
+    gap: 30px; z-index: 9999;
+    transition: opacity 0.5s ease;
+  }
+  .opening::before {
+    content:''; position:absolute; inset:0;
+    background:
+      radial-gradient(circle at 20% 30%, rgba(0,230,176,0.08), transparent 50%),
+      radial-gradient(circle at 80% 70%, rgba(122,215,255,0.08), transparent 50%);
+  }
+  .opening h1 {
+    position: relative; z-index: 1;
+    color: #00e6b0; font-size: 72px; font-weight: 800;
+    letter-spacing: 8px;
+    text-shadow: 0 0 30px #00e6b0aa, 0 0 60px #00e6b055;
+  }
+  .opening .subtitle {
+    position: relative; z-index: 1;
+    color: #b0c8d8; font-size: 16px;
+    letter-spacing: 4px; margin-top: -20px;
+  }
+  .opening .opening-btns {
+    position: relative; z-index: 1;
+    display: flex; gap: 16px; flex-wrap: wrap; justify-content: center;
+  }
+  .start-btn {
+    background: #00e6b0; color: #0a0c0f; border: none;
+    border-radius: 50px; padding: 18px 72px;
+    font-size: 22px; font-weight: 800; letter-spacing: 4px;
+    cursor: pointer; font-family: inherit;
+    box-shadow: 0 0 30px #00e6b0cc, 0 0 60px #00e6b066;
+    transition: all 0.2s ease;
+  }
+  .start-btn:hover { transform: scale(1.06); background: #1affc0; }
+  .start-btn:active { transform: scale(0.98); }
+  .opening.hidden-opening { opacity: 0; pointer-events: none; }
+
+  .checklist-panel {
+    position: fixed; top: 0; right: 0; bottom: 0;
+    width: 340px; background: #0d131a;
+    border-left: 2px solid #00e6b0;
+    box-shadow: -10px 0 40px rgba(0,0,0,0.8);
+    z-index: 9000; display: flex; flex-direction: column;
+    padding: 16px; transform: translateX(100%);
+    transition: transform 0.25s ease;
+  }
+  .checklist-panel.open { transform: translateX(0); }
+  .checklist-panel h2 {
+    color: #00e6b0; font-size: 18px;
+    letter-spacing: 2px; margin-bottom: 12px;
+  }
+  .checklist-panel .progress {
+    color: #b0c8d8; font-size: 13px; margin-bottom: 12px;
+  }
+  .checklist-panel .progress b { color: #00e6b0; }
+  .checklist-scroll {
+    flex: 1; overflow-y: auto;
+    border-top: 1px solid #1e3a4a;
+    border-bottom: 1px solid #1e3a4a;
+    padding: 8px 0;
+  }
+  .checklist-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 8px; border-radius: 8px;
+    font-size: 13px; color: #b0c8d8;
+  }
+  .checklist-item.checked { color: #00e6b0; background: #00e6b010; }
+  .checklist-item .mark { width: 16px; text-align: center; }
+  .checklist-item .rank { color: #ffd166; font-size: 11px; margin-left: auto; }
+  .checklist-panel .panel-btns { display: flex; gap: 8px; margin-top: 12px; }
+  .checklist-panel .panel-btns button { flex: 1; }
+
+  .dialogue {
+    position: fixed; left: 50%; bottom: 24px;
+    transform: translateX(-50%) translateY(20px);
+    width: 720px; max-width: 92vw;
+    background: #0d131aee; border: 2px solid #00e6b0;
+    border-radius: 16px; padding: 18px 22px;
+    z-index: 9500; box-shadow: 0 0 40px #00e6b055;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+  .dialogue.open {
+    opacity: 1; pointer-events: auto;
+    transform: translateX(-50%) translateY(0);
+  }
+  .dialogue .d-head {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 10px; flex-wrap: wrap;
+  }
+  .dialogue .d-name {
+    color: #00e6b0; font-size: 18px; font-weight: 800;
+    letter-spacing: 1px;
+  }
+  .dialogue .d-meta { color: #7a8b9b; font-size: 12px; }
+  .dialogue .d-meta b { color: #ffd166; }
+  .dialogue .d-text {
+    color: #e0e0e0; font-size: 16px; line-height: 1.6;
+    min-height: 60px; letter-spacing: 0.3px;
+  }
+  .dialogue .d-foot {
+    display: flex; gap: 10px; margin-top: 14px;
+    justify-content: flex-end; flex-wrap: wrap;
+  }
+  .dialogue .d-page {
+    color: #7a8b9b; font-size: 12px;
+    margin-right: auto; align-self: center;
+  }
+
+  .npc-panel {
+    position: fixed; left: 24px; bottom: 24px;
+    background: #0d131aee; border: 2px solid #7ad7ff;
+    border-radius: 14px; padding: 12px 16px;
+    z-index: 9400; color: #e0e0e0; font-size: 13px;
+    line-height: 1.5; box-shadow: 0 0 30px #7ad7ff44;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.15s ease; max-width: 300px;
+  }
+  .npc-panel.open { opacity: 1; }
+  .npc-panel .n-name { color: #7ad7ff; font-weight: 800; font-size: 15px; }
+  .npc-panel .n-rank { color: #ffd166; }
+  .npc-panel .n-role { color: #b0c8d8; }
+  .npc-panel .n-hint { color: #00e6b0; font-size: 11px; margin-top: 6px; }
+
+  .book-panel {
+    position: fixed; left: 24px; bottom: 24px;
+    background: #0d131aee; border: 2px solid #ffd166;
+    border-radius: 14px; padding: 12px 16px;
+    z-index: 9400; color: #e0e0e0; font-size: 13px;
+    line-height: 1.5; box-shadow: 0 0 30px #ffd16644;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.15s ease; max-width: 320px;
+  }
+  .book-panel.open { opacity: 1; }
+  .book-panel .b-title { color: #ffd166; font-weight: 800; font-size: 15px; }
+  .book-panel .b-author { color: #b0c8d8; }
+  .book-panel .b-hint { color: #00e6b0; font-size: 11px; margin-top: 6px; }
+
+  .reader {
+    position: fixed; inset: 0;
+    background: rgba(4,6,8,0.92);
+    z-index: 9800; display: none;
+    justify-content: center; align-items: center;
+    padding: 24px;
+  }
+  .reader.open { display: flex; }
+  .reader-inner {
+    background: #f4ecd8; color: #2a2018;
+    border: 4px solid #6b4a2a; border-radius: 12px;
+    max-width: 760px; width: 100%;
+    max-height: 88vh; display: flex; flex-direction: column;
+    box-shadow: 8px 8px 0 #2a1a0a;
+  }
+  .reader-header {
+    background: linear-gradient(180deg,#6b4a2a,#4a3018);
+    color: #ffd166; padding: 14px 20px;
+    border-bottom: 4px solid #2a1a0a;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .reader-header h2 { font-size: 18px; letter-spacing: 1px; }
+  .reader-close {
+    background: #d45a2a; color: #fff; border: 2px solid #2a1a0a;
+    border-radius: 50%; width: 32px; height: 32px;
+    font-size: 16px; cursor: pointer; font-weight: 800;
+  }
+  .reader-body {
+    padding: 28px 32px; overflow-y: auto; flex: 1;
+    font-size: 16px; line-height: 1.9;
+    font-family: 'Georgia', 'Times New Roman', serif;
+  }
+  .reader-body h3 {
+    font-size: 20px; margin-bottom: 16px;
+    border-bottom: 2px dashed #8a7554; padding-bottom: 8px;
+  }
+  .reader-body p { margin-bottom: 14px; }
+  .reader-footer {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 20px; border-top: 3px dashed #8a7554;
+    background: #e8dfc8;
+  }
+  .reader-footer .page-info { font-size: 13px; color: #5a4a38; }
+  .reader-footer button {
+    background: #6b4a2a; color: #f4ecd8; border: 2px solid #2a1a0a;
+    border-radius: 6px; padding: 8px 18px; font-weight: 800;
+    cursor: pointer; font-family: inherit;
+  }
+  .reader-footer button:hover { background: #8a6a42; }
+  .reader-footer button:disabled { opacity: 0.4; cursor: not-allowed; }
+</style>
+</head>
+<body>
+
+  <div class="opening" id="opening">
+    <h1>GS LIBRARY</h1>
+    <div class="subtitle">- WALK &amp; READ -</div>
+    <div class="opening-btns">
+      <button class="start-btn" id="startBtn">START</button>
+    </div>
+  </div>
+
+  <div class="game-wrapper">
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+    <div class="footer" id="footer">
+      <div class="status">
+        <span>Talked: <span id="talkedDisplay" class="highlight">0</span>/40</span>
+        <span>Books: <span id="booksDisplay" class="highlight">0</span>/10</span>
+        <span>Area: <span id="areaDisplay" class="sp">Entrance</span></span>
+        <span id="mapCoordSpan" class="hidden-coord">Map: <span id="mapDisplay" class="map-coord">6,11</span></span>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="ui-btn list" id="checklistBtn">CHECKLIST</button>
+      <button class="ui-btn minimap-toggle" id="minimapBtn">SHOW MINIMAP</button>
+      <button class="ui-btn map-toggle" id="mapToggleBtn">SHOW COORDS</button>
+    </div>
+
+    <div class="hint" id="hint">
+      Move: Arrow Keys / Talk to people and read books: approach and click / Door: stand in front and click
+    </div>
+  </div>
+
+  <div class="checklist-panel" id="checklistPanel">
+    <h2>CHECKLIST</h2>
+    <div class="progress">Talked: <b id="clProgress">0</b> / 40 &nbsp; Books: <b id="clBooks">0</b> / 10</div>
+    <div class="checklist-scroll" id="checklistScroll"></div>
+    <div class="panel-btns">
+      <button class="ui-btn" id="clClose">CLOSE</button>
+      <button class="ui-btn warn" id="clReset">RESET</button>
+    </div>
+  </div>
+
+  <div class="dialogue" id="dialogue">
+    <div class="d-head">
+      <div class="d-name" id="dName">Name</div>
+      <div class="d-meta">Age <b id="dAge">30</b> / Book Love <b id="dRank">50</b> / <span id="dRole">Role</span></div>
+    </div>
+    <div class="d-text" id="dText"></div>
+    <div class="d-foot">
+      <div class="d-page" id="dPage">1 / 1</div>
+      <button class="ui-btn" id="dNext">NEXT</button>
+      <button class="ui-btn warn" id="dClose">CLOSE</button>
+    </div>
+  </div>
+
+  <div class="npc-panel" id="npcPanel">
+    <div class="n-name" id="npName">Name</div>
+    <div>Age: <span id="npAge">30</span></div>
+    <div class="n-rank">Book Love: <span id="npRank">50</span> / 100</div>
+    <div class="n-role">Occupation: <span id="npRole">Librarian</span></div>
+    <div class="n-hint">Click to talk</div>
+  </div>
+
+  <div class="book-panel" id="bookPanel">
+    <div class="b-title" id="bpTitle">Title</div>
+    <div class="b-author" id="bpAuthor">Author</div>
+    <div class="b-hint">Click to read</div>
+  </div>
+
+  <div class="reader" id="reader">
+    <div class="reader-inner">
+      <div class="reader-header">
+        <h2 id="readerTitle">Title</h2>
+        <button class="reader-close" id="readerClose">X</button>
+      </div>
+      <div class="reader-body" id="readerBody"></div>
+      <div class="reader-footer">
+        <div class="page-info" id="readerPageInfo">1 / 4</div>
+        <div style="display:flex;gap:8px;">
+          <button id="readerPrev">PREV</button>
+          <button id="readerNext">NEXT</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  // ============================================================
+  //  Basic setup
+  // ============================================================
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  const talkedDisplay = document.getElementById('talkedDisplay');
+  const booksDisplay = document.getElementById('booksDisplay');
+  const areaDisplay = document.getElementById('areaDisplay');
+  const mapDisplay = document.getElementById('mapDisplay');
+  const mapCoordSpan = document.getElementById('mapCoordSpan');
+  const checklistBtn = document.getElementById('checklistBtn');
+  const minimapBtn = document.getElementById('minimapBtn');
+  const mapToggleBtn = document.getElementById('mapToggleBtn');
+  const checklistPanel = document.getElementById('checklistPanel');
+  const checklistScroll = document.getElementById('checklistScroll');
+  const clProgress = document.getElementById('clProgress');
+  const clBooks = document.getElementById('clBooks');
+  const clClose = document.getElementById('clClose');
+  const clReset = document.getElementById('clReset');
+  const dialogue = document.getElementById('dialogue');
+  const dName = document.getElementById('dName');
+  const dAge = document.getElementById('dAge');
+  const dRank = document.getElementById('dRank');
+  const dRole = document.getElementById('dRole');
+  const dText = document.getElementById('dText');
+  const dPage = document.getElementById('dPage');
+  const dNext = document.getElementById('dNext');
+  const dClose = document.getElementById('dClose');
+  const npcPanel = document.getElementById('npcPanel');
+  const npName = document.getElementById('npName');
+  const npAge = document.getElementById('npAge');
+  const npRank = document.getElementById('npRank');
+  const npRole = document.getElementById('npRole');
+  const bookPanel = document.getElementById('bookPanel');
+  const bpTitle = document.getElementById('bpTitle');
+  const bpAuthor = document.getElementById('bpAuthor');
+  const reader = document.getElementById('reader');
+  const readerTitle = document.getElementById('readerTitle');
+  const readerBody = document.getElementById('readerBody');
+  const readerPageInfo = document.getElementById('readerPageInfo');
+  const readerPrev = document.getElementById('readerPrev');
+  const readerNext = document.getElementById('readerNext');
+  const readerClose = document.getElementById('readerClose');
+
+  const W = 800, H = 600;
+  const MAP_W = 800, MAP_H = 600;
+  const MAP_COLS = 11, MAP_ROWS = 11;
+  const WORLD_W = MAP_W * MAP_COLS;
+  const WORLD_H = MAP_H * MAP_ROWS;
+
+  const STORAGE_KEY = 'gs_library_v1';
+
+  // ============================================================
+  //  Game state
+  // ============================================================
+  const player = {
+    x: WORLD_W / 2, y: WORLD_H / 2,
+    speed: 90, angle: 0, radius: 16,
+  };
+
+  const keys = { ArrowUp:false, ArrowDown:false, ArrowLeft:false, ArrowRight:false };
+  let mouseX = W/2, mouseY = H/2;
+  let lastTime = 0;
+  let showMapCoord = false;
+  let showMinimap = false;
+  let talked = new Set();
+  let booksRead = new Set();
+  let npcs = [];
+  let doors = [];
+  let walls = [];
+  let areas = [];
+  let shelves = [];
+  let realBooks = [];
+  let activeNPC = null;
+  let activeDoor = null;
+  let activeBook = null;
+  let conversation = null;
+  let reading = null;
+
+  const rand = (min, max) => Math.random() * (max - min) + min;
+  const randInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+  const dist = (x1,y1,x2,y2) => Math.hypot(x2-x1, y2-y1);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const pick = arr => arr[Math.floor(Math.random()*arr.length)];
+
+  // ============================================================
+  //  Areas (11x11)
+  // ============================================================
+  function buildAreas() {
+    const grid = [
+      ['garden','garden','road','road','garden','garden','garden','garden','garden','garden','garden'],
+      ['garden','entrance','entrance','hall','hall','hall','hall','garden','garden','garden','garden'],
+      ['road','entrance','reception','hall','hall','catalog','catalog','hall','garden','garden','garden'],
+      ['road','hall','reception','hall','hall','catalog','catalog','hall','reading','reading','garden'],
+      ['garden','hall','hall','hall','hall','hall','hall','hall','reading','reading','garden'],
+      ['garden','fiction','fiction','hall','reference','reference','hall','hall','reading','reading','garden'],
+      ['garden','fiction','fiction','hall','reference','reference','hall','periodical','periodical','hall','garden'],
+      ['garden','hall','hall','hall','hall','hall','hall','periodical','periodical','hall','garden'],
+      ['garden','children','children','hall','archive','archive','hall','hall','lounge','lounge','garden'],
+      ['garden','children','children','hall','archive','archive','hall','lounge','lounge','lounge','garden'],
+      ['garden','garden','garden','garden','garden','garden','garden','garden','garden','garden','garden'],
+    ];
+    const nameMap = {
+      garden:'Garden', road:'Road', hall:'Hallway',
+      entrance:'Entrance Hall', reception:'Reception Desk',
+      catalog:'Catalog Room', reading:'Reading Room',
+      fiction:'Fiction Section', reference:'Reference Section',
+      periodical:'Periodicals', children:'Children\'s Section',
+      archive:'Archive', lounge:'Lounge',
+    };
+    areas = [];
+    for (let r = 0; r < MAP_ROWS; r++) {
+      for (let c = 0; c < MAP_COLS; c++) {
+        areas.push({
+          col:c, row:r,
+          x:c*MAP_W, y:r*MAP_H,
+          w:MAP_W, h:MAP_H,
+          type:grid[r][c],
+          name:nameMap[grid[r][c]] || 'Area',
+        });
+      }
+    }
+  }
+
+  function areaAt(x, y) {
+    const c = clamp(Math.floor(x / MAP_W), 0, MAP_COLS-1);
+    const r = clamp(Math.floor(y / MAP_H), 0, MAP_ROWS-1);
+    return areas.find(a => a.col===c && a.row===r) || areas[0];
+  }
+
+  // ============================================================
+  //  Walls + Doors
+  // ============================================================
+  const WALL_THICK = 20;
+  const DOOR_LEN = 80;
+
+  function isOutdoor(a) {
+    return a.type === 'garden' || a.type === 'road';
+  }
+
+  function buildWallsAndDoors() {
+    walls = [];
+    doors = [];
+    const visited = new Set();
+
+    function boundaryKey(x1, y1, x2, y2) {
+      if (x1 > x2 || (x1 === x2 && y1 > y2)) return `${x2},${y2}-${x1},${y1}`;
+      return `${x1},${y1}-${x2},${y2}`;
+    }
+
+    function buildBoundary(a, side) {
+      let x1, y1, x2, y2, horizontal;
+      if (side === 'top') { x1=a.x; y1=a.y; x2=a.x+a.w; y2=a.y; horizontal=true; }
+      else if (side === 'bottom') { x1=a.x; y1=a.y+a.h; x2=a.x+a.w; y2=a.y+a.h; horizontal=true; }
+      else if (side === 'left') { x1=a.x; y1=a.y; x2=a.x; y2=a.y+a.h; horizontal=false; }
+      else { x1=a.x+a.w; y1=a.y; x2=a.x+a.w; y2=a.y+a.h; horizontal=false; }
+
+      const key = boundaryKey(x1,y1,x2,y2);
+      if (visited.has(key)) return;
+      visited.add(key);
+
+      const cx = (x1+x2)/2, cy = (y1+y2)/2;
+
+      if (horizontal) {
+        const wallY = (side==='top') ? a.y : a.y+a.h;
+        walls.push({x:a.x, y:wallY-WALL_THICK/2, w:(a.w-DOOR_LEN)/2, h:WALL_THICK});
+        walls.push({x:a.x+(a.w+DOOR_LEN)/2, y:wallY-WALL_THICK/2, w:(a.w-DOOR_LEN)/2, h:WALL_THICK});
+        doors.push({x:cx-DOOR_LEN/2, y:wallY-8, w:DOOR_LEN, h:16, open:false, area:a, side});
+      } else {
+        const wallX = (side==='left') ? a.x : a.x+a.w;
+        walls.push({x:wallX-WALL_THICK/2, y:a.y, w:WALL_THICK, h:(a.h-DOOR_LEN)/2});
+        walls.push({x:wallX-WALL_THICK/2, y:a.y+(a.h+DOOR_LEN)/2, w:WALL_THICK, h:(a.h-DOOR_LEN)/2});
+        doors.push({x:wallX-8, y:cy-DOOR_LEN/2, w:16, h:DOOR_LEN, open:false, area:a, side});
+      }
+    }
+
+    for (const a of areas) {
+      if (isOutdoor(a)) continue;
+      buildBoundary(a,'top');
+      buildBoundary(a,'bottom');
+      buildBoundary(a,'left');
+      buildBoundary(a,'right');
+    }
+  }
+
+  // ============================================================
+  //  Real Books (SBI証券テーマ、各4ページ、日本語)
+  // ============================================================
+  const REAL_BOOKS = [
+    {
+      id: 'b01', title: '株式会社とは？', author: '図書館スタッフ',
+      pages: [
+        '<h3>株式会社とは？</h3><p>株式会社は、法人の一種です。投資家からお金を集めて事業を行い、その見返りとして株式を発行します。株式を買った人は株主になり、会社の一部を所有することになります。</p>',
+        '<h3>なぜ生まれたのか</h3><p>株式会社の仕組みは、大きな事業にたくさんの人から資金を集めるために生まれました。株主は有限責任といって、出資した分だけの責任を負います。会社が倒産しても、自分の家や財産を失うことはありません。</p>',
+        '<h3>株主と経営者</h3><p>株主は会社の持ち主ですが、日々の経営はしません。株主総会で取締役を選び、取締役が経営者を雇って会社を動かします。つまり、所有と経営が分かれているのが特徴です。</p>',
+        '<h3>上場と非上場</h3><p>上場企業は、証券取引所で株式が売買されます。非上場企業は、取引所では売買されません。SBI証券で扱うのは、主に上場企業の株式です。</p>',
+      ],
+    },
+    {
+      id: 'b02', title: '法人とは？', author: '図書館スタッフ',
+      pages: [
+        '<h3>法人とは？</h3><p>法人とは、法律の上で人と同じように権利と義務を持つ存在です。財産を持ったり、契約を結んだり、訴えられたりすることができます。</p>',
+        '<h3>自然人と法人</h3><p>人間は自然人と呼ばれます。会社は法人と呼ばれます。法律では、この二つは別のものとして扱われます。</p>',
+        '<h3>法人の種類</h3><p>法人には多くの種類があります。株式会社、合同会社、財団法人、NPO法人などです。それぞれに決まりと税務上の扱いが違います。</p>',
+        '<h3>なぜ知る必要があるのか</h3><p>SBI証券で商品を買うとき、相手は法人です。法人と自然人を区別して考えると、誰が何に責任を持つのかが分かりやすくなります。</p>',
+      ],
+    },
+    {
+      id: 'b03', title: '会社と株式の違いとは？', author: '図書館スタッフ',
+      pages: [
+        '<h3>会社と株式の違い</h3><p>会社は、事業を行う組織そのものです。株式は、その会社の所有権を細かく分けたものです。似ていますが、同じものではありません。</p>',
+        '<h3>所有という考え方</h3><p>株式を買うと、会社の一部を所有することになります。会社が成長すれば、その一部の価値も上がる可能性があります。</p>',
+        '<h3>資金調達の仕組み</h3><p>会社は資金を集めるために株式を発行します。投資家はリターンを得るために株式を買います。これが株式市場の基本の循環です。</p>',
+        '<h3>SBI証券では</h3><p>SBI証券の発注画面では、会社そのものではなく株式を選びます。株式は、会社に対するあなたの権利を表しているのです。</p>',
+      ],
+    },
+    {
+      id: 'b04', title: '株が株式の単位であるとは？', author: '図書館スタッフ',
+      pages: [
+        '<h3>株という単位</h3><p>株は、株式の最小単位です。会社が株式を発行するとき、所有権をたくさんの株に分けます。</p>',
+        '<h3>持株数と議決権</h3><p>持っている株が多いほど、所有している割合が大きくなります。議決権も、通常は持株数に応じて決まります。</p>',
+        '<h3>単元株制度</h3><p>日本では、多くの銘柄で100株を1単元として売買します。これを単元株制度といいます。売買を分かりやすくするための仕組みです。</p>',
+        '<h3>端株と単元未満株</h3><p>1単元に満たない株を端株、または単元未満株といいます。SBI証券では、単元未満株を売買できるサービスもあります。</p>',
+      ],
+    },
+    {
+      id: 'b05', title: '1枚＝100株はなぜこの仕組みなのか？', author: '図書館スタッフ',
+      pages: [
+        '<h3>なぜ100株なのか</h3><p>日本では、多くの銘柄で100株を1単元としています。これはSBI証券だけでなく、日本市場全体の共通ルールです。</p>',
+        '<h3>歴史的な経緯</h3><p>昔は会社ごとに売買単位がばらばらでした。それでは分かりにくいということで、統一されていきました。</p>',
+        '<h3>例外もある</h3><p>なかには100株以外を1単元とする銘柄もあります。SBI証券の発注画面で、必ず銘柄ごとの単位を確認してください。</p>',
+        '<h3>入力するときの意味</h3><p>枚数欄に「1」と入れると、通常は100株を買うことになります。価格欄は1株あたりの円で入力します。ここを混同しないようにしましょう。</p>',
+      ],
+    },
+    {
+      id: 'b06', title: '寄指・寄成・引指・引成・不成とは？', author: '図書館スタッフ',
+      pages: [
+        '<h3>寄と引</h3><p>寄（より）は寄付、つまり始値のことです。引（ひけ）は引け、つまり終値のことです。どちらも一日の取引で重要な瞬間です。</p>',
+        '<h3>寄指と寄成</h3><p>寄指は寄付で指値、寄成は寄付で成行の注文です。始値に合わせて売買したいときに使います。</p>',
+        '<h3>引指と引成</h3><p>引指は引けで指値、引成は引けで成行の注文です。一日の終わりに売買したいときに使います。</p>',
+        '<h3>不成とは</h3><p>不成（ふなり）は、指値で約定しなかった場合に取り消される注文です。「成行にはしない」という意味です。思った価格で成立しなければ、潔く引くという考え方です。</p>',
+      ],
+    },
+    {
+      id: 'b07', title: 'IOC指とIOC成、指値と逆指値の違いとは？', author: '図書館スタッフ',
+      pages: [
+        '<h3>IOCとは</h3><p>IOCは Immediate or Cancel の略です。即時執行、できなければ取消という意味です。</p>',
+        '<h3>IOC指とIOC成</h3><p>IOC指はIOCの指値、IOC成はIOCの成行です。どちらも、その場で成立しなければすぐに取り消されます。</p>',
+        '<h3>指値と逆指値</h3><p>指値は価格を指定する注文です。逆指値は、指定した価格に達したら注文を出す条件付きの注文です。損切りや利益確定によく使われます。</p>',
+        '<h3>使い分け</h3><p>すぐに買いたいなら成行、価格を守りたいなら指値、条件が来たら動きたいなら逆指値です。場面によって使い分けましょう。</p>',
+      ],
+    },
+    {
+      id: 'b08', title: '期間：当日中・今週中・期間指定はなぜ選ぶ？', author: '図書館スタッフ',
+      pages: [
+        '<h3>注文の有効期限</h3><p>期間とは、出した注文が有効な期限のことです。当日中、今週中、期間指定などがあります。</p>',
+        '<h3>なぜ必要なのか</h3><p>株式市場には取引時間があります。約定しなかった注文をいつまで残すか、決めておく必要があるのです。</p>',
+        '<h3>bitFlyerとの違い</h3><p>bitFlyerは暗号資産の取引所で、24時間取引できます。株式市場は時間が決まっているので、期間という考え方が必要になります。</p>',
+        '<h3>どう選ぶか</h3><p>短期の売買なら当日中、特定の価格を待つなら期間指定が向いています。目的に合わせて選びましょう。</p>',
+      ],
+    },
+    {
+      id: 'b09', title: '預かり区分はどれを選ぶの？', author: '図書館スタッフ',
+      pages: [
+        '<h3>預かり区分とは</h3><p>預かり区分とは、株式をどの口座で保有するかの区分です。特定、一般、NISA、旧NISAがあります。</p>',
+        '<h3>特定預り</h3><p>特定預りは、税金の計算と申告を証券会社が代行してくれる区分です。多くの初心者にとって一番便利です。</p>',
+        '<h3>一般預り</h3><p>一般預りは、自分で確定申告をする区分です。初心者にはあまり向いていません。</p>',
+        '<h3>NISA預り</h3><p>NISA預りは、税金の優遇を受けられる区分です。NISAの審査に通っていれば選べます。審査に通った人は、NISA預りを選ぶとよいでしょう。</p>',
+      ],
+    },
+    {
+      id: 'b10', title: '銘柄コード検索の初心者へ', author: '図書館スタッフ',
+      pages: [
+        '<h3>銘柄コードとは</h3><p>銘柄コードは、会社を識別するための短い番号です。日本では、通常4桁の数字です。</p>',
+        '<h3>枚数と価格</h3><p>発注画面には、枚数と価格の2つの入力欄があります。枚数は株数、価格は円です。ここを混同すると、思わぬ注文になってしまいます。</p>',
+        '<h3>検索の手順</h3><p>SBI証券の検索欄にコードを入力し、会社名と株価を確認してから注文します。慌てずに、一つずつ確認しましょう。</p>',
+        '<h3>よくある間違い</h3><p>初心者がよくやる間違いは、価格を枚数欄に入れてしまうことです。注文確認画面で必ず見直してください。</p>',
+      ],
+    },
+  ];
+
+  // ============================================================
+  //  Shelves (decorative + real books)
+  // ============================================================
+  function buildShelves() {
+    shelves = [];
+    realBooks = [];
+
+    const shelfTypes = ['fiction','reference','periodical','children','archive','catalog','reading','lounge','reception'];
+
+    for (const a of areas) {
+      if (isOutdoor(a)) continue;
+      if (a.type === 'hall') continue;
+      if (a.type === 'entrance') continue;
+      if (!shelfTypes.includes(a.type)) continue;
+
+      const cols = 3;
+      const rows = 3;
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const sx = a.x + 120 + c * 220;
+          const sy = a.y + 120 + r * 180;
+          if (sx + 120 > a.x + a.w - 40) continue;
+          if (sy + 100 > a.y + a.h - 40) continue;
+          shelves.push({ x: sx, y: sy, w: 120, h: 100, area: a });
+        }
+      }
+    }
+
+    const usedShelves = new Set();
+    const areaOrder = ['fiction','reference','periodical','children','archive','catalog','reading','lounge','reception'];
+    let bi = 0;
+    for (const areaType of areaOrder) {
+      if (bi >= REAL_BOOKS.length) break;
+      const candidates = shelves.filter(s => s.area.type === areaType && !usedShelves.has(s));
+      if (candidates.length === 0) continue;
+      const s = pick(candidates);
+      usedShelves.add(s);
+      s.book = REAL_BOOKS[bi];
+      realBooks.push({ shelf: s, book: REAL_BOOKS[bi] });
+      bi++;
+    }
+    while (bi < REAL_BOOKS.length) {
+      const candidates = shelves.filter(s => !usedShelves.has(s));
+      if (candidates.length === 0) break;
+      const s = pick(candidates);
+      usedShelves.add(s);
+      s.book = REAL_BOOKS[bi];
+      realBooks.push({ shelf: s, book: REAL_BOOKS[bi] });
+      bi++;
+    }
+  }
+
+  // ============================================================
+  //  NPC data (40 people)
+  // ============================================================
+  const FIRST_NAMES = [
+    'David','Sarah','Michael','Emily','James','Jessica','Robert','Ashley',
+    'John','Amanda','William','Melissa','Richard','Stephanie','Joseph','Nicole',
+    'Thomas','Elizabeth','Charles','Rebecca','Daniel','Laura','Matthew','Rachel',
+    'Anthony','Jennifer','Mark','Linda','Donald','Patricia','Steven','Barbara',
+    'Paul','Susan','Andrew','Karen','Joshua','Nancy','Kenneth','Betty',
+  ];
+  const LAST_NAMES = [
+    'Smith','Johnson','Williams','Brown','Jones','Garcia','Miller','Davis',
+    'Rodriguez','Martinez','Hernandez','Lopez','Gonzalez','Wilson','Anderson','Thomas',
+    'Taylor','Moore','Jackson','Martin','Lee','Perez','Thompson','White',
+    'Harris','Sanchez','Clark','Ramirez','Lewis','Robinson','Walker','Young',
+    'Allen','King','Wright','Scott','Torres','Nguyen','Hill','Flores',
+  ];
+  const ROLES = [
+    'Librarian','Archivist','Catalog Specialist','Reference Librarian',
+    'Children\'s Librarian','Periodicals Clerk','Reading Room Attendant',
+    'Library Assistant','Security Guard','Janitor','Cafe Staff','Volunteer',
+    'Researcher','Student','Professor','Writer','Editor','Translator',
+    'Book Conservator','IT Support','Receptionist','Event Coordinator',
+    'Donor','Collector','Historian','Poet','Novelist','Journalist',
+    'Bookseller','Publisher','Curator','Guide','Teacher','Tutor',
+    'Philosopher','Scientist','Engineer','Artist','Musician','Chef',
+  ];
+
+  const EN_LINES = {
+    'Librarian': [
+      "Welcome to the library. Feel free to browse.",
+      "We have over ten thousand books here.",
+      "If you need help finding a book, just ask.",
+      "Please keep your voice down in the reading room.",
+    ],
+    'Archivist': [
+      "I take care of the oldest books in the collection.",
+      "Some of these books are over a hundred years old.",
+      "Handling them requires great care.",
+      "The archive is not open to the public.",
+    ],
+    'Catalog Specialist': [
+      "I organize the catalog so books are easy to find.",
+      "Every book has a code and a category.",
+      "A good catalog saves hours of searching.",
+      "I love the smell of old paper.",
+    ],
+    'Reference Librarian': [
+      "The reference section has dictionaries and encyclopedias.",
+      "I help people find facts and answers.",
+      "Reference books cannot be borrowed, only read here.",
+      "Ask me anything. I love questions.",
+    ],
+    'Children\'s Librarian': [
+      "The children's section is my favorite place.",
+      "Story time is at three o'clock every day.",
+      "Kids love picture books and fairy tales.",
+      "Reading to children is a joy.",
+    ],
+    'Periodicals Clerk': [
+      "We keep newspapers and magazines here.",
+      "The latest issues are on the front shelf.",
+      "Back issues are stored in the archive.",
+      "Periodicals are for reading in the library.",
+    ],
+    'Reading Room Attendant': [
+      "The reading room is a quiet space.",
+      "Please turn off your phone.",
+      "Natural light makes reading pleasant.",
+      "Take your time. No one will rush you.",
+    ],
+    'Library Assistant': [
+      "I shelve returned books every morning.",
+      "It's satisfying to see the shelves in order.",
+      "I also help at the reception desk.",
+      "Libraries are peaceful places.",
+    ],
+    'Security Guard': [
+      "I keep the library safe for everyone.",
+      "Please leave your bags at the entrance.",
+      "No food or drink in the reading room.",
+      "Have a pleasant visit.",
+    ],
+    'Janitor': [
+      "I keep the floors clean and the lights bright.",
+      "A clean library is a happy library.",
+      "I've worked here for fifteen years.",
+      "Take care of the books.",
+    ],
+    'Cafe Staff': [
+      "The cafe is on the first floor.",
+      "We serve coffee, tea, and light meals.",
+      "Reading and coffee go well together.",
+      "Try our seasonal blend.",
+    ],
+    'Volunteer': [
+      "I volunteer here on weekends.",
+      "I love helping people find books.",
+      "Libraries are important for the community.",
+      "Everyone is welcome here.",
+    ],
+    'Researcher': [
+      "I'm researching the history of printing.",
+      "The library has rare documents.",
+      "I spend hours in the archive.",
+      "Research is a journey, not a destination.",
+    ],
+    'Student': [
+      "I'm studying for my exams here.",
+      "The reading room is perfect for focus.",
+      "I borrow at least three books a week.",
+      "Libraries are the best study spaces.",
+    ],
+    'Professor': [
+      "I've been teaching literature for thirty years.",
+      "Books are windows into other worlds.",
+      "I recommend reading widely and deeply.",
+      "The classics never go out of style.",
+    ],
+    'Writer': [
+      "I come here for inspiration.",
+      "The quiet helps me think.",
+      "I'm working on my second novel.",
+      "Every book starts with a single sentence.",
+    ],
+    'Editor': [
+      "I edit manuscripts for a living.",
+      "A good editor is invisible.",
+      "Words matter more than you think.",
+      "I read at least five books a month.",
+    ],
+    'Translator': [
+      "I translate books from English to Japanese.",
+      "Translation is an art, not a science.",
+      "Every language has its own music.",
+      "I love the challenge of a good text.",
+    ],
+    'Book Conservator': [
+      "I repair damaged books.",
+      "Old paper is fragile and beautiful.",
+      "My work requires patience and steady hands.",
+      "Saving a book is saving a piece of history.",
+    ],
+    'IT Support': [
+      "I keep the library's computers running.",
+      "The catalog system is my responsibility.",
+      "Technology and books can coexist.",
+      "If something breaks, call me.",
+    ],
+    'Receptionist': [
+      "Welcome to the library.",
+      "How can I help you today?",
+      "The reading room is down the hall.",
+      "Enjoy your visit.",
+    ],
+    'Event Coordinator': [
+      "We host author talks every month.",
+      "The next event is a poetry reading.",
+      "Check the schedule at the entrance.",
+      "Community events bring people together.",
+    ],
+    'Donor': [
+      "I donated part of my collection to the library.",
+      "Books should be shared, not hidden.",
+      "It feels good to give back.",
+      "I hope others enjoy these books.",
+    ],
+    'Collector': [
+      "I collect first editions.",
+      "A first edition can be worth a fortune.",
+      "I come here to study rare books.",
+      "Collecting is a lifelong passion.",
+    ],
+    'Historian': [
+      "I study the history of this city.",
+      "The library has records no one else has.",
+      "History is written in books.",
+      "The past explains the present.",
+    ],
+    'Poet': [
+      "I write poems in the garden.",
+      "Words can be gentle or fierce.",
+      "Poetry is the music of language.",
+      "I read my poems at the cafe sometimes.",
+    ],
+    'Novelist': [
+      "I write novels in the reading room.",
+      "Characters come alive on the page.",
+      "A novel is a long conversation with yourself.",
+      "I need silence to write.",
+    ],
+    'Journalist': [
+      "I'm writing an article about libraries.",
+      "Facts matter. Books matter.",
+      "I interview people here every week.",
+      "The truth is often hidden in old papers.",
+    ],
+    'Bookseller': [
+      "I run a small bookshop downtown.",
+      "Libraries and bookshops are partners.",
+      "I come here to find rare titles.",
+      "Books are meant to be read.",
+    ],
+    'Publisher': [
+      "I publish books on art and history.",
+      "Print is not dead. It's evolving.",
+      "A beautiful book is a work of art.",
+      "I love the smell of a new book.",
+    ],
+    'Curator': [
+      "I curate exhibitions for the library.",
+      "Every object tells a story.",
+      "Displaying books is an art.",
+      "Come see our current exhibition.",
+    ],
+    'Guide': [
+      "I give tours of the library.",
+      "The building is over a century old.",
+      "Follow me and I'll show you the highlights.",
+      "There is so much to see here.",
+    ],
+    'Teacher': [
+      "I bring my students here every month.",
+      "Libraries teach children to love reading.",
+      "A good book can change a life.",
+      "Education starts with curiosity.",
+    ],
+    'Tutor': [
+      "I tutor students in the lounge.",
+      "Reading and writing are the foundation.",
+      "Everyone learns at their own pace.",
+      "Patience is key.",
+    ],
+    'Philosopher': [
+      "I think about big questions here.",
+      "What is knowledge? What is truth?",
+      "Books are the memory of humanity.",
+      "Silence helps me think.",
+    ],
+    'Scientist': [
+      "I research the science of materials.",
+      "The library has old scientific journals.",
+      "Science and books go hand in hand.",
+      "Curiosity drives discovery.",
+    ],
+    'Engineer': [
+      "I design the library's lighting system.",
+      "Good light makes reading easier.",
+      "Engineering is about solving problems.",
+      "I love this building.",
+    ],
+    'Artist': [
+      "I sketch the library's architecture.",
+      "The light in the reading room is beautiful.",
+      "Art and books inspire each other.",
+      "I come here every weekend.",
+    ],
+    'Musician': [
+      "I play quiet music at the cafe.",
+      "Music and reading are similar arts.",
+      "Silence has its own rhythm.",
+      "I love the atmosphere here.",
+    ],
+    'Chef': [
+      "I run the library's small kitchen.",
+      "Simple food is the best food.",
+      "Readers need good meals too.",
+      "Try the soup of the day.",
+    ],
+  };
+
+  const START_X = 6 * MAP_W + MAP_W / 2;
+  const START_Y = 10 * MAP_H + MAP_H / 2;
+
+  function buildNPCs() {
+    npcs = [];
+    const total = 40;
+    const areaTypes = ['entrance','reception','catalog','reading','fiction','reference','periodical','children','archive','lounge'];
+    for (let i = 0; i < total; i++) {
+      const role = ROLES[i % ROLES.length];
+      const first = FIRST_NAMES[i % FIRST_NAMES.length];
+      const last = LAST_NAMES[i % LAST_NAMES.length];
+      const name = `${first} ${last}`;
+      const age = randInt(20, 70);
+      const bookLove = randInt(10, 100);
+      const areaType = areaTypes[i % areaTypes.length];
+      const candidates = areas.filter(a => a.type === areaType);
+      const area = candidates.length ? pick(candidates) : pick(areas.filter(a=>!isOutdoor(a)));
+      let x = rand(area.x + 100, area.x + area.w - 100);
+      let y = rand(area.y + 100, area.y + area.h - 100);
+      const dStart = dist(x, y, START_X, START_Y);
+      if (dStart < 140) {
+        const ang = Math.atan2(y - START_Y, x - START_X);
+        x = START_X + Math.cos(ang) * 180;
+        y = START_Y + Math.sin(ang) * 180;
+      }
+      const behavior = Math.random() < 0.5 ? 'walk' : 'idle';
+      const baseLines = EN_LINES[role] || EN_LINES['Librarian'];
+      const talkLen = randInt(1, baseLines.length);
+      const dialogueEN = baseLines.slice(0, talkLen);
+
+      npcs.push({
+        id: i, name, age, bookLove, role,
+        x, y, baseX:x, baseY:y,
+        behavior,
+        walkRange: behavior === 'walk' ? rand(40, 140) : 0,
+        phase: Math.random() * Math.PI * 2,
+        speed: behavior === 'walk' ? rand(0.3, 0.8) : 0,
+        radius: 14,
+        dialogueEN,
+        talked: false,
+      });
+    }
+  }
+
+  // ============================================================
+  //  Save / Load
+  // ============================================================
+  function loadState() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const data = JSON.parse(raw);
+        talked = new Set(data.talked || []);
+        booksRead = new Set(data.booksRead || []);
+        for (const n of npcs) if (talked.has(n.id)) n.talked = true;
+      }
+    } catch(e) { talked = new Set(); booksRead = new Set(); }
+  }
+  function saveState() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        talked: [...talked],
+        booksRead: [...booksRead],
+      }));
+    } catch(e) {}
+  }
+
+  // ============================================================
+  //  Init
+  // ============================================================
+  function initGame() {
+    buildAreas();
+    buildWallsAndDoors();
+    buildShelves();
+    buildNPCs();
+    player.x = START_X;
+    player.y = START_Y;
+    loadState();
+    updateHUD();
+    buildChecklist();
+  }
+
+  function updateHUD() {
+    talkedDisplay.textContent = talked.size;
+    booksDisplay.textContent = booksRead.size;
+    const a = areaAt(player.x, player.y);
+    areaDisplay.textContent = a.name;
+    const c = Math.floor(player.x / MAP_W) + 1;
+    const r = Math.floor(player.y / MAP_H) + 1;
+    mapDisplay.textContent = `${c},${r}`;
+  }
+
+  // ============================================================
+  //  Checklist
+  // ============================================================
+  function buildChecklist() {
+    checklistScroll.innerHTML = '';
+    for (const n of npcs) {
+      const div = document.createElement('div');
+      div.className = 'checklist-item' + (talked.has(n.id) ? ' checked' : '');
+      div.innerHTML = `<span class="mark">${talked.has(n.id) ? 'V' : '-'}</span>
+        <span>${n.name}</span>
+        <span class="rank">${n.bookLove}</span>`;
+      checklistScroll.appendChild(div);
+    }
+    clProgress.textContent = talked.size;
+    clBooks.textContent = booksRead.size;
+  }
+
+  // ============================================================
+  //  Input
+  // ============================================================
+  window.addEventListener('keydown', (e) => {
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) {
+      e.preventDefault();
+      keys[e.key] = true;
+    }
+    if (e.key === 'Escape') {
+      closeDialogue();
+      closeChecklist();
+      closeReader();
+    }
+  });
+  window.addEventListener('keyup', (e) => {
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) {
+      e.preventDefault();
+      keys[e.key] = false;
+    }
+  });
+
+  canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const sx = canvas.width / rect.width;
+    const sy = canvas.height / rect.height;
+    mouseX = (e.clientX - rect.left) * sx;
+    mouseY = (e.clientY - rect.top) * sy;
+  });
+
+  canvas.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    if (reading) return;
+    if (conversation) { nextDialogue(); return; }
+    if (activeDoor) { activeDoor.open = !activeDoor.open; return; }
+    if (activeBook) { openReader(activeBook.book); return; }
+    if (activeNPC) { startDialogue(activeNPC); return; }
+  });
+
+  checklistBtn.addEventListener('click', (e) => { e.preventDefault(); checklistPanel.classList.toggle('open'); buildChecklist(); });
+  minimapBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    showMinimap = !showMinimap;
+    minimapBtn.textContent = showMinimap ? 'HIDE MINIMAP' : 'SHOW MINIMAP';
+  });
+  clClose.addEventListener('click', (e) => { e.preventDefault(); checklistPanel.classList.remove('open'); });
+  clReset.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (confirm('Reset all progress?')) {
+      talked = new Set(); booksRead = new Set();
+      for (const n of npcs) n.talked = false;
+      saveState(); buildChecklist(); updateHUD();
+    }
+  });
+  mapToggleBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    showMapCoord = !showMapCoord;
+    if (showMapCoord) { mapCoordSpan.classList.remove('hidden-coord'); mapToggleBtn.textContent = 'HIDE COORDS'; }
+    else { mapCoordSpan.classList.add('hidden-coord'); mapToggleBtn.textContent = 'SHOW COORDS'; }
+  });
+  dNext.addEventListener('click', (e) => { e.preventDefault(); nextDialogue(); });
+  dClose.addEventListener('click', (e) => { e.preventDefault(); closeDialogue(); });
+
+  function closeChecklist() { checklistPanel.classList.remove('open'); }
+
+  // ============================================================
+  //  Dialogue
+  // ============================================================
+  function startDialogue(npc) {
+    conversation = { npc, page: 0 };
+    dName.textContent = npc.name;
+    dAge.textContent = npc.age;
+    dRank.textContent = npc.bookLove;
+    dRole.textContent = npc.role;
+    renderDialogue();
+    dialogue.classList.add('open');
+    if (!talked.has(npc.id)) {
+      talked.add(npc.id); npc.talked = true;
+      saveState(); updateHUD(); buildChecklist();
+    }
+  }
+  function renderDialogue() {
+    if (!conversation) return;
+    const { npc, page } = conversation;
+    dText.textContent = npc.dialogueEN[page] || '';
+    dPage.textContent = `${page+1} / ${npc.dialogueEN.length}`;
+    dNext.textContent = (page < npc.dialogueEN.length - 1) ? 'NEXT' : 'FINISH';
+  }
+  function nextDialogue() {
+    if (!conversation) return;
+    if (conversation.page < conversation.npc.dialogueEN.length - 1) {
+      conversation.page++; renderDialogue();
+    } else { closeDialogue(); }
+  }
+  function closeDialogue() { conversation = null; dialogue.classList.remove('open'); }
+
+  // ============================================================
+  //  Reader
+  // ============================================================
+  function openReader(book) {
+    reading = { book, page: 0 };
+    readerTitle.textContent = book.title;
+    renderReader();
+    reader.classList.add('open');
+    if (!booksRead.has(book.id)) {
+      booksRead.add(book.id);
+      saveState(); updateHUD(); buildChecklist();
+    }
+  }
+  function renderReader() {
+    if (!reading) return;
+    const { book, page } = reading;
+    readerBody.innerHTML = book.pages[page] || '';
+    readerPageInfo.textContent = `${page+1} / ${book.pages.length}`;
+    readerPrev.disabled = page === 0;
+    readerNext.disabled = page >= book.pages.length - 1;
+  }
+  function closeReader() { reading = null; reader.classList.remove('open'); }
+  readerPrev.addEventListener('click', () => { if (reading && reading.page > 0) { reading.page--; renderReader(); } });
+  readerNext.addEventListener('click', () => { if (reading && reading.page < reading.book.pages.length - 1) { reading.page++; renderReader(); } });
+  readerClose.addEventListener('click', closeReader);
+
+  // ============================================================
+  //  Collision
+  // ============================================================
+  function resolveRectCollision(cx, cy, r, rx, ry, rw, rh) {
+    const nx = clamp(cx, rx, rx + rw);
+    const ny = clamp(cy, ry, ry + rh);
+    const dx = cx - nx, dy = cy - ny;
+    const d2 = dx*dx + dy*dy;
+    if (d2 >= r*r) return null;
+    if (d2 > 0.0001) {
+      const d = Math.sqrt(d2);
+      const overlap = r - d;
+      return { x: cx + (dx/d)*overlap, y: cy + (dy/d)*overlap };
+    }
+    const left = cx - rx, right = rx + rw - cx;
+    const top = cy - ry, bottom = ry + rh - cy;
+    const min = Math.min(left, right, top, bottom);
+    if (min === left) return { x: rx - r, y: cy };
+    if (min === right) return { x: rx + rw + r, y: cy };
+    if (min === top) return { x: cx, y: ry - r };
+    return { x: cx, y: ry + rh + r };
+  }
+
+  function tryMovePlayer(dx, dy) {
+    player.x = clamp(player.x + dx, 20, WORLD_W - 20);
+    for (const w of walls) {
+      const res = resolveRectCollision(player.x, player.y, player.radius, w.x, w.y, w.w, w.h);
+      if (res) { player.x = res.x; player.y = res.y; }
+    }
+    for (const dr of doors) {
+      if (dr.open) continue;
+      const res = resolveRectCollision(player.x, player.y, player.radius, dr.x, dr.y, dr.w, dr.h);
+      if (res) { player.x = res.x; player.y = res.y; }
+    }
+    for (const s of shelves) {
+      const res = resolveRectCollision(player.x, player.y, player.radius, s.x, s.y, s.w, s.h);
+      if (res) { player.x = res.x; player.y = res.y; }
+    }
+    player.y = clamp(player.y + dy, 20, WORLD_H - 20);
+    for (const w of walls) {
+      const res = resolveRectCollision(player.x, player.y, player.radius, w.x, w.y, w.w, w.h);
+      if (res) { player.x = res.x; player.y = res.y; }
+    }
+    for (const dr of doors) {
+      if (dr.open) continue;
+      const res = resolveRectCollision(player.x, player.y, player.radius, dr.x, dr.y, dr.w, dr.h);
+      if (res) { player.x = res.x; player.y = res.y; }
+    }
+    for (const s of shelves) {
+      const res = resolveRectCollision(player.x, player.y, player.radius, s.x, s.y, s.w, s.h);
+      if (res) { player.x = res.x; player.y = res.y; }
+    }
+  }
+
+  // ============================================================
+  //  Update
+  // ============================================================
+  function update(dt) {
+    const baseSpeed = player.speed * 0.4;
+    let dx = 0, dy = 0;
+    if (keys.ArrowUp) dy -= 1;
+    if (keys.ArrowDown) dy += 1;
+    if (keys.ArrowLeft) dx -= 1;
+    if (keys.ArrowRight) dx += 1;
+    if (dx !== 0 || dy !== 0) {
+      const len = Math.hypot(dx, dy);
+      dx = dx/len*baseSpeed; dy = dy/len*baseSpeed;
+      const total = Math.hypot(dx, dy);
+      const steps = Math.max(1, Math.ceil(total / 4));
+      for (let s = 0; s < steps; s++) tryMovePlayer(dx/steps, dy/steps);
+    }
+
+    const camX = clamp(player.x - W/2, 0, WORLD_W - W);
+    const camY = clamp(player.y - H/2, 0, WORLD_H - H);
+    const wmx = mouseX + camX, wmy = mouseY + camY;
+    player.angle = Math.atan2(wmy - player.y, wmx - player.x);
+
+    for (const n of npcs) {
+      if (n.behavior === 'walk') {
+        n.phase += 0.02 * n.speed;
+        n.x = n.baseX + Math.cos(n.phase) * n.walkRange;
+        n.y = n.baseY + Math.sin(n.phase * 0.8) * n.walkRange * 0.5;
+      }
+    }
+
+    activeNPC = null;
+    let bestD = 60;
+    for (const n of npcs) {
+      const d = dist(n.x, n.y, player.x, player.y);
+      if (d < bestD) { bestD = d; activeNPC = n; }
+    }
+
+    activeDoor = null;
+    let bestDoorD = 55;
+    for (const dr of doors) {
+      const d = dist(dr.x + dr.w/2, dr.y + dr.h/2, player.x, player.y);
+      if (d < bestDoorD) { bestDoorD = d; activeDoor = dr; }
+    }
+
+    activeBook = null;
+    let bestBookD = 70;
+    for (const s of shelves) {
+      if (!s.book) continue;
+      const d = dist(s.x + s.w/2, s.y + s.h/2, player.x, player.y);
+      if (d < bestBookD) { bestBookD = d; activeBook = s; }
+    }
+
+    if (activeNPC && !conversation && !reading) {
+      npName.textContent = activeNPC.name;
+      npAge.textContent = activeNPC.age;
+      npRank.textContent = activeNPC.bookLove;
+      npRole.textContent = activeNPC.role;
+      npcPanel.classList.add('open');
+    } else { npcPanel.classList.remove('open'); }
+
+    if (activeBook && !conversation && !reading && !activeNPC) {
+      bpTitle.textContent = activeBook.book.title;
+      bpAuthor.textContent = activeBook.book.author;
+      bookPanel.classList.add('open');
+    } else { bookPanel.classList.remove('open'); }
+
+    updateHUD();
+  }
+
+  // ============================================================
+  //  Draw
+  // ============================================================
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    const camX = clamp(player.x - W/2, 0, WORLD_W - W);
+    const camY = clamp(player.y - H/2, 0, WORLD_H - H);
+    ctx.save();
+    ctx.translate(-camX, -camY);
+
+    for (const a of areas) {
+      if (a.x > camX + W || a.x + a.w < camX || a.y > camY + H || a.y + a.h < camY) continue;
+      drawArea(a);
+    }
+
+    for (const s of shelves) {
+      if (s.x > camX + W || s.x + s.w < camX || s.y > camY + H || s.y + s.h < camY) continue;
+      drawShelf(s);
+    }
+
+    for (const dr of doors) {
+      if (dr.x > camX + W || dr.x + dr.w < camX || dr.y > camY + H || dr.y + dr.h < camY) continue;
+      drawDoor(dr);
+    }
+
+    for (const n of npcs) {
+      if (n.x < camX - 40 || n.x > camX + W + 40 || n.y < camY - 40 || n.y > camY + H + 40) continue;
+      drawNPC(n);
+    }
+
+    drawPlayer();
+
+    if (activeNPC && !conversation && !reading) {
+      ctx.fillStyle = '#00e6b0'; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('Click to talk', activeNPC.x, activeNPC.y - 34);
+    }
+    if (activeBook && !conversation && !reading && !activeNPC) {
+      ctx.fillStyle = '#ffd166'; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('Click to read', activeBook.x + activeBook.w/2, activeBook.y - 8);
+    }
+    if (activeDoor) {
+      ctx.fillStyle = '#7ad7ff'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(activeDoor.open ? 'Click to close' : 'Click to open', activeDoor.x + activeDoor.w/2, activeDoor.y - 6);
+    }
+
+    ctx.restore();
+    if (showMinimap) drawMinimap();
+  }
+
+  function drawArea(a) {
+    if (a.type === 'garden') {
+      ctx.fillStyle = '#14301e'; ctx.fillRect(a.x, a.y, a.w, a.h);
+      for (let i = 0; i < 4; i++) drawTree(a.x + 120 + i*180, a.y + 150);
+      drawBench(a.x + a.w/2 - 50, a.y + a.h - 120);
+    } else if (a.type === 'road') {
+      ctx.fillStyle = '#1a1d22'; ctx.fillRect(a.x, a.y, a.w, a.h);
+      ctx.fillStyle = '#e0e0e0';
+      for (let i = 0; i < 8; i++) ctx.fillRect(a.x + 40 + i*90, a.y + a.h/2 - 3, 50, 6);
+    } else if (a.type === 'entrance') {
+      ctx.fillStyle = '#1e2833'; ctx.fillRect(a.x, a.y, a.w, a.h);
+      ctx.fillStyle = '#2a3a4a'; ctx.fillRect(a.x + 60, a.y + a.h/2 - 40, a.w - 120, 80);
+      ctx.fillStyle = '#00e6b0'; ctx.fillRect(a.x + 60, a.y + a.h/2 - 40, a.w - 120, 6);
+    } else if (a.type === 'reception') {
+      ctx.fillStyle = '#1e2833'; ctx.fillRect(a.x, a.y, a.w, a.h);
+      ctx.fillStyle = '#2a3a4a'; ctx.fillRect(a.x + a.w/2 - 200, a.y + 100, 400, 70);
+      ctx.fillStyle = '#00e6b0'; ctx.fillRect(a.x + a.w/2 - 200, a.y + 100, 400, 6);
+      drawChair(a.x + a.w/2 - 150, a.y + 220);
+      drawChair(a.x + a.w/2 + 150, a.y + 220);
+    } else if (a.type === 'catalog') {
+      ctx.fillStyle = '#141b22'; ctx.fillRect(a.x, a.y, a.w, a.h);
+      for (let r = 0; r < 3; r++) for (let c = 0; c < 5; c++) drawDesk(a.x + 60 + c*140, a.y + 60 + r*150);
+    } else if (a.type === 'reading') {
+      ctx.fillStyle = '#1a222c'; ctx.fillRect(a.x, a.y, a.w, a.h);
+      for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) drawReadingTable(a.x + 130 + c*260, a.y + 130 + r*200);
+    } else if (a.type === 'fiction') {
+      ctx.fillStyle = '#1e1a14'; ctx.fillRect(a.x, a.y, a.w, a.h);
+      for (let r = 0; r < 2; r++) for (let c = 0; c < 4; c++) drawCarpet(a.x + 100 + c*180, a.y + 100 + r*220);
+    } else if (a.type === 'reference') {
+      ctx.fillStyle = '#1a1e24'; ctx.fillRect(a.x, a.y, a.w, a.h);
+      for (let r = 0; r < 2; r++) for (let c = 0; c < 4; c++) drawCarpet(a.x + 100 + c*180, a.y + 100 + r*220);
+    } else if (a.type === 'periodical') {
+      ctx.fillStyle = '#221a14'; ctx.fillRect(a.x, a.y, a.w, a.h);
+      for (let r = 0; r < 2; r++) for (let c = 0; c < 3; c++) drawRoundTable(a.x + 150 + c*220, a.y + 150 + r*250);
+    } else if (a.type === 'children') {
+      ctx.fillStyle = '#241a2a'; ctx.fillRect(a.x, a.y, a.w, a.h);
+      for (let i = 0; i < 4; i++) drawCarpet(a.x + 100 + i*160, a.y + 150);
+      for (let i = 0; i < 4; i++) drawCarpet(a.x + 100 + i*160, a.y + 380);
+    } else if (a.type === 'archive') {
+      ctx.fillStyle = '#0d1318'; ctx.fillRect(a.x, a.y, a.w, a.h);
+      for (let r = 0; r < 3; r++) for (let c = 0; c < 5; c++) drawArchiveBox(a.x + 100 + c*130, a.y + 100 + r*160);
+    } else if (a.type === 'lounge') {
+      ctx.fillStyle = '#1a1a24'; ctx.fillRect(a.x, a.y, a.w, a.h);
+      drawSofa(a.x + 120, a.y + 120); drawSofa(a.x + 480, a.y + 120);
+      drawSofa(a.x + 120, a.y + 380); drawSofa(a.x + 480, a.y + 380);
+      drawPlant(a.x + 60, a.y + 60); drawPlant(a.x + a.w - 60, a.y + a.h - 60);
+    } else {
+      ctx.fillStyle = '#161c24'; ctx.fillRect(a.x, a.y, a.w, a.h);
+    }
+    ctx.strokeStyle = '#1e3a4a'; ctx.lineWidth = 2;
+    ctx.strokeRect(a.x, a.y, a.w, a.h);
+    ctx.fillStyle = '#3a5a6a'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText(a.name, a.x + 12, a.y + 24);
+  }
+
+  function drawDesk(x, y) {
+    ctx.fillStyle = '#2a3a4a'; ctx.fillRect(x, y, 100, 60);
+    ctx.fillStyle = '#0a1a2a'; ctx.fillRect(x + 10, y + 8, 80, 30);
+    ctx.fillStyle = '#00e6b0'; ctx.fillRect(x + 14, y + 12, 72, 22);
+    ctx.fillStyle = '#2a3a4a'; ctx.fillRect(x + 20, y + 70, 60, 20);
+  }
+  function drawChair(x, y) {
+    ctx.fillStyle = '#3a4a5a';
+    ctx.beginPath(); ctx.arc(x, y, 12, 0, Math.PI*2); ctx.fill();
+    ctx.fillRect(x - 12, y - 24, 24, 12);
+  }
+  function drawRoundTable(x, y) {
+    ctx.fillStyle = '#3a2a1a';
+    ctx.beginPath(); ctx.arc(x, y, 40, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 2; ctx.stroke();
+  }
+  function drawSofa(x, y) {
+    ctx.fillStyle = '#2a3a5a'; ctx.fillRect(x, y, 100, 50);
+    ctx.fillStyle = '#1a2a4a'; ctx.fillRect(x, y, 100, 15);
+  }
+  function drawPlant(x, y) {
+    ctx.fillStyle = '#3a2a1a'; ctx.fillRect(x - 10, y + 10, 20, 20);
+    ctx.fillStyle = '#1a5a2a';
+    ctx.beginPath(); ctx.arc(x, y, 18, 0, Math.PI*2); ctx.fill();
+  }
+  function drawReadingTable(x, y) {
+    ctx.fillStyle = '#5a3a1a'; ctx.fillRect(x, y, 160, 90);
+    ctx.fillStyle = '#ffd166'; ctx.fillRect(x + 6, y + 6, 148, 4);
+    ctx.fillStyle = '#2a3a4a';
+    ctx.fillRect(x - 20, y + 20, 16, 50);
+    ctx.fillRect(x + 164, y + 20, 16, 50);
+  }
+  function drawCarpet(x, y) {
+    ctx.fillStyle = '#3a2a3a'; ctx.fillRect(x, y, 140, 140);
+    ctx.strokeStyle = '#5a4a5a'; ctx.lineWidth = 2; ctx.strokeRect(x, y, 140, 140);
+  }
+  function drawArchiveBox(x, y) {
+    ctx.fillStyle = '#2a2018'; ctx.fillRect(x, y, 100, 80);
+    ctx.strokeStyle = '#5a4a38'; ctx.lineWidth = 2; ctx.strokeRect(x, y, 100, 80);
+    ctx.fillStyle = '#8a7554'; ctx.fillRect(x + 10, y + 10, 80, 10);
+  }
+  function drawTree(x, y) {
+    ctx.fillStyle = '#3a2a1a'; ctx.fillRect(x - 6, y, 12, 30);
+    ctx.fillStyle = '#1a5a2a';
+    ctx.beginPath(); ctx.arc(x, y - 10, 26, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#2a7a3a';
+    ctx.beginPath(); ctx.arc(x - 10, y - 20, 18, 0, Math.PI*2); ctx.fill();
+  }
+  function drawBench(x, y) {
+    ctx.fillStyle = '#5a3a1a'; ctx.fillRect(x, y, 100, 14);
+    ctx.fillRect(x + 6, y + 14, 8, 20); ctx.fillRect(x + 86, y + 14, 8, 20);
+  }
+  function drawDoor(dr) {
+    if (dr.open) {
+      ctx.fillStyle = 'rgba(42,90,58,0.55)'; ctx.fillRect(dr.x, dr.y, dr.w, dr.h);
+      ctx.strokeStyle = '#00e6b0'; ctx.lineWidth = 2; ctx.strokeRect(dr.x, dr.y, dr.w, dr.h);
+    } else {
+      ctx.fillStyle = '#5a3a1a'; ctx.fillRect(dr.x, dr.y, dr.w, dr.h);
+      ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 2; ctx.strokeRect(dr.x, dr.y, dr.w, dr.h);
+    }
+  }
+
+  function drawShelf(s) {
+    ctx.fillStyle = '#3a2a1a'; ctx.fillRect(s.x, s.y, s.w, s.h);
+    for (let i = 0; i < 4; i++) {
+      ctx.fillStyle = '#2a1a0a';
+      ctx.fillRect(s.x + 6, s.y + 6 + i*24, s.w - 12, 20);
+      for (let j = 0; j < 6; j++) {
+        const colors = ['#ff4d6d','#00e6b0','#ffd166','#7ad7ff','#ff8ad8','#b0c8d8'];
+        ctx.fillStyle = colors[(i*6+j) % colors.length];
+        ctx.fillRect(s.x + 10 + j*((s.w-20)/6), s.y + 8 + i*24, 10, 16);
+      }
+    }
+    if (s.book) {
+      ctx.shadowColor = '#ffd166'; ctx.shadowBlur = 20;
+      ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 3;
+      ctx.strokeRect(s.x - 2, s.y - 2, s.w + 4, s.h + 4);
+      ctx.shadowBlur = 0;
+    }
+  }
+
+  function drawNPC(n) {
+    const x = n.x, y = n.y;
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.beginPath(); ctx.ellipse(x, y + 16, 12, 4, 0, 0, Math.PI*2); ctx.fill();
+    const bodyColor = n.bookLove >= 70 ? '#3a2a4a' : (n.bookLove >= 40 ? '#2a3a4a' : '#3a4a5a');
+    ctx.fillStyle = bodyColor; ctx.fillRect(x - 8, y - 4, 16, 20);
+    ctx.fillStyle = '#e0b090';
+    ctx.beginPath(); ctx.arc(x, y - 12, 8, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = ['#1a1a1a','#3a2a1a','#5a4a2a','#7a6a3a'][n.id % 4];
+    ctx.beginPath(); ctx.arc(x, y - 15, 8, Math.PI, Math.PI*2); ctx.fill();
+    if (talked.has(n.id)) {
+      ctx.fillStyle = '#00e6b0'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('V', x + 12, y - 18);
+    }
+  }
+
+  function drawPlayer() {
+    const x = player.x, y = player.y;
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.beginPath(); ctx.ellipse(x, y + 16, 12, 4, 0, 0, Math.PI*2); ctx.fill();
+    ctx.shadowColor = '#00e6b0'; ctx.shadowBlur = 18;
+    ctx.fillStyle = '#0a1a1a';
+    ctx.beginPath(); ctx.arc(x, y, player.radius, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#00e6b0'; ctx.lineWidth = 2.5; ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#00e6b0'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(x, y);
+    ctx.lineTo(x + Math.cos(player.angle)*24, y + Math.sin(player.angle)*24);
+    ctx.stroke();
+  }
+
+  function drawMinimap() {
+    const mw = 180, mh = 140;
+    const mx = W - mw - 12, my = H - mh - 12;
+    ctx.fillStyle = 'rgba(10,12,15,0.85)'; ctx.fillRect(mx, my, mw, mh);
+    ctx.strokeStyle = '#1e3a4a'; ctx.lineWidth = 1; ctx.strokeRect(mx, my, mw, mh);
+    const sx = mw / WORLD_W, sy = mh / WORLD_H;
+    for (const a of areas) {
+      ctx.fillStyle = (a.type === 'garden') ? '#1a3a2a' :
+                      (a.type === 'road') ? '#2a2a2a' :
+                      (a.type === 'reading') ? '#2a2a3a' :
+                      (a.type === 'archive') ? '#1a1a1a' :
+                      (a.type === 'lounge') ? '#2a1a2a' : '#1a222c';
+      ctx.fillRect(mx + a.x*sx, my + a.y*sy, a.w*sx, a.h*sy);
+    }
+    ctx.fillStyle = '#ffd166';
+    for (const rb of realBooks) {
+      ctx.fillRect(mx + (rb.shelf.x)*sx - 1, my + (rb.shelf.y)*sy - 1, 3, 3);
+    }
+    ctx.fillStyle = '#00e6b0';
+    ctx.fillRect(mx + player.x*sx - 2, my + player.y*sy - 2, 4, 4);
+    ctx.fillStyle = '#ffd166'; ctx.font = '10px sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText('MINIMAP', mx + 4, my + 12);
+  }
+
+  // ============================================================
+  //  Loop
+  // ============================================================
+  function gameLoop(timestamp) {
+    const dt = Math.min(2, (timestamp - lastTime) / (1000/60));
+    lastTime = timestamp;
+    update(dt);
+    draw();
+    requestAnimationFrame(gameLoop);
+  }
+
+  // ============================================================
+  //  Opening
+  // ============================================================
+  const opening = document.getElementById('opening');
+  const startBtn = document.getElementById('startBtn');
+  startBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    opening.classList.add('hidden-opening');
+    setTimeout(() => { opening.style.display = 'none'; }, 500);
+  });
+
+  // ============================================================
+  //  Start
+  // ============================================================
+  initGame();
+  requestAnimationFrame(gameLoop);
+})();
+</script>
+</body>
+</html>
