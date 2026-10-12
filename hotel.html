@@ -86,9 +86,6 @@
   .info-panel .panel-btns button { flex:1; }
   .empty-note { color:#4a5a6a; font-size:12px; font-style:italic; }
 
-  /* ============================================================
-     DIALOGUE  — bottom-center position
-     ============================================================ */
   .dialogue {
     position:fixed; left:50%; bottom:20px;
     transform:translateX(-50%) translateY(20px);
@@ -443,6 +440,9 @@
   let toastTimer = 0;
 
   let walkingTo = null;
+
+  // ★ 会話を開いた直後の click を無視するフラグ
+  let justOpenedDialogue = false;
 
   // ============================================================
   //  Cell types
@@ -1260,6 +1260,7 @@
     mouseX = (e.clientX - rect.left) * sx;
     mouseY = (e.clientY - rect.top) * sy;
   });
+
   canvas.addEventListener('mousedown', e => {
     if (e.button !== 0) return;
     if (elevatorPanel.classList.contains('hidden') === false) return;
@@ -1292,8 +1293,10 @@
       return;
     }
 
+    // === NPC click ===
     if (activeNPC) {
       e.preventDefault();
+      justOpenedDialogue = true;
       startDialogue(activeNPC);
       return;
     }
@@ -1323,6 +1326,12 @@
   });
 
   dialogue.addEventListener('click', e => {
+    if (justOpenedDialogue) {
+      justOpenedDialogue = false;
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
     if (e.target.closest('.choice-row')) return;
     e.preventDefault();
     nextDialogue();
@@ -1944,7 +1953,6 @@
 
     // ============================================================
     //  activeNPC detection — all guests are candidates
-    //  The character whose AGE panel appears is the one you can talk to.
     // ============================================================
     activeNPC = null;
     let bestD = 260;
