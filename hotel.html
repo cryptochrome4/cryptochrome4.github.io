@@ -66,14 +66,15 @@
   .info-panel .panel-btns button { flex:1; }
   .empty-note { color:#4a5a6a; font-size:12px; font-style:italic; }
 
-  .dialogue { position:fixed; right:20px; bottom:20px; left:auto;
-    width:520px; max-width:calc(100vw - 340px);
+  .dialogue { position:fixed; left:50%; bottom:24px;
+    transform:translateX(-50%) translateY(20px);
+    width:720px; max-width:92vw;
     background:#0d131aee; border:2px solid #00e6b0; border-radius:16px;
     padding:18px 22px; z-index:9500; box-shadow:0 0 40px #00e6b055;
     opacity:0; pointer-events:none;
     transition:opacity 0.2s ease, transform 0.2s ease;
-    transform:translateY(20px); cursor:pointer; }
-  .dialogue.open { opacity:1; pointer-events:auto; transform:translateY(0); }
+    cursor:pointer; }
+  .dialogue.open { opacity:1; pointer-events:auto; transform:translateX(-50%) translateY(0); }
   .dialogue .d-head { display:flex; align-items:center; gap:12px; margin-bottom:10px; flex-wrap:wrap; }
   .dialogue .d-name { color:#00e6b0; font-size:18px; font-weight:800; letter-spacing:1px; }
   .dialogue .d-meta { color:#7a8b9b; font-size:12px; }
@@ -84,12 +85,12 @@
   .dialogue .choice-row .ui-btn { flex:1; min-width:120px; pointer-events:auto; }
   .dialogue .d-foot .ui-btn { pointer-events:none; opacity:0.6; }
 
-  .npc-panel { position:fixed; left:20px; bottom:20px;
-    width:260px; max-width:260px;
+  .npc-panel { position:fixed; left:24px; bottom:24px;
     background:#0d131aee; border:2px solid #7ad7ff; border-radius:14px;
     padding:12px 16px; z-index:9400; color:#e0e0e0; font-size:13px;
     line-height:1.5; box-shadow:0 0 30px #7ad7ff44;
-    opacity:0; pointer-events:none; transition:opacity 0.15s ease; }
+    opacity:0; pointer-events:none; transition:opacity 0.15s ease;
+    max-width:280px; }
   .npc-panel.open { opacity:1; }
   .npc-panel .n-name { color:#7ad7ff; font-weight:800; font-size:15px; }
   .npc-panel .n-hint { color:#00e6b0; font-size:11px; margin-top:6px; }
@@ -114,6 +115,7 @@
     border-radius:50px; padding:16px 40px; font-size:16px; font-weight:700;
     letter-spacing:3px; cursor:pointer; font-family:inherit; }
   .bgview-btn:hover { background:#7ad7ff; color:#0a0c0f; }
+  .opening.hidden-opening { opacity:0; pointer-events:none; }
 
   .bg-viewer { position:fixed; inset:0; background:#000; z-index:10000;
     display:flex; flex-direction:column; justify-content:center; align-items:center; }
@@ -361,7 +363,6 @@
       grid[1][c].type = CELL.ROAD;    grid[1][c].areaName = 'Road';
     }
     grid[1][6].type = CELL.ENTRANCE; grid[1][6].areaName = 'Hotel Entrance';
-
     const floorRows = [
       { roomsRow: 2, hallRow: 3, floor: 4, special: CELL.BANQUET },
       { roomsRow: 4, hallRow: 5, floor: 3, special: CELL.GACHA },
@@ -375,7 +376,6 @@
         [CELL.ONSEN]:'Onsen', [CELL.REST]:'Rest Room'
       }[fr.special];
       grid[fr.roomsRow][0].floorTag = fr.floor;
-
       for (let i = 1; i <= 10; i++) {
         const num = fr.floor*100 + i;
         const cell = grid[fr.roomsRow][i];
@@ -391,12 +391,10 @@
       grid[fr.roomsRow][11].areaName = 'Elevator';
       grid[fr.roomsRow][11].floorTag = fr.floor;
       elevatorCells.push(grid[fr.roomsRow][11]);
-
       grid[fr.roomsRow][12].type = CELL.STAIRS;
       grid[fr.roomsRow][12].areaName = 'Stairs';
       grid[fr.roomsRow][12].floorTag = fr.floor;
       stairsCells.push(grid[fr.roomsRow][12]);
-
       for (let c = 0; c < MAP_COLS; c++) {
         grid[fr.hallRow][c].type = CELL.HALL;
         grid[fr.hallRow][c].areaName = 'Hallway';
@@ -412,7 +410,6 @@
     }
     grid[11][2].type = CELL.PRESENTATION;
     grid[11][2].areaName = 'Presentation Room';
-
     buildWallsAndDoors();
   }
 
@@ -856,7 +853,7 @@
   }
 
   // ============================================================
-  //  INPUT - exact same structure as GS Office
+  //  INPUT — EXACTLY like GS Office
   // ============================================================
   window.addEventListener('keydown', e => {
     if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) {
@@ -878,56 +875,9 @@
   canvas.addEventListener('mousedown', e => {
     if (e.button !== 0) return;
     e.preventDefault();
-    if (!gameStarted) return;
-    if (elevatorPanel.classList.contains('hidden') === false) return;
     if (conversation) { nextDialogue(); return; }
-    if (presViewOpen && currentPresentation) {
-      if (presSlideIndex < currentPresentation.slides.length - 1) {
-        presSlideIndex++;
-      } else {
-        presViewOpen = false;
-        presenterState = 'presented';
-        conversation = { npc: presenter, page:0, lines:[
-          "以上でプレゼンは終わりです。","宣伝しますか？それとも投資しますか？"
-        ], choices:[
-          { label:'Promote (+¥100)', action: () => { money += 100; showToast('You promoted. +¥100', 2); updateHUD(); buildInfoPanel(); } },
-          { label:'Invest (¥10,000 / 4h)', action: () => {
-            if (hotelPaid) { showToast('You already paid the hotel. Investment not available.', 2); }
-            else if (money >= 10000) {
-              money -= 10000; invested = true;
-              investReturnHour = (gameHours + 4) % 24;
-              showToast('You invested ¥10,000. Return in 4 hours.', 3);
-              updateHUD(); buildInfoPanel();
-            } else { showToast('You need ¥10,000 to invest.', 2); }
-          } },
-        ]};
-        dialogue.classList.add('open');
-        renderDialogue();
-      }
-      return;
-    }
-    // === NPC talk FIRST (exactly like GS Office) ===
+    if (activeDoor) { activeDoor.open = !activeDoor.open; return; }
     if (activeNPC) { startDialogue(activeNPC); return; }
-    // === Lamp click ===
-    const rect = canvas.getBoundingClientRect();
-    const clickX = (e.clientX - rect.left) * (canvas.width / rect.width);
-    const clickY = (e.clientY - rect.top) * (canvas.height / rect.height);
-    const camX = clamp(player.x - W/2, 0, WORLD_W - W);
-    const camY = clamp(player.y - H/2, 0, WORLD_H - H);
-    const wClickX = clickX + camX;
-    const wClickY = clickY + camY;
-    const clickedCell = cellAt(wClickX, wClickY);
-    if (clickedCell.type === CELL.ROOM && clickedCell.lamp) {
-      if (dist(wClickX, wClickY, clickedCell.lamp.x, clickedCell.lamp.y) < 50) {
-        clickedCell.lamp.on = !clickedCell.lamp.on;
-        showToast(clickedCell.lamp.on ? 'Light ON' : 'Light OFF', 1.2);
-        return;
-      }
-    }
-    // === Door / EV / Stairs ===
-    if (activeDoor) { tryToggleDoor(activeDoor); return; }
-    if (activeElevator) { handleElevatorClick(); return; }
-    if (activeStairs) { handleStairsClick(); return; }
   });
 
   dialogue.addEventListener('click', e => {
@@ -984,18 +934,6 @@
         const adult = group.members.find(m => m.age >= 18) || group.members[0];
         startDialogue(adult);
       }
-    }
-  }
-
-  function tryToggleDoor(dr) {
-    if (dr.isPresentationDoor) {
-      if (presenterState !== 'presented' && presenterState !== 'atRoom') { showToast('This door is locked until the presenter arrives.', 2); return; }
-      dr.open = !dr.open;
-    } else if (dr.roomNum) {
-      if (dr.locked) { showToast('This room is locked. Use a key from the INFO PANEL.', 2); return; }
-      dr.open = !dr.open;
-      const r = rooms.find(rr => rr.num === dr.roomNum);
-      if (r) r.doorOpen = dr.open;
     }
   }
 
@@ -1158,6 +1096,7 @@
     comedyState = 'leaving';
   }
 
+  // ==== startDialogue - EXACTLY like GS Office ====
   function startDialogue(npc) {
     if (!npc) return;
     conversation = { npc, page:0, lines:[], choices:null };
@@ -1406,7 +1345,8 @@
       g.y = g.baseY + Math.sin(g.phase * 0.8) * 4;
     }
 
-    // === Active NPC detection - GS Office style (use n.x, n.y) ===
+    // ==== Active NPC detection — EXACTLY like GS Office ====
+    // Iterate over all characters (guests + presenter + comedians)
     activeNPC = null;
     let bestD = 60;
     const candidates = [];
@@ -1420,6 +1360,7 @@
       if (d < bestD) { bestD = d; activeNPC = n; }
     }
 
+    // Active door
     activeDoor = null;
     let bestDoorD = 55;
     for (const dr of doors) {
@@ -1438,7 +1379,7 @@
       if (dist(player.x, player.y, ex, ey) < 120) activeStairs = c;
     }
 
-    // === NPC panel - GS Office style: only when !conversation ===
+    // NPC panel — only when not in conversation
     if (activeNPC && !conversation) {
       npName.textContent = activeNPC.name || '???';
       if (activeNPC.groupId !== undefined) {
@@ -1527,7 +1468,7 @@
     if (presViewOpen && currentPresentation) drawPresentationSlide();
     drawPlayer();
 
-    // === Head "Click to talk" - GS Office style (use n.x, n.y) ===
+    // ==== Head "Click to talk" — EXACTLY like GS Office ====
     if (activeNPC && !conversation) {
       ctx.fillStyle = '#00e6b0';
       ctx.font = 'bold 13px sans-serif';
@@ -1838,7 +1779,7 @@
     requestAnimationFrame(gameLoop);
   }
 
-  // START - exactly like GS Office
+  // START — exactly like GS Office
   const opening = document.getElementById('opening');
   const startBtn = document.getElementById('startBtn');
   const bgViewBtn = document.getElementById('bgViewBtn');
@@ -1849,7 +1790,6 @@
     e.preventDefault();
     opening.classList.add('hidden-opening');
     setTimeout(() => { opening.style.display = 'none'; }, 500);
-    gameStarted = true;
   });
   bgViewBtn.addEventListener('click', (e) => {
     e.preventDefault();
