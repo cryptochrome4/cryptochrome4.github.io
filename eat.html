@@ -792,14 +792,14 @@
   }
 
   // ========== 状態管理 ==========
-  let money = TOTAL_COST;       // 273,000 円
+  let money = TOTAL_COST;
   let totalSpent = 0;
   let platesOnLane = [];
   let stackedParts = [];
   let currentTablePart = null;
   let currentTableEl = null;
-  let bonusGiven = false;        // 1万円以上使ったら footer に study.html
-  let allCleared = false;        // 全皿制覇でクリア画面
+  let bonusGiven = false;      // 10万円以上使ったら footer に study.html
+  let allCleared = false;      // 全皿制覇でクリア画面
 
   const lane = document.getElementById('lane');
   const stack = document.getElementById('stack');
@@ -816,37 +816,74 @@
   const footerText = document.getElementById('footer-text');
 
   const LANE_SPEED = 0.6;
+  const PLATE_SPACING = 140;
   let nextPlateId = 0;
 
-  // 初期所持金表示
   moneyDisplay.textContent = '💰 ¥' + money.toLocaleString();
+
+  // レーン上に存在しないパーツを取得（食われた/流れ去ったものを除く）
+  function getAvailableParts() {
+    const onLane = new Set(platesOnLane.map(p => p.part.key));
+    // まだ一度も登場していない（初期配置前）または食われていないパーツ
+    // 「同じ単語の皿は流れない」= レーン上に同じパーツが2枚以上ない
+    return PARTS.filter(p => !onLane.has(p.key));
+  }
+
+  // 皿を1枚生成してレーンの指定X位置に置く
+  function spawnPlate(part, x) {
+    const el = document.createElement('div');
+    el.className = 'plate';
+    el.dataset.id = nextPlateId;
+    el.innerHTML = plateSVG(part.svg) + `<span class="label">${part.name}</span>`;
+    el.style.left = x + 'px';
+    lane.appendChild(el);
+
+    const plateObj = {
+      id: nextPlateId,
+      part: part,
+      x: x,
+      el: el,
+      eaten: false
+    };
+
+    el.addEventListener('click', () => onPlateClick(plateObj));
+    platesOnLane.push(plateObj);
+    nextPlateId++;
+    return plateObj;
+  }
 
   function initLane() {
     const shuffled = [...PARTS].sort(() => Math.random() - 0.5);
-    const spacing = 140;
     shuffled.forEach((part, i) => {
-      const el = document.createElement('div');
-      el.className = 'plate';
-      el.dataset.id = nextPlateId;
-      el.innerHTML = plateSVG(part.svg) + `<span class="label">${part.name}</span>`;
-      el.style.left = (i * spacing) + 'px';
-      lane.appendChild(el);
-
-      const plateObj = {
-        id: nextPlateId,
-        part: part,
-        x: i * spacing,
-        el: el,
-        eaten: false
-      };
-
-      el.addEventListener('click', () => onPlateClick(plateObj));
-      platesOnLane.push(plateObj);
-      nextPlateId++;
+      spawnPlate(part, i * PLATE_SPACING);
     });
   }
 
+  // ループ補充：レーン右端の外側に、まだレーン上に無いパーツを補充
+  function refillLane() {
+    // レーン上の最も右の皿のXを取得
+    let maxX = -Infinity;
+    for (const p of platesOnLane) {
+      if (p.eaten) continue;
+      if (p.x > maxX) maxX = p.x;
+    }
+
+    const laneWidth = lane.clientWidth;
+    // 右端から十分な余白が空いていれば補充
+    const available = getAvailableParts();
+    if (available.length === 0) return;
+
+    // 右端の皿が laneWidth より内側にいて、十分な隙間があれば補充
+    const targetX = Math.max(laneWidth, maxX + PLATE_SPACING);
+    if (targetX - maxX < PLATE_SPACING && maxX > -200) return;
+
+    // ランダムに1つ選んで補充
+    const part = available[Math.floor(Math.random() * available.length)];
+    spawnPlate(part, targetX);
+  }
+
   function animate() {
+    // 皿を左へ移動
     for (let i = platesOnLane.length - 1; i >= 0; i--) {
       const p = platesOnLane[i];
       if (p.eaten) continue;
@@ -859,6 +896,10 @@
         platesOnLane.splice(i, 1);
       }
     }
+
+    // ループ補充（定期的に呼ぶ）
+    refillLane();
+
     requestAnimationFrame(animate);
   }
 
@@ -897,8 +938,8 @@
 
     eatBtn.disabled = false;
 
-    // 仮クリア（1万円以上使ったら footer に study.html を出すだけ）
-    if (totalSpent >= 10000 && !bonusGiven) {
+    // 10万円以上使ったら footer に study.html
+    if (totalSpent >= 100000 && !bonusGiven) {
       bonusGiven = true;
       footerText.innerHTML = '© 2026 Sushi Spec · <a href="study.html" target="_self">study.html</a>';
     }
@@ -952,10 +993,8 @@
     }
   });
 
-  // 本当のクリア画面
   function showAllClear() {
     clearNotice.classList.add('active');
-    // footer も念のため study.html を出す
     if (!bonusGiven) {
       bonusGiven = true;
     }
