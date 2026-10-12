@@ -366,7 +366,7 @@
     z-index: 2001;
   }
 
-  /* クリア通知 */
+  /* クリア通知（本当のクリア時のみ） */
   #clear-notice {
     position: fixed;
     top: 50%;
@@ -448,7 +448,7 @@
 <!-- ========== オープニング ========== -->
 <div id="opening">
   <h1>回転寿司</h1>
-  <p>SPEC PLATE · 100,000 YEN CHALLENGE</p>
+  <p>SPEC PLATE · 273,000 YEN CHALLENGE</p>
   <div class="opening-buttons">
     <button class="opening-btn" id="start-btn">はじめる</button>
     <button class="opening-btn" id="view-bg-btn">背景画像を見る</button>
@@ -465,7 +465,7 @@
 <div id="game" style="display:none;">
 
   <div id="hud">
-    <span class="money" id="money-display">💰 ¥100,000</span>
+    <span class="money" id="money-display">💰 ¥273,000</span>
     <span class="counter" id="counter-display">PLATES: 0 / 0</span>
   </div>
 
@@ -493,10 +493,10 @@
   </div>
 </div>
 
-<!-- ========== クリア通知 ========== -->
+<!-- ========== クリア通知（本当のクリア時のみ） ========== -->
 <div id="clear-notice">
-  <h2>CLEAR!</h2>
-  <p>10万円以上使いました</p>
+  <h2>ALL CLEAR!</h2>
+  <p>全15皿 制覇 · ¥273,000 完食</p>
   <a href="study.html" target="_self">study.html へ進む</a>
 </div>
 
@@ -612,6 +612,8 @@
       svg: 'fan'
     }
   ];
+
+  const TOTAL_COST = PARTS.reduce((s, p) => s + p.cost, 0); // 273,000
 
   // ========== 皿のSVGドット絵生成 ==========
   function plateSVG(type) {
@@ -790,13 +792,14 @@
   }
 
   // ========== 状態管理 ==========
-  let money = 100000;
+  let money = TOTAL_COST;       // 273,000 円
   let totalSpent = 0;
   let platesOnLane = [];
   let stackedParts = [];
   let currentTablePart = null;
   let currentTableEl = null;
-  let cleared = false;
+  let bonusGiven = false;        // 1万円以上使ったら footer に study.html
+  let allCleared = false;        // 全皿制覇でクリア画面
 
   const lane = document.getElementById('lane');
   const stack = document.getElementById('stack');
@@ -814,6 +817,9 @@
 
   const LANE_SPEED = 0.6;
   let nextPlateId = 0;
+
+  // 初期所持金表示
+  moneyDisplay.textContent = '💰 ¥' + money.toLocaleString();
 
   function initLane() {
     const shuffled = [...PARTS].sort(() => Math.random() - 0.5);
@@ -891,9 +897,10 @@
 
     eatBtn.disabled = false;
 
-    if (totalSpent >= 100000 && !cleared) {
-      cleared = true;
-      showClear();
+    // 仮クリア（1万円以上使ったら footer に study.html を出すだけ）
+    if (totalSpent >= 10000 && !bonusGiven) {
+      bonusGiven = true;
+      footerText.innerHTML = '© 2026 Sushi Spec · <a href="study.html" target="_self">study.html</a>';
     }
   }
 
@@ -936,11 +943,22 @@
       eatBtn.disabled = true;
 
       updateHUD();
+
+      // 本当のクリア：全部食べきった
+      if (stackedParts.length === PARTS.length && !allCleared) {
+        allCleared = true;
+        showAllClear();
+      }
     }
   });
 
-  function showClear() {
+  // 本当のクリア画面
+  function showAllClear() {
     clearNotice.classList.add('active');
+    // footer も念のため study.html を出す
+    if (!bonusGiven) {
+      bonusGiven = true;
+    }
     footerText.innerHTML = '© 2026 Sushi Spec · <a href="study.html" target="_self">study.html</a>';
   }
 
