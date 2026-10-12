@@ -1633,13 +1633,30 @@
   }
 
   // ============================================================
-  //  Dialogue
+  //  Dialogue  ★ 修正: 客の判定を最優先にし、startsWith の型エラーを回避
   // ============================================================
   function startDialogue(npc) {
     if (!npc) return;
     npcPanel.classList.remove('open');
     conversation = { npc, page:0, lines:[], choices:null };
-    if (npc.id === 'presenter') {
+
+    if (npc.groupId !== undefined) {
+      // === 客 ===
+      let lines;
+      if (npc.location === 'rest') lines = REST_LINES;
+      else if (npc.location === 'onsen') lines = ONSEN_LINES;
+      else if (npc.location === 'banquet') lines = BANQUET_LINES;
+      else lines = ROOM_LINES;
+      const len = randInt(1, Math.min(4, lines.length));
+      conversation.lines = shuffle(lines).slice(0, len);
+      if (npc.age < 18) {
+        if (npc.location === 'banquet') conversation.lines.unshift(pick(CHILD_LINES_BANQUET));
+        else if (npc.location === 'onsen') conversation.lines.unshift(pick(CHILD_LINES_ONSEN));
+        else conversation.lines.unshift(pick(CHILD_LINES_ROOM));
+      }
+      npc.talkedRoom = true;
+    } else if (npc.id === 'presenter') {
+      // === 山田 ===
       if (presenterState === 'idle') {
         conversation.lines = [
           "Hey! You look like someone who could use some money.",
@@ -1708,28 +1725,16 @@
       } else {
         conversation.lines = ["I'm busy preparing my presentation."];
       }
-    } else if (npc.id && npc.id.startsWith('comedian')) {
+    } else if (typeof npc.id === 'string' && npc.id.startsWith('comedian')) {
+      // === コメディアン ===
       conversation.lines = [
         "We're the comedy duo!",
         comedyState === 'onstage' ? "Enjoy the show!" : "We perform at 19:00 in the banquet hall (4F).",
       ];
-    } else if (npc.groupId !== undefined) {
-      let lines;
-      if (npc.location === 'rest') lines = REST_LINES;
-      else if (npc.location === 'onsen') lines = ONSEN_LINES;
-      else if (npc.location === 'banquet') lines = BANQUET_LINES;
-      else lines = ROOM_LINES;
-      const len = randInt(1, Math.min(4, lines.length));
-      conversation.lines = shuffle(lines).slice(0, len);
-      if (npc.age < 18) {
-        if (npc.location === 'banquet') conversation.lines.unshift(pick(CHILD_LINES_BANQUET));
-        else if (npc.location === 'onsen') conversation.lines.unshift(pick(CHILD_LINES_ONSEN));
-        else conversation.lines.unshift(pick(CHILD_LINES_ROOM));
-      }
-      npc.talkedRoom = true;
     } else {
       conversation.lines = ["Hello there."];
     }
+
     renderDialogue();
     dialogue.classList.add('open');
   }
@@ -1951,9 +1956,7 @@
       g.y = g.baseY + Math.sin(g.phase * 0.8) * 4;
     }
 
-    // ============================================================
-    //  activeNPC detection — all guests are candidates
-    // ============================================================
+    // === activeNPC detection — すべての客を候補に含める ===
     activeNPC = null;
     let bestD = 260;
     const candidates = [];
