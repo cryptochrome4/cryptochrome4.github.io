@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>回転寿司 · SPEC PLATE</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    user-select: none;
+    font-family: 'Courier New', monospace;
+  }
+
+  body {
+    background: #1a1a2e;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    color: #eee;
+  }
+
+  /* ========== オープニング ========== */
+  #opening {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background-color: #0a0a14;
+    background-image: url('img225door.jpg');
+    background-size: cover;
+    background-position: center;
+    transition: opacity 0.5s;
+  }
+
+  #opening.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  #opening h1 {
+    font-size: 2.4rem;
+    letter-spacing: 8px;
+    text-shadow: 0 0 20px #000, 0 0 40px #000;
+    margin-bottom: 0.5rem;
+    color: #fff;
+  }
+
+  #opening p {
+    font-size: 0.9rem;
+    letter-spacing: 4px;
+    color: #ccc;
+    text-shadow: 0 0 10px #000;
+    margin-bottom: 2rem;
+  }
+
+  .opening-buttons {
+    display: flex;
+    gap: 1.2rem;
+  }
+
+  .opening-btn {
+    background: rgba(0, 0, 0, 0.6);
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    color: #fff;
+    padding: 0.9rem 2.4rem;
+    border-radius: 40px;
+    font-size: 1rem;
+    letter-spacing: 3px;
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+    transition: 0.2s;
+    font-weight: 700;
+  }
+
+  .opening-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: #fff;
+    transform: scale(1.05);
+  }
+
+  /* ========== ゲーム画面 ========== */
+  #game {
+    display: flex;
+    flex-direction: column;
+    width: 100vw;
+    height: 100vh;
+  }
+
+  /* 上部HUD */
+  #hud {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 1.2rem;
+    background: #0d0d18;
+    border-bottom: 2px solid #2a2a4a;
+    font-size: 0.85rem;
+    letter-spacing: 2px;
+    height: 44px;
+    flex-shrink: 0;
+  }
+
+  #hud .money {
+    color: #7affb0;
+    font-weight: 700;
+  }
+
+  #hud .money.low {
+    color: #ff6b6b;
+  }
+
+  #hud .counter {
+    color: #aab8d4;
+  }
+
+  /* 回転レーン */
+  #lane {
+    flex: 1;
+    position: relative;
+    background: #12121f;
+    overflow: hidden;
+    border-bottom: 3px solid #2a2a4a;
+  }
+
+  #lane::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: repeating-linear-gradient(90deg, #2a2a4a 0 20px, transparent 20px 40px);
+    transform: translateY(-50%);
+  }
+
+  /* 皿 */
+  .plate {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 90px;
+    height: 90px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.15s;
+  }
+
+  .plate:hover {
+    transform: translateY(-50%) scale(1.12);
+  }
+
+  .plate:active {
+    transform: translateY(-50%) scale(0.95);
+  }
+
+  .plate-svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  .plate .label {
+    position: absolute;
+    bottom: -18px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.55rem;
+    letter-spacing: 1px;
+    color: #cdd9ff;
+    white-space: nowrap;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 1px 6px;
+    border-radius: 8px;
+    pointer-events: none;
+  }
+
+  /* テーブル */
+  #table-area {
+    flex-shrink: 0;
+    height: 200px;
+    background: #0d0d18;
+    border-top: 3px solid #3a3a5a;
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    gap: 1rem;
+    position: relative;
+  }
+
+  #table-label {
+    font-size: 0.7rem;
+    letter-spacing: 3px;
+    color: #6f88b0;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    flex-shrink: 0;
+  }
+
+  /* 積み重ね皿 */
+  #stack {
+    flex: 1;
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+    flex-wrap: wrap-reverse;
+    align-content: flex-end;
+    height: 100%;
+    padding: 4px;
+    overflow: hidden;
+  }
+
+  .stack-plate {
+    width: 52px;
+    height: 52px;
+    flex-shrink: 0;
+    animation: dropIn 0.35s ease-out;
+  }
+
+  @keyframes dropIn {
+    0% { transform: translateY(-40px) scale(1.2); opacity: 0; }
+    60% { transform: translateY(4px) scale(0.95); opacity: 1; }
+    100% { transform: translateY(0) scale(1); }
+  }
+
+  /* 食べるボタン */
+  #eat-btn {
+    flex-shrink: 0;
+    background: #2a1a1a;
+    border: 2px solid #ff6b6b;
+    color: #ff6b6b;
+    padding: 0.8rem 1.4rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    letter-spacing: 2px;
+    cursor: pointer;
+    font-weight: 700;
+    transition: 0.2s;
+  }
+
+  #eat-btn:hover {
+    background: #ff6b6b;
+    color: #1a1a2e;
+  }
+
+  #eat-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
+  /* 解説モーダル */
+  #modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(6px);
+    z-index: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s;
+  }
+
+  #modal.active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .modal-panel {
+    background: #12121f;
+    border: 2px solid #3a8cff;
+    border-radius: 20px;
+    padding: 2rem;
+    width: min(560px, 88vw);
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 0 40px rgba(58, 140, 255, 0.3);
+  }
+
+  .modal-panel h2 {
+    font-size: 1.1rem;
+    letter-spacing: 4px;
+    color: #7fb8ff;
+    margin-bottom: 1rem;
+    text-transform: uppercase;
+  }
+
+  .modal-panel .item-name {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 0.8rem;
+  }
+
+  .modal-panel .desc {
+    font-size: 0.85rem;
+    line-height: 1.8;
+    color: #cdd9ff;
+    margin-bottom: 1.2rem;
+    letter-spacing: 0.5px;
+  }
+
+  .modal-panel .cost-info {
+    font-size: 0.8rem;
+    color: #7affb0;
+    margin-bottom: 1.2rem;
+    letter-spacing: 1px;
+  }
+
+  .modal-close {
+    background: #ffffff10;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #cfe0ff;
+    padding: 0.6rem 1.6rem;
+    border-radius: 30px;
+    font-size: 0.75rem;
+    letter-spacing: 2px;
+    cursor: pointer;
+    transition: 0.15s;
+  }
+
+  .modal-close:hover {
+    background: rgba(58, 140, 255, 0.2);
+    border-color: #3a8cff;
+  }
+
+  /* 背景画像ビューア */
+  #bg-viewer {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    background: #000;
+    display: none;
+  }
+
+  #bg-viewer.active {
+    display: block;
+  }
+
+  #bg-viewer img {
+    width: 100%;
+    height: 100%;
+    object-fit: fill;
+  }
+
+  #bg-viewer .close-bg {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.7);
+    border: 2px solid #fff;
+    color: #fff;
+    padding: 0.7rem 1.6rem;
+    border-radius: 30px;
+    font-size: 0.85rem;
+    letter-spacing: 2px;
+    cursor: pointer;
+    z-index: 2001;
+  }
+
+  /* クリア通知 */
+  #clear-notice {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.8);
+    background: rgba(10, 30, 20, 0.95);
+    border: 3px solid #7affb0;
+    border-radius: 24px;
+    padding: 2rem 3rem;
+    text-align: center;
+    z-index: 800;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.4s;
+    box-shadow: 0 0 60px rgba(122, 255, 176, 0.4);
+  }
+
+  #clear-notice.active {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  #clear-notice h2 {
+    font-size: 1.6rem;
+    letter-spacing: 6px;
+    color: #7affb0;
+    margin-bottom: 0.8rem;
+  }
+
+  #clear-notice p {
+    font-size: 0.85rem;
+    color: #cdd9ff;
+    letter-spacing: 2px;
+    margin-bottom: 1.2rem;
+  }
+
+  #clear-notice a {
+    color: #7affb0;
+    font-size: 1rem;
+    letter-spacing: 3px;
+    text-decoration: none;
+    border: 2px solid #7affb0;
+    padding: 0.6rem 1.8rem;
+    border-radius: 30px;
+    display: inline-block;
+    transition: 0.2s;
+  }
+
+  #clear-notice a:hover {
+    background: #7affb0;
+    color: #0a1e14;
+  }
+
+  /* footer */
+  footer {
+    text-align: center;
+    padding: 0.5rem;
+    background: #0a0a14;
+    font-size: 0.7rem;
+    letter-spacing: 2px;
+    color: #4a5f80;
+    border-top: 1px solid #2a2a4a;
+    flex-shrink: 0;
+  }
+
+  footer a {
+    color: #3a8cff;
+    text-decoration: none;
+  }
+
+  footer a:hover {
+    text-decoration: underline;
+  }
+</style>
+</head>
+<body>
+
+<!-- ========== オープニング ========== -->
+<div id="opening">
+  <h1>回転寿司</h1>
+  <p>SPEC PLATE · 100,000 YEN CHALLENGE</p>
+  <div class="opening-buttons">
+    <button class="opening-btn" id="start-btn">はじめる</button>
+    <button class="opening-btn" id="view-bg-btn">背景画像を見る</button>
+  </div>
+</div>
+
+<!-- ========== 背景画像ビューア ========== -->
+<div id="bg-viewer">
+  <img src="img225door.jpg" alt="背景画像">
+  <button class="close-bg" id="close-bg-btn">閉じる</button>
+</div>
+
+<!-- ========== ゲーム ========== -->
+<div id="game" style="display:none;">
+
+  <div id="hud">
+    <span class="money" id="money-display">💰 ¥100,000</span>
+    <span class="counter" id="counter-display">PLATES: 0 / 0</span>
+  </div>
+
+  <div id="lane"></div>
+
+  <div id="table-area">
+    <div id="table-label">TABLE</div>
+    <div id="stack"></div>
+    <button id="eat-btn" disabled>🍽 食う</button>
+  </div>
+
+  <footer id="footer">
+    <span id="footer-text">© 2026 Sushi Spec</span>
+  </footer>
+</div>
+
+<!-- ========== 解説モーダル ========== -->
+<div id="modal">
+  <div class="modal-panel">
+    <h2 id="modal-title">解説</h2>
+    <div class="item-name" id="modal-item-name"></div>
+    <div class="desc" id="modal-desc"></div>
+    <div class="cost-info" id="modal-cost"></div>
+    <button class="modal-close" id="modal-close-btn">食った</button>
+  </div>
+</div>
+
+<!-- ========== クリア通知 ========== -->
+<div id="clear-notice">
+  <h2>CLEAR!</h2>
+  <p>10万円以上使いました</p>
+  <a href="study.html" target="_self">study.html へ進む</a>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ========== PCパーツデータ（項目名はすべて英語 / 解説文は日本語） ==========
+  const PARTS = [
+    {
+      key: 'CPU',
+      name: 'CPU',
+      cost: 45000,
+      desc: 'CPU（中央演算処理装置）。シリコンウェハーから製造され、多数のトランジスタを集積している。Clock（動作周波数）、Cores（コア数）、CPU Cache（キャッシュ）が主要スペック。材料費はシリコン・銅・金・レアアースなど。',
+      svg: 'cpu'
+    },
+    {
+      key: 'GPU',
+      name: 'GPU',
+      cost: 80000,
+      desc: 'GPU（グラフィックス処理装置）。並列計算に優れ、AI学習にも使われる。VRAM（ビデオメモリ）、Bus Width（バス幅）、GPU TDP（熱設計電力）が主要スペック。材料費はシリコン・銅・金・パラジウムなど。',
+      svg: 'gpu'
+    },
+    {
+      key: 'RAM',
+      name: 'Memory',
+      cost: 12000,
+      desc: 'Memory（主記憶装置）。Memory Type（種類）、Memory Speed（速度）、Channels（チャネル数）が主要スペック。DRAMチップが基板に実装され、材料費はシリコン・銅・金・銀など。',
+      svg: 'ram'
+    },
+    {
+      key: 'SSD',
+      name: 'Storage',
+      cost: 15000,
+      desc: 'Storage（記憶装置）。Capacity（容量）、Interface（接続規格）、Sequential Read（シーケンシャル読込速度）が主要スペック。NANDフラッシュメモリを使用し、材料費はシリコン・銅・金・アルミなど。',
+      svg: 'ssd'
+    },
+    {
+      key: 'Motherboard',
+      name: 'Motherboard',
+      cost: 25000,
+      desc: 'Motherboard（マザーボード）。Chipset（チップセット）、Form Factor（フォームファクター）、Socket（ソケット）が主要スペック。多層プリント基板に銅配線・金メッキ・各種コネクタを実装。',
+      svg: 'mobo'
+    },
+    {
+      key: 'PSU',
+      name: 'Power Supply',
+      cost: 10000,
+      desc: 'Power Supply（電源ユニット）。Wattage（定格出力）、Efficiency（変換効率）、Modular（着脱式）が主要スペック。トランス・コンデンサ・銅線・アルミヒートシンクなどが使われる。',
+      svg: 'psu'
+    },
+    {
+      key: 'Cooling',
+      name: 'Cooling',
+      cost: 8000,
+      desc: 'Cooling（冷却装置）。Cooler Type（方式）、Cooler Spec（サイズ）、Cooler TDP（対応熱設計電力）が主要スペック。ヒートシンク（アルミ・銅）とファン、または水冷ポンプ・ラジエーターで構成。',
+      svg: 'cooler'
+    },
+    {
+      key: 'OS',
+      name: 'Operating System',
+      cost: 15000,
+      desc: 'Operating System（基本ソフト）。OS Version（バージョン）、Architecture（アーキテクチャ）、Build / Kernel（ビルド／カーネル）が主要スペック。開発・保守・ライセンス費用が主で、物理的材料費はごく僅か。',
+      svg: 'os'
+    },
+    {
+      key: 'Display',
+      name: 'Display',
+      cost: 30000,
+      desc: 'Display（表示装置）。Panel Class（解像度クラス）、Refresh Rate（リフレッシュレート）、Panel Type（パネル方式）が主要スペック。材料費はガラス・液晶素材・偏光板・バックライト・銅配線・金など。',
+      svg: 'display'
+    },
+    {
+      key: 'Max RAM',
+      name: 'Max RAM',
+      cost: 7000,
+      desc: 'Max RAM（最大メモリ搭載量）。マザーボードとCPUが対応する上限。スロット数×単条容量で決まり、材料費というより設計・検証コストが主。',
+      svg: 'case'
+    },
+    {
+      key: 'Max Storage',
+      name: 'Max Storage',
+      cost: 6000,
+      desc: 'Max Storage（最大記憶容量）。インターフェース規格と物理ベイ数で決まる上限。拡張性の指標であり、材料費は筐体・コネクタ・配線など。',
+      svg: 'keyboard'
+    },
+    {
+      key: 'Total System TDP',
+      name: 'Total System TDP',
+      cost: 4000,
+      desc: 'Total System TDP（システム全体の熱設計電力）。CPU・GPU・その他パーツの合計発熱量。電源容量と冷却設計の基準になる。',
+      svg: 'mouse'
+    },
+    {
+      key: 'Clock',
+      name: 'Clock',
+      cost: 5000,
+      desc: 'Clock（動作周波数）。CPUやGPUが1秒間に何回振動するかを示す。ベースクロックとブーストクロックがあり、材料費は発振器・銅配線など。',
+      svg: 'network'
+    },
+    {
+      key: 'Cores',
+      name: 'Cores',
+      cost: 8000,
+      desc: 'Cores（コア数）。同時に処理できる命令列の数。Pコア（性能）とEコア（効率）に分かれる場合もある。シリコン面積に比例して材料費が増える。',
+      svg: 'sound'
+    },
+    {
+      key: 'CPU Cache',
+      name: 'CPU Cache',
+      cost: 3000,
+      desc: 'CPU Cache（キャッシュメモリ）。CPU内蔵の高速記憶領域。L1・L2・L3があり、容量が大きいほど高速。SRAMで構成され、材料費はシリコン・銅など。',
+      svg: 'fan'
+    }
+  ];
+
+  // ========== 皿のSVGドット絵生成 ==========
+  function plateSVG(type) {
+    const base = `
+      <svg viewBox="0 0 100 100" class="plate-svg" xmlns="http://www.w3.org/2000/svg">
+        <ellipse cx="50" cy="72" rx="42" ry="12" fill="#d0d0e0" stroke="#8888a0" stroke-width="3"/>
+        <ellipse cx="50" cy="68" rx="38" ry="10" fill="#e8e8f4" stroke="#aaaacc" stroke-width="2"/>
+        <ellipse cx="50" cy="66" rx="34" ry="8" fill="#f4f4ff" stroke="#ccccee" stroke-width="1"/>
+    `;
+
+    let item = '';
+
+    switch(type) {
+      case 'cpu':
+        item = `
+          <rect x="35" y="42" width="30" height="30" rx="3" fill="#3a3a4a" stroke="#6a6a8a" stroke-width="2"/>
+          <rect x="39" y="46" width="22" height="22" rx="2" fill="#5a5a7a"/>
+          <rect x="43" y="50" width="14" height="14" rx="1" fill="#7a7aaa"/>
+          <rect x="46" y="53" width="8" height="8" fill="#a0a0d0"/>
+          ${Array.from({length:5},(_,i)=>`<rect x="${37+i*6}" y="38" width="3" height="5" fill="#c0c0d0"/>`).join('')}
+          ${Array.from({length:5},(_,i)=>`<rect x="${37+i*6}" y="71" width="3" height="5" fill="#c0c0d0"/>`).join('')}
+          ${Array.from({length:5},(_,i)=>`<rect x="31" y="${43+i*6}" width="5" height="3" fill="#c0c0d0"/>`).join('')}
+          ${Array.from({length:5},(_,i)=>`<rect x="64" y="${43+i*6}" width="5" height="3" fill="#c0c0d0"/>`).join('')}
+        `;
+        break;
+      case 'gpu':
+        item = `
+          <rect x="20" y="45" width="60" height="25" rx="3" fill="#2a2a3a" stroke="#5a5a7a" stroke-width="2"/>
+          <rect x="24" y="49" width="16" height="16" rx="2" fill="#4a4a6a"/>
+          <circle cx="32" cy="57" r="6" fill="#6a6aaa" stroke="#8a8acc" stroke-width="1.5"/>
+          <circle cx="32" cy="57" r="2" fill="#aaaadd"/>
+          <rect x="44" y="49" width="16" height="16" rx="2" fill="#4a4a6a"/>
+          <circle cx="52" cy="57" r="6" fill="#6a6aaa" stroke="#8a8acc" stroke-width="1.5"/>
+          <circle cx="52" cy="57" r="2" fill="#aaaadd"/>
+          <rect x="64" y="49" width="12" height="8" rx="1" fill="#3a3a5a"/>
+          <rect x="24" y="70" width="4" height="6" fill="#ffd700"/>
+          <rect x="32" y="70" width="4" height="6" fill="#ffd700"/>
+          <rect x="40" y="70" width="4" height="6" fill="#ffd700"/>
+        `;
+        break;
+      case 'ram':
+        item = `
+          <rect x="22" y="48" width="56" height="18" rx="2" fill="#1a4a2a" stroke="#2a7a4a" stroke-width="2"/>
+          ${Array.from({length:4},(_,i)=>`<rect x="${26+i*13}" y="51" width="10" height="12" rx="1" fill="#2a2a3a" stroke="#5a5a7a" stroke-width="1"/>`).join('')}
+          <rect x="22" y="64" width="56" height="3" fill="#ffd700"/>
+        `;
+        break;
+      case 'ssd':
+        item = `
+          <rect x="25" y="44" width="50" height="26" rx="4" fill="#2a2a3a" stroke="#5a5a7a" stroke-width="2"/>
+          <rect x="30" y="48" width="16" height="18" rx="2" fill="#3a3a5a"/>
+          <rect x="50" y="48" width="16" height="18" rx="2" fill="#3a3a5a"/>
+          <rect x="34" y="52" width="8" height="10" fill="#5a5a8a"/>
+          <rect x="54" y="52" width="8" height="10" fill="#5a5a8a"/>
+          <rect x="70" y="50" width="4" height="14" fill="#ffd700"/>
+        `;
+        break;
+      case 'mobo':
+        item = `
+          <rect x="20" y="42" width="60" height="30" rx="2" fill="#1a5a2a" stroke="#2a8a4a" stroke-width="2"/>
+          <rect x="25" y="46" width="12" height="12" rx="1" fill="#2a2a3a"/>
+          <rect x="42" y="46" width="14" height="14" rx="1" fill="#3a3a5a"/>
+          <rect x="60" y="46" width="10" height="8" rx="1" fill="#4a4a6a"/>
+          <rect x="25" y="62" width="8" height="6" fill="#ffd700"/>
+          <rect x="38" y="62" width="20" height="6" fill="#2a2a3a"/>
+          <rect x="62" y="60" width="14" height="8" fill="#3a3a5a"/>
+        `;
+        break;
+      case 'psu':
+        item = `
+          <rect x="25" y="42" width="50" height="30" rx="4" fill="#2a2a3a" stroke="#5a5a7a" stroke-width="2"/>
+          <circle cx="50" cy="57" r="12" fill="#3a3a5a" stroke="#6a6a8a" stroke-width="2"/>
+          <circle cx="50" cy="57" r="8" fill="#4a4a6a"/>
+          <circle cx="50" cy="57" r="3" fill="#8a8acc"/>
+          ${Array.from({length:6},(_,i)=>{
+            const a = i * Math.PI/3;
+            const x = 50 + Math.cos(a)*6;
+            const y = 57 + Math.sin(a)*6;
+            return `<line x1="50" y1="57" x2="${x}" y2="${y}" stroke="#7a7aaa" stroke-width="2"/>`;
+          }).join('')}
+        `;
+        break;
+      case 'cooler':
+        item = `
+          <rect x="30" y="40" width="40" height="30" rx="3" fill="#a0a0b0" stroke="#707080" stroke-width="2"/>
+          ${Array.from({length:5},(_,i)=>`<rect x="${34+i*7}" y="44" width="4" height="22" fill="#c0c0d0"/>`).join('')}
+          <circle cx="50" cy="55" r="10" fill="none" stroke="#6a6a8a" stroke-width="2"/>
+          <circle cx="50" cy="55" r="3" fill="#8a8acc"/>
+        `;
+        break;
+      case 'os':
+        item = `
+          <rect x="28" y="42" width="44" height="30" rx="4" fill="#2a2a4a" stroke="#5a5a8a" stroke-width="2"/>
+          <rect x="34" y="48" width="32" height="18" rx="2" fill="#1a1a3a"/>
+          <rect x="37" y="51" width="10" height="12" fill="#3a8cff"/>
+          <rect x="50" y="51" width="10" height="5" fill="#7affb0"/>
+          <rect x="50" y="58" width="10" height="5" fill="#ff6b6b"/>
+        `;
+        break;
+      case 'display':
+        item = `
+          <rect x="22" y="38" width="56" height="32" rx="3" fill="#1a1a2a" stroke="#4a4a6a" stroke-width="2"/>
+          <rect x="26" y="42" width="48" height="24" rx="2" fill="#3a8cff"/>
+          <rect x="30" y="46" width="20" height="16" fill="#7affb0" opacity="0.6"/>
+          <rect x="54" y="46" width="16" height="16" fill="#ff6b6b" opacity="0.6"/>
+          <rect x="44" y="70" width="12" height="4" fill="#4a4a6a"/>
+          <rect x="40" y="74" width="20" height="3" rx="1" fill="#5a5a7a"/>
+        `;
+        break;
+      case 'case':
+        item = `
+          <rect x="28" y="38" width="44" height="34" rx="4" fill="#2a2a3a" stroke="#5a5a7a" stroke-width="2"/>
+          <rect x="34" y="44" width="12" height="22" rx="2" fill="#1a1a2a"/>
+          <circle cx="40" cy="50" r="3" fill="#7affb0"/>
+          <circle cx="40" cy="58" r="3" fill="#ff6b6b"/>
+          <rect x="52" y="44" width="14" height="22" rx="2" fill="#1a1a2a"/>
+          <rect x="55" y="48" width="8" height="14" fill="#3a3a5a"/>
+        `;
+        break;
+      case 'keyboard':
+        item = `
+          <rect x="20" y="48" width="60" height="22" rx="4" fill="#3a3a4a" stroke="#6a6a8a" stroke-width="2"/>
+          ${Array.from({length:4},(_,r)=>
+            Array.from({length:8},(_,c)=>
+              `<rect x="${24+c*7}" y="${52+r*4}" width="5" height="3" rx="0.5" fill="#5a5a7a"/>`
+            ).join('')
+          ).join('')}
+        `;
+        break;
+      case 'mouse':
+        item = `
+          <ellipse cx="50" cy="56" rx="18" ry="24" fill="#3a3a4a" stroke="#6a6a8a" stroke-width="2"/>
+          <line x1="50" y1="40" x2="50" y2="52" stroke="#6a6a8a" stroke-width="2"/>
+          <ellipse cx="50" cy="48" rx="5" ry="3" fill="#5a5a7a"/>
+          <circle cx="50" cy="56" r="3" fill="#7affb0"/>
+        `;
+        break;
+      case 'network':
+        item = `
+          <rect x="28" y="48" width="44" height="22" rx="3" fill="#1a4a2a" stroke="#2a7a4a" stroke-width="2"/>
+          <rect x="34" y="52" width="12" height="14" rx="1" fill="#2a2a3a"/>
+          <rect x="52" y="52" width="14" height="14" rx="1" fill="#3a3a5a"/>
+          <line x1="70" y1="52" x2="76" y2="40" stroke="#6a6a8a" stroke-width="2"/>
+          <line x1="76" y1="40" x2="76" y2="36" stroke="#ff6b6b" stroke-width="2"/>
+          <line x1="70" y1="52" x2="78" y2="48" stroke="#6a6a8a" stroke-width="2"/>
+        `;
+        break;
+      case 'sound':
+        item = `
+          <rect x="24" y="46" width="52" height="24" rx="2" fill="#2a1a4a" stroke="#5a3a8a" stroke-width="2"/>
+          <rect x="30" y="50" width="14" height="16" rx="1" fill="#3a2a5a"/>
+          <rect x="48" y="50" width="10" height="10" rx="1" fill="#4a3a6a"/>
+          <circle cx="66" cy="54" r="3" fill="#ffd700"/>
+          <circle cx="66" cy="62" r="3" fill="#ffd700"/>
+          <circle cx="58" cy="58" r="3" fill="#ffd700"/>
+        `;
+        break;
+      case 'fan':
+        item = `
+          <circle cx="50" cy="54" r="18" fill="#2a2a3a" stroke="#5a5a7a" stroke-width="2"/>
+          <circle cx="50" cy="54" r="6" fill="#4a4a6a"/>
+          <circle cx="50" cy="54" r="3" fill="#8a8acc"/>
+          ${Array.from({length:5},(_,i)=>{
+            const a = i * Math.PI*2/5 - Math.PI/2;
+            const x = 50 + Math.cos(a)*12;
+            const y = 54 + Math.sin(a)*12;
+            return `<ellipse cx="${x}" cy="${y}" rx="6" ry="4" fill="#6a6aaa" opacity="0.7" transform="rotate(${a*180/Math.PI},${x},${y})"/>`;
+          }).join('')}
+        `;
+        break;
+      default:
+        item = `<rect x="35" y="42" width="30" height="24" rx="3" fill="#5a5a7a"/>`;
+    }
+
+    return base + item + `</svg>`;
+  }
+
+  // ========== 状態管理 ==========
+  let money = 100000;
+  let totalSpent = 0;
+  let platesOnLane = [];
+  let stackedParts = [];
+  let currentTablePart = null;
+  let currentTableEl = null;
+  let cleared = false;
+
+  const lane = document.getElementById('lane');
+  const stack = document.getElementById('stack');
+  const moneyDisplay = document.getElementById('money-display');
+  const counterDisplay = document.getElementById('counter-display');
+  const eatBtn = document.getElementById('eat-btn');
+  const modal = document.getElementById('modal');
+  const modalTitle = document.getElementById('modal-title');
+  const modalItemName = document.getElementById('modal-item-name');
+  const modalDesc = document.getElementById('modal-desc');
+  const modalCost = document.getElementById('modal-cost');
+  const modalCloseBtn = document.getElementById('modal-close-btn');
+  const clearNotice = document.getElementById('clear-notice');
+  const footerText = document.getElementById('footer-text');
+
+  const LANE_SPEED = 0.6;
+  let nextPlateId = 0;
+
+  function initLane() {
+    const shuffled = [...PARTS].sort(() => Math.random() - 0.5);
+    const spacing = 140;
+    shuffled.forEach((part, i) => {
+      const el = document.createElement('div');
+      el.className = 'plate';
+      el.dataset.id = nextPlateId;
+      el.innerHTML = plateSVG(part.svg) + `<span class="label">${part.name}</span>`;
+      el.style.left = (i * spacing) + 'px';
+      lane.appendChild(el);
+
+      const plateObj = {
+        id: nextPlateId,
+        part: part,
+        x: i * spacing,
+        el: el,
+        eaten: false
+      };
+
+      el.addEventListener('click', () => onPlateClick(plateObj));
+      platesOnLane.push(plateObj);
+      nextPlateId++;
+    });
+  }
+
+  function animate() {
+    for (let i = platesOnLane.length - 1; i >= 0; i--) {
+      const p = platesOnLane[i];
+      if (p.eaten) continue;
+
+      p.x -= LANE_SPEED;
+      p.el.style.left = p.x + 'px';
+
+      if (p.x < -120) {
+        p.el.remove();
+        platesOnLane.splice(i, 1);
+      }
+    }
+    requestAnimationFrame(animate);
+  }
+
+  function onPlateClick(plateObj) {
+    if (plateObj.eaten) return;
+    if (currentTablePart) return;
+
+    plateObj.eaten = true;
+    plateObj.el.remove();
+    const idx = platesOnLane.indexOf(plateObj);
+    if (idx >= 0) platesOnLane.splice(idx, 1);
+
+    currentTablePart = plateObj.part;
+    currentTableEl = document.createElement('div');
+    currentTableEl.className = 'plate';
+    currentTableEl.style.position = 'relative';
+    currentTableEl.style.top = 'auto';
+    currentTableEl.style.transform = 'none';
+    currentTableEl.style.width = '70px';
+    currentTableEl.style.height = '70px';
+    currentTableEl.innerHTML = plateSVG(plateObj.part.svg) + `<span class="label">${plateObj.part.name}</span>`;
+    currentTableEl.style.cursor = 'default';
+    currentTableEl.style.pointerEvents = 'none';
+
+    const tempArea = document.createElement('div');
+    tempArea.id = 'current-table-plate';
+    tempArea.style.cssText = 'display:flex;align-items:center;justify-content:center;width:80px;height:100%;flex-shrink:0;';
+    tempArea.appendChild(currentTableEl);
+
+    const tableArea = document.getElementById('table-area');
+    tableArea.insertBefore(tempArea, eatBtn);
+
+    money -= plateObj.part.cost;
+    totalSpent += plateObj.part.cost;
+    updateHUD();
+
+    eatBtn.disabled = false;
+
+    if (totalSpent >= 100000 && !cleared) {
+      cleared = true;
+      showClear();
+    }
+  }
+
+  function updateHUD() {
+    moneyDisplay.textContent = '💰 ¥' + money.toLocaleString();
+    if (money < 10000) {
+      moneyDisplay.classList.add('low');
+    } else {
+      moneyDisplay.classList.remove('low');
+    }
+    counterDisplay.textContent = 'PLATES: ' + stackedParts.length + ' / ' + PARTS.length;
+  }
+
+  eatBtn.addEventListener('click', () => {
+    if (!currentTablePart) return;
+
+    const part = currentTablePart;
+    modalTitle.textContent = '解説 · ' + part.key;
+    modalItemName.textContent = part.name;
+    modalDesc.textContent = part.desc;
+    modalCost.textContent = '材料費平均: ¥' + part.cost.toLocaleString();
+    modal.classList.add('active');
+  });
+
+  modalCloseBtn.addEventListener('click', () => {
+    modal.classList.remove('active');
+
+    if (currentTablePart) {
+      stackedParts.push(currentTablePart);
+
+      const sp = document.createElement('div');
+      sp.className = 'stack-plate';
+      sp.innerHTML = plateSVG(currentTablePart.svg);
+      stack.appendChild(sp);
+
+      const tempArea = document.getElementById('current-table-plate');
+      if (tempArea) tempArea.remove();
+      currentTablePart = null;
+      currentTableEl = null;
+      eatBtn.disabled = true;
+
+      updateHUD();
+    }
+  });
+
+  function showClear() {
+    clearNotice.classList.add('active');
+    footerText.innerHTML = '© 2026 Sushi Spec · <a href="study.html" target="_self">study.html</a>';
+  }
+
+  const opening = document.getElementById('opening');
+  const game = document.getElementById('game');
+  const startBtn = document.getElementById('start-btn');
+  const viewBgBtn = document.getElementById('view-bg-btn');
+  const bgViewer = document.getElementById('bg-viewer');
+  const closeBgBtn = document.getElementById('close-bg-btn');
+
+  startBtn.addEventListener('click', () => {
+    opening.classList.add('hidden');
+    game.style.display = 'flex';
+    initLane();
+    updateHUD();
+    animate();
+  });
+
+  viewBgBtn.addEventListener('click', () => {
+    bgViewer.classList.add('active');
+  });
+
+  closeBgBtn.addEventListener('click', () => {
+    bgViewer.classList.remove('active');
+  });
+
+  updateHUD();
+
+})();
+</script>
+</body>
+</html>
