@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>誤った二分法 / 偽りのジレンマ — 加藤純と学ぶ</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: #0a0e14;
+            font-family: 'Helvetica Neue', 'Hiragino Sans', 'Yu Gothic', Meiryo, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        /* Twitch風配信画面 */
+        .stream-container {
+            max-width: 1100px;
+            width: 100%;
+            background-color: #1e1f2b;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.7);
+            border: 1px solid #2e2f3e;
+        }
+
+        /* ヘッダー (ライブ風) */
+        .stream-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 18px;
+            background-color: #0e0e14;
+            border-bottom: 1px solid #2e2f3e;
+        }
+
+        .streamer-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background-color: #3a3c4a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            border: 2px solid #9147ff;
+        }
+
+        .avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .streamer-name {
+            font-weight: 700;
+            font-size: 1.2rem;
+            color: #efeff1;
+        }
+
+        .live-badge {
+            background-color: #e91916;
+            color: white;
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 2px 10px;
+            border-radius: 20px;
+            letter-spacing: 0.5px;
+            margin-left: 8px;
+        }
+
+        .viewer-count {
+            color: #adadb8;
+            font-size: 0.9rem;
+            background: #2e2f3e;
+            padding: 4px 12px;
+            border-radius: 20px;
+        }
+
+        /* 動画エリア (YouTube風の再生バー付き) */
+        .video-wrapper {
+            position: relative;
+            background-color: #000;
+            aspect-ratio: 16 / 9;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .video-placeholder {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(circle at 20% 30%, #1a1c26, #0b0b12);
+        }
+
+        .video-placeholder img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0.6;
+        }
+
+        .overlay-content {
+            position: relative;
+            z-index: 2;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            text-align: center;
+            padding: 2rem;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 16px;
+            backdrop-filter: blur(4px);
+            max-width: 80%;
+            border: 1px solid #9147ff33;
+        }
+
+        .overlay-content h1 {
+            font-size: 2.5rem;
+            letter-spacing: 2px;
+            text-shadow: 0 0 20px #9147ff;
+            margin-bottom: 0.5rem;
+        }
+
+        .overlay-content p {
+            font-size: 1.1rem;
+            color: #d3d3d3;
+        }
+
+        /* 字幕 / 現在の発言 (加藤純一) */
+        .speech-bubble {
+            position: absolute;
+            bottom: 80px;
+            left: 30px;
+            right: 30px;
+            background: rgba(14, 14, 20, 0.9);
+            backdrop-filter: blur(10px);
+            border-left: 5px solid #9147ff;
+            border-radius: 12px;
+            padding: 18px 24px;
+            color: #efeff1;
+            font-size: 1.3rem;
+            font-weight: 500;
+            line-height: 1.5;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+            z-index: 10;
+            transition: opacity 0.2s;
+            max-width: 80%;
+            border: 1px solid #2e2f3e;
+        }
+
+        .speech-bubble .speaker {
+            color: #9147ff;
+            font-weight: 700;
+            margin-right: 10px;
+            font-size: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* コメント欄 (Twitch風チャット) */
+        .chat-container {
+            background-color: #0e0e14;
+            padding: 12px 16px;
+            height: 200px;
+            overflow-y: auto;
+            border-top: 1px solid #2e2f3e;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            scroll-behavior: smooth;
+        }
+
+        .chat-message {
+            display: flex;
+            gap: 10px;
+            font-size: 0.95rem;
+            line-height: 1.4;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .chat-message .user {
+            font-weight: 700;
+            color: #a970ff;
+            white-space: nowrap;
+        }
+
+        .chat-message .text {
+            color: #dedee3;
+            word-break: break-word;
+        }
+
+        /* ユーザーごとの色 (簡易) */
+        .user.color1 { color: #ff6b6b; }
+        .user.color2 { color: #4ecdc4; }
+        .user.color3 { color: #ffe66d; }
+        .user.color4 { color: #a970ff; }
+        .user.color5 { color: #ff9f1c; }
+
+        /* YouTube風コントロールバー */
+        .yt-controls {
+            background-color: #0e0e14;
+            padding: 8px 16px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            border-top: 1px solid #2e2f3e;
+        }
+
+        .progress-bar-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+        }
+
+        .time-display {
+            color: #adadb8;
+            font-size: 0.8rem;
+            font-family: monospace;
+            min-width: 40px;
+            text-align: center;
+        }
+
+        .progress-bar-bg {
+            flex: 1;
+            height: 6px;
+            background-color: #3a3c4a;
+            border-radius: 10px;
+            cursor: pointer;
+            position: relative;
+            transition: height 0.1s;
+        }
+
+        .progress-bar-bg:hover {
+            height: 8px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #9147ff, #a970ff);
+            border-radius: 10px;
+            width: 0%;
+            transition: width 0.1s linear;
+            position: relative;
+        }
+
+        .progress-fill::after {
+            content: '';
+            position: absolute;
+            right: -6px;
+            top: 50%;
+            transform: translateY(-50%) scale(0);
+            width: 14px;
+            height: 14px;
+            background: white;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #9147ff;
+            transition: transform 0.1s;
+        }
+
+        .progress-bar-bg:hover .progress-fill::after {
+            transform: translateY(-50%) scale(1);
+        }
+
+        .controls-row {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            color: #efeff1;
+        }
+
+        .control-btn {
+            background: none;
+            border: none;
+            color: #efeff1;
+            font-size: 1.2rem;
+            cursor: pointer;
+            opacity: 0.8;
+            transition: opacity 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 4px;
+        }
+
+        .control-btn:hover {
+            opacity: 1;
+            color: #9147ff;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* スクロールバー */
+        .chat-container::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .chat-container::-webkit-scrollbar-track {
+            background: #1e1f2b;
+        }
+
+        .chat-container::-webkit-scrollbar-thumb {
+            background: #3a3c4a;
+            border-radius: 10px;
+        }
+
+        .chat-container::-webkit-scrollbar-thumb:hover {
+            background: #9147ff;
+        }
+
+        /* レスポンシブ */
+        @media (max-width: 700px) {
+            .overlay-content h1 { font-size: 1.5rem; }
+            .speech-bubble { font-size: 1rem; padding: 12px; bottom: 60px; }
+            .streamer-name { font-size: 1rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="stream-container">
+        <!-- 配信ヘッダー -->
+        <div class="stream-header">
+            <div class="streamer-info">
+                <div class="avatar">
+                    <img src="img230streamer.jpg" alt="加藤純一">
+                </div>
+                <div>
+                    <span class="streamer-name">加藤純一</span>
+                    <span class="live-badge">LIVE</span>
+                </div>
+            </div>
+            <div class="viewer-count">👁️ 12,845 人が視聴中</div>
+        </div>
+
+        <!-- 動画エリア (YouTube風) -->
+        <div class="video-wrapper">
+            <div class="video-placeholder">
+                <img src="img230streamer.jpg" alt="配信背景">
+                <div class="overlay-content">
+                    <h1>誤った二分法</h1>
+                    <p>偽りのジレンマ — 深掘り解説</p>
+                </div>
+            </div>
+
+            <!-- 加藤純一の現在の発言 (字幕風) -->
+            <div class="speech-bubble" id="speechBubble">
+                <span class="speaker">加藤純一</span>
+                <span id="speechText">じゃあまず「誤った二分法」って何かって話から始めるわ。</span>
+            </div>
+        </div>
+
+        <!-- チャット欄 (コメントが流れる) -->
+        <div class="chat-container" id="chatContainer">
+            <!-- コメントはJSで動的に追加 -->
+        </div>
+
+        <!-- YouTube風コントロールバー -->
+        <div class="yt-controls">
+            <div class="progress-bar-container">
+                <span class="time-display" id="currentTime">0:00</span>
+                <div class="progress-bar-bg" id="progressBarBg">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <span class="time-display" id="totalTime">7:00</span>
+            </div>
+            <div class="controls-row">
+                <button class="control-btn" id="playPauseBtn">▶</button>
+                <button class="control-btn">🔊</button>
+                <button class="control-btn">⚙️</button>
+                <button class="control-btn">⛶</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            // 配信全体の長さ (秒) : 7分 = 420秒
+            const TOTAL_SECONDS = 420; // 7分
+            // 実際の時間経過に合わせて進むが、会話スピードは遅め。
+            // 1秒の現実時間 = 1秒の動画時間 (等速) だが、コメントと台詞の間隔をゆったり取る。
+
+            // 現在の動画再生位置 (秒)
+            let currentSec = 0;
+            let isPlaying = true;
+            let timerInterval = null;
+
+            // 発言・コメントのスケジュール (動画時間ベース、秒)
+            // 加藤純一の台詞 (speech) と コメント (chat) を時系列で管理
+            // 各イベント: { time: 秒, type: 'speech'|'chat', user?: string, text: string, color?: string }
+            const events = [
+                // 0秒: 最初の台詞
+                { time: 0, type: 'speech', text: 'じゃあまず「誤った二分法」って何かって話から始めるわ。' },
+                { time: 3, type: 'chat', user: 'わかる', text: 'また難しい話始まった', color: 'color1' },
+                { time: 6, type: 'chat', user: '哲学者', text: '偽りのジレンマとも言うよな', color: 'color2' },
+                { time: 10, type: 'speech', text: '要は「AかBか」の二択しかないと思わせて、実はCもあるみたいなやつな。' },
+                { time: 16, type: 'chat', user: 'ラーメン次郎', text: 'ラーメン食べるか食べないか？→どっちも正解', color: 'color3' },
+                { time: 20, type: 'speech', text: 'そうそう、極端な例だと「お前は味方か敵か」とか。' },
+                { time: 25, type: 'chat', user: 'ネトウヨ', text: 'それ政治でよく見るわ', color: 'color4' },
+                { time: 28, type: 'chat', user: '左翼くん', text: 'どっちも極端なんだよな', color: 'color5' },
+                { time: 32, type: 'speech', text: 'で、よくあるのが「金を取るか、命を取るか」みたいな。' },
+                { time: 37, type: 'chat', user: '一般人', text: 'それジレンマじゃなくて脅迫では？', color: 'color1' },
+                { time: 42, type: 'speech', text: 'ははっ、そう。だから「誤った」二分法なんだよ。実際は第三の選択肢があるかもしれない。' },
+                { time: 49, type: 'chat', user: '純一ファン', text: '純一の説明わかりやすい', color: 'color2' },
+                { time: 52, type: 'chat', user: '通りすがり', text: 'でも現実は二分法が多い気がする', color: 'color3' },
+                { time: 56, type: 'speech', text: '例えば「お前、俺のやり方に従うか、消えるか」って言われたら？' },
+                { time: 62, type: 'chat', user: 'ビビり', text: '怖すぎワロタ', color: 'color4' },
+                { time: 65, type: 'speech', text: 'でも実際は「逃げる」「戦う」「無視する」とか他にもあるわけ。' },
+                { time: 72, type: 'chat', user: '論理マン', text: '要は選択肢のすり替えだよね', color: 'color5' },
+                { time: 76, type: 'speech', text: 'そう。で、この誤謬は「偽りのジレンマ」って言われる。英語だとfalse dilemma。' },
+                { time: 84, type: 'chat', user: '英語できる', text: 'false dilemma って言うのか', color: 'color1' },
+                { time: 88, type: 'speech', text: 'あと「お前、俺と一緒にやるか、敵になるか」とか言うやつ。' },
+                { time: 95, type: 'chat', user: '任侠', text: 'ヤクザの世界やん', color: 'color2' },
+                { time: 99, type: 'speech', text: 'まあ、そういうのでも「第三の道」を提示するのが大事なんだよ。' },
+                { time: 106, type: 'chat', user: 'ひろゆき', text: 'それってあなたの感想ですよね', color: 'color3' },
+                { time: 112, type: 'speech', text: 'ぶっちゃけ、ネットの議論でもめっちゃ見る。' },
+                { time: 118, type: 'chat', user: 'ネット民', text: '「俺を支持するか、無能か」みたいな', color: 'color4' },
+                { time: 123, type: 'speech', text: 'そうそう。だから「本当に二択しかないのか？」って一回疑うのが大事。' },
+                { time: 130, type: 'chat', user: '賢者', text: 'メタ認知ってやつだ', color: 'color5' },
+                { time: 135, type: 'speech', text: 'で、この誤謬に引っかかると、思考停止するか、過激な方に行っちゃう。' },
+                { time: 143, type: 'chat', user: '心理学者', text: '認知の歪みの一種だね', color: 'color1' },
+                { time: 148, type: 'speech', text: 'あと「金か名誉か」みたいな。でも「静かな生活」って選択肢もある。' },
+                { time: 155, type: 'chat', user: '仙人', text: 'それいいな', color: 'color2' },
+                { time: 160, type: 'speech', text: 'まあ、加藤純一的には「どっちも取る」とか言いたくなるけどな。' },
+                { time: 167, type: 'chat', user: '欲張り', text: '両方取れるやろ', color: 'color3' },
+                { time: 172, type: 'speech', text: 'はは、そう。実際、二択に見せかけて「どちらも選ばない」って手もある。' },
+                { time: 180, type: 'chat', user: 'アナーキー', text: '政府か無政府かみたいな', color: 'color4' },
+                { time: 185, type: 'speech', text: 'そう。で、この誤った二分法を使うやつはだいたい「自分の都合のいい選択肢」に誘導したい。' },
+                { time: 194, type: 'chat', user: '洗脳', text: 'マーケティングでも使われるやつ', color: 'color5' },
+                { time: 199, type: 'speech', text: '例えば「この商品を買うか、一生後悔するか」とか。' },
+                { time: 205, type: 'chat', user: 'セールス', text: 'それまさにセールストーク', color: 'color1' },
+                { time: 210, type: 'speech', text: 'あとは「俺の言うことを聞くか、出て行くか」とか。' },
+                { time: 217, type: 'chat', user: 'ドラマ', text: 'それドラマでよくある', color: 'color2' },
+                { time: 222, type: 'speech', text: 'でも「話し合う」とか「一旦保留」とかあるからな。' },
+                { time: 229, type: 'chat', user: '大人', text: '大人の対応だ', color: 'color3' },
+                { time: 234, type: 'speech', text: 'だから、もし誰かが「AかBか」って迫ってきたら、一度立ち止まれ。' },
+                { time: 242, type: 'chat', user: '冷静', text: '一回深呼吸な', color: 'color4' },
+                { time: 247, type: 'speech', text: 'そして「Cはないのか？」って聞いてみる。大抵はある。' },
+                { time: 254, type: 'chat', user: '目からウロコ', text: 'なるほど', color: 'color5' },
+                { time: 259, type: 'speech', text: 'ちなみに、誤った二分法は「白か黒か」って言い方もされる。' },
+                { time: 267, type: 'chat', user: 'グレー', text: 'グレーゾーンもあるのにね', color: 'color1' },
+                { time: 272, type: 'speech', text: 'そう、世の中はほぼグレー。だから二択に絞る時点でおかしいことが多い。' },
+                { time: 280, type: 'chat', user: '多様性', text: '多様性を無視してる', color: 'color2' },
+                { time: 285, type: 'speech', text: 'あと、この誤謬は「ジレンマ」って言われるけど、本当のジレンマとは違う。' },
+                { time: 293, type: 'chat', user: '哲学部', text: '本当のジレンマはどっち選んでも悪い結果', color: 'color3' },
+                { time: 299, type: 'speech', text: 'そう。本当のジレンマはどちらも辛い。でも誤った二分法は「実はそうでもない」って話。' },
+                { time: 308, type: 'chat', user: '倫理', text: 'トロッコ問題は本当のジレンマに近い', color: 'color4' },
+                { time: 313, type: 'speech', text: 'トロッコはまた別の話だが、まあ似てるな。' },
+                { time: 319, type: 'chat', user: '映画', text: 'ソフィーの選択は本当のジレンマ', color: 'color5' },
+                { time: 325, type: 'speech', text: 'で、今日言いたいのは「二択に見えたら疑え」ってこと。' },
+                { time: 332, type: 'chat', user: 'まとめ', text: 'つまり第三の道を探せと', color: 'color1' },
+                { time: 337, type: 'speech', text: 'そう。そして、自分が誰かに「AかBか」って迫ってないかも振り返ってみ？' },
+                { time: 345, type: 'chat', user: '自己啓発', text: 'それ大事', color: 'color2' },
+                { time: 350, type: 'speech', text: '意外と自分もやってたりするからな。' },
+                { time: 356, type: 'chat', user: 'ハッとした', text: '確かに…', color: 'color3' },
+                { time: 361, type: 'speech', text: 'まあ、そんな感じで「誤った二分法」は身近にあるって話でした。' },
+                { time: 368, type: 'chat', user: '勉強になった', text: 'ためになった', color: 'color4' },
+                { time: 373, type: 'speech', text: 'また次回、別の誤謬もやるかもな。じゃあな。' },
+                { time: 380, type: 'chat', user: 'ファン', text: 'ありがとう純一！', color: 'color5' },
+                { time: 385, type: 'chat', user: 'まとめ役', text: 'おつかれー', color: 'color1' },
+                { time: 390, type: 'speech', text: 'あと、これ配信切り忘れてるわ。おい誰か切れよ。' },
+                { time: 397, type: 'chat', user: '笑', text: 'わろた', color: 'color2' },
+                { time: 402, type: 'speech', text: 'まあいいや。じゃあ本当に終わる。バイバイ。' },
+                { time: 410, type: 'chat', user: 'エンド', text: '最後まで見た', color: 'color3' },
+                { time: 415, type: 'chat', user: 'またね', text: 'また明日', color: 'color4' }
+            ];
+
+            // ソート済み (time順)
+            events.sort((a, b) => a.time - b.time);
+
+            // インデックス管理
+            let eventIndex = 0;
+
+            // DOM要素
+            const chatContainer = document.getElementById('chatContainer');
+            const speechTextEl = document.getElementById('speechText');
+            const progressFill = document.getElementById('progressFill');
+            const currentTimeEl = document.getElementById('currentTime');
+            const totalTimeEl = document.getElementById('totalTime');
+            const playPauseBtn = document.getElementById('playPauseBtn');
+            const progressBarBg = document.getElementById('progressBarBg');
+
+            totalTimeEl.textContent = formatTime(TOTAL_SECONDS);
+
+            // 時間フォーマット 0:00
+            function formatTime(sec) {
+                const m = Math.floor(sec / 60);
+                const s = Math.floor(sec % 60);
+                return `${m}:${s.toString().padStart(2, '0')}`;
+            }
+
+            // チャット追加
+            function addChatMessage(user, text, colorClass) {
+                const msgDiv = document.createElement('div');
+                msgDiv.className = 'chat-message';
+                msgDiv.innerHTML = `<span class="user ${colorClass || 'color4'}">${user}:</span><span class="text">${text}</span>`;
+                chatContainer.appendChild(msgDiv);
+                // 自動スクロール (最新へ)
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+
+                // チャットが多くなりすぎたら削除 (パフォーマンス)
+                if (chatContainer.children.length > 100) {
+                    chatContainer.removeChild(chatContainer.firstChild);
+                }
+            }
+
+            // 台詞更新
+            function updateSpeech(text) {
+                speechTextEl.textContent = text;
+                // 少しフェード効果
+                const bubble = document.getElementById('speechBubble');
+                bubble.style.opacity = '0.7';
+                setTimeout(() => bubble.style.opacity = '1', 80);
+            }
+
+            // イベント処理 (現在の秒数に基づいて)
+            function processEvents(currentTimeSec) {
+                // すべてのイベントをチェック (time <= currentTimeSec かつ 未処理)
+                while (eventIndex < events.length && events[eventIndex].time <= currentTimeSec) {
+                    const ev = events[eventIndex];
+                    if (ev.type === 'speech') {
+                        updateSpeech(ev.text);
+                    } else if (ev.type === 'chat') {
+                        addChatMessage(ev.user, ev.text, ev.color);
+                    }
+                    eventIndex++;
+                }
+            }
+
+            // 再生/一時停止
+            function togglePlayPause() {
+                isPlaying = !isPlaying;
+                playPauseBtn.textContent = isPlaying ? '⏸' : '▶';
+            }
+
+            playPauseBtn.addEventListener('click', togglePlayPause);
+
+            // プログレスバークリックでシーク
+            progressBarBg.addEventListener('click', (e) => {
+                const rect = progressBarBg.getBoundingClientRect();
+                const clickX = e.clientX - rect.left;
+                const ratio = clickX / rect.width;
+                const seekTime = Math.floor(ratio * TOTAL_SECONDS);
+                seekTo(seekTime);
+            });
+
+            // シーク処理
+            function seekTo(seconds) {
+                if (seconds < 0) seconds = 0;
+                if (seconds > TOTAL_SECONDS) seconds = TOTAL_SECONDS;
+
+                currentSec = seconds;
+
+                // チャットと台詞をリセットして、現在の時間に合った状態に再構築
+                chatContainer.innerHTML = '';
+                eventIndex = 0;
+
+                // 一旦、現在の秒数までのイベントをすべて処理
+                processEvents(currentSec);
+
+                // 進捗バー更新
+                updateProgressBar();
+
+                // 時間表示
+                currentTimeEl.textContent = formatTime(currentSec);
+
+                // 台詞がまだない場合 (最初のイベントが0秒より大きい場合)
+                if (events.length > 0 && events[0].time > currentSec) {
+                    // デフォルトメッセージ
+                    speechTextEl.textContent = '...';
+                } else if (events.length === 0) {
+                    speechTextEl.textContent = '...';
+                }
+            }
+
+            // 進捗バー更新
+            function updateProgressBar() {
+                const percent = (currentSec / TOTAL_SECONDS) * 100;
+                progressFill.style.width = percent + '%';
+            }
+
+            // タイマー進行
+            function startTimer() {
+                if (timerInterval) clearInterval(timerInterval);
+                timerInterval = setInterval(() => {
+                    if (isPlaying) {
+                        if (currentSec < TOTAL_SECONDS) {
+                            currentSec += 1; // 1秒ずつ進む（等速）
+                            // でも、会話のスピードを遅くしたいので、1秒ごとに1秒進む = 等速だが、
+                            // コメント間隔はすでにゆったり目に設定してある
+                            processEvents(currentSec);
+                            updateProgressBar();
+                            currentTimeEl.textContent = formatTime(currentSec);
+                        } else {
+                            // 動画終端
+                            if (isPlaying) {
+                                isPlaying = false;
+                                playPauseBtn.textContent = '▶';
+                            }
+                        }
+                    }
+                }, 1000); // 1秒ごと
+            }
+
+            // 初期化: 最初のイベントを即時実行
+            function init() {
+                // 最初の秒0のイベントを処理
+                processEvents(0);
+                currentTimeEl.textContent = formatTime(0);
+                totalTimeEl.textContent = formatTime(TOTAL_SECONDS);
+                updateProgressBar();
+                startTimer();
+            }
+
+            init();
+
+            // オプション: キーボードスペースで再生/一時停止
+            window.addEventListener('keydown', (e) => {
+                if (e.code === 'Space') {
+                    e.preventDefault();
+                    togglePlayPause();
+                }
+            });
+
+        })();
+    </script>
+</body>
+</html>
