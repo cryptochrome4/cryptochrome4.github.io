@@ -1,0 +1,1209 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ROBOT CARD GAME</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    background: #000;
+    font-family: "Segoe UI", "Hiragino Sans", "Yu Gothic", sans-serif;
+    color: #cff;
+  }
+
+  /* =====================
+     オープニング
+  ===================== */
+  #opening {
+    position: fixed; inset: 0;
+    background-image: url("img225door.jpg");
+    background-size: 100% 100%;
+    background-position: center;
+    background-repeat: no-repeat;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+  }
+  #opening::before {
+    content: ""; position: absolute; inset: 0;
+    background: rgba(0,0,0,0.4); z-index: 0;
+  }
+  #opening .title {
+    position: relative; z-index: 1;
+    color: #fff;
+    font-size: clamp(28px, 6vw, 64px);
+    letter-spacing: 0.15em;
+    text-shadow: 0 0 10px #0ff, 0 0 20px #0af, 0 0 40px #06f;
+    margin-bottom: 20px;
+    text-align: center;
+  }
+  #opening .subtitle {
+    position: relative; z-index: 1;
+    color: #cff;
+    font-size: clamp(12px, 2vw, 18px);
+    letter-spacing: 0.3em;
+    margin-bottom: 50px;
+    text-shadow: 0 0 8px #0af;
+  }
+  .btn-area {
+    position: relative; z-index: 1;
+    display: flex; flex-direction: column; gap: 16px; align-items: center;
+  }
+  .btn {
+    min-width: 220px;
+    padding: 12px 28px;
+    font-size: clamp(14px, 2vw, 20px);
+    letter-spacing: 0.2em;
+    color: #e8ffff;
+    background: linear-gradient(180deg, #0a2a3a 0%, #041018 100%);
+    border: 2px solid #0ff;
+    border-radius: 8px;
+    cursor: pointer;
+    text-shadow: 0 0 6px #0ff;
+    box-shadow: 0 0 10px rgba(0,255,255,0.5), inset 0 0 12px rgba(0,255,255,0.2);
+    transition: all 0.2s ease;
+  }
+  .btn:hover {
+    background: linear-gradient(180deg, #0f4a5a 0%, #062028 100%);
+    box-shadow: 0 0 20px rgba(0,255,255,0.9), inset 0 0 18px rgba(0,255,255,0.4);
+    transform: translateY(-2px);
+  }
+  .btn:active { transform: translateY(1px); }
+  .btn:disabled {
+    opacity: 0.35; cursor: not-allowed;
+    box-shadow: none; transform: none;
+  }
+
+  /* 背景ビューア */
+  #bgViewer {
+    position: fixed; inset: 0; z-index: 200;
+    background: #000;
+    display: none; justify-content: center; align-items: center;
+  }
+  #bgViewer.active { display: flex; }
+  #bgViewer img {
+    width: 100%; height: 100%;
+    object-fit: fill; display: block;
+  }
+  #bgViewer .close-viewer {
+    position: absolute; top: 20px; right: 20px; z-index: 210;
+    padding: 10px 24px;
+    color: #fff;
+    background: rgba(0,0,0,0.6);
+    border: 2px solid #0ff;
+    border-radius: 6px;
+    cursor: pointer;
+    letter-spacing: 0.15em;
+  }
+  #bgViewer .close-viewer:hover { background: rgba(0,255,255,0.3); }
+
+  /* =====================
+     ゲーム画面
+  ===================== */
+  #game {
+    position: fixed; inset: 0;
+    display: none;
+    flex-direction: column;
+    background: radial-gradient(circle at 50% 0%, #0a1a2a 0%, #03060a 70%);
+    z-index: 50;
+    overflow: hidden;
+  }
+  #game.active { display: flex; }
+
+  #topBar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 16px;
+    background: rgba(0,20,30,0.85);
+    border-bottom: 1px solid #0ff;
+    font-size: 14px;
+    letter-spacing: 0.1em;
+    flex-shrink: 0;
+  }
+  #topBar .clock { color: #0ff; text-shadow: 0 0 6px #0ff; }
+  #topBar .money { color: #ff0; text-shadow: 0 0 6px #ff0; }
+
+  #main {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* 左：パック開封エリア */
+  #packArea {
+    flex: 1.4;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 12px;
+    position: relative;
+  }
+
+  #packCardWrap {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+  #packCardWrap.active { display: flex; }
+
+  /* 遊戯王風カード */
+  .ygo-card {
+    width: 260px;
+    height: 380px;
+    background: linear-gradient(160deg, #d4a24a 0%, #b07d2a 40%, #8a5f1c 100%);
+    border-radius: 10px;
+    padding: 8px;
+    box-shadow: 0 0 20px rgba(255,200,80,0.5), 0 0 40px rgba(0,0,0,0.8);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+  .ygo-card.space {
+    background: linear-gradient(160deg, #4a6ad4 0%, #2a3fb0 40%, #1c288a 100%);
+    box-shadow: 0 0 20px rgba(120,160,255,0.6), 0 0 40px rgba(0,0,0,0.8);
+  }
+  .ygo-card.ur {
+    background: linear-gradient(160deg, #e0c060 0%, #c09020 30%, #8050a0 70%, #5030a0 100%);
+    box-shadow: 0 0 30px rgba(255,220,100,0.9), 0 0 60px rgba(160,100,255,0.6);
+  }
+
+  .ygo-name {
+    font-size: 12px;
+    font-weight: bold;
+    color: #fff;
+    background: rgba(0,0,0,0.5);
+    padding: 4px 8px;
+    border-radius: 4px;
+    text-align: center;
+    letter-spacing: 0.05em;
+    min-height: 24px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+  }
+  .ygo-attr-mark {
+    display: inline-block;
+    width: 18px; height: 18px;
+    line-height: 18px;
+    text-align: center;
+    border-radius: 50%;
+    font-size: 11px;
+    font-weight: bold;
+  }
+  .ygo-attr-mark.earth { background: #2a8a2a; color: #fff; }
+  .ygo-attr-mark.space { background: #2a4ad0; color: #fff; }
+
+  .ygo-art {
+    flex: 1;
+    margin: 6px 0;
+    background: #0a0a12;
+    border: 2px solid rgba(255,255,255,0.4);
+    border-radius: 4px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+  }
+  .ygo-art canvas {
+    width: 100%; height: 100%;
+    image-rendering: pixelated;
+  }
+
+  .ygo-stats {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    font-weight: bold;
+    color: #fff;
+    background: rgba(0,0,0,0.5);
+    padding: 3px 8px;
+    border-radius: 4px;
+  }
+  .ygo-effect {
+    font-size: 10px;
+    color: #fff;
+    background: rgba(0,0,0,0.45);
+    padding: 4px 6px;
+    border-radius: 4px;
+    margin-top: 4px;
+    min-height: 34px;
+    line-height: 1.2;
+  }
+
+  .pack-controls {
+    display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
+    margin-top: 8px;
+  }
+  .pack-controls .btn { min-width: 90px; padding: 8px 14px; font-size: 12px; }
+
+  #buyArea {
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+  }
+
+  /* 右：情報パネル */
+  #infoPanel {
+    flex: 1;
+    border-left: 1px solid #0ff;
+    display: flex;
+    flex-direction: column;
+    background: rgba(0,10,20,0.9);
+    overflow: hidden;
+  }
+  #infoPanel h3 {
+    font-size: 13px;
+    padding: 8px;
+    letter-spacing: 0.15em;
+    color: #0ff;
+    border-bottom: 1px solid #0ff;
+    text-shadow: 0 0 6px #0ff;
+  }
+  #sortSelect {
+    margin: 6px 8px;
+    padding: 4px;
+    background: #041018;
+    color: #cff;
+    border: 1px solid #0ff;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+  #infoList {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px 8px 8px;
+  }
+  .info-item {
+    padding: 5px 6px;
+    font-size: 12px;
+    border-bottom: 1px solid rgba(0,255,255,0.15);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #cff;
+  }
+  .info-item:hover { background: rgba(0,255,255,0.12); }
+
+  /* 買取相場表 */
+  #priceTable {
+    border-top: 1px solid #0ff;
+    max-height: 38%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  #priceTable h3 {
+    font-size: 12px;
+    padding: 6px 8px;
+    color: #ff0;
+    border-bottom: 1px solid #ff0;
+    letter-spacing: 0.1em;
+    text-shadow: 0 0 6px #ff0;
+  }
+  #priceList {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+  .price-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 2px 0;
+    border-bottom: 1px dashed rgba(255,255,0,0.2);
+    color: #ffd;
+  }
+  .price-row .up { color: #4f4; }
+  .price-row .down { color: #f66; }
+
+  /* =====================
+     モーダル
+  ===================== */
+  #modal {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.85);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 300;
+  }
+  #modal.active { display: flex; }
+  #modalInner {
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+  }
+  #modalControls {
+    display: flex; gap: 12px;
+  }
+  #modalControls .btn { min-width: 120px; }
+
+  /* =====================
+     footer
+  ===================== */
+  #footer {
+    flex-shrink: 0;
+    height: 22px;
+    background: rgba(0,0,0,0.9);
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    padding: 0 12px;
+    font-size: 11px;
+  }
+  #studyLink {
+    display: none;
+    color: #0a4a4a;
+    text-decoration: none;
+    letter-spacing: 0.1em;
+  }
+  #studyLink:hover { color: #0ff; text-shadow: 0 0 6px #0ff; }
+  #studyLink.visible { display: inline; }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<!-- オープニング -->
+<div id="opening">
+  <div class="title">ROBOT CARD GAME</div>
+  <div class="subtitle">- EARTH &amp; SPACE -</div>
+  <div class="btn-area">
+    <button class="btn" id="startBtn">はじめる</button>
+    <button class="btn" id="viewBgBtn">背景画像を見る</button>
+  </div>
+</div>
+
+<!-- 背景ビューア -->
+<div id="bgViewer">
+  <img src="img225door.jpg" alt="背景画像">
+  <button class="close-viewer" id="closeViewerBtn">CLOSE</button>
+</div>
+
+<!-- ゲーム -->
+<div id="game">
+  <div id="topBar">
+    <div class="clock" id="clock">00:00:00</div>
+    <div class="money" id="moneyDisplay">所持金：200円</div>
+  </div>
+
+  <div id="main">
+    <!-- パックエリア -->
+    <div id="packArea">
+      <div id="buyArea">
+        <button class="btn" id="buyPackBtn">パックを買う（200円）</button>
+        <div style="font-size:11px;color:#8ac;">1パック = 7枚</div>
+      </div>
+
+      <div id="packCardWrap">
+        <div class="ygo-card" id="packCard">
+          <div class="ygo-name" id="packName"></div>
+          <div class="ygo-art"><canvas id="packCanvas" width="120" height="120"></canvas></div>
+          <div class="ygo-stats">
+            <span id="packAtk">ATK 0</span>
+            <span id="packDef">DEF 0</span>
+          </div>
+          <div class="ygo-effect" id="packEffect"></div>
+        </div>
+        <div class="pack-controls">
+          <button class="btn" id="prevBtn">PREV</button>
+          <button class="btn" id="nextBtn">NEXT</button>
+          <button class="btn" id="sellNowBtn">その場で売る</button>
+          <button class="btn" id="endPackBtn">売らずに開封終了</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 情報パネル -->
+    <div id="infoPanel">
+      <h3>入手カード</h3>
+      <select id="sortSelect">
+        <option value="obtained">入手順</option>
+        <option value="rarity">レア度順</option>
+        <option value="atk">攻撃力が高い順</option>
+        <option value="defLow">守備力が低い順</option>
+        <option value="earth">地球属性順</option>
+        <option value="space">宇宙属性順</option>
+      </select>
+      <div id="infoList"></div>
+
+      <div id="priceTable">
+        <h3>買取相場表</h3>
+        <div id="priceList"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="footer">
+    <a href="study.html" id="studyLink">study.html</a>
+  </div>
+</div>
+
+<!-- モーダル -->
+<div id="modal">
+  <div id="modalInner">
+    <div class="ygo-card" id="modalCard">
+      <div class="ygo-name" id="modalName"></div>
+      <div class="ygo-art"><canvas id="modalCanvas" width="120" height="120"></canvas></div>
+      <div class="ygo-stats">
+        <span id="modalAtk">ATK 0</span>
+        <span id="modalDef">DEF 0</span>
+      </div>
+      <div class="ygo-effect" id="modalEffect"></div>
+    </div>
+    <div id="modalControls">
+      <button class="btn" id="modalCloseBtn">CLOSE</button>
+      <button class="btn" id="modalSellBtn">売る</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   カード名ルール
+   カタカナのみ → 英語名
+   カタカナ＋の＋ひらがな → 日本語名
+   カタカナ＋の＋漢字 → 日本語名
+========================================================= */
+
+const KATAKANA = [
+  "アイアン","コスモ","ギガ","テラ","スペース",
+  "オービット","グラビティ","メテオ","サンライズ","ルナティック",
+  "ノヴァ","サイバー","クロノ","アストロ","ヴォルテックス",
+  "イクリプス","フェニックス","タイタン","オーロラ","ゼロ"
+];
+
+const ENGLISH_BODY = [
+  "GUARD","WING","BREAKER","NOVA","DRILL",
+  "CANNON","CORE","KNIGHT","ARMOR","CLAW",
+  "BLADE","SHIELD","BLAZE","STORM","EDGE",
+  "FANG","SPHERE","LANCE","AXE","BOLT"
+];
+
+const HIRA_BODY = [
+  "まもり","はばたき","うねり","めざめ","きらめき",
+  "まわり","しずみ","ながれ","あけぼの","つきかげ",
+  "いのり","さけび","ちかい","ゆめ","ひかり"
+];
+
+const KANJI_BODY = [
+  "守護","翼","破壊","新星","砲",
+  "核","騎士","鎧","爪","刃",
+  "盾","炎","嵐","刃","球",
+  "槍","斧","雷","環","零"
+];
+
+/* =========================================================
+   カード定義（100枚）
+   70枚ノーマル + 30枚レア以上
+========================================================= */
+
+function pick(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+function rand(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function makeEnglishName() {
+  return (pick(KATAKANA) + " " + pick(ENGLISH_BODY)).toUpperCase();
+}
+function makeHiraName() {
+  return pick(KATAKANA) + "の" + pick(HIRA_BODY);
+}
+function makeKanjiName() {
+  return pick(KATAKANA) + "の" + pick(KANJI_BODY);
+}
+
+function rollRarity(isRareSlot) {
+  if (!isRareSlot) return "N";
+  const r = Math.random();
+  if (r < 0.6) return "R";
+  if (r < 0.9) return "SR";
+  return "UR";
+}
+
+function rarityRank(r) {
+  return { N: 0, R: 1, SR: 2, UR: 3 }[r];
+}
+
+const NORMAL_EFFECTS = [
+  "攻撃力+5",
+  "守備力+5",
+  "このカードは宇宙属性としても扱う",
+  "1ターンだけ守備力2倍",
+  "1ターンだけ攻撃力2倍",
+  "相手の攻撃力を5下げる",
+  "ダメージを5軽減する"
+];
+const RARE_EFFECTS = [
+  "攻撃力+15",
+  "守備力+15",
+  "宇宙属性なら攻撃力2倍",
+  "地球属性なら守備力2倍",
+  "相手の効果を1つ無効化",
+  "攻守を入れ替える",
+  "1ターンだけ攻撃力3倍",
+  "ダメージを20軽減する"
+];
+const SR_EFFECTS = [
+  "攻撃力+30",
+  "守備力+30",
+  "宇宙属性なら攻撃力3倍",
+  "地球属性なら守備力3倍",
+  "相手の効果を2つ無効化",
+  "攻守を入れ替えて2倍にする",
+  "1ターンだけ攻撃力4倍"
+];
+const UR_EFFECTS = [
+  "攻撃力+50",
+  "守備力+50",
+  "宇宙と地球の両方として扱う",
+  "相手の効果を全て無効化",
+  "攻守を入れ替えて3倍にする",
+  "1ターンだけ攻撃力5倍",
+  "このカードが破壊された時、相手に50ダメージ"
+];
+
+function pickEffect(rarity) {
+  if (rarity === "N") return pick(NORMAL_EFFECTS);
+  if (rarity === "R") return pick(RARE_EFFECTS);
+  if (rarity === "SR") return pick(SR_EFFECTS);
+  return pick(UR_EFFECTS);
+}
+
+/* ロボットパラメータ生成 */
+function makeRobotParams(attr, rarity, atk, def) {
+  return {
+    head: pick(["square","round","triangle","hex"]),
+    eyes: pick([1,2,3]),
+    body: pick(["slim","thick","armor","frame"]),
+    arms: pick(["normal","cannon","drill","claw"]),
+    legs: pick(["biped","quad","tank","hover"]),
+    wings: rarity === "UR" ? true : Math.random() < 0.35,
+    antenna: Math.random() < 0.5,
+    core: rarity !== "N",
+    color: attr === "宇"
+      ? pick(["#36f","#a4f","#fc0","#0ff","#f6f"])
+      : pick(["#4a4","#8b5","#aaa","#fa0","#6c6"]),
+    accent: attr === "宇" ? "#0ff" : "#ff0",
+    size: rarity === "UR" ? "L" : rarity === "SR" ? "M" : "S",
+    atk, def
+  };
+}
+
+function makePrice(rarity, atk, def) {
+  const base = { N: 10, R: 40, SR: 90, UR: 200 }[rarity];
+  return base + Math.floor((atk + def) / 8);
+}
+
+function makeCard(isRareSlot, forceRarity) {
+  const attr = Math.random() < 0.5 ? "地" : "宇";
+  const rarity = forceRarity || rollRarity(isRareSlot);
+
+  let name;
+  const r = Math.random();
+  if (r < 0.5) {
+    name = makeEnglishName();
+  } else if (r < 0.75) {
+    name = makeHiraName();
+  } else {
+    name = makeKanjiName();
+  }
+
+  let atk, def;
+  if (rarity === "N") { atk = rand(10,40); def = rand(10,40); }
+  else if (rarity === "R") { atk = rand(40,70); def = rand(40,70); }
+  else if (rarity === "SR") { atk = rand(70,110); def = rand(70,110); }
+  else { atk = rand(110,180); def = rand(110,180); }
+
+  if (attr === "宇") atk += 5;
+  if (attr === "地") def += 5;
+
+  const effect = pickEffect(rarity);
+  const basePrice = makePrice(rarity, atk, def);
+
+  return {
+    id: "C" + Math.random().toString(36).slice(2,9),
+    name, attr, rarity, atk, def, effect,
+    basePrice,
+    robot: makeRobotParams(attr, rarity, atk, def),
+    trend: Math.random() < 0.5 ? "up" : "down",
+    maxPrice: basePrice * 2,
+    minPrice: 0,
+    currentPrice: basePrice,
+    obtainedAt: 0
+  };
+}
+
+/* ノーマル70枚・レア以上30枚をプールとして生成 */
+const normalPool = [];
+for (let i = 0; i < 70; i++) normalPool.push(makeCard(false, "N"));
+
+const rarePool = [];
+for (let i = 0; i < 18; i++) rarePool.push(makeCard(true, "R"));
+for (let i = 0; i < 9; i++)  rarePool.push(makeCard(true, "SR"));
+for (let i = 0; i < 3; i++)  rarePool.push(makeCard(true, "UR"));
+
+/* =========================================================
+   ロボット描画（ドット絵 + 図形学）
+========================================================= */
+function drawRobot(canvas, robot) {
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // 背景グラデ
+  const bg = ctx.createLinearGradient(0,0,0,H);
+  bg.addColorStop(0, robot.attr === "宇" ? "#0a1030" : "#101a10");
+  bg.addColorStop(1, "#000");
+  ctx.fillStyle = bg;
+  ctx.fillRect(0,0,W,H);
+
+  const cx = W/2, cy = H/2;
+  const s = W/120; // スケール
+
+  const main = robot.color;
+  const accent = robot.accent;
+  const dark = "#111";
+  const metal = "#888";
+
+  ctx.save();
+  ctx.translate(cx, cy);
+
+  // ---- 脚 ----
+  ctx.fillStyle = metal;
+  if (robot.legs === "biped") {
+    ctx.fillRect(-18*s, 20*s, 12*s, 28*s);
+    ctx.fillRect(6*s, 20*s, 12*s, 28*s);
+  } else if (robot.legs === "quad") {
+    ctx.fillRect(-28*s, 22*s, 8*s, 24*s);
+    ctx.fillRect(-14*s, 22*s, 8*s, 24*s);
+    ctx.fillRect(6*s, 22*s, 8*s, 24*s);
+    ctx.fillRect(20*s, 22*s, 8*s, 24*s);
+  } else if (robot.legs === "tank") {
+    ctx.fillRect(-30*s, 28*s, 60*s, 16*s);
+    ctx.fillStyle = dark;
+    ctx.fillRect(-24*s, 30*s, 8*s, 12*s);
+    ctx.fillRect(-8*s, 30*s, 8*s, 12*s);
+    ctx.fillRect(8*s, 30*s, 8*s, 12*s);
+  } else {
+    // hover
+    ctx.fillStyle = accent;
+    ctx.beginPath();
+    ctx.ellipse(0, 34*s, 26*s, 8*s, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(0,255,255,0.3)";
+    ctx.beginPath();
+    ctx.ellipse(0, 40*s, 30*s, 10*s, 0, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  // ---- 胴体 ----
+  ctx.fillStyle = main;
+  if (robot.body === "slim") {
+    ctx.fillRect(-16*s, -8*s, 32*s, 30*s);
+  } else if (robot.body === "thick") {
+    ctx.fillRect(-22*s, -10*s, 44*s, 34*s);
+  } else if (robot.body === "armor") {
+    ctx.fillRect(-20*s, -12*s, 40*s, 36*s);
+    ctx.fillStyle = metal;
+    ctx.fillRect(-20*s, -12*s, 40*s, 6*s);
+    ctx.fillRect(-20*s, 18*s, 40*s, 6*s);
+  } else {
+    // frame
+    ctx.fillRect(-18*s, -8*s, 6*s, 30*s);
+    ctx.fillRect(12*s, -8*s, 6*s, 30*s);
+    ctx.fillRect(-18*s, -8*s, 36*s, 6*s);
+    ctx.fillRect(-18*s, 16*s, 36*s, 6*s);
+  }
+
+  // コア
+  if (robot.core) {
+    ctx.fillStyle = accent;
+    ctx.beginPath();
+    ctx.arc(0, 6*s, 6*s, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.beginPath();
+    ctx.arc(0, 6*s, 3*s, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  // ---- 腕 ----
+  ctx.fillStyle = main;
+  if (robot.arms === "normal") {
+    ctx.fillRect(-30*s, -6*s, 10*s, 26*s);
+    ctx.fillRect(20*s, -6*s, 10*s, 26*s);
+  } else if (robot.arms === "cannon") {
+    ctx.fillRect(-34*s, -4*s, 14*s, 14*s);
+    ctx.fillRect(20*s, -4*s, 14*s, 14*s);
+    ctx.fillStyle = dark;
+    ctx.fillRect(-38*s, -2*s, 6*s, 10*s);
+    ctx.fillRect(32*s, -2*s, 6*s, 10*s);
+  } else if (robot.arms === "drill") {
+    ctx.fillRect(-32*s, -6*s, 10*s, 22*s);
+    ctx.fillRect(22*s, -6*s, 10*s, 22*s);
+    ctx.fillStyle = metal;
+    ctx.beginPath();
+    ctx.moveTo(-32*s, 16*s);
+    ctx.lineTo(-22*s, 16*s);
+    ctx.lineTo(-27*s, 28*s);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(22*s, 16*s);
+    ctx.lineTo(32*s, 16*s);
+    ctx.lineTo(27*s, 28*s);
+    ctx.closePath();
+    ctx.fill();
+  } else {
+    // claw
+    ctx.fillRect(-32*s, -6*s, 10*s, 20*s);
+    ctx.fillRect(22*s, -6*s, 10*s, 20*s);
+    ctx.fillStyle = accent;
+    ctx.fillRect(-36*s, 14*s, 6*s, 12*s);
+    ctx.fillRect(-28*s, 14*s, 6*s, 12*s);
+    ctx.fillRect(22*s, 14*s, 6*s, 12*s);
+    ctx.fillRect(30*s, 14*s, 6*s, 12*s);
+  }
+
+  // ---- 翼 ----
+  if (robot.wings) {
+    ctx.fillStyle = "rgba(0,255,255,0.6)";
+    ctx.beginPath();
+    ctx.moveTo(-20*s, -6*s);
+    ctx.lineTo(-48*s, -20*s);
+    ctx.lineTo(-40*s, 4*s);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(20*s, -6*s);
+    ctx.lineTo(48*s, -20*s);
+    ctx.lineTo(40*s, 4*s);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // ---- 頭 ----
+  ctx.fillStyle = main;
+  if (robot.head === "square") {
+    ctx.fillRect(-20*s, -40*s, 40*s, 30*s);
+  } else if (robot.head === "round") {
+    ctx.beginPath();
+    ctx.arc(0, -25*s, 20*s, 0, Math.PI*2);
+    ctx.fill();
+  } else if (robot.head === "triangle") {
+    ctx.beginPath();
+    ctx.moveTo(0, -45*s);
+    ctx.lineTo(-22*s, -12*s);
+    ctx.lineTo(22*s, -12*s);
+    ctx.closePath();
+    ctx.fill();
+  } else {
+    // hex
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const a = Math.PI/3 * i - Math.PI/6;
+      const x = Math.cos(a) * 20*s;
+      const y = Math.sin(a) * 20*s - 25*s;
+      i === 0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    }
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // アンテナ
+  if (robot.antenna) {
+    ctx.strokeStyle = metal;
+    ctx.lineWidth = 2*s;
+    ctx.beginPath();
+    ctx.moveTo(0, -45*s);
+    ctx.lineTo(0, -58*s);
+    ctx.stroke();
+    ctx.fillStyle = accent;
+    ctx.beginPath();
+    ctx.arc(0, -60*s, 3*s, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  // ---- 目 ----
+  ctx.fillStyle = accent;
+  if (robot.eyes === 1) {
+    ctx.beginPath();
+    ctx.arc(0, -25*s, 6*s, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.beginPath();
+    ctx.arc(0, -25*s, 2*s, 0, Math.PI*2);
+    ctx.fill();
+  } else if (robot.eyes === 2) {
+    ctx.fillRect(-12*s, -30*s, 8*s, 8*s);
+    ctx.fillRect(4*s, -30*s, 8*s, 8*s);
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(-10*s, -28*s, 3*s, 3*s);
+    ctx.fillRect(6*s, -28*s, 3*s, 3*s);
+  } else {
+    ctx.fillRect(-14*s, -28*s, 6*s, 6*s);
+    ctx.fillRect(-3*s, -30*s, 6*s, 8*s);
+    ctx.fillRect(8*s, -28*s, 6*s, 6*s);
+  }
+
+  ctx.restore();
+
+  // レアリティオーラ
+  if (robot.rarity === "UR") {
+    ctx.strokeStyle = "rgba(255,220,100,0.8)";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(2,2,W-4,H-4);
+  } else if (robot.rarity === "SR") {
+    ctx.strokeStyle = "rgba(160,100,255,0.6)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(2,2,W-4,H-4);
+  }
+}
+
+/* =========================================================
+   ゲーム状態
+========================================================= */
+let money = 200;
+let currentPack = [];
+let currentIndex = 0;
+let obtainedCards = [];
+let sortMode = "obtained";
+let packsBought = 0;
+let startTime = Date.now();
+let gameStarted = false;
+
+/* 要素 */
+const opening = document.getElementById("opening");
+const startBtn = document.getElementById("startBtn");
+const viewBgBtn = document.getElementById("viewBgBtn");
+const bgViewer = document.getElementById("bgViewer");
+const closeViewerBtn = document.getElementById("closeViewerBtn");
+const game = document.getElementById("game");
+
+const clockEl = document.getElementById("clock");
+const moneyDisplay = document.getElementById("moneyDisplay");
+const buyPackBtn = document.getElementById("buyPackBtn");
+const buyArea = document.getElementById("buyArea");
+const packCardWrap = document.getElementById("packCardWrap");
+
+const packCard = document.getElementById("packCard");
+const packName = document.getElementById("packName");
+const packCanvas = document.getElementById("packCanvas");
+const packAtk = document.getElementById("packAtk");
+const packDef = document.getElementById("packDef");
+const packEffect = document.getElementById("packEffect");
+
+const prevBtn = document.getElementById("prevBtn");
+const nextBtn = document.getElementById("nextBtn");
+const sellNowBtn = document.getElementById("sellNowBtn");
+const endPackBtn = document.getElementById("endPackBtn");
+
+const infoList = document.getElementById("infoList");
+const sortSelect = document.getElementById("sortSelect");
+const priceList = document.getElementById("priceList");
+const studyLink = document.getElementById("studyLink");
+
+const modal = document.getElementById("modal");
+const modalCard = document.getElementById("modalCard");
+const modalName = document.getElementById("modalName");
+const modalCanvas = document.getElementById("modalCanvas");
+const modalAtk = document.getElementById("modalAtk");
+const modalDef = document.getElementById("modalDef");
+const modalEffect = document.getElementById("modalEffect");
+const modalCloseBtn = document.getElementById("modalCloseBtn");
+const modalSellBtn = document.getElementById("modalSellBtn");
+
+/* =========================================================
+   時計・相場
+========================================================= */
+function updateClock() {
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2,"0");
+  const mm = String(now.getMinutes()).padStart(2,"0");
+  const ss = String(now.getSeconds()).padStart(2,"0");
+  clockEl.textContent = `${hh}:${mm}:${ss}`;
+}
+
+function updateAllPrices() {
+  const elapsed = Math.floor((Date.now() - startTime) / 1000);
+  const all = [...normalPool, ...rarePool, ...obtainedCards];
+  all.forEach(card => {
+    if (card.trend === "up") {
+      card.currentPrice = Math.min(card.maxPrice, card.basePrice + elapsed);
+    } else {
+      card.currentPrice = Math.max(card.minPrice, card.basePrice - elapsed);
+    }
+  });
+}
+
+function renderPriceTable() {
+  const all = [...normalPool, ...rarePool].slice(0, 60);
+  priceList.innerHTML = all.map(card => {
+    const cls = card.trend === "up" ? "up" : "down";
+    const arrow = card.trend === "up" ? "▲" : "▼";
+    return `<div class="price-row">
+      <span>${card.name}</span>
+      <span class="${cls}">${arrow} ${card.currentPrice}円</span>
+    </div>`;
+  }).join("");
+}
+
+/* =========================================================
+   情報パネル
+========================================================= */
+function sortCards(mode) {
+  const cards = [...obtainedCards];
+  switch (mode) {
+    case "rarity":
+      return cards.sort((a,b) => rarityRank(b.rarity) - rarityRank(a.rarity));
+    case "atk":
+      return cards.sort((a,b) => b.atk - a.atk);
+    case "defLow":
+      return cards.sort((a,b) => a.def - b.def);
+    case "earth":
+      return cards.sort((a,b) => (a.attr === "地" ? -1 : 1));
+    case "space":
+      return cards.sort((a,b) => (a.attr === "宇" ? -1 : 1));
+    default:
+      return cards.sort((a,b) => a.obtainedAt - b.obtainedAt);
+  }
+}
+
+function renderInfoList() {
+  const cards = sortCards(sortMode);
+  infoList.innerHTML = cards.map((card, i) => {
+    const mark = card.attr === "地"
+      ? `<span class="ygo-attr-mark earth">地</span>`
+      : `<span class="ygo-attr-mark space">宇</span>`;
+    return `<div class="info-item" data-id="${card.id}">
+      <span>${i+1}.</span>${mark}<span>${card.name}</span>
+    </div>`;
+  }).join("");
+
+  infoList.querySelectorAll(".info-item").forEach(el => {
+    el.addEventListener("click", () => {
+      const id = el.dataset.id;
+      const card = obtainedCards.find(c => c.id === id);
+      if (card) openModal(card);
+    });
+  });
+}
+
+/* =========================================================
+   カード表示
+========================================================= */
+function renderCardToUI(card, cardEl, nameEl, canvasEl, atkEl, defEl, effectEl) {
+  cardEl.classList.remove("space", "ur");
+  if (card.attr === "宇") cardEl.classList.add("space");
+  if (card.rarity === "UR") cardEl.classList.add("ur");
+
+  const mark = card.attr === "地"
+    ? `<span class="ygo-attr-mark earth">地</span>`
+    : `<span class="ygo-attr-mark space">宇</span>`;
+
+  nameEl.innerHTML = `${mark}<span>${card.name}</span>`;
+
+  const robot = { ...card.robot, rarity: card.rarity, attr: card.attr };
+  drawRobot(canvasEl, robot);
+
+  atkEl.textContent = `ATK ${card.atk}`;
+  defEl.textContent = `DEF ${card.def}`;
+  effectEl.textContent = card.effect;
+}
+
+function showPackCard() {
+  const card = currentPack[currentIndex];
+  if (!card) return;
+  renderCardToUI(card, packCard, packName, packCanvas, packAtk, packDef, packEffect);
+  prevBtn.disabled = currentIndex === 0;
+  nextBtn.disabled = currentIndex === currentPack.length - 1;
+}
+
+/* =========================================================
+   パック
+========================================================= */
+function buyPack() {
+  if (money < 200) return;
+  money -= 200;
+  packsBought++;
+  updateMoneyDisplay();
+
+  currentPack = [];
+  currentIndex = 0;
+
+  // 1〜6枚目：ノーマル70枚から
+  const normalCopy = [...normalPool];
+  for (let i = 0; i < 6; i++) {
+    const idx = Math.floor(Math.random() * normalCopy.length);
+    const base = normalCopy.splice(idx,1)[0];
+    currentPack.push(cloneCard(base));
+  }
+  // 7枚目：レア以上30枚から
+  const baseRare = pick(rarePool);
+  currentPack.push(cloneCard(baseRare));
+
+  buyArea.style.display = "none";
+  packCardWrap.classList.add("active");
+  showPackCard();
+}
+
+function cloneCard(card) {
+  return {
+    ...card,
+    robot: { ...card.robot },
+    trend: Math.random() < 0.5 ? "up" : "down",
+    maxPrice: card.basePrice * 2,
+    minPrice: 0,
+    currentPrice: card.basePrice
+  };
+}
+
+function nextCard() {
+  if (currentIndex < currentPack.length - 1) {
+    currentIndex++;
+    showPackCard();
+  }
+}
+function prevCard() {
+  if (currentIndex > 0) {
+    currentIndex--;
+    showPackCard();
+  }
+}
+
+function sellCurrentCard() {
+  const card = currentPack[currentIndex];
+  if (!card) return;
+  money += card.currentPrice;
+  updateMoneyDisplay();
+  currentPack.splice(currentIndex, 1);
+
+  if (currentPack.length === 0) {
+    endPack();
+  } else {
+    currentIndex = Math.min(currentIndex, currentPack.length - 1);
+    showPackCard();
+  }
+}
+
+function endPack() {
+  currentPack.forEach(card => {
+    card.obtainedAt = obtainedCards.length;
+    obtainedCards.push(card);
+  });
+  currentPack = [];
+  currentIndex = 0;
+  packCardWrap.classList.remove("active");
+  buyArea.style.display = "flex";
+  renderInfoList();
+}
+
+/* =========================================================
+   モーダル
+========================================================= */
+let modalCardData = null;
+
+function openModal(card) {
+  modalCardData = card;
+  renderCardToUI(card, modalCard, modalName, modalCanvas, modalAtk, modalDef, modalEffect);
+  modal.classList.add("active");
+}
+
+function closeModal() {
+  modal.classList.remove("active");
+  modalCardData = null;
+}
+
+function sellFromModal() {
+  if (!modalCardData) return;
+  money += modalCardData.currentPrice;
+  updateMoneyDisplay();
+  obtainedCards = obtainedCards.filter(c => c.id !== modalCardData.id);
+  renderInfoList();
+  closeModal();
+}
+
+/* =========================================================
+   所持金
+========================================================= */
+function updateMoneyDisplay() {
+  moneyDisplay.textContent = `所持金：${money}円`;
+}
+
+/* =========================================================
+   footer の study.html 表示
+========================================================= */
+function checkStudyLink() {
+  if (packsBought >= 3) {
+    studyLink.classList.add("visible");
+  }
+}
+
+/* =========================================================
+   イベント
+========================================================= */
+startBtn.addEventListener("click", () => {
+  opening.style.display = "none";
+  game.classList.add("active");
+  gameStarted = true;
+  startTime = Date.now();
+  updateMoneyDisplay();
+  renderInfoList();
+  renderPriceTable();
+});
+
+viewBgBtn.addEventListener("click", () => {
+  bgViewer.classList.add("active");
+});
+closeViewerBtn.addEventListener("click", () => {
+  bgViewer.classList.remove("active");
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && bgViewer.classList.contains("active")) {
+    bgViewer.classList.remove("active");
+  }
+});
+
+buyPackBtn.addEventListener("click", () => {
+  buyPack();
+  checkStudyLink();
+});
+
+prevBtn.addEventListener("click", prevCard);
+nextBtn.addEventListener("click", nextCard);
+sellNowBtn.addEventListener("click", sellCurrentCard);
+endPackBtn.addEventListener("click", endPack);
+
+sortSelect.addEventListener("change", () => {
+  sortMode = sortSelect.value;
+  renderInfoList();
+});
+
+modalCloseBtn.addEventListener("click", closeModal);
+modalSellBtn.addEventListener("click", sellFromModal);
+
+/* =========================================================
+   ループ
+========================================================= */
+setInterval(() => {
+  updateClock();
+  if (gameStarted) {
+    updateAllPrices();
+    renderPriceTable();
+  }
+}, 1000);
+
+updateClock();
+</script>
+
+</body>
+</html>
