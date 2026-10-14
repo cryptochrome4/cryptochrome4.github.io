@@ -427,6 +427,7 @@
   const randInt = (a,b)=>Math.floor(Math.random()*(b-a+1))+a;
   const randFloat = (a,b)=>a + Math.random()*(b-a);
   const fmt = (h,m)=>`${h}:${String(m).padStart(2,'0')}`;
+  const lerp = (a,b,t)=>a+(b-a)*t;
 
   function showToast(msg, dur) {
     toast.textContent = msg;
@@ -454,6 +455,7 @@
   let guestKeys = [];
   let slept = false;
   let checkedOut = false;
+  let needCheckout = false;
 
   let grid = [];
   let rooms = [];
@@ -479,9 +481,14 @@
   let taxiVisible = false;
   let comedianPath = null;
   let comedianPathIdx = 0;
-  // ★ コメディアン降車演出用
   let comedianExitTimer = 0;
-  let comedianExitPhase = 'none';  // 'none' | 'exiting' | 'walking'
+  let comedianExitPhase = 'none';
+  // ★ 漫才師の状態
+  let comedianMode = 'before';    // 'before' | 'taxi' | 'exiting' | 'waiting' | 'strolling' | 'atBanquet' | 'returning' | 'boarded' | 'done'
+  let comedianWalkFramesLeft = 0;
+  let comedianWalkSpeed = 0;
+  let comedianWalkTargetX = 0;
+  let comedianWalkTargetY = 0;
 
   let invested = false;
   let investReturnHour = null;
@@ -519,7 +526,6 @@
     STAIRS:'stairs', PRESENTATION:'presentation',
   };
 
-  // 公共エリア（散歩可能）
   const PUBLIC_CELL_TYPES = [
     CELL.HALL, CELL.LOBBY, CELL.GARDEN, CELL.PARK,
     CELL.ENTRANCE, CELL.ROAD, CELL.PARKING, CELL.OUTSIDE,
@@ -1047,13 +1053,12 @@
           hair: pick(['#1a1a1a','#3a2a1a','#5a4a2a','#7a6a3a']),
           talkedRoom: false,
           location: 'room',
-          // ★ 散歩状態
-          walkMode: 'idle',      // 'idle' | 'strolling'
-          walkPhase: null,        // 'toEvent' | 'home'
+          walkMode: 'idle',
+          walkPhase: null,
           walkTargetX: 0,
           walkTargetY: 0,
-          walkSpeed: 0,           // 2.5 〜 12.5
-          walkFramesLeft: 0,      // 残り散歩フレーム数
+          walkSpeed: 0,
+          walkFramesLeft: 0,
         };
         group.members.push(g);
         guests.push(g);
@@ -1083,15 +1088,18 @@
     taxiVisible = false;
     comedians = [
       { id:'comedian0', name:'田中 健太', x: taxiX, y: taxiY, radius:14,
-        color:'#4a2a3a', hair:'#1a1a1a', state:'taxi', role:'Boke', angle:0 },
+        color:'#4a2a3a', hair:'#1a1a1a', state:'before', role:'Boke', angle:0 },
       { id:'comedian1', name:'鈴木 裕介', x: taxiX, y: taxiY, radius:14,
-        color:'#2a3a4a', hair:'#1a1a1a', state:'taxi', role:'Tsukkomi', angle:0 },
+        color:'#2a3a4a', hair:'#1a1a1a', state:'before', role:'Tsukkomi', angle:0 },
     ];
     comedyState = 'before';
     comedianPath = null;
     comedianPathIdx = 0;
     comedianExitTimer = 0;
     comedianExitPhase = 'none';
+    comedianMode = 'before';
+    comedianWalkFramesLeft = 0;
+    comedianWalkSpeed = 0;
   }
 
   function initGame() {
@@ -1105,6 +1113,7 @@
     gameHours = 4; gameMinutes = 0; timeAccum = 0;
     money = 10000; hotelPaid = false; hasKey = false;
     guestKeys = []; slept = false; checkedOut = false;
+    needCheckout = false;
     invested = false; investReturnHour = null; investResult = null;
     currentComedy = null; comedyProgress = 0;
     presViewOpen = false; presSlideIndex = 0; currentPresentation = null;
@@ -1234,11 +1243,7 @@
     }
   }
 
-  // ============================================================
-  //  公共エリアのランダム座標を取得
-  // ============================================================
   function getRandomPublicPosition() {
-    // 公共セルをリスト化
     const publicCells = [];
     for (let r = 0; r < MAP_ROWS; r++) {
       for (let c = 0; c < MAP_COLS; c++) {
@@ -1250,72 +1255,121 @@
     if (publicCells.length === 0) return { x: 0, y: 0 };
     const cell = pick(publicCells);
     return {
-      x: cell.x + randFloat(60, cell.w - 60),
-      y: cell.y + randFloat(60, cell.h - 60),
+      x: cell.x + randFloat(80, cell.w - 80),
+      y: cell.y + randFloat(80, cell.h - 80),
     };
   }
 
-  // ============================================================
-  //  散歩を開始
-  // ============================================================
+  function isInPublicArea(x, y) {
+    const c = cellAt(x, y);
+    return PUBLIC_CELL_TYPES.includes(c.type);
+  }
+
   function startStrolling(g, phase, frames) {
     g.walkMode = 'strolling';
     g.walkPhase = phase;
     g.walkFramesLeft = frames;
-    g.walkSpeed = randFloat(2.5, 12.5);  // 山田初期〜現在
-    const pos = getRandomPublicPosition();
+    g.walkSpeed = randFloat(2.5, 12.5);
+    let pos = getRandomPublicPosition();
+    let tries = 0;
+    while (!isInPublicArea(pos.x, pos.y) && tries < 20) {
+      pos = getRandomPublicPosition();
+      tries++;
+    }
     g.x = pos.x;
     g.y = pos.y;
     g.baseX = g.x;
     g.baseY = g.y;
-    // 目標地点を設定
-    const target = getRandomPublicPosition();
+    let target = getRandomPublicPosition();
+    tries = 0;
+    while (!isInPublicArea(target.x, target.y) && tries < 20) {
+      target = getRandomPublicPosition();
+      tries++;
+    }
     g.walkTargetX = target.x;
     g.walkTargetY = target.y;
   }
 
-  // ============================================================
-  //  時間イベント
-  // ============================================================
   function onHourChanged() {
     if (gameHours === 7) showToast('It is 7:00. The rest room and reception are open.', 2.5);
     if (gameHours === 11) showToast('It is 11:00. The rest room closes.', 2);
-    if (gameHours === 17) {
-      // ★ タクシー 17:00 発
+
+    // ★ タクシー 15:00 発
+    if (gameHours === 15) {
       showToast('A taxi is approaching the hotel.', 3);
       comedyState = 'arriving';
       taxiVisible = true;
       taxiX = -300;
+      comedianMode = 'taxi';
+      for (const c of comedians) c.state = 'taxi';
     }
-    if (gameHours === 18) {
-      // ★ タクシー停止、コメディアン降車演出開始
-      comedyState = 'stopped';
-      comedianExitPhase = 'exiting';
-      comedianExitTimer = 0;
-      showToast('The comedians arrive at the hotel.', 3);
+
+    // ★ 17:00 に散歩開始（タクシー降車は既に終わっている）
+    if (gameHours === 17) {
+      if (comedianMode === 'waiting') {
+        comedianMode = 'strolling';
+        comedianWalkFramesLeft = 14 * 60;
+        comedianWalkSpeed = randFloat(2.5, 12.5);
+        let pos = getRandomPublicPosition();
+        let tries = 0;
+        while (!isInPublicArea(pos.x, pos.y) && tries < 20) {
+          pos = getRandomPublicPosition(); tries++;
+        }
+        for (const c of comedians) {
+          c.x = pos.x + (c.id === 'comedian0' ? -30 : 30);
+          c.y = pos.y;
+          c.state = 'strolling';
+        }
+        let target = getRandomPublicPosition();
+        tries = 0;
+        while (!isInPublicArea(target.x, target.y) && tries < 20) {
+          target = getRandomPublicPosition(); tries++;
+        }
+        comedianWalkTargetX = target.x;
+        comedianWalkTargetY = target.y;
+        showToast('The comedians start walking around the hotel.', 3);
+      }
     }
+
     if (gameHours === 19) {
+      comedianMode = 'atBanquet';
       comedyState = 'onstage';
       currentComedy = pick(COMEDY_THEMES);
       comedyProgress = 0;
+      for (const c of comedians) {
+        c.state = 'atBanquet';
+      }
       showToast('The banquet begins and the comedy show starts in the banquet hall (4F)!', 3);
       showToast('The reception is now closed.', 2);
     }
+
     if (gameHours === 21) {
       comedyState = 'finished';
       showToast('The comedy show ends.', 2);
-      startComediansLeave();
+      comedianMode = 'returning';
+      const stopX = grid[1][6].x - 400;
+      for (let i = 0; i < comedians.length; i++) {
+        const c = comedians[i];
+        c.x = stopX + 40 + (i === 0 ? -30 : 30);
+        c.y = taxiY + 100;
+        c.state = 'returning';
+      }
+      taxiVisible = true;
+      taxiX = stopX;
     }
+
     if (gameHours === 22) {
       comedyState = 'done';
+      comedianMode = 'done';
       taxiVisible = false;
+      for (const c of comedians) c.state = 'done';
       showToast('The hotel lights dim for the night.', 2.5);
     }
+
     if (gameHours === 5) {
       showToast('The morning light returns.', 2.5);
     }
 
-    // ★ 客の散歩開始/終了判定
     handleGuestWalking();
 
     updateGuestLocations();
@@ -1323,41 +1377,32 @@
     buildInfoPanel();
   }
 
-  // ============================================================
-  //  客の散歩制御
-  // ============================================================
   function handleGuestWalking() {
     for (const g of guests) {
       const group = guestGroups[g.groupId];
       const eventType = group.eventType;
 
-      // 集合時間・解散時間
       let eventStart, eventEnd;
       if (eventType === 'rest')      { eventStart = 7;  eventEnd = 11; }
       else if (eventType === 'onsen') { eventStart = 18; eventEnd = 22; }
       else if (eventType === 'banquet') { eventStart = 19; eventEnd = 22; }
       else { continue; }
 
-      // 行き：集合2時間前 → 散歩開始
       if (gameHours === (eventStart - 2 + 24) % 24 && g.walkMode === 'idle') {
         startStrolling(g, 'toEvent', 14 * 60);
       }
-      // 行き：集合時間 → 散歩終了 → 集合場所へ瞬間移動
       if (gameHours === eventStart && g.walkMode === 'strolling' && g.walkPhase === 'toEvent') {
         g.walkMode = 'idle';
         g.walkPhase = null;
         g.walkFramesLeft = 0;
       }
-      // 帰り：解散時間 → 散歩開始
       if (gameHours === eventEnd && g.walkMode === 'idle') {
         startStrolling(g, 'home', 14 * 60);
       }
-      // 帰り：解散+2時間 → 散歩終了 → 部屋へ瞬間移動
       if (gameHours === (eventEnd + 2) % 24 && g.walkMode === 'strolling' && g.walkPhase === 'home') {
         g.walkMode = 'idle';
         g.walkPhase = null;
         g.walkFramesLeft = 0;
-        // 部屋へ瞬間移動
         const r = rooms.find(rr => rr.num === g.room);
         if (r) {
           g.x = r.x + r.w/2;
@@ -1370,12 +1415,8 @@
     }
   }
 
-  // ============================================================
-  //  客の場所更新
-  // ============================================================
   function updateGuestLocations() {
     for (const g of guests) {
-      // 散歩中は触らない
       if (g.walkMode === 'strolling') continue;
 
       const group = guestGroups[g.groupId];
@@ -1850,13 +1891,13 @@
       showToast('You can only sleep between 19:00 and 3:00.', 2); return;
     }
     slept = true;
+    needCheckout = true;
     gameHours = (gameHours + 7) % 24;
     showToast('You slept for 7 hours...', 2);
     updateHUD(); buildInfoPanel();
-    // ★ 起床したら時間を再開（7秒後に slept を false に戻す）
     setTimeout(() => {
       slept = false;
-      showToast('You woke up. A new day begins.', 2.5);
+      showToast('You woke up. Go to the reception to check out.', 3);
       updateHUD(); buildInfoPanel();
     }, HOUR_SECONDS * 1000);
   }
@@ -1964,41 +2005,6 @@
     }
   }
 
-  function startComediansToBanquet() {
-    const enterX = grid[1][6].x + grid[1][6].w/2;
-    const lobbyX = grid[10][6].x + grid[10][6].w/2;
-    const lobbyY = grid[10][6].y + grid[10][6].h/2;
-    const ev4 = elevatorCells.find(c => c.floorTag === 4);
-    const evX = ev4.x + ev4.w/2;
-    const evY = ev4.y + ev4.h + 80;
-    const banX = grid[2][0].x + grid[2][0].w/2;
-    const banY = grid[2][0].y + 160;
-    comedianPath = [
-      { x: enterX, y: taxiY + 100 },
-      { x: lobbyX, y: lobbyY },
-      { x: evX, y: evY },
-      { x: banX, y: banY },
-    ];
-    comedianPathIdx = 0;
-  }
-  function startComediansLeave() {
-    const enterX = grid[1][6].x + grid[1][6].w/2;
-    const lobbyX = grid[10][6].x + grid[10][6].w/2;
-    const lobbyY = grid[10][6].y + grid[10][6].h/2;
-    const ev4 = elevatorCells.find(c => c.floorTag === 4);
-    const evX = ev4.x + ev4.w/2;
-    const evY = ev4.y + ev4.h + 80;
-    const stopX = grid[1][6].x - 400;
-    comedianPath = [
-      { x: evX, y: evY },
-      { x: lobbyX, y: lobbyY },
-      { x: enterX, y: taxiY + 100 },
-      { x: stopX + 40, y: taxiY },
-    ];
-    comedianPathIdx = 0;
-    comedyState = 'leaving';
-  }
-
   // ============================================================
   //  Dialogue
   // ============================================================
@@ -2009,7 +2015,6 @@
 
     if (npc.groupId !== undefined) {
       let lines;
-      // ★ 散歩中はイベント時の会話内容を使う
       if (npc.walkMode === 'strolling') {
         const group = guestGroups[npc.groupId];
         const et = group.eventType;
@@ -2181,9 +2186,6 @@
     return gameHours >= 22 || gameHours < 5;
   }
 
-  // ============================================================
-  //  Update
-  // ============================================================
   function update(dt) {
     if (!gameStarted) return;
 
@@ -2263,78 +2265,123 @@
       }
     }
 
-    // ★ タクシー＆コメディアン降車演出
-    if (taxiVisible) {
+    // ★ タクシー到着＆漫才師降車
+    if (taxiVisible && comedyState === 'arriving') {
       const stopX = grid[1][6].x - 400;
-
-      // タクシー到着中
-      if (comedyState === 'arriving') {
-        taxiX += 4;
-        if (taxiX >= stopX) {
-          taxiX = stopX;
-          comedyState = 'stopped';
-        } else {
-          // コメディアンはタクシー内
-          for (const c of comedians) {
-            c.x = taxiX + 40;
-            c.y = taxiY;
-          }
-        }
-      }
-
-      // コメディアン降車演出（18:00〜19:00）
-      if (comedyState === 'stopped') {
-        comedianExitTimer += dt;
-        // 0〜2秒：ドアが開く（車内から外へ）
-        if (comedianExitPhase === 'exiting') {
-          const t = Math.min(1, comedianExitTimer / (2 * 60));
-          for (let i = 0; i < comedians.length; i++) {
-            const c = comedians[i];
-            const baseX = taxiX + 40 + (i === 0 ? -30 : 30);
-            // 車内位置
-            const insideX = taxiX + 40;
-            const insideY = taxiY + 10;
-            // 車外位置
-            const outsideX = baseX;
-            const outsideY = taxiY + 100;
-            c.x = lerp(insideX, outsideX, t);
-            c.y = lerp(insideY, outsideY, t);
-            c.state = 'walking';
-          }
-          if (t >= 1) {
-            comedianExitPhase = 'walking';
-            comedianExitTimer = 0;
-          }
-        }
-        // 2秒以降：その場で待機（19:00まで）
-      }
-    }
-
-    if (comedianPath && comedians[0].state === 'walking' && comedyState === 'onstage') {
-      const target = comedianPath[comedianPathIdx];
-      if (!target) {
-        comedianPath = null;
+      taxiX += 40;
+      if (taxiX >= stopX) {
+        taxiX = stopX;
+        comedyState = 'stopped';
+        comedianExitPhase = 'exiting';
+        comedianExitTimer = 0;
+        comedianMode = 'exiting';
       } else {
-        let allArrived = true;
-        for (let i = 0; i < comedians.length; i++) {
-          const c = comedians[i];
-          const tx = target.x + (i === 0 ? -30 : 30);
-          const ty = target.y;
-          const cx = tx - c.x;
-          const cy = ty - c.y;
-          const cd = Math.hypot(cx, cy);
-          if (cd > 8) {
-            allArrived = false;
-            c.x += cx/cd * 2.2;
-            c.y += cy/cd * 2.2;
-            c.angle = Math.atan2(cy, cx);
-          }
+        for (const c of comedians) {
+          c.x = taxiX + 40;
+          c.y = taxiY;
         }
-        if (allArrived) comedianPathIdx++;
       }
     }
 
-    if (comedyState === 'onstage' && currentComedy) {
+    // ★ 漫才師の降車演出
+    if (comedianMode === 'exiting' && comedianExitPhase === 'exiting') {
+      comedianExitTimer += dt;
+      const t = Math.min(1, comedianExitTimer / (2 * 60));  // 2秒かけて降車
+      for (let i = 0; i < comedians.length; i++) {
+        const c = comedians[i];
+        const baseX = taxiX + 40 + (i === 0 ? -30 : 30);
+        const insideX = taxiX + 40;
+        const insideY = taxiY + 10;
+        const outsideX = baseX;
+        const outsideY = taxiY + 100;
+        c.x = lerp(insideX, outsideX, t);
+        c.y = lerp(insideY, outsideY, t);
+        c.state = 'waiting';
+      }
+      if (t >= 1) {
+        comedianExitPhase = 'done';
+        comedianMode = 'waiting';
+        comedianExitTimer = 0;
+      }
+    }
+
+    // ★ 漫才師の待機（15:00〜17:00）
+    if (comedianMode === 'waiting') {
+      // その場に立っているだけ
+    }
+
+    // ★ 漫才師の散歩（17:00〜19:00）
+    if (comedianMode === 'strolling') {
+      comedianWalkFramesLeft -= dt;
+      let allArrived = true;
+      for (let i = 0; i < comedians.length; i++) {
+        const c = comedians[i];
+        const tx = comedianWalkTargetX + (i === 0 ? -30 : 30);
+        const ty = comedianWalkTargetY;
+        const cx = tx - c.x;
+        const cy = ty - c.y;
+        const cd = Math.hypot(cx, cy);
+        if (cd > 8) {
+          allArrived = false;
+          c.x += cx/cd * comedianWalkSpeed;
+          c.y += cy/cd * comedianWalkSpeed;
+          c.angle = Math.atan2(cy, cx);
+        }
+      }
+      if (allArrived) {
+        let target = getRandomPublicPosition();
+        let tries = 0;
+        while (!isInPublicArea(target.x, target.y) && tries < 20) {
+          target = getRandomPublicPosition(); tries++;
+        }
+        comedianWalkTargetX = target.x;
+        comedianWalkTargetY = target.y;
+      }
+      for (const c of comedians) {
+        if (!isInPublicArea(c.x, c.y)) {
+          let pos = getRandomPublicPosition();
+          let tries = 0;
+          while (!isInPublicArea(pos.x, pos.y) && tries < 20) {
+            pos = getRandomPublicPosition(); tries++;
+          }
+          c.x = pos.x;
+          c.y = pos.y;
+        }
+      }
+    }
+
+    // ★ 漫才師の帰宅（21:00以降）
+    if (comedianMode === 'returning') {
+      const stopX = grid[1][6].x - 400;
+      let allBoarded = true;
+      for (let i = 0; i < comedians.length; i++) {
+        const c = comedians[i];
+        const tx = taxiX + 40 + (i === 0 ? -30 : 30);
+        const ty = taxiY;
+        const cx = tx - c.x;
+        const cy = ty - c.y;
+        const cd = Math.hypot(cx, cy);
+        if (cd > 8) {
+          allBoarded = false;
+          c.x += cx/cd * 2.2;
+          c.y += cy/cd * 2.2;
+          c.angle = Math.atan2(cy, cx);
+        }
+      }
+      if (allBoarded) {
+        comedianMode = 'boarded';
+        for (const c of comedians) c.state = 'boarded';
+      }
+      taxiX -= 4;
+      if (taxiX < -400) {
+        taxiVisible = false;
+        comedyState = 'done';
+        comedianMode = 'done';
+        for (const c of comedians) c.state = 'done';
+      }
+    }
+
+    if (comedyState === 'onstage' && currentComedy && comedianMode === 'atBanquet') {
       const total = 14 * 60;
       comedyProgress += dt;
       if (comedyProgress >= total) {
@@ -2342,20 +2389,21 @@
       }
     }
 
-    // ★ 客の散歩更新
+    // ★ 客の散歩
     for (const g of guests) {
       if (g.walkMode !== 'strolling') continue;
 
-      // 残り時間を減らす
       g.walkFramesLeft -= dt;
 
-      // 目標地点へ移動
       const dx = g.walkTargetX - g.x;
       const dy = g.walkTargetY - g.y;
       const d = Math.hypot(dx, dy);
       if (d < 8) {
-        // 新しい目標地点を設定
-        const target = getRandomPublicPosition();
+        let target = getRandomPublicPosition();
+        let tries = 0;
+        while (!isInPublicArea(target.x, target.y) && tries < 20) {
+          target = getRandomPublicPosition(); tries++;
+        }
         g.walkTargetX = target.x;
         g.walkTargetY = target.y;
       } else {
@@ -2363,18 +2411,31 @@
         g.y += dy/d * g.walkSpeed;
         g.angle = Math.atan2(dy, dx);
       }
+      if (!isInPublicArea(g.x, g.y)) {
+        let pos = getRandomPublicPosition();
+        let tries = 0;
+        while (!isInPublicArea(pos.x, pos.y) && tries < 20) {
+          pos = getRandomPublicPosition(); tries++;
+        }
+        g.x = pos.x;
+        g.y = pos.y;
+        let target = getRandomPublicPosition();
+        tries = 0;
+        while (!isInPublicArea(target.x, target.y) && tries < 20) {
+          target = getRandomPublicPosition(); tries++;
+        }
+        g.walkTargetX = target.x;
+        g.walkTargetY = target.y;
+      }
       g.baseX = g.x;
       g.baseY = g.y;
 
-      // 時間切れ → 散歩終了
       if (g.walkFramesLeft <= 0) {
         if (g.walkPhase === 'toEvent') {
-          // 集合場所へ瞬間移動
           g.walkMode = 'idle';
           g.walkPhase = null;
           updateGuestLocations();
         } else if (g.walkPhase === 'home') {
-          // 部屋へ瞬間移動
           g.walkMode = 'idle';
           g.walkPhase = null;
           const r = rooms.find(rr => rr.num === g.room);
@@ -2389,7 +2450,6 @@
       }
     }
 
-    // 散歩していない客の揺れ
     for (const g of guests) {
       if (g.walkMode === 'strolling') continue;
       g.phase += 0.01;
@@ -2401,8 +2461,8 @@
     let bestD = 260;
     const candidates = [];
     if (presenter) candidates.push(presenter);
-    for (const c of comedians) {
-      if (c.state !== 'taxi' && c.state !== 'done') candidates.push(c);
+    if (comedianMode === 'strolling' || comedianMode === 'returning' || comedianMode === 'waiting') {
+      for (const c of comedians) candidates.push(c);
     }
     for (const g of guests) candidates.push(g);
     for (const n of candidates) {
@@ -2453,9 +2513,10 @@
       if (toastTimer <= 0) toast.classList.remove('show');
     }
 
-    if (slept && !checkedOut && hotelPaid && hasKey) {
+    if (needCheckout && !checkedOut && hasKey) {
       if (isPlayerAtReception()) {
         doCheckout();
+        needCheckout = false;
       }
     }
 
@@ -2527,12 +2588,17 @@
 
     if (taxiVisible) drawTaxi(taxiX, taxiY - 30);
 
-    for (const c of comedians) {
-      if (c.state === 'taxi' || c.state === 'done') continue;
-      drawPerson(c.x, c.y, c.color, c.hair, c.name, c.angle);
+    // ★ 漫才師の描画
+    if (comedianMode === 'strolling' || comedianMode === 'returning' ||
+        comedianMode === 'exiting' || comedianMode === 'waiting' || comedianMode === 'boarded') {
+      for (const c of comedians) {
+        if (c.state === 'taxi' || c.state === 'done') continue;
+        if (c.x < camX - 60 || c.x > camX + W + 60 || c.y < camY - 60 || c.y > camY + H + 60) continue;
+        drawPerson(c.x, c.y, c.color, c.hair, c.name, c.angle);
+      }
     }
 
-    if (comedyState === 'onstage' && currentComedy) {
+    if (comedianMode === 'atBanquet' && currentComedy) {
       const c = grid[2][0];
       const stageCx = c.x + c.w/2;
       const stageCy = c.y + 160;
@@ -2856,34 +2922,27 @@
       ctx.stroke();
     }
 
-    // ★ 窓の描画（昼夜で切り替え）
     const night = isNight();
     const winX = x + w - 180, winY = y + 60, winW = 140, winH = 110;
 
     if (night) {
-      // 夜：暗い紺 + 星
       ctx.fillStyle = '#0d1a2a'; ctx.fillRect(winX, winY, winW, winH);
-      // 星
       ctx.fillStyle = '#ffffff';
       const stars = [[20,20],[40,35],[70,15],[100,40],[120,25],[30,70],[80,80],[110,90],[55,50],[95,60]];
       for (const [sx, sy] of stars) {
         ctx.beginPath(); ctx.arc(winX + sx, winY + sy, 1.5, 0, Math.PI*2); ctx.fill();
       }
-      // 月
       ctx.fillStyle = '#f0f0c0';
       ctx.beginPath(); ctx.arc(winX + 110, winY + 30, 10, 0, Math.PI*2); ctx.fill();
     } else {
-      // 昼：空色 + 雲 + 太陽
       const skyGrad = ctx.createLinearGradient(winX, winY, winX, winY + winH);
       skyGrad.addColorStop(0, '#87ceeb');
       skyGrad.addColorStop(1, '#b0e0f0');
       ctx.fillStyle = skyGrad; ctx.fillRect(winX, winY, winW, winH);
-      // 太陽
       ctx.fillStyle = '#fff4b0';
       ctx.beginPath(); ctx.arc(winX + 110, winY + 25, 14, 0, Math.PI*2); ctx.fill();
       ctx.fillStyle = '#ffe070';
       ctx.beginPath(); ctx.arc(winX + 110, winY + 25, 10, 0, Math.PI*2); ctx.fill();
-      // 雲
       ctx.fillStyle = 'rgba(255,255,255,0.85)';
       ctx.beginPath(); ctx.arc(winX + 30, winY + 30, 12, 0, Math.PI*2); ctx.fill();
       ctx.beginPath(); ctx.arc(winX + 45, winY + 28, 15, 0, Math.PI*2); ctx.fill();
@@ -2892,11 +2951,9 @@
       ctx.beginPath(); ctx.arc(winX + 65, winY + 73, 12, 0, Math.PI*2); ctx.fill();
     }
 
-    // 窓枠
     ctx.strokeStyle = night ? '#7ad7ff' : '#ffffff';
     ctx.lineWidth = 3;
     ctx.strokeRect(winX, winY, winW, winH);
-    ctx.strokeStyle = night ? '#7ad7ff' : '#ffffff';
     ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(winX + winW/2, winY); ctx.lineTo(winX + winW/2, winY + winH); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(winX, winY + winH/2); ctx.lineTo(winX + winW, winY + winH/2); ctx.stroke();
