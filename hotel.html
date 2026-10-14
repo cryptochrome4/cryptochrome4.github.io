@@ -435,7 +435,6 @@
   const stayAnotherDayBtn = document.getElementById('stayAnotherDay');
   const goDudeLink = document.getElementById('goDude');
 
-  // === Gachapon animation DOM ===
   const gachaOverlay = document.getElementById('gachaOverlay');
   const gachaCanvas = document.getElementById('gachaCanvas');
   const gachaCtx = gachaCanvas.getContext('2d');
@@ -525,12 +524,9 @@
 
   let justOpenedDialogue = false;
 
-  // ============================================================
-  //  Gachapon animation state
-  // ============================================================
   let gachaAnim = {
     active: false,
-    phase: 'chart',   // 'chart' | 'vault' | 'open' | 'result'
+    phase: 'chart',
     t: 0,
     points: [],
     targetY: 0,
@@ -813,9 +809,6 @@
     { members:[{name:'井上 真由美', gender:'F', age:44}], eventType:'rest' },
   ];
 
-  // ============================================================
-  //  Guest dialogue (ENGLISH)
-  // ============================================================
   const ROOM_LINES = [
     "Oh, you have a key to my room? How unusual.",
     "I was just resting. This hotel is quite nice.",
@@ -909,9 +902,6 @@
     "Look at the bubbles!",
   ];
 
-  // ============================================================
-  //  Presentation (JAPANESE)
-  // ============================================================
   const PRES_BAD = [
     { title:"ドローンでパンを配達",
       slides:[
@@ -959,9 +949,6 @@
       ]},
   ];
 
-  // ============================================================
-  //  Comedy (JAPANESE)
-  // ============================================================
   const COMEDY_THEMES = [
     { title:"ホテル生活", lines:[
       "A：昨日このホテルにチェックインしたんや。","B：どうやった？",
@@ -1049,9 +1036,6 @@
     ]},
   ];
 
-  // ============================================================
-  //  Assign rooms
-  // ============================================================
   function assignGuests() {
     const allRoomNums = rooms.map(r => r.num);
     const shuffled = shuffle(allRoomNums);
@@ -1150,9 +1134,6 @@
     victory.classList.add('hidden');
   }
 
-  // ============================================================
-  //  HUD
-  // ============================================================
   function cellAt(x, y) {
     const c = clamp(Math.floor(x / MAP_W), 0, MAP_COLS-1);
     const r = clamp(Math.floor(y / MAP_H), 0, MAP_ROWS-1);
@@ -1248,9 +1229,6 @@
     return dist(player.x, player.y, r.x + r.w/2, r.y + r.h/2) < 300;
   }
 
-  // ============================================================
-  //  Time
-  // ============================================================
   function updateTime(dt) {
     if (slept) return;
     if (gachaAnim.active) return;
@@ -1375,21 +1353,22 @@
       } else {
         presViewOpen = false;
         presenterState = 'presented';
-        // ★ プレゼン終了後：Invest のみ（Promote は削除）
+        // ★ プレゼン直後：Promote + Invest の2択
         conversation = { npc: presenter, page:0, lines:[
           "以上でプレゼンは終わりです。",
-          "投資しますか？",
+          "宣伝しますか？それとも投資しますか？",
         ], choices:[
+          { label:'Promote (+¥100)', action: () => { money += 100; showToast('You promoted. +¥100', 2); updateHUD(); buildInfoPanel(); } },
           { label:'Invest (¥10,000 / 4h)', action: () => {
             if (hotelPaid) { showToast('You already paid the hotel. Investment not available.', 2); }
             else if (money >= 10000) {
               money -= 10000; invested = true;
               investReturnHour = (gameHours + 4) % 24;
+              investResult = null;
               showToast('You invested ¥10,000. Return in 4 hours.', 3);
               updateHUD(); buildInfoPanel();
             } else { showToast('You need ¥10,000 to invest.', 2); }
           } },
-          { label:'Not now', action: () => {} },
         ]};
         dialogue.classList.add('open');
         renderDialogue();
@@ -1590,7 +1569,7 @@
     gachaResult.classList.remove('show');
     gachaResult.textContent = '';
     gachaHint.classList.remove('show');
-    gachaSkip.classList.remove('hidden');   // ★ スキップボタン表示
+    gachaSkip.classList.remove('hidden');
     gachaOverlay.classList.add('show');
 
     const baseY = gachaCanvas.height * 0.75;
@@ -1600,10 +1579,9 @@
     }
   }
 
-  // ★ スキップ処理：即座に結果フェーズへ
   function skipGachaAnimation() {
     if (!gachaAnim.active) return;
-    if (gachaAnim.phase === 'result') return; // 既に結果なら何もしない
+    if (gachaAnim.phase === 'result') return;
     gachaAnim.phase = 'result';
     gachaAnim.t = 0;
     gachaVault.src = 'img226door.jpg';
@@ -1611,7 +1589,7 @@
     gachaResult.textContent = `🔑 Room ${gachaAnim.pendingKey} の鍵を手に入れた！`;
     gachaResult.classList.add('show');
     gachaHint.classList.add('show');
-    gachaSkip.classList.add('hidden');      // ★ 結果ではスキップ非表示
+    gachaSkip.classList.add('hidden');
   }
 
   function updateGachaAnimation(dt) {
@@ -1662,7 +1640,7 @@
         gachaResult.textContent = `🔑 Room ${gachaAnim.pendingKey} の鍵を手に入れた！`;
         gachaResult.classList.add('show');
         gachaHint.classList.add('show');
-        gachaSkip.classList.add('hidden');  // ★ 結果でスキップ非表示
+        gachaSkip.classList.add('hidden');
       }
     }
   }
@@ -1739,14 +1717,12 @@
     gachaSkip.classList.add('hidden');
   }
 
-  // オーバーレイクリックで結果画面を閉じる
   gachaOverlay.addEventListener('click', e => {
     if (gachaAnim.phase === 'result') {
       endGachaAnimation();
     }
   });
 
-  // ★ スキップボタン
   gachaSkip.addEventListener('click', e => {
     e.stopPropagation();
     skipGachaAnimation();
@@ -1771,9 +1747,6 @@
     }, HOUR_SECONDS * 1000);
   }
 
-  // ============================================================
-  //  Elevator
-  // ============================================================
   function handleElevatorClick() {
     if (walkingTo) return;
     if (!elevatorPanel.classList.contains('hidden')) return;
@@ -1805,7 +1778,7 @@
       x: target.x + target.w/2,
       y: target.y + target.h + 80,
       msg: `Arrived at ${targetFloor}F.`,
-      speed: 24,   // ★ 3倍（元 8）
+      speed: 24,
     };
   }
   epClose.addEventListener('click', e => {
@@ -1829,9 +1802,6 @@
     };
   }
 
-  // ============================================================
-  //  Collision
-  // ============================================================
   function resolveRectCollision(cx, cy, r, rx, ry, rw, rh) {
     const nx = clamp(cx, rx, rx + rw);
     const ny = clamp(cy, ry, ry + rh);
@@ -1880,9 +1850,6 @@
     }
   }
 
-  // ============================================================
-  //  Comedian paths
-  // ============================================================
   function startComediansToBanquet() {
     const enterX = grid[1][6].x + grid[1][6].w/2;
     const lobbyX = grid[10][6].x + grid[10][6].w/2;
@@ -1970,7 +1937,7 @@
           { label:'No', action: () => {} },
         ];
       } else if (presenterState === 'presented') {
-        // ★ プレゼン後の会話：Promote を削除、Invest のみ
+        // ★ 再話しかけ時：Invest のみ
         if (investReturnHour !== null && gameHours >= investReturnHour && investResult === null) {
           const result = pick([0, 13000]);
           investResult = result;
@@ -1990,7 +1957,6 @@
         } else if (investReturnHour !== null) {
           conversation.lines = [`Your investment returns at ${investReturnHour}:00. Come back then.`];
         } else {
-          // ★ 永続的に Invest のみ選択可能
           conversation.lines = [
             "Thanks for watching my presentation.",
             "Would you like to invest again?",
@@ -2077,9 +2043,6 @@
     choiceRow.classList.add('hidden');
   }
 
-  // ============================================================
-  //  Presentation
-  // ============================================================
   function openPresentation() {
     const isPro = Math.random() < 0.5;
     currentPresentation = isPro ? pick(PRES_PRO) : pick(PRES_BAD);
@@ -2088,16 +2051,10 @@
     showToast('The projector shows the first slide. Click to advance.', 3);
   }
 
-  // ============================================================
-  //  Night
-  // ============================================================
   function isNight() {
     return gameHours >= 22 || gameHours < 5;
   }
 
-  // ============================================================
-  //  Update
-  // ============================================================
   function update(dt) {
     if (!gameStarted) return;
 
@@ -2170,7 +2127,6 @@
           }
           presenterPathIdx++;
         } else {
-          // ★ 山田の移動速度 5倍（元 2.5）
           presenter.x += pdx/pd * 12.5;
           presenter.y += pdy/pd * 12.5;
           presenter.angle = Math.atan2(pdy, pdx);
@@ -2309,9 +2265,6 @@
     updateHUD();
   }
 
-  // ============================================================
-  //  Draw
-  // ============================================================
   function draw() {
     ctx.clearRect(0,0,W,H);
     if (!gameStarted) {
@@ -3122,9 +3075,6 @@
     }
   }
 
-  // ============================================================
-  //  Loop
-  // ============================================================
   function gameLoop(timestamp) {
     const dt = Math.min(2, (timestamp - lastTime) / (1000/60));
     lastTime = timestamp;
@@ -3133,9 +3083,6 @@
     requestAnimationFrame(gameLoop);
   }
 
-  // ============================================================
-  //  Opening
-  // ============================================================
   const opening = document.getElementById('opening');
   const startBtn = document.getElementById('startBtn');
   const bgViewBtn = document.getElementById('bgViewBtn');
@@ -3162,20 +3109,15 @@
     bgViewer.classList.add('hidden');
   });
 
-  // ★ クリア画面：もう1日過ごす
   stayAnotherDayBtn.addEventListener('click', e => {
     e.preventDefault();
     e.stopPropagation();
-    // リセットして同じページで再スタート
     initGame();
     gameStarted = true;
     lastTime = performance.now();
     showToast('A new day begins at the hotel!', 3);
   });
 
-  // ============================================================
-  //  Start
-  // ============================================================
   initGame();
   requestAnimationFrame(gameLoop);
 })();
