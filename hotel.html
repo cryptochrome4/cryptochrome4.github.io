@@ -37,7 +37,6 @@
   .footer .status .money { color:#ff8ad8; text-shadow:0 0 8px #ff8ad888; }
   .footer .status .map-coord { color:#7ad7ff; text-shadow:0 0 8px #7ad7ff88; }
   .footer .status .hidden-coord { display:none; }
-  /* ★ 密かに表示される dude.html リンク */
   .footer .status .checkout-link {
     color:#3a4a5a; font-size:11px; text-decoration:none;
     letter-spacing:1px; transition:color 0.3s ease;
@@ -209,9 +208,6 @@
     box-shadow:0 0 20px #00e6b0aa;
   }
 
-  /* ============================================================
-     GACHAPON ANIMATION
-     ============================================================ */
   .gacha-overlay {
     position:fixed; inset:0; z-index:13000;
     background:radial-gradient(circle at center, #0a1a14 0%, #000 80%);
@@ -285,7 +281,6 @@
         <span>Money: ¥<span id="moneyDisplay" class="money">10000</span></span>
         <span>Room: <span id="roomDisplay" class="sp">???</span></span>
         <span>Area: <span id="areaDisplay" class="highlight">Outside</span></span>
-        <!-- ★ チェックアウト後に密かに表示される dude.html リンク -->
         <a href="dude.html" id="checkoutLink" class="checkout-link hidden">dude.html</a>
         <span id="mapCoordSpan" class="hidden-coord">Map: <span id="mapDisplay" class="map-coord">0,0</span></span>
       </div>
@@ -352,9 +347,6 @@
     <button class="ui-btn warn" id="epClose">CANCEL</button>
   </div>
 
-  <!-- ============================================================
-       GACHAPON ANIMATION OVERLAY
-       ============================================================ -->
   <div class="gacha-overlay" id="gachaOverlay">
     <button class="g-skip" id="gachaSkip">SKIP ▶</button>
     <div class="g-title">🎰 GACHAPON 🎰</div>
@@ -378,6 +370,11 @@
   const WORLD_W = MAP_W * MAP_COLS;
   const WORLD_H = MAP_H * MAP_ROWS;
   const HOUR_SECONDS = 7;
+
+  // ★ 客の歩行時間（実時間 14秒 = ゲーム内 2時間）
+  const GUEST_WALK_DURATION = 14 * 60; // フレーム数（60fps × 14秒）
+  // ★ 歩行速度（山田と同じ）
+  const GUEST_SPEED = 12.5;
 
   const timeDisplay = document.getElementById('timeDisplay');
   const moneyDisplay = document.getElementById('moneyDisplay');
@@ -434,6 +431,7 @@
   const shuffle = arr => { const a=arr.slice(); for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; };
   const randInt = (a,b)=>Math.floor(Math.random()*(b-a+1))+a;
   const fmt = (h,m)=>`${h}:${String(m).padStart(2,'0')}`;
+  const lerp = (a,b,t)=>a+(b-a)*t;
 
   function showToast(msg, dur) {
     toast.textContent = msg;
@@ -460,7 +458,7 @@
   let hasKey = false;
   let guestKeys = [];
   let slept = false;
-  let checkedOut = false;    // ★ チェックアウト済みフラグ
+  let checkedOut = false;
 
   let grid = [];
   let rooms = [];
@@ -516,9 +514,6 @@
     peakTimer: 0,
   };
 
-  // ============================================================
-  //  Cell types
-  // ============================================================
   const CELL = {
     OUTSIDE:'outside', ROAD:'road', PARKING:'parking', PARK:'park', GARDEN:'garden',
     ENTRANCE:'entrance', ROOM:'room', HALL:'hall', LOBBY:'lobby', REST:'rest',
@@ -613,9 +608,6 @@
     buildWallsAndDoors();
   }
 
-  // ============================================================
-  //  Walls + Doors + Stairs mazes
-  // ============================================================
   const WALL_THICK = 14;
   const DOOR_LEN = 70;
 
@@ -1017,6 +1009,9 @@
     ]},
   ];
 
+  // ============================================================
+  //  Guest assign (travel state 追加)
+  // ============================================================
   function assignGuests() {
     const allRoomNums = rooms.map(r => r.num);
     const shuffled = shuffle(allRoomNums);
@@ -1051,6 +1046,14 @@
           hair: pick(['#1a1a1a','#3a2a1a','#5a4a2a','#7a6a3a']),
           talkedRoom: false,
           location: 'room',
+          // ★ 歩行状態
+          travel: {
+            phase: 'idle',      // 'idle' | 'walkingToDest' | 'walkingHome'
+            elapsed: 0,         // 歩行開始からの経過フレーム
+            fromX: 0, fromY: 0,
+            toX: 0, toY: 0,
+            destType: null,     // 'rest' | 'onsen' | 'banquet'
+          },
         };
         group.members.push(g);
         guests.push(g);
@@ -1082,7 +1085,7 @@
       { id:'comedian0', name:'田中 健太', x: taxiX, y: taxiY, radius:14,
         color:'#4a2a3a', hair:'#1a1a1a', state:'taxi', role:'Boke', angle:0 },
       { id:'comedian1', name:'鈴木 裕介', x: taxiX, y: taxiY, radius:14,
-        color:'#2a3a4a', hair:'#1a1a1a', state:'taxi', role:'Tsukkomi', angle:0 },
+        color:'#2a3a4a', hair:'#1a1a1a', state:'taxi', role:'Tsukommi', angle:0 },
     ];
     comedyState = 'before';
     comedianPath = null;
@@ -1099,8 +1102,7 @@
     player.y = startCell.y + startCell.h/2;
     gameHours = 4; gameMinutes = 0; timeAccum = 0;
     money = 10000; hotelPaid = false; hasKey = false;
-    guestKeys = []; slept = false; cleared = false;
-    checkedOut = false;
+    guestKeys = []; slept = false; checkedOut = false;
     invested = false; investReturnHour = null; investResult = null;
     currentComedy = null; comedyProgress = 0;
     presViewOpen = false; presSlideIndex = 0; currentPresentation = null;
@@ -1230,43 +1232,136 @@
     }
   }
 
-  function onHourChanged() {
-    if (gameHours === 7) showToast('It is 7:00. The rest room and reception are open.', 2.5);
-    if (gameHours === 11) showToast('It is 11:00. The rest room closes.', 2);
-    if (gameHours === 18) {
-      showToast('The comedians arrive by taxi.', 3);
-      comedyState = 'arriving';
-      taxiVisible = true;
-      taxiX = -300;
-    }
-    if (gameHours === 19) {
-      comedyState = 'onstage';
-      currentComedy = pick(COMEDY_THEMES);
-      comedyProgress = 0;
-      showToast('The banquet begins and the comedy show starts in the banquet hall (4F)!', 3);
-      showToast('The reception is now closed.', 2);
-    }
-    if (gameHours === 21) {
-      comedyState = 'finished';
-      showToast('The comedy show ends.', 2);
-      startComediansLeave();
-    }
-    if (gameHours === 22) {
-      comedyState = 'done';
-      taxiVisible = false;
-      showToast('The hotel lights dim for the night.', 2.5);
-    }
-    if (gameHours === 5) {
-      showToast('The morning light returns.', 2.5);
-    }
-    updateGuestLocations();
-    updateHUD();
-    buildInfoPanel();
+  // ============================================================
+  //  廊下の座標を取得
+  // ============================================================
+  function getHallY(floorNum) {
+    // 4F: hallRow=3、3F: hallRow=5、2F: hallRow=7、1F: hallRow=9
+    const hallRow = (floorNum === 4) ? 3 : (floorNum === 3) ? 5 : (floorNum === 2) ? 7 : 9;
+    const cell = grid[hallRow][0];
+    return cell.y + cell.h / 2;
   }
 
+  function getHallLeftX(floorNum) {
+    // 左端（宴会場・温泉・レストルーム側）: セル1の左端
+    const hallRow = (floorNum === 4) ? 3 : (floorNum === 3) ? 5 : (floorNum === 2) ? 7 : 9;
+    const cell = grid[hallRow][1];
+    return cell.x;
+  }
+
+  function getHallRightX(floorNum) {
+    // 右端（エレベーター側）: セル10の右端
+    const hallRow = (floorNum === 4) ? 3 : (floorNum === 3) ? 5 : (floorNum === 2) ? 7 : 9;
+    const cell = grid[hallRow][10];
+    return cell.x + cell.w;
+  }
+
+  // ============================================================
+  //  客の歩行開始 / 瞬間移動
+  // ============================================================
+  function startGuestWalkToDest(g, destType) {
+    // 部屋の前の廊下に瞬間移動 → 行き先方向（左）へ歩く
+    const floor = g.floor;
+    const hallY = getHallY(floor);
+    const startX = getHallLeftX(floor) + 40; // 少し内側から
+    const goalX = getHallLeftX(floor) + 20;  // 左端の壁付近まで
+
+    g.travel.phase = 'walkingToDest';
+    g.travel.elapsed = 0;
+    g.travel.fromX = startX;
+    g.travel.fromY = hallY;
+    g.travel.toX = goalX;
+    g.travel.toY = hallY;
+    g.travel.destType = destType;
+    g.x = startX;
+    g.y = hallY;
+  }
+
+  function startGuestWalkHome(g, destType) {
+    // 行き先から廊下の中央 → 右（エレベーター）方向へ歩く
+    const floor = g.floor;
+    const hallY = getHallY(floor);
+    const midX = getHallLeftX(floor) + 400; // 廊下の中央付近
+    const goalX = getHallRightX(floor) - 40; // 右端手前まで
+
+    g.travel.phase = 'walkingHome';
+    g.travel.elapsed = 0;
+    g.travel.fromX = midX;
+    g.travel.fromY = hallY;
+    g.travel.toX = goalX;
+    g.travel.toY = hallY;
+    g.travel.destType = destType;
+    g.x = midX;
+    g.y = hallY;
+  }
+
+  function finishGuestWalkToDest(g) {
+    // 行き先（宴会場・温泉・レストルーム）の中央へ瞬間移動
+    const destType = g.travel.destType;
+    let cell;
+    if (destType === 'rest') cell = grid[8][0];
+    else if (destType === 'onsen') cell = grid[6][0];
+    else if (destType === 'banquet') cell = grid[2][0];
+    else cell = grid[8][0];
+
+    g.location = destType;
+    g.travel.phase = 'idle';
+    g.travel.elapsed = 0;
+    // 位置は updateGuestLocations の配置に任せる（後で調整）
+    updateGuestLocations();
+  }
+
+  function finishGuestWalkHome(g) {
+    // 自分の部屋の中へ瞬間移動
+    const room = rooms.find(r => r.num === g.room);
+    if (room) {
+      g.x = room.x + room.w/2;
+      g.y = room.y + room.h/2;
+      g.baseX = g.x;
+      g.baseY = g.y;
+    }
+    g.location = 'room';
+    g.travel.phase = 'idle';
+    g.travel.elapsed = 0;
+  }
+
+  // ============================================================
+  //  客の歩行更新（update 内で呼ぶ）
+  // ============================================================
+  function updateGuestTravel(dt) {
+    for (const g of guests) {
+      if (g.travel.phase === 'idle') continue;
+      g.travel.elapsed += dt;
+
+      const t = clamp(g.travel.elapsed / GUEST_WALK_DURATION, 0, 1);
+      g.x = lerp(g.travel.fromX, g.travel.toX, t);
+      g.y = lerp(g.travel.fromY, g.travel.toY, t);
+      g.baseX = g.x;
+      g.baseY = g.y;
+      // 向き
+      g.angle = Math.atan2(g.travel.toY - g.travel.fromY, g.travel.toX - g.travel.fromX);
+
+      // 完了
+      if (t >= 1) {
+        if (g.travel.phase === 'walkingToDest') {
+          finishGuestWalkToDest(g);
+        } else if (g.travel.phase === 'walkingHome') {
+          finishGuestWalkHome(g);
+        }
+      }
+    }
+  }
+
+  // ============================================================
+  //  客の場所更新（歩行開始判定も含む）
+  // ============================================================
   function updateGuestLocations() {
     for (const g of guests) {
       const group = guestGroups[g.groupId];
+      // 歩行中は触らない
+      if (g.travel.phase !== 'idle') continue;
+
+      // 通常の滞在場所を決める
       let loc = 'room';
       if (group.eventType === 'rest' && gameHours >= 7 && gameHours < 11) loc = 'rest';
       else if (group.eventType === 'onsen' && gameHours >= 18 && gameHours < 22) loc = 'onsen';
@@ -1298,6 +1393,85 @@
       }
       g.x = g.baseX;
       g.y = g.baseY;
+    }
+  }
+
+  // ============================================================
+  //  時間イベント（歩行開始の判定も含む）
+  // ============================================================
+  function onHourChanged() {
+    if (gameHours === 7) showToast('It is 7:00. The rest room and reception are open.', 2.5);
+    if (gameHours === 11) showToast('It is 11:00. The rest room closes.', 2);
+    if (gameHours === 18) {
+      showToast('The comedians arrive by taxi.', 3);
+      comedyState = 'arriving';
+      taxiVisible = true;
+      taxiX = -300;
+    }
+    if (gameHours === 19) {
+      comedyState = 'onstage';
+      currentComedy = pick(COMEDY_THEMES);
+      comedyProgress = 0;
+      showToast('The banquet begins and the comedy show starts in the banquet hall (4F)!', 3);
+      showToast('The reception is now closed.', 2);
+    }
+    if (gameHours === 21) {
+      comedyState = 'finished';
+      showToast('The comedy show ends.', 2);
+      startComediansLeave();
+    }
+    if (gameHours === 22) {
+      comedyState = 'done';
+      taxiVisible = false;
+      showToast('The hotel lights dim for the night.', 2.5);
+    }
+    if (gameHours === 5) {
+      showToast('The morning light returns.', 2.5);
+    }
+    // ★ 客の歩行開始：集合時間の2時間前に廊下へ
+    handleGuestDepartures();
+    updateGuestLocations();
+    updateHUD();
+    buildInfoPanel();
+  }
+
+  // ============================================================
+  //  客の出発判定（集合時間の2時間前に廊下へ瞬間移動 → 歩き始め）
+  // ============================================================
+  function handleGuestDepartures() {
+    for (const g of guests) {
+      const group = guestGroups[g.groupId];
+      // すでに歩行中 or 会場にいるならスキップ
+      if (g.travel.phase !== 'idle') continue;
+
+      if (group.eventType === 'rest') {
+        // 7:00 集合 → 5:00 に廊下へ
+        if (gameHours === 5 && g.location === 'room') {
+          startGuestWalkToDest(g, 'rest');
+        }
+        // 11:00 解散 → その場で廊下へ瞬間移動して歩き始め
+        if (gameHours === 11 && g.location === 'rest') {
+          startGuestWalkHome(g, 'rest');
+        }
+      } else if (group.eventType === 'onsen') {
+        // 18:00 集合 → 16:00 に廊下へ
+        if (gameHours === 16 && g.location === 'room') {
+          startGuestWalkToDest(g, 'onsen');
+        }
+        // 22:00 解散
+        if (gameHours === 22 && g.location === 'onsen') {
+          startGuestWalkHome(g, 'onsen');
+        }
+      } else if (group.eventType === 'banquet') {
+        // 19:00 集合 → 17:00 に廊下へ
+        if (gameHours === 17 && g.location === 'room') {
+          startGuestWalkToDest(g, 'banquet');
+        }
+        // 22:00 解散
+        if (gameHours === 22 && g.location === 'banquet') {
+          startGuestWalkHome(g, 'banquet');
+        }
+      }
     }
   }
 
@@ -1516,14 +1690,12 @@
     updateHUD(); buildInfoPanel();
   }
 
-  // ★ チェックアウト処理
   function doCheckout() {
     if (checkedOut) return;
     if (!hotelPaid || !hasKey) return;
     checkedOut = true;
     hasKey = false;
 
-    // My Room のドアを閉じて施錠
     if (myRoom !== null) {
       const dr = doors.find(d => d.roomNum === myRoom);
       if (dr) { dr.open = false; dr.locked = true; }
@@ -1531,7 +1703,6 @@
       if (r) r.doorOpen = false;
     }
 
-    // フッターに dude.html リンクを表示
     checkoutLink.classList.remove('hidden');
 
     showToast('You have checked out. Thank you for staying with us!', 3);
@@ -1606,7 +1777,6 @@
     if (gachaAnim.phase === 'chart') {
       if (gachaAnim.t % 3 < 1) {
         const last = gachaAnim.points[gachaAnim.points.length - 1];
-        const canvasW = gachaCanvas.width;
         const canvasH = gachaCanvas.height;
 
         const progress = Math.min(1, gachaAnim.points.length / 55);
@@ -1746,12 +1916,8 @@
     gameHours = (gameHours + 7) % 24;
     showToast('You slept for 7 hours...', 2);
     updateHUD(); buildInfoPanel();
-    // ★ クリア画面は表示しない（何もしない）
   }
 
-  // ============================================================
-  //  Elevator
-  // ============================================================
   function handleElevatorClick() {
     if (walkingTo) return;
     if (!elevatorPanel.classList.contains('hidden')) return;
@@ -2059,6 +2225,9 @@
     return gameHours >= 22 || gameHours < 5;
   }
 
+  // ============================================================
+  //  Update
+  // ============================================================
   function update(dt) {
     if (!gameStarted) return;
 
@@ -2204,7 +2373,12 @@
       }
     }
 
+    // ★ 客の歩行更新
+    updateGuestTravel(dt);
+
+    // 客の通常揺れ（歩行中は除く）
     for (const g of guests) {
+      if (g.travel.phase !== 'idle') continue;
       g.phase += 0.01;
       g.x = g.baseX + Math.cos(g.phase) * 6;
       g.y = g.baseY + Math.sin(g.phase * 0.8) * 4;
@@ -2266,7 +2440,6 @@
       if (toastTimer <= 0) toast.classList.remove('show');
     }
 
-    // ★ チェックアウト判定：起床後、受付に立つとチェックアウト
     if (slept && !checkedOut && hotelPaid && hasKey) {
       if (isPlayerAtReception()) {
         doCheckout();
