@@ -29,7 +29,7 @@
     width:100%; padding:4px 8px 0; font-size:13px; color:#7a8b9b;
     letter-spacing:0.5px;
   }
-  .footer .status { display:flex; gap:16px; flex-wrap:wrap; }
+  .footer .status { display:flex; gap:16px; flex-wrap:wrap; align-items:center; }
   .footer .status span { color:#b0c8d8; font-weight:500; }
   .footer .status .highlight { color:#00e6b0; text-shadow:0 0 8px #00e6b088; }
   .footer .status .sp { color:#ffd166; text-shadow:0 0 8px #ffd16688; }
@@ -37,6 +37,12 @@
   .footer .status .money { color:#ff8ad8; text-shadow:0 0 8px #ff8ad888; }
   .footer .status .map-coord { color:#7ad7ff; text-shadow:0 0 8px #7ad7ff88; }
   .footer .status .hidden-coord { display:none; }
+  /* ★ 密かに表示される dude.html リンク */
+  .footer .status .checkout-link {
+    color:#3a4a5a; font-size:11px; text-decoration:none;
+    letter-spacing:1px; transition:color 0.3s ease;
+  }
+  .footer .status .checkout-link:hover { color:#00e6b0; text-shadow:0 0 8px #00e6b088; }
   .btn-row { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; width:100%; padding:4px 0; }
   .ui-btn {
     background:#1a2530; color:#00e6b0; border:2px solid #00e6b0;
@@ -165,20 +171,6 @@
   }
   .bg-viewer .close-bg:hover { background:#ff8ad8; }
 
-  .victory {
-    position:fixed; inset:0; z-index:11000; background:#000000ee;
-    display:flex; flex-direction:column; justify-content:center;
-    align-items:center; gap:24px;
-  }
-  .victory h1 { color:#ffd166; font-size:64px; font-weight:800; letter-spacing:6px;
-    text-shadow:0 0 40px #ffd166aa; }
-  .victory p { color:#b0c8d8; font-size:18px; letter-spacing:2px; }
-  .victory .vfoot { color:#4a5a6a; font-size:12px; margin-top:20px; }
-  .victory .vfoot a { color:#00e6b0; text-decoration:none; font-weight:700; }
-  .victory .vfoot a:hover { text-shadow:0 0 10px #00e6b0; }
-  .victory .vbtns { display:flex; gap:16px; flex-wrap:wrap; justify-content:center; margin-top:12px; }
-  .victory .vbtns .ui-btn { padding:12px 28px; font-size:15px; }
-
   .toast {
     position:fixed; top:24px; left:50%; transform:translateX(-50%);
     background:#0d131aee; border:2px solid #00e6b0; color:#00e6b0;
@@ -293,6 +285,8 @@
         <span>Money: ¥<span id="moneyDisplay" class="money">10000</span></span>
         <span>Room: <span id="roomDisplay" class="sp">???</span></span>
         <span>Area: <span id="areaDisplay" class="highlight">Outside</span></span>
+        <!-- ★ チェックアウト後に密かに表示される dude.html リンク -->
+        <a href="dude.html" id="checkoutLink" class="checkout-link hidden">dude.html</a>
         <span id="mapCoordSpan" class="hidden-coord">Map: <span id="mapDisplay" class="map-coord">0,0</span></span>
       </div>
     </div>
@@ -348,16 +342,6 @@
     <div class="n-name" id="npName">Name</div>
     <div id="npInfo">Info</div>
     <div class="n-hint" id="npHint">Click to talk</div>
-  </div>
-
-  <div class="victory hidden" id="victory">
-    <h1>DAY CLEARED</h1>
-    <p id="victoryText">You slept well and woke up refreshed.</p>
-    <div class="vbtns">
-      <button class="ui-btn" id="stayAnotherDay">STAY ANOTHER DAY</button>
-      <a class="ui-btn list" id="goDude" href="dude.html">NEXT: dude.html</a>
-    </div>
-    <div class="vfoot">Choose your path.</div>
   </div>
 
   <div class="toast" id="toast"></div>
@@ -426,14 +410,11 @@
   const npName = document.getElementById('npName');
   const npInfo = document.getElementById('npInfo');
   const npHint = document.getElementById('npHint');
-  const victory = document.getElementById('victory');
-  const victoryText = document.getElementById('victoryText');
   const toast = document.getElementById('toast');
   const elevatorPanel = document.getElementById('elevatorPanel');
   const epFloors = document.getElementById('epFloors');
   const epClose = document.getElementById('epClose');
-  const stayAnotherDayBtn = document.getElementById('stayAnotherDay');
-  const goDudeLink = document.getElementById('goDude');
+  const checkoutLink = document.getElementById('checkoutLink');
 
   const gachaOverlay = document.getElementById('gachaOverlay');
   const gachaCanvas = document.getElementById('gachaCanvas');
@@ -479,7 +460,7 @@
   let hasKey = false;
   let guestKeys = [];
   let slept = false;
-  let cleared = false;
+  let checkedOut = false;    // ★ チェックアウト済みフラグ
 
   let grid = [];
   let rooms = [];
@@ -1119,6 +1100,7 @@
     gameHours = 4; gameMinutes = 0; timeAccum = 0;
     money = 10000; hotelPaid = false; hasKey = false;
     guestKeys = []; slept = false; cleared = false;
+    checkedOut = false;
     invested = false; investReturnHour = null; investResult = null;
     currentComedy = null; comedyProgress = 0;
     presViewOpen = false; presSlideIndex = 0; currentPresentation = null;
@@ -1128,10 +1110,10 @@
     dialogue.classList.remove('open');
     gachaOverlay.classList.remove('show');
     gachaAnim.active = false;
+    checkoutLink.classList.add('hidden');
     updateGuestLocations();
     updateHUD();
     buildInfoPanel();
-    victory.classList.add('hidden');
   }
 
   function cellAt(x, y) {
@@ -1144,20 +1126,20 @@
   function updateHUD() {
     timeDisplay.textContent = fmt(gameHours, gameMinutes);
     moneyDisplay.textContent = money;
-    roomDisplay.textContent = hasKey ? myRoom : '???';
+    roomDisplay.textContent = (hasKey && !checkedOut) ? myRoom : '???';
     areaDisplay.textContent = currentAreaName();
     const cx = Math.floor(player.x / MAP_W) + 1;
     const cy = Math.floor(player.y / MAP_H) + 1;
     mapDisplay.textContent = `${cx},${cy}`;
     ipTime.textContent = fmt(gameHours, gameMinutes);
     ipMoney.textContent = '¥' + money;
-    ipRoom.textContent = hasKey ? myRoom : '???';
+    ipRoom.textContent = (hasKey && !checkedOut) ? myRoom : '???';
     ipSleep.textContent = slept ? 'Slept' : 'Awake';
   }
 
   function buildInfoPanel() {
     itemsList.innerHTML = '';
-    if (hasKey) {
+    if (hasKey && !checkedOut) {
       const row = document.createElement('div');
       row.className = 'item-row';
       row.innerHTML = `<span class="item-name">🔑 Key (My Room ${myRoom})</span>
@@ -1179,7 +1161,7 @@
         </span>`;
       itemsList.appendChild(row);
     }
-    if (!hasKey && guestKeys.length === 0) {
+    if ((!hasKey || checkedOut) && guestKeys.length === 0) {
       const n = document.createElement('div');
       n.className = 'empty-note'; n.textContent = 'No items.';
       itemsList.appendChild(n);
@@ -1206,7 +1188,7 @@
         </span>`;
       actionsList.appendChild(row);
     }
-    if (isPlayerInMyRoom() && (gameHours >= 19 || gameHours < 3) && !slept) {
+    if (isPlayerInMyRoom() && (gameHours >= 19 || gameHours < 3) && !slept && !checkedOut) {
       const row = document.createElement('div');
       row.className = 'item-row';
       row.innerHTML = `<span class="item-name">Sleep (7 hours)</span>
@@ -1223,10 +1205,17 @@
   }
 
   function isPlayerInMyRoom() {
-    if (!myRoom || !hasKey) return false;
+    if (!myRoom || !hasKey || checkedOut) return false;
     const r = rooms.find(rr => rr.num === myRoom);
     if (!r) return false;
     return dist(player.x, player.y, r.x + r.w/2, r.y + r.h/2) < 300;
+  }
+
+  function isPlayerAtReception() {
+    const recCell = grid[10][6];
+    const recX = recCell.x + recCell.w/2;
+    const recY = recCell.y + recCell.h/2 - 120;
+    return dist(player.x, player.y, recX, recY) < 400;
   }
 
   function updateTime(dt) {
@@ -1353,7 +1342,6 @@
       } else {
         presViewOpen = false;
         presenterState = 'presented';
-        // ★ プレゼン直後：Promote + Invest の2択
         conversation = { npc: presenter, page:0, lines:[
           "以上でプレゼンは終わりです。",
           "宣伝しますか？それとも投資しますか？",
@@ -1518,16 +1506,35 @@
       showToast('Reception is open from 7:00 to 19:00.', 2.5); return;
     }
     if (money < 10000) { showToast('Not enough money.', 2); return; }
-    const recCell = grid[10][6];
-    const recX = recCell.x + recCell.w/2;
-    const recY = recCell.y + recCell.h/2 - 120;
-    if (dist(player.x, player.y, recX, recY) > 400) {
+    if (!isPlayerAtReception()) {
       showToast('Stand in front of the receptionist (Lobby).', 2); return;
     }
     money -= 10000;
     hotelPaid = true;
     hasKey = true;
     showToast('Paid ¥10,000. Received key to room ' + myRoom + '.', 3);
+    updateHUD(); buildInfoPanel();
+  }
+
+  // ★ チェックアウト処理
+  function doCheckout() {
+    if (checkedOut) return;
+    if (!hotelPaid || !hasKey) return;
+    checkedOut = true;
+    hasKey = false;
+
+    // My Room のドアを閉じて施錠
+    if (myRoom !== null) {
+      const dr = doors.find(d => d.roomNum === myRoom);
+      if (dr) { dr.open = false; dr.locked = true; }
+      const r = rooms.find(rr => rr.num === myRoom);
+      if (r) r.doorOpen = false;
+    }
+
+    // フッターに dude.html リンクを表示
+    checkoutLink.classList.remove('hidden');
+
+    showToast('You have checked out. Thank you for staying with us!', 3);
     updateHUD(); buildInfoPanel();
   }
 
@@ -1730,6 +1737,7 @@
 
   function doSleep() {
     if (slept) return;
+    if (checkedOut) { showToast('You have already checked out.', 2); return; }
     if (!isPlayerInMyRoom()) { showToast('You must be in your own room.', 2); return; }
     if (!(gameHours >= 19 || gameHours < 3)) {
       showToast('You can only sleep between 19:00 and 3:00.', 2); return;
@@ -1738,15 +1746,12 @@
     gameHours = (gameHours + 7) % 24;
     showToast('You slept for 7 hours...', 2);
     updateHUD(); buildInfoPanel();
-    setTimeout(() => {
-      if (!cleared) {
-        cleared = true;
-        victory.classList.remove('hidden');
-        victoryText.textContent = `You woke up at ${fmt(gameHours,0)} and spent a full day at the hotel.`;
-      }
-    }, HOUR_SECONDS * 1000);
+    // ★ クリア画面は表示しない（何もしない）
   }
 
+  // ============================================================
+  //  Elevator
+  // ============================================================
   function handleElevatorClick() {
     if (walkingTo) return;
     if (!elevatorPanel.classList.contains('hidden')) return;
@@ -1937,7 +1942,6 @@
           { label:'No', action: () => {} },
         ];
       } else if (presenterState === 'presented') {
-        // ★ 再話しかけ時：Invest のみ
         if (investReturnHour !== null && gameHours >= investReturnHour && investResult === null) {
           const result = pick([0, 13000]);
           investResult = result;
@@ -2260,6 +2264,13 @@
     if (toastTimer > 0) {
       toastTimer -= dt;
       if (toastTimer <= 0) toast.classList.remove('show');
+    }
+
+    // ★ チェックアウト判定：起床後、受付に立つとチェックアウト
+    if (slept && !checkedOut && hotelPaid && hasKey) {
+      if (isPlayerAtReception()) {
+        doCheckout();
+      }
     }
 
     updateHUD();
@@ -2702,7 +2713,7 @@
     ctx.fillStyle = '#ffd166';
     ctx.font = 'bold 26px sans-serif';
     ctx.fillText('Room ' + cell.roomNum, x + 120, y + 64);
-    if (cell.roomNum === myRoom && hasKey) {
+    if (cell.roomNum === myRoom && hasKey && !checkedOut) {
       ctx.fillStyle = '#00e6b0';
       ctx.font = 'bold 16px sans-serif';
       ctx.fillText('MY ROOM', x + 120, y + 100);
@@ -3107,15 +3118,6 @@
   closeBgBtn.addEventListener('click', e => {
     e.preventDefault();
     bgViewer.classList.add('hidden');
-  });
-
-  stayAnotherDayBtn.addEventListener('click', e => {
-    e.preventDefault();
-    e.stopPropagation();
-    initGame();
-    gameStarted = true;
-    lastTime = performance.now();
-    showToast('A new day begins at the hotel!', 3);
   });
 
   initGame();
