@@ -176,6 +176,8 @@
   .victory .vfoot { color:#4a5a6a; font-size:12px; margin-top:20px; }
   .victory .vfoot a { color:#00e6b0; text-decoration:none; font-weight:700; }
   .victory .vfoot a:hover { text-shadow:0 0 10px #00e6b0; }
+  .victory .vbtns { display:flex; gap:16px; flex-wrap:wrap; justify-content:center; margin-top:12px; }
+  .victory .vbtns .ui-btn { padding:12px 28px; font-size:15px; }
 
   .toast {
     position:fixed; top:24px; left:50%; transform:translateX(-50%);
@@ -255,6 +257,16 @@
     opacity:0; transition:opacity 0.4s ease;
   }
   .gacha-overlay .g-hint.show { opacity:1; }
+  .gacha-overlay .g-skip {
+    position:absolute; top:24px; right:24px;
+    background:transparent; color:#7ad7ff; border:2px solid #7ad7ff;
+    border-radius:40px; padding:8px 20px; font-size:13px; font-weight:700;
+    letter-spacing:2px; cursor:pointer; font-family:inherit;
+    box-shadow:0 0 20px #7ad7ff55; transition:all 0.15s ease;
+    z-index:13100;
+  }
+  .gacha-overlay .g-skip:hover { background:#7ad7ff; color:#0a0c0f; box-shadow:0 0 30px #7ad7ffaa; }
+  .gacha-overlay .g-skip.hidden { display:none; }
 </style>
 </head>
 <body>
@@ -341,7 +353,11 @@
   <div class="victory hidden" id="victory">
     <h1>DAY CLEARED</h1>
     <p id="victoryText">You slept well and woke up refreshed.</p>
-    <div class="vfoot">Next: <a href="dude.html">dude.html</a></div>
+    <div class="vbtns">
+      <button class="ui-btn" id="stayAnotherDay">STAY ANOTHER DAY</button>
+      <a class="ui-btn list" id="goDude" href="dude.html">NEXT: dude.html</a>
+    </div>
+    <div class="vfoot">Choose your path.</div>
   </div>
 
   <div class="toast" id="toast"></div>
@@ -356,6 +372,7 @@
        GACHAPON ANIMATION OVERLAY
        ============================================================ -->
   <div class="gacha-overlay" id="gachaOverlay">
+    <button class="g-skip" id="gachaSkip">SKIP ▶</button>
     <div class="g-title">🎰 GACHAPON 🎰</div>
     <div class="g-sub" id="gachaSub">-¥100</div>
     <canvas id="gachaCanvas" width="640" height="280"></canvas>
@@ -415,6 +432,8 @@
   const elevatorPanel = document.getElementById('elevatorPanel');
   const epFloors = document.getElementById('epFloors');
   const epClose = document.getElementById('epClose');
+  const stayAnotherDayBtn = document.getElementById('stayAnotherDay');
+  const goDudeLink = document.getElementById('goDude');
 
   // === Gachapon animation DOM ===
   const gachaOverlay = document.getElementById('gachaOverlay');
@@ -424,6 +443,7 @@
   const gachaResult = document.getElementById('gachaResult');
   const gachaHint = document.getElementById('gachaHint');
   const gachaSub = document.getElementById('gachaSub');
+  const gachaSkip = document.getElementById('gachaSkip');
 
   // ============================================================
   //  Utilities
@@ -511,11 +531,11 @@
   let gachaAnim = {
     active: false,
     phase: 'chart',   // 'chart' | 'vault' | 'open' | 'result'
-    t: 0,             // timer (frames)
-    points: [],       // chart points {x, y}
+    t: 0,
+    points: [],
     targetY: 0,
     peakReached: false,
-    pendingKey: null, // key room number to award
+    pendingKey: null,
     peakTimer: 0,
   };
 
@@ -1233,7 +1253,7 @@
   // ============================================================
   function updateTime(dt) {
     if (slept) return;
-    if (gachaAnim.active) return; // ガチャ演出中は時間停止
+    if (gachaAnim.active) return;
     timeAccum += dt / (HOUR_SECONDS * 60);
     while (timeAccum >= 1) {
       timeAccum -= 1;
@@ -1319,7 +1339,6 @@
   // ============================================================
   window.addEventListener('keydown', e => {
     if (gachaAnim.active) {
-      // ガチャ演出中は Esc 以外無効
       if (e.key === 'Escape') { /* ignore */ }
       return;
     }
@@ -1356,11 +1375,11 @@
       } else {
         presViewOpen = false;
         presenterState = 'presented';
+        // ★ プレゼン終了後：Invest のみ（Promote は削除）
         conversation = { npc: presenter, page:0, lines:[
           "以上でプレゼンは終わりです。",
-          "宣伝しますか？それとも投資しますか？",
+          "投資しますか？",
         ], choices:[
-          { label:'Promote (+¥100)', action: () => { money += 100; showToast('You promoted. +¥100', 2); updateHUD(); buildInfoPanel(); } },
           { label:'Invest (¥10,000 / 4h)', action: () => {
             if (hotelPaid) { showToast('You already paid the hotel. Investment not available.', 2); }
             else if (money >= 10000) {
@@ -1370,6 +1389,7 @@
               updateHUD(); buildInfoPanel();
             } else { showToast('You need ¥10,000 to invest.', 2); }
           } },
+          { label:'Not now', action: () => {} },
         ]};
         dialogue.classList.add('open');
         renderDialogue();
@@ -1547,12 +1567,10 @@
     const available = guestGroups.filter(g => g.room !== myRoom && !guestKeys.includes(g.room));
     if (available.length === 0) { showToast('No more keys available.', 2); return; }
 
-    // 100円消費
     money -= 100;
     updateHUD(); buildInfoPanel();
     closeInfoPanel();
 
-    // 演出開始
     const g = pick(available);
     startGachaAnimation(g.room);
   }
@@ -1572,14 +1590,28 @@
     gachaResult.classList.remove('show');
     gachaResult.textContent = '';
     gachaHint.classList.remove('show');
+    gachaSkip.classList.remove('hidden');   // ★ スキップボタン表示
     gachaOverlay.classList.add('show');
 
-    // 初期チャートポイント
     const baseY = gachaCanvas.height * 0.75;
-    gachaAnim.targetY = gachaCanvas.height * 0.15; // 最終目標（上部）
+    gachaAnim.targetY = gachaCanvas.height * 0.15;
     for (let i = 0; i < 30; i++) {
       gachaAnim.points.push({ x: i * 12, y: baseY });
     }
+  }
+
+  // ★ スキップ処理：即座に結果フェーズへ
+  function skipGachaAnimation() {
+    if (!gachaAnim.active) return;
+    if (gachaAnim.phase === 'result') return; // 既に結果なら何もしない
+    gachaAnim.phase = 'result';
+    gachaAnim.t = 0;
+    gachaVault.src = 'img226door.jpg';
+    gachaVault.classList.add('show');
+    gachaResult.textContent = `🔑 Room ${gachaAnim.pendingKey} の鍵を手に入れた！`;
+    gachaResult.classList.add('show');
+    gachaHint.classList.add('show');
+    gachaSkip.classList.add('hidden');      // ★ 結果ではスキップ非表示
   }
 
   function updateGachaAnimation(dt) {
@@ -1587,39 +1619,28 @@
     gachaAnim.t += dt;
 
     if (gachaAnim.phase === 'chart') {
-      // ギザギザ上昇：一定間隔で新しい点を追加、上昇しつつランダムノイズ
       if (gachaAnim.t % 3 < 1) {
         const last = gachaAnim.points[gachaAnim.points.length - 1];
         const canvasW = gachaCanvas.width;
         const canvasH = gachaCanvas.height;
 
-        // 進行度：0 → 1
         const progress = Math.min(1, gachaAnim.points.length / 55);
-
-        // ベースライン（progress に応じて上昇）
         const baseY = canvasH * 0.75 - progress * (canvasH * 0.6);
-
-        // ノイズ（ギザギザ感）
         const noise = (Math.random() - 0.5) * 40;
-
-        // たまに急落（リアルなBTC感）
         const crash = Math.random() < 0.15 ? (Math.random() * 30) : 0;
 
         const newY = clamp(baseY + noise + crash, canvasH * 0.1, canvasH * 0.85);
         const newX = last.x + 12;
         gachaAnim.points.push({ x: newX, y: newY });
 
-        // 古い点を削除（スクロール）
         if (gachaAnim.points.length > 60) gachaAnim.points.shift();
 
-        // ピーク判定：progress がほぼ1で、まだピーク未到達
         if (progress >= 0.95 && !gachaAnim.peakReached) {
           gachaAnim.peakReached = true;
           gachaAnim.peakTimer = 0;
         }
       }
 
-      // ピーク到達後、少し待ってから金庫へ
       if (gachaAnim.peakReached) {
         gachaAnim.peakTimer += dt;
         if (gachaAnim.peakTimer > 25) {
@@ -1629,23 +1650,20 @@
         }
       }
     } else if (gachaAnim.phase === 'vault') {
-      // 金庫（閉じた状態）を 30 フレーム表示
       if (gachaAnim.t > 30) {
         gachaAnim.phase = 'open';
         gachaAnim.t = 0;
         gachaVault.src = 'img226door.jpg';
       }
     } else if (gachaAnim.phase === 'open') {
-      // 開いた金庫を 40 フレーム表示 → 結果表示
       if (gachaAnim.t > 40) {
         gachaAnim.phase = 'result';
         gachaAnim.t = 0;
         gachaResult.textContent = `🔑 Room ${gachaAnim.pendingKey} の鍵を手に入れた！`;
         gachaResult.classList.add('show');
         gachaHint.classList.add('show');
+        gachaSkip.classList.add('hidden');  // ★ 結果でスキップ非表示
       }
-    } else if (gachaAnim.phase === 'result') {
-      // クリック待ち（何もしない）
     }
   }
 
@@ -1654,7 +1672,6 @@
     const ch = gachaCanvas.height;
     gachaCtx.clearRect(0, 0, cw, ch);
 
-    // 背景グリッド
     gachaCtx.strokeStyle = 'rgba(0,230,176,0.08)';
     gachaCtx.lineWidth = 1;
     for (let i = 0; i <= 8; i++) {
@@ -1672,7 +1689,6 @@
       gachaCtx.stroke();
     }
 
-    // チャート線
     if (gachaAnim.points.length > 1) {
       gachaCtx.strokeStyle = '#00e6b0';
       gachaCtx.lineWidth = 3;
@@ -1686,7 +1702,6 @@
       gachaCtx.stroke();
       gachaCtx.shadowBlur = 0;
 
-      // 塗りつぶし（グラデーション）
       const lastPt = gachaAnim.points[gachaAnim.points.length - 1];
       const firstPt = gachaAnim.points[0];
       const grad = gachaCtx.createLinearGradient(0, 0, 0, ch);
@@ -1700,7 +1715,6 @@
       gachaCtx.closePath();
       gachaCtx.fill();
 
-      // 最新点の光
       gachaCtx.fillStyle = '#ffd166';
       gachaCtx.shadowColor = '#ffd166';
       gachaCtx.shadowBlur = 20;
@@ -1713,7 +1727,6 @@
 
   function endGachaAnimation() {
     if (!gachaAnim.active) return;
-    // 鍵を付与
     if (gachaAnim.pendingKey !== null) {
       guestKeys.push(gachaAnim.pendingKey);
       showToast(`Gachapon! You got the key to room ${gachaAnim.pendingKey}.`, 2.5);
@@ -1723,6 +1736,7 @@
     gachaAnim.active = false;
     gachaAnim.pendingKey = null;
     gachaOverlay.classList.remove('show');
+    gachaSkip.classList.add('hidden');
   }
 
   // オーバーレイクリックで結果画面を閉じる
@@ -1730,6 +1744,12 @@
     if (gachaAnim.phase === 'result') {
       endGachaAnimation();
     }
+  });
+
+  // ★ スキップボタン
+  gachaSkip.addEventListener('click', e => {
+    e.stopPropagation();
+    skipGachaAnimation();
   });
 
   function doSleep() {
@@ -1785,7 +1805,7 @@
       x: target.x + target.w/2,
       y: target.y + target.h + 80,
       msg: `Arrived at ${targetFloor}F.`,
-      speed: 8,
+      speed: 24,   // ★ 3倍（元 8）
     };
   }
   epClose.addEventListener('click', e => {
@@ -1950,6 +1970,7 @@
           { label:'No', action: () => {} },
         ];
       } else if (presenterState === 'presented') {
+        // ★ プレゼン後の会話：Promote を削除、Invest のみ
         if (investReturnHour !== null && gameHours >= investReturnHour && investResult === null) {
           const result = pick([0, 13000]);
           investResult = result;
@@ -1969,21 +1990,23 @@
         } else if (investReturnHour !== null) {
           conversation.lines = [`Your investment returns at ${investReturnHour}:00. Come back then.`];
         } else {
+          // ★ 永続的に Invest のみ選択可能
           conversation.lines = [
             "Thanks for watching my presentation.",
-            "Feel free to promote or invest next time.",
+            "Would you like to invest again?",
           ];
           conversation.choices = [
-            { label:'Promote (+¥100)', action: () => { money += 100; showToast('You promoted. +¥100', 2); updateHUD(); buildInfoPanel(); } },
             { label:'Invest (¥10,000 / 4h)', action: () => {
               if (hotelPaid) { showToast('You already paid the hotel. Investment not available.', 2); }
               else if (money >= 10000) {
                 money -= 10000; invested = true;
                 investReturnHour = (gameHours + 4) % 24;
+                investResult = null;
                 showToast('You invested ¥10,000. Return in 4 hours.', 3);
                 updateHUD(); buildInfoPanel();
               } else { showToast('You need ¥10,000 to invest.', 2); }
             } },
+            { label:'Not now', action: () => {} },
           ];
         }
       } else {
@@ -2078,7 +2101,6 @@
   function update(dt) {
     if (!gameStarted) return;
 
-    // ガチャ演出中
     if (gachaAnim.active) {
       updateGachaAnimation(dt);
       drawGachaChart();
@@ -2148,8 +2170,9 @@
           }
           presenterPathIdx++;
         } else {
-          presenter.x += pdx/pd * 2.5;
-          presenter.y += pdy/pd * 2.5;
+          // ★ 山田の移動速度 5倍（元 2.5）
+          presenter.x += pdx/pd * 12.5;
+          presenter.y += pdy/pd * 12.5;
           presenter.angle = Math.atan2(pdy, pdx);
         }
       }
@@ -2296,7 +2319,7 @@
       ctx.fillRect(0,0,W,H);
       return;
     }
-    if (gachaAnim.active) return; // ガチャ演出中は通常描画スキップ
+    if (gachaAnim.active) return;
 
     const camX = clamp(player.x - W/2, 0, WORLD_W - W);
     const camY = clamp(player.y - H/2, 0, WORLD_H - H);
@@ -3137,6 +3160,17 @@
   closeBgBtn.addEventListener('click', e => {
     e.preventDefault();
     bgViewer.classList.add('hidden');
+  });
+
+  // ★ クリア画面：もう1日過ごす
+  stayAnotherDayBtn.addEventListener('click', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    // リセットして同じページで再スタート
+    initGame();
+    gameStarted = true;
+    lastTime = performance.now();
+    showToast('A new day begins at the hotel!', 3);
   });
 
   // ============================================================
