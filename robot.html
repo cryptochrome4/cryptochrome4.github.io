@@ -729,7 +729,7 @@ function drawRobot(canvas, robot, rarity, attr) {
 }
 
 /* =========================================================
-   カードプール（マスターを属性・レア度で参照）
+   カードプール
 ========================================================= */
 const NORMAL_POOL = CARD_MASTER.filter(c => c.rarity === "N");   // 30
 const RARE_POOL   = CARD_MASTER.filter(c => c.rarity !== "N");   // 20
@@ -797,15 +797,23 @@ function updateClock() {
   clockEl.textContent = `${hh}:${mm}:${ss}`;
 }
 
+/* =========================================================
+   相場更新：マスター・開封中パック・入手済みすべてを更新
+========================================================= */
 function updateAllPrices() {
   const elapsed = Math.floor((Date.now() - startTime) / 1000);
-  CARD_MASTER.forEach(card => {
+
+  const apply = (card) => {
     if (card.trend === "up") {
       card.currentPrice = Math.min(card.maxPrice, card.basePrice + elapsed);
     } else {
       card.currentPrice = Math.max(card.minPrice, card.basePrice - elapsed);
     }
-  });
+  };
+
+  CARD_MASTER.forEach(apply);
+  currentPack.forEach(apply);
+  obtainedCards.forEach(apply);
 }
 
 function renderPriceTable() {
@@ -886,7 +894,6 @@ function showPackCard() {
    パック
 ========================================================= */
 function makeInstance(master) {
-  // マスターカードの市場情報を初期化（上昇/下降を抽選）
   const trend = Math.random() < 0.5 ? "up" : "down";
   const basePrice = master.basePrice;
   return {
@@ -933,9 +940,16 @@ function buyPack() {
 function nextCard() { if (currentIndex < currentPack.length - 1) { currentIndex++; showPackCard(); } }
 function prevCard() { if (currentIndex > 0) { currentIndex--; showPackCard(); } }
 
+/* =========================================================
+   売却：売る瞬間の currentPrice を使う（時間経過反映済み）
+========================================================= */
 function sellCurrentCard() {
   const card = currentPack[currentIndex];
   if (!card) return;
+
+  // 売る直前に最新の相場を反映
+  updateAllPrices();
+
   money += card.currentPrice;
   updateMoneyDisplay();
   currentPack.splice(currentIndex, 1);
@@ -974,8 +988,13 @@ function closeModal() {
   modal.classList.remove("active");
   modalCardData = null;
 }
+
 function sellFromModal() {
   if (!modalCardData) return;
+
+  // 売る直前に最新の相場を反映
+  updateAllPrices();
+
   money += modalCardData.currentPrice;
   updateMoneyDisplay();
   obtainedCards = obtainedCards.filter(c => c.uid !== modalCardData.uid);
