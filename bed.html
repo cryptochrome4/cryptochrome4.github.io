@@ -427,6 +427,7 @@
   const randInt = (a,b)=>Math.floor(Math.random()*(b-a+1))+a;
   const randFloat = (a,b)=>a + Math.random()*(b-a);
   const fmt = (h,m)=>`${h}:${String(m).padStart(2,'0')}`;
+  const lerp = (a,b,t)=>a+(b-a)*t;   // ★ 追加
 
   function showToast(msg, dur) {
     toast.textContent = msg;
@@ -479,9 +480,8 @@
   let taxiVisible = false;
   let comedianPath = null;
   let comedianPathIdx = 0;
-  // ★ コメディアン降車演出用
   let comedianExitTimer = 0;
-  let comedianExitPhase = 'none';  // 'none' | 'exiting' | 'walking'
+  let comedianExitPhase = 'none';
 
   let invested = false;
   let investReturnHour = null;
@@ -1264,21 +1264,16 @@
     g.walkTargetY = target.y;
   }
 
-  // ============================================================
-  //  時間イベント
-  // ============================================================
   function onHourChanged() {
     if (gameHours === 7) showToast('It is 7:00. The rest room and reception are open.', 2.5);
     if (gameHours === 11) showToast('It is 11:00. The rest room closes.', 2);
     if (gameHours === 17) {
-      // ★ タクシー 17:00 発
       showToast('A taxi is approaching the hotel.', 3);
       comedyState = 'arriving';
       taxiVisible = true;
       taxiX = -300;
     }
     if (gameHours === 18) {
-      // ★ 18:00：トースト表示のみ。タクシー停止は update() の arriving ブロックに任せる
       showToast('The comedians arrive at the hotel.', 3);
     }
     if (gameHours === 19) {
@@ -2152,9 +2147,6 @@
     return gameHours >= 22 || gameHours < 5;
   }
 
-  // ============================================================
-  //  Update
-  // ============================================================
   function update(dt) {
     if (!gameStarted) return;
 
@@ -2234,13 +2226,11 @@
       }
     }
 
-    // ★ タクシー＆コメディアン降車演出
     if (taxiVisible) {
       const stopX = grid[1][6].x - 400;
 
-      // タクシー到着中（17:00〜到着まで）
       if (comedyState === 'arriving') {
-        taxiX += 40;   // ★ 高速化（実時間 約2秒で到着）
+        taxiX += 40;
         if (taxiX >= stopX) {
           taxiX = stopX;
           comedyState = 'stopped';
@@ -2254,11 +2244,10 @@
         }
       }
 
-      // コメディアン降車演出（到着後1秒）
       if (comedyState === 'stopped') {
         if (comedianExitPhase === 'exiting') {
           comedianExitTimer += dt;
-          const t = Math.min(1, comedianExitTimer / (1 * 60));  // ★ 1秒で降車完了
+          const t = Math.min(1, comedianExitTimer / (1 * 60));
           for (let i = 0; i < comedians.length; i++) {
             const c = comedians[i];
             const baseX = taxiX + 40 + (i === 0 ? -30 : 30);
@@ -2278,7 +2267,6 @@
       }
     }
 
-    // 漫才師の移動（19:00以降）
     if (comedianPath && comedians[0].state === 'walking' && comedyState === 'onstage') {
       const target = comedianPath[comedianPathIdx];
       if (!target) {
@@ -2311,7 +2299,6 @@
       }
     }
 
-    // ★ 客の散歩更新
     for (const g of guests) {
       if (g.walkMode !== 'strolling') continue;
 
@@ -2818,7 +2805,6 @@
       ctx.stroke();
     }
 
-    // ★ 窓の描画（昼夜で切り替え）
     const night = isNight();
     const winX = x + w - 180, winY = y + 60, winW = 140, winH = 110;
 
