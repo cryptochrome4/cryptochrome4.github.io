@@ -1,0 +1,3302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hotel Day - Walk &amp; Talk</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; user-select:none; }
+  body {
+    background:#0a0c0f;
+    font-family:'Segoe UI','Helvetica Neue',sans-serif;
+    display:flex; justify-content:center; align-items:flex-start;
+    min-height:100vh; color:#e0e0e0;
+    padding:20px 0; overflow-y:auto;
+  }
+  .game-wrapper {
+    background:#11161c; border-radius:24px; padding:20px 20px 14px;
+    box-shadow:0 20px 40px rgba(0,0,0,0.8), 0 0 0 1px #2a3a4a inset;
+    display:flex; flex-direction:column; align-items:center; gap:12px;
+    width:fit-content;
+  }
+  canvas {
+    display:block; border-radius:16px; background:#0b0f14;
+    box-shadow:0 0 30px rgba(0,255,200,0.1);
+    cursor:crosshair; width:800px; height:600px;
+  }
+  .footer {
+    display:flex; flex-direction:column; gap:6px;
+    width:100%; padding:4px 8px 0; font-size:13px; color:#7a8b9b;
+    letter-spacing:0.5px;
+  }
+  .footer .status { display:flex; gap:16px; flex-wrap:wrap; align-items:center; }
+  .footer .status span { color:#b0c8d8; font-weight:500; }
+  .footer .status .highlight { color:#00e6b0; text-shadow:0 0 8px #00e6b088; }
+  .footer .status .sp { color:#ffd166; text-shadow:0 0 8px #ffd16688; }
+  .footer .status .clock { color:#7ad7ff; text-shadow:0 0 8px #7ad7ff88; }
+  .footer .status .money { color:#ff8ad8; text-shadow:0 0 8px #ff8ad888; }
+  .footer .status .map-coord { color:#7ad7ff; text-shadow:0 0 8px #7ad7ff88; }
+  .footer .status .hidden-coord { display:none; }
+  .footer .status .checkout-link {
+    color:#3a4a5a; font-size:11px; text-decoration:none;
+    letter-spacing:1px; transition:color 0.3s ease;
+  }
+  .footer .status .checkout-link:hover { color:#00e6b0; text-shadow:0 0 8px #00e6b088; }
+  .btn-row { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; width:100%; padding:4px 0; }
+  .ui-btn {
+    background:#1a2530; color:#00e6b0; border:2px solid #00e6b0;
+    border-radius:40px; padding:7px 16px; font-size:13px; font-weight:700;
+    letter-spacing:1px; cursor:pointer; transition:all 0.15s ease;
+    box-shadow:0 0 10px #00e6b033; font-family:inherit;
+  }
+  .ui-btn:hover { background:#00e6b0; color:#0a0c0f; box-shadow:0 0 20px #00e6b0aa; }
+  .ui-btn:active { transform:scale(0.96); }
+  .ui-btn.info-toggle { color:#7ad7ff; border-color:#7ad7ff; box-shadow:0 0 10px #7ad7ff33; }
+  .ui-btn.info-toggle:hover { background:#7ad7ff; color:#0a0c0f; }
+  .ui-btn.map-toggle { color:#7ad7ff; border-color:#7ad7ff; box-shadow:0 0 10px #7ad7ff33; }
+  .ui-btn.map-toggle:hover { background:#7ad7ff; color:#0a0c0f; }
+  .ui-btn.minimap-toggle { color:#ff8ad8; border-color:#ff8ad8; box-shadow:0 0 10px #ff8ad833; }
+  .ui-btn.minimap-toggle:hover { background:#ff8ad8; color:#0a0c0f; }
+  .ui-btn.warn { color:#ff4d6d; border-color:#ff4d6d; box-shadow:0 0 10px #ff4d6d33; }
+  .ui-btn.warn:hover { background:#ff4d6d; color:#0a0c0f; }
+  .ui-btn.list { color:#ffd166; border-color:#ffd166; box-shadow:0 0 10px #ffd16633; }
+  .ui-btn.list:hover { background:#ffd166; color:#0a0c0f; }
+  .hidden { display:none !important; }
+  .hint { font-size:11px; color:#4a5a6a; margin-top:2px; text-align:center; width:100%; }
+
+  .info-panel {
+    position:fixed; top:0; right:0; bottom:0; width:340px;
+    background:#0d131a; border-left:2px solid #7ad7ff;
+    box-shadow:-10px 0 40px rgba(0,0,0,0.8); z-index:9000;
+    display:flex; flex-direction:column; padding:16px;
+    transform:translateX(100%); transition:transform 0.25s ease;
+  }
+  .info-panel.open { transform:translateX(0); }
+  .info-panel h2 { color:#7ad7ff; font-size:18px; letter-spacing:2px;
+    margin-bottom:12px; text-shadow:0 0 10px #7ad7ff88; }
+  .info-section { margin-bottom:14px; border-top:1px solid #1e3a4a; padding-top:10px; }
+  .info-section h3 { color:#00e6b0; font-size:13px; letter-spacing:1.5px; margin-bottom:8px; }
+  .item-row { display:flex; align-items:center; justify-content:space-between;
+    gap:8px; background:#111a24; border:1px solid #1e3a4a; border-radius:8px;
+    padding:8px 10px; font-size:13px; color:#b0c8d8; margin-bottom:6px; }
+  .item-row .item-name { color:#ffd166; }
+  .item-row .item-actions { display:flex; gap:6px; }
+  .item-row .mini-btn { background:#1a2530; color:#00e6b0; border:1px solid #00e6b0;
+    border-radius:20px; padding:3px 10px; font-size:11px; font-weight:700;
+    cursor:pointer; font-family:inherit; }
+  .item-row .mini-btn:hover { background:#00e6b0; color:#0a0c0f; }
+  .item-row .mini-btn.warn { color:#ff4d6d; border-color:#ff4d6d; }
+  .item-row .mini-btn.warn:hover { background:#ff4d6d; color:#0a0c0f; }
+  .info-panel .panel-btns { display:flex; gap:8px; margin-top:auto; }
+  .info-panel .panel-btns button { flex:1; }
+  .empty-note { color:#4a5a6a; font-size:12px; font-style:italic; }
+
+  .dialogue {
+    position:fixed; left:50%; bottom:20px;
+    transform:translateX(-50%) translateY(20px);
+    width:720px; max-width:calc(100vw - 40px);
+    background:#0d131aee; border:2px solid #00e6b0; border-radius:16px;
+    padding:18px 22px; z-index:9500; box-shadow:0 0 40px #00e6b055;
+    opacity:0; pointer-events:none;
+    transition:opacity 0.2s ease, transform 0.2s ease;
+    cursor:pointer;
+  }
+  .dialogue.open {
+    opacity:1; pointer-events:auto;
+    transform:translateX(-50%) translateY(0);
+  }
+  .dialogue .d-head { display:flex; align-items:center; gap:12px; margin-bottom:10px; flex-wrap:wrap; }
+  .dialogue .d-name { color:#00e6b0; font-size:18px; font-weight:800; letter-spacing:1px; }
+  .dialogue .d-meta { color:#7a8b9b; font-size:12px; }
+  .dialogue .d-meta b { color:#ffd166; }
+  .dialogue .d-text { color:#e0e0e0; font-size:16px; line-height:1.6; min-height:60px; letter-spacing:0.3px; }
+  .dialogue .d-foot { display:flex; gap:10px; margin-top:14px; justify-content:flex-end; flex-wrap:wrap; }
+  .dialogue .d-page { color:#7a8b9b; font-size:12px; margin-right:auto; align-self:center; }
+  .dialogue .choice-row { display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; }
+  .dialogue .choice-row .ui-btn { flex:1; min-width:120px; pointer-events:auto; }
+  .dialogue .d-foot .ui-btn { pointer-events:none; opacity:0.6; }
+
+  .npc-panel {
+    position:fixed; left:24px; bottom:24px;
+    background:#0d131aee; border:2px solid #7ad7ff; border-radius:14px;
+    padding:12px 16px; z-index:9400; color:#e0e0e0; font-size:13px;
+    line-height:1.5; box-shadow:0 0 30px #7ad7ff44;
+    opacity:0; pointer-events:none; transition:opacity 0.15s ease;
+    max-width:280px;
+  }
+  .npc-panel.open { opacity:1; }
+  .npc-panel .n-name { color:#7ad7ff; font-weight:800; font-size:15px; }
+  .npc-panel .n-hint { color:#00e6b0; font-size:11px; margin-top:6px; }
+
+  .opening {
+    position:fixed; inset:0;
+    background-image:url('img224hotel.jpg');
+    background-size:cover; background-position:center; background-repeat:no-repeat;
+    display:flex; flex-direction:column; justify-content:center;
+    align-items:center; gap:30px; z-index:9999;
+    transition:opacity 0.5s ease;
+  }
+  .opening::before { content:''; position:absolute; inset:0; background:rgba(0,0,0,0.55); z-index:0; }
+  .opening h1 { position:relative; z-index:1; color:#00e6b0; font-size:72px; font-weight:800;
+    letter-spacing:8px; text-shadow:0 0 30px #00e6b0aa, 0 0 60px #00e6b055; }
+  .opening .subtitle { position:relative; z-index:1; color:#b0c8d8; font-size:16px;
+    letter-spacing:4px; margin-top:-20px; }
+  .opening .opening-btns { position:relative; z-index:1; display:flex; gap:16px;
+    flex-wrap:wrap; justify-content:center; }
+  .start-btn {
+    background:#00e6b0; color:#0a0c0f; border:none; border-radius:50px;
+    padding:18px 72px; font-size:22px; font-weight:800; letter-spacing:4px;
+    cursor:pointer; font-family:inherit;
+    box-shadow:0 0 30px #00e6b0cc, 0 0 60px #00e6b066; transition:all 0.2s ease;
+  }
+  .start-btn:hover { transform:scale(1.06); box-shadow:0 0 50px #00e6b0ff, 0 0 100px #00e6b0aa; background:#1affc0; }
+  .bgview-btn {
+    background:transparent; color:#7ad7ff; border:2px solid #7ad7ff;
+    border-radius:50px; padding:16px 40px; font-size:16px; font-weight:700;
+    letter-spacing:3px; cursor:pointer; font-family:inherit;
+    box-shadow:0 0 20px #7ad7ff55; transition:all 0.2s ease;
+  }
+  .bgview-btn:hover { background:#7ad7ff; color:#0a0c0f; box-shadow:0 0 40px #7ad7ffaa; }
+
+  .bg-viewer {
+    position:fixed; inset:0; background:#000; z-index:10000;
+    display:flex; flex-direction:column; justify-content:center; align-items:center;
+  }
+  .bg-viewer img { width:100%; height:100%; object-fit:contain; background:#000; }
+  .bg-viewer .close-bg {
+    position:absolute; top:20px; right:20px; background:#ff4d6d; color:#fff;
+    border:none; border-radius:40px; padding:10px 24px; font-size:16px;
+    font-weight:700; cursor:pointer; font-family:inherit; box-shadow:0 0 20px #ff4d6daa;
+  }
+  .bg-viewer .close-bg:hover { background:#ff8ad8; }
+
+  .toast {
+    position:fixed; top:24px; left:50%; transform:translateX(-50%);
+    background:#0d131aee; border:2px solid #00e6b0; color:#00e6b0;
+    border-radius:40px; padding:10px 24px; font-size:14px; font-weight:700;
+    letter-spacing:1px; z-index:12000; box-shadow:0 0 30px #00e6b055;
+    opacity:0; transition:opacity 0.25s ease; pointer-events:none;
+  }
+  .toast.show { opacity:1; }
+
+  .elevator-panel {
+    position:fixed; top:50%; left:50%;
+    transform:translate(-50%,-50%);
+    background:#0d131aee; border:2px solid #7ad7ff;
+    border-radius:16px; padding:20px 24px;
+    z-index:9600; box-shadow:0 0 50px #7ad7ff55;
+    display:flex; flex-direction:column; gap:14px; align-items:center;
+    min-width:280px;
+  }
+  .elevator-panel .ep-title {
+    color:#7ad7ff; font-size:16px; font-weight:800; letter-spacing:3px;
+    text-shadow:0 0 10px #7ad7ff88;
+  }
+  .elevator-panel .ep-floors {
+    display:grid; grid-template-columns:1fr 1fr; gap:10px; width:100%;
+  }
+  .elevator-panel .ep-floors button {
+    background:#1a2530; color:#7ad7ff; border:2px solid #7ad7ff;
+    border-radius:12px; padding:14px 0; font-size:20px; font-weight:800;
+    cursor:pointer; font-family:inherit; transition:all 0.15s ease;
+  }
+  .elevator-panel .ep-floors button:hover {
+    background:#7ad7ff; color:#0a0c0f; box-shadow:0 0 20px #7ad7ffaa;
+  }
+  .elevator-panel .ep-floors button.current {
+    background:#00e6b0; color:#0a0c0f; border-color:#00e6b0;
+    box-shadow:0 0 20px #00e6b0aa;
+  }
+
+  .gacha-overlay {
+    position:fixed; inset:0; z-index:13000;
+    background:radial-gradient(circle at center, #0a1a14 0%, #000 80%);
+    display:flex; flex-direction:column; justify-content:center; align-items:center;
+    gap:20px; opacity:0; pointer-events:none;
+    transition:opacity 0.3s ease;
+  }
+  .gacha-overlay.show { opacity:1; pointer-events:auto; }
+  .gacha-overlay .g-title {
+    color:#00e6b0; font-size:22px; font-weight:800; letter-spacing:4px;
+    text-shadow:0 0 20px #00e6b0aa;
+  }
+  .gacha-overlay .g-sub {
+    color:#7a8b9b; font-size:13px; letter-spacing:2px;
+  }
+  .gacha-overlay canvas {
+    border-radius:12px; background:#050a08;
+    box-shadow:0 0 40px #00e6b044, 0 0 0 2px #00e6b033 inset;
+    width:640px; height:280px;
+  }
+  .gacha-overlay .g-vault {
+    width:320px; height:320px; object-fit:contain;
+    filter:drop-shadow(0 0 40px #ffd16688);
+    display:none;
+  }
+  .gacha-overlay .g-vault.show { display:block; }
+  .gacha-overlay .g-result {
+    color:#ffd166; font-size:24px; font-weight:800; letter-spacing:2px;
+    text-shadow:0 0 20px #ffd166aa;
+    opacity:0; transition:opacity 0.4s ease;
+  }
+  .gacha-overlay .g-result.show { opacity:1; }
+  .gacha-overlay .g-hint {
+    color:#4a5a6a; font-size:12px; letter-spacing:1px;
+    opacity:0; transition:opacity 0.4s ease;
+  }
+  .gacha-overlay .g-hint.show { opacity:1; }
+  .gacha-overlay .g-skip {
+    position:absolute; top:24px; right:24px;
+    background:transparent; color:#7ad7ff; border:2px solid #7ad7ff;
+    border-radius:40px; padding:8px 20px; font-size:13px; font-weight:700;
+    letter-spacing:2px; cursor:pointer; font-family:inherit;
+    box-shadow:0 0 20px #7ad7ff55; transition:all 0.15s ease;
+    z-index:13100;
+  }
+  .gacha-overlay .g-skip:hover { background:#7ad7ff; color:#0a0c0f; box-shadow:0 0 30px #7ad7ffaa; }
+  .gacha-overlay .g-skip.hidden { display:none; }
+</style>
+</head>
+<body>
+
+  <div class="opening" id="opening">
+    <h1>HOTEL DAY</h1>
+    <div class="subtitle">- WALK &amp; TALK -</div>
+    <div class="opening-btns">
+      <button class="start-btn" id="startBtn">START</button>
+      <button class="bgview-btn" id="bgViewBtn">VIEW BACKGROUND</button>
+    </div>
+  </div>
+
+  <div class="bg-viewer hidden" id="bgViewer">
+    <button class="close-bg" id="closeBgBtn">CLOSE ✕</button>
+    <img src="img224hotel.jpg" alt="background">
+  </div>
+
+  <div class="game-wrapper">
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <div class="footer" id="footer">
+      <div class="status">
+        <span>Time: <span id="timeDisplay" class="clock">4:00</span></span>
+        <span>Money: ¥<span id="moneyDisplay" class="money">10000</span></span>
+        <span>Room: <span id="roomDisplay" class="sp">???</span></span>
+        <span>Area: <span id="areaDisplay" class="highlight">Outside</span></span>
+        <a href="dude.html" id="checkoutLink" class="checkout-link hidden">dude.html</a>
+        <span id="mapCoordSpan" class="hidden-coord">Map: <span id="mapDisplay" class="map-coord">0,0</span></span>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="ui-btn info-toggle" id="infoBtn">📋 INFO PANEL</button>
+      <button class="ui-btn minimap-toggle" id="minimapBtn">🗺 SHOW MINIMAP</button>
+      <button class="ui-btn map-toggle" id="mapToggleBtn">📍 SHOW COORDS</button>
+      <button class="ui-btn list" id="helpBtn">❓ HELP</button>
+    </div>
+    <div class="hint" id="hint">
+      Move: Arrow Keys / Talk: Approach a person &amp; click / Door: Stand in front &amp; click
+    </div>
+  </div>
+
+  <div class="info-panel" id="infoPanel">
+    <h2>INFO PANEL</h2>
+    <div class="info-section">
+      <h3>STATUS</h3>
+      <div class="item-row"><span>Time</span><span class="item-name" id="ipTime">4:00</span></div>
+      <div class="item-row"><span>Money</span><span class="item-name" id="ipMoney">¥10000</span></div>
+      <div class="item-row"><span>My Room</span><span class="item-name" id="ipRoom">???</span></div>
+      <div class="item-row"><span>Sleep</span><span class="item-name" id="ipSleep">Awake</span></div>
+    </div>
+    <div class="info-section">
+      <h3>ITEMS</h3>
+      <div id="itemsList"></div>
+    </div>
+    <div class="info-section">
+      <h3>ACTIONS</h3>
+      <div id="actionsList"></div>
+    </div>
+    <div class="panel-btns">
+      <button class="ui-btn" id="ipClose">CLOSE</button>
+      <button class="ui-btn warn" id="ipReset">RESET</button>
+    </div>
+  </div>
+
+  <div class="dialogue" id="dialogue">
+    <div class="d-head">
+      <div class="d-name" id="dName">Name</div>
+      <div class="d-meta" id="dMeta"></div>
+    </div>
+    <div class="d-text" id="dText"></div>
+    <div class="choice-row hidden" id="choiceRow"></div>
+    <div class="d-foot">
+      <div class="d-page" id="dPage">1 / 1</div>
+      <button class="ui-btn" id="dNext" disabled>NEXT ▶</button>
+      <button class="ui-btn warn" id="dClose" disabled>CLOSE</button>
+    </div>
+  </div>
+
+  <div class="npc-panel" id="npcPanel">
+    <div class="n-name" id="npName">Name</div>
+    <div id="npInfo">Info</div>
+    <div class="n-hint" id="npHint">Click to talk</div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <div class="elevator-panel hidden" id="elevatorPanel">
+    <div class="ep-title">SELECT FLOOR</div>
+    <div class="ep-floors" id="epFloors"></div>
+    <button class="ui-btn warn" id="epClose">CANCEL</button>
+  </div>
+
+  <div class="gacha-overlay" id="gachaOverlay">
+    <button class="g-skip" id="gachaSkip">SKIP ▶</button>
+    <div class="g-title">🎰 GACHAPON 🎰</div>
+    <div class="g-sub" id="gachaSub">-¥100</div>
+    <canvas id="gachaCanvas" width="640" height="280"></canvas>
+    <img class="g-vault" id="gachaVault" src="img225door.jpg" alt="vault">
+    <div class="g-result" id="gachaResult"></div>
+    <div class="g-hint" id="gachaHint">Click to continue</div>
+  </div>
+
+<script>
+(function(){
+  // ============================================================
+  //  Constants
+  // ============================================================
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = 800, H = 600;
+  const MAP_W = 800, MAP_H = 600;
+  const MAP_COLS = 13, MAP_ROWS = 13;
+  const WORLD_W = MAP_W * MAP_COLS;
+  const WORLD_H = MAP_H * MAP_ROWS;
+  const HOUR_SECONDS = 7;
+
+  const timeDisplay = document.getElementById('timeDisplay');
+  const moneyDisplay = document.getElementById('moneyDisplay');
+  const roomDisplay = document.getElementById('roomDisplay');
+  const areaDisplay = document.getElementById('areaDisplay');
+  const mapDisplay = document.getElementById('mapDisplay');
+  const mapCoordSpan = document.getElementById('mapCoordSpan');
+  const infoBtn = document.getElementById('infoBtn');
+  const minimapBtn = document.getElementById('minimapBtn');
+  const mapToggleBtn = document.getElementById('mapToggleBtn');
+  const helpBtn = document.getElementById('helpBtn');
+  const infoPanel = document.getElementById('infoPanel');
+  const ipTime = document.getElementById('ipTime');
+  const ipMoney = document.getElementById('ipMoney');
+  const ipRoom = document.getElementById('ipRoom');
+  const ipSleep = document.getElementById('ipSleep');
+  const itemsList = document.getElementById('itemsList');
+  const actionsList = document.getElementById('actionsList');
+  const ipClose = document.getElementById('ipClose');
+  const ipReset = document.getElementById('ipReset');
+  const dialogue = document.getElementById('dialogue');
+  const dName = document.getElementById('dName');
+  const dMeta = document.getElementById('dMeta');
+  const dText = document.getElementById('dText');
+  const dPage = document.getElementById('dPage');
+  const dNext = document.getElementById('dNext');
+  const dClose = document.getElementById('dClose');
+  const choiceRow = document.getElementById('choiceRow');
+  const npcPanel = document.getElementById('npcPanel');
+  const npName = document.getElementById('npName');
+  const npInfo = document.getElementById('npInfo');
+  const npHint = document.getElementById('npHint');
+  const toast = document.getElementById('toast');
+  const elevatorPanel = document.getElementById('elevatorPanel');
+  const epFloors = document.getElementById('epFloors');
+  const epClose = document.getElementById('epClose');
+  const checkoutLink = document.getElementById('checkoutLink');
+
+  const gachaOverlay = document.getElementById('gachaOverlay');
+  const gachaCanvas = document.getElementById('gachaCanvas');
+  const gachaCtx = gachaCanvas.getContext('2d');
+  const gachaVault = document.getElementById('gachaVault');
+  const gachaResult = document.getElementById('gachaResult');
+  const gachaHint = document.getElementById('gachaHint');
+  const gachaSub = document.getElementById('gachaSub');
+  const gachaSkip = document.getElementById('gachaSkip');
+
+  // ============================================================
+  //  Utilities
+  // ============================================================
+  const dist = (x1,y1,x2,y2)=>Math.hypot(x2-x1,y2-y1);
+  const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+  const pick = arr => arr[Math.floor(Math.random()*arr.length)];
+  const shuffle = arr => { const a=arr.slice(); for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; };
+  const randInt = (a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+  const randFloat = (a,b)=>a + Math.random()*(b-a);
+  const fmt = (h,m)=>`${h}:${String(m).padStart(2,'0')}`;
+
+  function showToast(msg, dur) {
+    toast.textContent = msg;
+    toast.classList.add('show');
+    toastTimer = (dur || 2) * 60;
+  }
+
+  // ============================================================
+  //  Game state
+  // ============================================================
+  const player = { x: 0, y: 0, speed: 90, angle: 0, radius: 14 };
+  const keys = { ArrowUp:false, ArrowDown:false, ArrowLeft:false, ArrowRight:false };
+  let mouseX = W/2, mouseY = H/2;
+  let lastTime = 0;
+  let gameStarted = false;
+  let showMinimap = false;
+  let showMapCoord = false;
+
+  let gameHours = 4, gameMinutes = 0, timeAccum = 0;
+
+  let money = 10000;
+  let myRoom = null;
+  let hotelPaid = false;
+  let hasKey = false;
+  let guestKeys = [];
+  let slept = false;
+  let checkedOut = false;
+
+  let grid = [];
+  let rooms = [];
+  let doors = [];
+  let walls = [];
+  let elevatorCells = [];
+  let stairsCells = [];
+
+  let guests = [];
+  let guestGroups = [];
+
+  let presenter = null;
+  let presenterState = 'idle';
+  let presenterPath = null;
+  let presenterPathIdx = 0;
+
+  let comedians = [];
+  let comedyState = 'before';
+  let currentComedy = null;
+  let comedyProgress = 0;
+  let taxiX = -300;
+  let taxiY = 0;
+  let taxiVisible = false;
+  let comedianPath = null;
+  let comedianPathIdx = 0;
+  // ★ コメディアン降車演出用
+  let comedianExitTimer = 0;
+  let comedianExitPhase = 'none';  // 'none' | 'exiting' | 'walking'
+
+  let invested = false;
+  let investReturnHour = null;
+  let investResult = null;
+  let currentPresentation = null;
+  let presSlideIndex = 0;
+  let presViewOpen = false;
+
+  let activeNPC = null;
+  let activeDoor = null;
+  let activeElevator = null;
+  let activeStairs = null;
+  let conversation = null;
+  let toastTimer = 0;
+
+  let walkingTo = null;
+
+  let justOpenedDialogue = false;
+
+  let gachaAnim = {
+    active: false,
+    phase: 'chart',
+    t: 0,
+    points: [],
+    targetY: 0,
+    peakReached: false,
+    pendingKey: null,
+    peakTimer: 0,
+  };
+
+  const CELL = {
+    OUTSIDE:'outside', ROAD:'road', PARKING:'parking', PARK:'park', GARDEN:'garden',
+    ENTRANCE:'entrance', ROOM:'room', HALL:'hall', LOBBY:'lobby', REST:'rest',
+    ONSEN:'onsen', GACHA:'gacha', BANQUET:'banquet', ELEVATOR:'elevator',
+    STAIRS:'stairs', PRESENTATION:'presentation',
+  };
+
+  const PUBLIC_CELL_TYPES = [
+    CELL.HALL, CELL.LOBBY, CELL.GARDEN, CELL.PARK,
+    CELL.ENTRANCE, CELL.ROAD, CELL.PARKING, CELL.OUTSIDE,
+  ];
+
+  // ============================================================
+  //  Build map
+  // ============================================================
+  function buildMap() {
+    grid = [];
+    rooms = [];
+    for (let r = 0; r < MAP_ROWS; r++) {
+      const row = [];
+      for (let c = 0; c < MAP_COLS; c++) {
+        row.push({
+          col:c, row:r,
+          x:c*MAP_W, y:r*MAP_H,
+          w:MAP_W, h:MAP_H,
+          type:CELL.OUTSIDE, floorTag:null, roomNum:null, areaName:'Outside',
+          lamp: null,
+        });
+      }
+      grid.push(row);
+    }
+
+    for (let c = 0; c < MAP_COLS; c++) {
+      grid[0][c].type = CELL.PARKING; grid[0][c].areaName = 'Parking';
+      grid[1][c].type = CELL.ROAD;    grid[1][c].areaName = 'Road';
+    }
+    grid[1][6].type = CELL.ENTRANCE; grid[1][6].areaName = 'Hotel Entrance';
+
+    const floorRows = [
+      { roomsRow: 2, hallRow: 3, floor: 4, special: CELL.BANQUET },
+      { roomsRow: 4, hallRow: 5, floor: 3, special: CELL.GACHA },
+      { roomsRow: 6, hallRow: 7, floor: 2, special: CELL.ONSEN },
+      { roomsRow: 8, hallRow: 9, floor: 1, special: CELL.REST },
+    ];
+    for (const fr of floorRows) {
+      grid[fr.roomsRow][0].type = fr.special;
+      grid[fr.roomsRow][0].areaName = {
+        [CELL.BANQUET]:'Banquet Hall', [CELL.GACHA]:'Gachapon',
+        [CELL.ONSEN]:'Onsen', [CELL.REST]:'Rest Room'
+      }[fr.special];
+      grid[fr.roomsRow][0].floorTag = fr.floor;
+
+      for (let i = 1; i <= 10; i++) {
+        const num = fr.floor*100 + i;
+        const cell = grid[fr.roomsRow][i];
+        cell.type = CELL.ROOM;
+        cell.floorTag = fr.floor;
+        cell.roomNum = num;
+        cell.areaName = 'Room ' + num;
+        cell.lamp = { x: cell.x + 415, y: cell.y + 200, on: false };
+        rooms.push({
+          num, floor: fr.floor, col: i, row: fr.roomsRow,
+          x: cell.x, y: cell.y, w: cell.w, h: cell.h,
+          doorOpen: false,
+        });
+      }
+
+      grid[fr.roomsRow][11].type = CELL.ELEVATOR;
+      grid[fr.roomsRow][11].areaName = 'Elevator';
+      grid[fr.roomsRow][11].floorTag = fr.floor;
+      elevatorCells.push(grid[fr.roomsRow][11]);
+
+      grid[fr.roomsRow][12].type = CELL.STAIRS;
+      grid[fr.roomsRow][12].areaName = 'Stairs';
+      grid[fr.roomsRow][12].floorTag = fr.floor;
+      stairsCells.push(grid[fr.roomsRow][12]);
+
+      for (let c = 0; c < MAP_COLS; c++) {
+        grid[fr.hallRow][c].type = CELL.HALL;
+        grid[fr.hallRow][c].areaName = 'Hallway';
+        grid[fr.hallRow][c].floorTag = fr.floor;
+      }
+    }
+
+    for (let c = 0; c < MAP_COLS; c++) {
+      grid[10][c].type = CELL.LOBBY;
+      grid[10][c].areaName = 'Lobby';
+      grid[10][c].floorTag = 1;
+    }
+    for (let c = 0; c < MAP_COLS; c++) {
+      grid[11][c].type = CELL.OUTSIDE; grid[11][c].areaName = 'Outside';
+      grid[12][c].type = CELL.GARDEN;  grid[12][c].areaName = 'Garden';
+    }
+    grid[11][2].type = CELL.PRESENTATION;
+    grid[11][2].areaName = 'Presentation Room';
+
+    buildWallsAndDoors();
+  }
+
+  const WALL_THICK = 14;
+  const DOOR_LEN = 70;
+
+  function buildWallsAndDoors() {
+    walls = [];
+    doors = [];
+
+    for (const r of rooms) {
+      walls.push({ x: r.x, y: r.y, w: r.w, h: WALL_THICK });
+      walls.push({ x: r.x, y: r.y, w: WALL_THICK, h: r.h });
+      walls.push({ x: r.x + r.w - WALL_THICK, y: r.y, w: WALL_THICK, h: r.h });
+      const wallY = r.y + r.h - WALL_THICK;
+      walls.push({ x: r.x, y: wallY, w: (r.w - DOOR_LEN)/2, h: WALL_THICK });
+      walls.push({ x: r.x + (r.w + DOOR_LEN)/2, y: wallY, w: (r.w - DOOR_LEN)/2, h: WALL_THICK });
+      doors.push({
+        x: r.x + (r.w - DOOR_LEN)/2,
+        y: wallY + 3,
+        w: DOOR_LEN,
+        h: 10,
+        roomNum: r.num,
+        floor: r.floor,
+        open: false,
+        locked: true,
+      });
+    }
+
+    const pcell = grid[11][2];
+    walls.push({ x: pcell.x, y: pcell.y, w: pcell.w, h: WALL_THICK });
+    walls.push({ x: pcell.x, y: pcell.y, w: WALL_THICK, h: pcell.h });
+    walls.push({ x: pcell.x + pcell.w - WALL_THICK, y: pcell.y, w: WALL_THICK, h: pcell.h });
+    const pWallY = pcell.y + pcell.h - WALL_THICK;
+    walls.push({ x: pcell.x, y: pWallY, w: (pcell.w - DOOR_LEN)/2, h: WALL_THICK });
+    walls.push({ x: pcell.x + (pcell.w + DOOR_LEN)/2, y: pWallY, w: (pcell.w - DOOR_LEN)/2, h: WALL_THICK });
+    doors.push({
+      x: pcell.x + (pcell.w - DOOR_LEN)/2,
+      y: pWallY + 3,
+      w: DOOR_LEN,
+      h: 10,
+      isPresentationDoor: true,
+      open: false,
+      locked: false,
+    });
+
+    for (const c of stairsCells) {
+      buildStairsMaze(c);
+    }
+  }
+
+  function buildStairsMaze(cell) {
+    const MW = 8, MH = 6;
+    const cw = cell.w / MW;
+    const ch = cell.h / MH;
+
+    const mg = [];
+    for (let r = 0; r < MH; r++) {
+      const row = [];
+      for (let c = 0; c < MW; c++) {
+        row.push({ n:true, e:true, s:true, w:true, visited:false });
+      }
+      mg.push(row);
+    }
+
+    const stack = [];
+    const start = { r: Math.floor(MH/2), c: 0 };
+    mg[start.r][start.c].visited = true;
+    stack.push(start);
+    while (stack.length > 0) {
+      const c0 = stack[stack.length-1];
+      const neigh = [];
+      if (c0.r > 0 && !mg[c0.r-1][c0.c].visited) neigh.push({ r:c0.r-1, c:c0.c, dir:'n' });
+      if (c0.c < MW-1 && !mg[c0.r][c0.c+1].visited) neigh.push({ r:c0.r, c:c0.c+1, dir:'e' });
+      if (c0.r < MH-1 && !mg[c0.r+1][c0.c].visited) neigh.push({ r:c0.r+1, c:c0.c, dir:'s' });
+      if (c0.c > 0 && !mg[c0.r][c0.c-1].visited) neigh.push({ r:c0.r, c:c0.c-1, dir:'w' });
+      if (neigh.length === 0) { stack.pop(); continue; }
+      const nxt = pick(neigh);
+      if (nxt.dir === 'n') { mg[c0.r][c0.c].n = false; mg[nxt.r][nxt.c].s = false; }
+      if (nxt.dir === 's') { mg[c0.r][c0.c].s = false; mg[nxt.r][nxt.c].n = false; }
+      if (nxt.dir === 'e') { mg[c0.r][c0.c].e = false; mg[nxt.r][nxt.c].w = false; }
+      if (nxt.dir === 'w') { mg[c0.r][c0.c].w = false; mg[nxt.r][nxt.c].e = false; }
+      mg[nxt.r][nxt.c].visited = true;
+      stack.push(nxt);
+    }
+
+    for (let c = 0; c < MW; c++) mg[0][c].n = false;
+    for (let c = 0; c < MW; c++) mg[MH-1][c].s = false;
+
+    const TH = 10;
+    for (let r = 0; r < MH; r++) {
+      for (let c = 0; c < MW; c++) {
+        const x = cell.x + c * cw;
+        const y = cell.y + r * ch;
+        const m = mg[r][c];
+        if (m.n && r > 0) {
+          walls.push({ x: x, y: y - TH/2, w: cw + TH/2, h: TH, isMaze: true });
+        }
+        if (m.w) {
+          walls.push({ x: x - TH/2, y: y, w: TH, h: ch + TH/2, isMaze: true });
+        }
+        if (m.e && c === MW-1) {
+          walls.push({ x: x + cw - TH/2, y: y, w: TH, h: ch + TH/2, isMaze: true });
+        }
+      }
+    }
+    walls.push({ x: cell.x - TH/2, y: cell.y, w: TH, h: cell.h, isMaze: true });
+    walls.push({ x: cell.x + cell.w - TH/2, y: cell.y, w: TH, h: cell.h, isMaze: true });
+  }
+
+  // ============================================================
+  //  Guest data
+  // ============================================================
+  const GUEST_GROUPS_DATA = [
+    { members:[{name:'高橋 陽一', gender:'M', age:45}], eventType:'banquet' },
+    { members:[{name:'中村 由美', gender:'F', age:38}], eventType:'banquet' },
+    { members:[{name:'小林 翔太', gender:'M', age:29}], eventType:'banquet' },
+    { members:[{name:'加藤 さくら', gender:'F', age:33}], eventType:'banquet' },
+    { members:[{name:'吉田 大輔', gender:'M', age:41}], eventType:'banquet' },
+    { members:[
+        {name:'山本 健一', gender:'M', age:42},
+        {name:'山本 由紀', gender:'F', age:39},
+        {name:'山本 蓮', gender:'M', age:8},
+      ], eventType:'banquet' },
+    { members:[{name:'木村 拓也', gender:'M', age:36}], eventType:'banquet' },
+    { members:[{name:'林 香織', gender:'F', age:31}], eventType:'banquet' },
+    { members:[{name:'清水 涼介', gender:'M', age:48}], eventType:'banquet' },
+    { members:[{name:'渡辺 智子', gender:'F', age:47}], eventType:'banquet' },
+    { members:[
+        {name:'中島 修', gender:'M', age:50},
+        {name:'中島 香', gender:'F', age:48},
+        {name:'中島 大和', gender:'M', age:15},
+        {name:'中島 美月', gender:'F', age:10},
+      ], eventType:'banquet' },
+    { members:[{name:'前田 浩二', gender:'M', age:51}], eventType:'onsen' },
+    { members:[{name:'藤田 麻衣', gender:'F', age:34}], eventType:'onsen' },
+    { members:[{name:'後藤 誠', gender:'M', age:46}], eventType:'onsen' },
+    { members:[{name:'岡田 彩', gender:'F', age:23}], eventType:'onsen' },
+    { members:[{name:'長谷川 亮', gender:'M', age:37}], eventType:'onsen' },
+    { members:[{name:'村上 有希', gender:'F', age:30}], eventType:'onsen' },
+    { members:[
+        {name:'佐々木 隆', gender:'M', age:45},
+        {name:'佐々木 真理', gender:'F', age:43},
+        {name:'佐々木 結衣', gender:'F', age:12},
+        {name:'佐々木 悠斗', gender:'M', age:6},
+      ], eventType:'onsen' },
+    { members:[{name:'藤井 学', gender:'M', age:40}], eventType:'onsen' },
+    { members:[{name:'西村 綾', gender:'F', age:35}], eventType:'onsen' },
+    { members:[{name:'福田 剛', gender:'M', age:54}], eventType:'onsen' },
+    { members:[{name:'太田 沙織', gender:'F', age:32}], eventType:'onsen' },
+    { members:[{name:'三浦 洋平', gender:'M', age:47}], eventType:'rest' },
+    { members:[{name:'藤原 奈々', gender:'F', age:29}], eventType:'rest' },
+    { members:[
+        {name:'伊藤 浩', gender:'M', age:38},
+        {name:'伊藤 沙耶', gender:'F', age:36},
+        {name:'伊藤 陽菜', gender:'F', age:4},
+      ], eventType:'rest' },
+    { members:[{name:'中野 優子', gender:'F', age:41}], eventType:'rest' },
+    { members:[{name:'原田 慎一', gender:'M', age:56}], eventType:'rest' },
+    { members:[{name:'小川 杏奈', gender:'F', age:26}], eventType:'rest' },
+    { members:[{name:'竹内 陽介', gender:'M', age:33}], eventType:'rest' },
+    { members:[{name:'森 雄大', gender:'M', age:26}], eventType:'banquet' },
+    { members:[{name:'池田 直美', gender:'F', age:42}], eventType:'banquet' },
+    { members:[{name:'橋本 竜也', gender:'M', age:39}], eventType:'banquet' },
+    { members:[{name:'石川 千夏', gender:'F', age:28}], eventType:'onsen' },
+    { members:[{name:'近藤 隆', gender:'M', age:58}], eventType:'onsen' },
+    { members:[{name:'大野 加奈子', gender:'F', age:46}], eventType:'onsen' },
+    { members:[{name:'遠藤 淳', gender:'M', age:43}], eventType:'onsen' },
+    { members:[{name:'青木 舞', gender:'F', age:25}], eventType:'onsen' },
+    { members:[
+        {name:'松本 健一', gender:'M', age:52},
+        {name:'松本 美咲', gender:'F', age:49},
+        {name:'松本 翔', gender:'M', age:17},
+      ], eventType:'banquet' },
+    { members:[{name:'井上 真由美', gender:'F', age:44}], eventType:'rest' },
+  ];
+
+  const ROOM_LINES = [
+    "Oh, you have a key to my room? How unusual.",
+    "I was just resting. This hotel is quite nice.",
+    "The bed here is surprisingly comfortable.",
+    "Did you need something from me?",
+    "I'm on vacation. Just relaxing in my room.",
+    "The view from this floor is lovely.",
+    "I heard there's an onsen on the 2nd floor.",
+    "Have you tried the gachapon on the 3rd floor?",
+    "I'm here for the banquet tonight.",
+    "The lobby has a nice rest area.",
+    "I always stay at this hotel when I visit.",
+    "The elevator is convenient, isn't it?",
+    "I prefer the stairs. Good exercise.",
+    "My room key is a nice souvenir.",
+    "I wonder what's for dinner.",
+    "The staff here are very polite.",
+    "This room has a clock, which is handy.",
+    "I'm reading a book. It's very quiet here.",
+    "Do you know when the banquet starts?",
+    "I'm looking forward to the comedy show.",
+    "I hope I don't oversleep tomorrow.",
+    "The hotel has four floors, I heard.",
+    "I'm on the top floor. The view is great.",
+    "I always lock my door when I'm inside.",
+  ];
+  const REST_LINES = [
+    "Ah, the rest room. So relaxing.",
+    "I come here every morning to unwind.",
+    "The chairs here are very comfortable.",
+    "Care for a cup of tea?",
+    "The morning light is beautiful here.",
+    "I like to read the newspaper here.",
+    "This is my favorite spot in the hotel.",
+    "The rest room is open from 7 to 11.",
+    "I met some interesting people here.",
+    "It's nice to have a quiet place.",
+    "The staff keeps this place spotless.",
+    "I could stay here all day.",
+    "Have you seen the garden outside?",
+    "The rest room has a lovely atmosphere.",
+  ];
+  const ONSEN_LINES = [
+    "The onsen is wonderful this time of day.",
+    "Ah, nothing beats a hot bath.",
+    "The water temperature is perfect.",
+    "I come here every evening.",
+    "The steam is so relaxing.",
+    "This onsen is a hidden gem.",
+    "I feel so refreshed.",
+    "The onsen is open until 10 PM.",
+    "Have you tried the outdoor bath?",
+    "The minerals in the water are great for skin.",
+    "I could soak here for hours.",
+    "The onsen is quieter in the evening.",
+    "It's the perfect way to end the day.",
+    "I always sleep well after the onsen.",
+  ];
+  const BANQUET_LINES = [
+    "The banquet hall is beautifully decorated.",
+    "I'm here for the celebration.",
+    "The food looks delicious.",
+    "What a lovely gathering.",
+    "I know the host. Great person.",
+    "The speeches were touching.",
+    "I'm glad I came tonight.",
+    "The banquet starts at 7 PM.",
+    "This hall can hold many people.",
+    "The cake is amazing.",
+    "I'm seated near the front.",
+    "The music is nice, isn't it?",
+    "I'll stay until the end.",
+    "What a wonderful evening.",
+  ];
+  const CHILD_LINES_ROOM = [
+    "Hey, do you have any candy?",
+    "This room is so big!",
+    "Can I watch TV?",
+    "I want to stay up late!",
+  ];
+  const CHILD_LINES_BANQUET = [
+    "The cake looks so yummy!",
+    "I want to see the comedy!",
+    "This hall is huge!",
+    "I'm going to eat everything!",
+  ];
+  const CHILD_LINES_ONSEN = [
+    "The water is so warm!",
+    "I can swim here!",
+    "The steam tickles!",
+    "Look at the bubbles!",
+  ];
+
+  const PRES_BAD = [
+    { title:"ドローンでパンを配達",
+      slides:[
+        {t:"課題", l:["パンは冷める。","人は温かいパンを求める。","ドローンはかっこいい。"], art:'bread'},
+        {t:"解決策", l:["ドローン＋パン＝温かいパン。","空からパンを落とす。","店はいらない。"], art:'drone'},
+        {t:"市場規模", l:["みんなパンを食べる。","つまり数十億人。","1%取れば大金持ち。"], art:'chart'},
+        {t:"お願い", l:["お金をください。","残りは後で考えます。","信じてください。"], art:'money'},
+      ]},
+    { title:"スマート傘シェアリング",
+      slides:[
+        {t:"課題", l:["雨は突然降る。","傘はなくなる。","悲しい。"], art:'rain'},
+        {t:"解決策", l:["傘アプリ。","スキャンして使う。","どこでも返せる。"], art:'phone'},
+        {t:"収益", l:["傘に広告。","プレミアム乾燥モード。","フランチャイズ。"], art:'umbrella'},
+        {t:"お願い", l:["シードラウンド。","プランBはない。","でも心はある。"], art:'heart'},
+      ]},
+    { title:"AIペット翻訳機",
+      slides:[
+        {t:"ビジョン", l:["ペットは喋っている。","人間にはわからない。","問題だ。"], art:'cat'},
+        {t:"製品", l:["マイク付き首輪。","AIが鳴き声を翻訳。","ニャーを英語に。"], art:'collar'},
+        {t:"実績", l:["うちの猫で試した。","彼女は『餌をくれ』と言った。","実話。"], art:'cat'},
+        {t:"お願い", l:["投資が必要。","後でピボットする。","たぶん。"], art:'money'},
+      ]},
+  ];
+  const PRES_PRO = [
+    { title:"再生可能エネルギー・マイクログリッド",
+      slides:[
+        {t:"市場機会", l:["世界の電力需要は30%増。","送電ロスを削減。","TAM：2030年までに1200億ドル。"], art:'chart'},
+        {t:"独自技術", l:["モジュール型太陽光＋蓄電池。","AIによる負荷分散。","設置コスト40%削減。"], art:'solar'},
+        {t:"ビジネスモデル", l:["SaaS＋ハードウェアリース。","継続収益。","粗利率62%。"], art:'money'},
+        {t:"実績と調達", l:["3カ国で12件の実証。","ARR 800万ドル。","シリーズBで2500万ドル調達中。"], art:'chart'},
+      ]},
+    { title:"精密農業プラットフォーム",
+      slides:[
+        {t:"課題", l:["作物の30%が無駄に。","気候が予測不能。","農家にデータがない。"], art:'plant'},
+        {t:"解決策", l:["IoT土壌センサー。","衛星＋ドローン画像。","実行可能なインサイト。"], art:'drone'},
+        {t:"市場戦略", l:["獲得して拡大。","農業組合との提携。","CAC 1200ドル、LTV 1万8000ドル。"], art:'chart'},
+        {t:"財務", l:["ARR 600万ドル、前月比20%成長。","粗利率71%。","シリーズAで1500万ドル調達中。"], art:'money'},
+      ]},
+    { title:"デジタル医療記録",
+      slides:[
+        {t:"課題", l:["患者データが分断。","医療過誤。","管理コスト高騰。"], art:'hospital'},
+        {t:"プラットフォーム", l:["統一患者記録。","HIPAA準拠。","相互運用API。"], art:'chart'},
+        {t:"実績", l:["200クリニック導入。","稼働率99.9%。","NRR 130%。"], art:'chart'},
+        {t:"お願い", l:["シリーズBで2000万ドル。","5市場へ拡大。","ARR1億ドルへの道。"], art:'money'},
+      ]},
+  ];
+
+  const COMEDY_THEMES = [
+    { title:"ホテル生活", lines:[
+      "A：昨日このホテルにチェックインしたんや。","B：どうやった？",
+      "A：カードキーが全然効かへんくて、部屋の前で20分立ちっぱなしや。","B：フロントに電話したん？",
+      "A：したわ。そしたら『本当にあなたの部屋ですか？』って言われた。","B：なんて答えたん？",
+      "A：『1万円払ったんや、間違いないやろ！』って。","B：それで？",
+      "A：階を間違えてたんや。俺は3階、部屋は4階やった。","B：あるある。エレベーターに裏切られたな。",
+      "A：このホテルで動いてるのはエレベーターだけや。","B：温泉は？",
+      "A：熱すぎて走馬灯が見えたわ。","B：それはただの湯気や。",
+      "A：いや、間違いなく人生やった。","B：まあ、ガチャガチャは楽しかったやろ。",
+      "A：100円で他人の部屋の鍵が出てきた。","B：入ったん？",
+      "A：もちろん！今では大親友や。","B：ホテルってそういうもんちゃうで。",
+      "A：今からそうなるんや。おやすみなさい！",
+    ]},
+    { title:"披露宴", lines:[
+      "A：今夜は披露宴に行くんや。","B：へえ、何のお祝い？",
+      "A：知らん。人混みについて行っただけや。","B：誰も知らんの？",
+      "A：今はみんな知っとる。ケーキも食べたし。","B：それで友情が生まれるん？",
+      "A：披露宴ではな。","B：スピーチは何の話やった？",
+      "A：30分ずっと『シナジー』の話やった。","B：どういう意味？",
+      "A：今もわからん。でも拍手したわ。","B：わからんのに拍手したん？",
+      "A：それが披露宴の流儀や。","B：料理は？",
+      "A：エビが小さすぎて顕微鏡が要るわ。","B：それは高級やな。",
+      "A：高級やなくて高額や。別もんや。","B：来年も行くん？",
+      "A：まだおる。出てへん。","B：3時間も披露宴におるん？",
+      "A：ケーキが本当に美味かったんや。おやすみ！",
+    ]},
+    { title:"温泉の冒険", lines:[
+      "A：2階の温泉に行ったんや。","B：どうやった？",
+      "A：タオルを忘れた。","B：あらら。",
+      "A：ハンドドライヤーを使うしかなかった。","B：それはハンドドライヤーの用途ちゃうやろ。",
+      "A：それかカーテンか、二択やった。","B：ハンドドライヤーを選んだと言ってくれ。",
+      "A：カーテンを選んだ。大きいカーテンやった。","B：カーテン着たん？",
+      "A：トーガみたいに着たわ。完全にローマ人や。","B：誰か見たん？",
+      "A：全員見た。今や有名人や。","B：何の有名人？",
+      "A：2階のトーガ男や。","B：それは伝説やな。",
+      "A：湯は最高やったで。とても癒された。","B：カーテン騒動があっても？",
+      "A：カーテン騒動があったからこそや。","B：お前とは絶対温泉に行かへん。",
+      "A：損するで。おやすみ！",
+    ]},
+    { title:"ガチャガチャ狂騒曲", lines:[
+      "A：3階のガチャガチャが大好きなんや。","B：何が出た？",
+      "A：207号室の鍵や。","B：なんでガチャガチャから部屋の鍵が出るん？",
+      "A：それが謎や。","B：207号室に行ったん？",
+      "A：行ったわ。男が寝てた。","B：他人の部屋に入ったん？",
+      "A：鍵持ってたんや！不法侵入ちゃうわ。","B：間違いなく侵入や。",
+      "A：彼はとても優しかったで。","B：寝てたやろ！",
+      "A：起きたわ。お茶も飲んだ。","B：起こした他人とお茶したん？",
+      "A：それがおもてなしや。","B：それは犯罪や。",
+      "A：お茶はハーブティーやった。とても落ち着く。","B：警備呼ぶぞ。",
+      "A：警備も友達や。彼の鍵も持っとる。","B：全員の鍵を持ってるんかい！",
+      "A：それがガチャガチャの魔法や。おやすみ！",
+    ]},
+    { title:"コンビニ", lines:[
+      "A：昨日コンビニでバイトしてたんや。","B：へえ、どうやった？",
+      "A：お客さんが「おでんください」って言うから渡したら「温めてください」って。","B：おでんは温かいやろ。",
+      "A：そう言ったら「もっと温めて」って。","B：どれだけ温めるんや。",
+      "A：「レンジで5分」って言われた。","B：おでんが爆発するわ。",
+      "A：そしたら「やっぱりいいです」って帰っていった。","B：なんだったんや。",
+      "A：私も知りたい。おやすみなさい！",
+    ]},
+    { title:"満員電車", lines:[
+      "A：朝の満員電車に乗ったんや。","B：大変やな。",
+      "A：ドアに挟まれて、片足だけ中、片足だけ外。","B：それは危ない。",
+      "A：次の駅でドアが開いたら、外の足だけ置いてけぼり。","B：足が置いてけぼり？",
+      "A：中に入った足は電車と一緒に旅に出た。","B：大変や。",
+      "A：今もその足はどこかを旅してる。","B：早く探しに行け。",
+      "A：おやすみなさい！",
+    ]},
+    { title:"美容院", lines:[
+      "A：美容院に行ったんや。","B：どうやった？",
+      "A：「いつも通りで」って言ったら「いつもって何ですか？」って聞かれた。","B：そらそうや。",
+      "A：俺もわからんかったから「おまかせで」って。","B：それも危険や。",
+      "A：3時間後、鏡を見たら知らん人がいた。","B：それはあんたや。",
+      "A：いや、知らん人やった。","B：鏡は正直やで。",
+      "A：おやすみなさい！",
+    ]},
+    { title:"引っ越し", lines:[
+      "A：引っ越ししたんや。","B：おめでとう。",
+      "A：挨拶回りに行ったら、隣の人が「前の住人は挨拶に来なかった」って。","B：へえ。",
+      "A：「じゃあ私は来たので」って言ったら「でも前の人は静かだった」って。","B：嫌味やな。",
+      "A：次の日、引っ越しの段ボールが全部外に出されてた。","B：追い出されたん？",
+      "A：いや、隣の人が「邪魔だから」って。","B：それは追い出しや。",
+      "A：おやすみなさい。",
+    ]},
+  ];
+
+  function assignGuests() {
+    const allRoomNums = rooms.map(r => r.num);
+    const shuffled = shuffle(allRoomNums);
+    myRoom = shuffled[0];
+    const guestRoomAssign = shuffled.slice(1, 40);
+
+    guestGroups = [];
+    guests = [];
+    let personId = 0;
+    for (let i = 0; i < 39; i++) {
+      const data = GUEST_GROUPS_DATA[i];
+      const roomNum = guestRoomAssign[i];
+      const room = rooms.find(r => r.num === roomNum);
+      const group = {
+        id: i, room: roomNum, floor: room.floor,
+        eventType: data.eventType,
+        members: [],
+        baseX: room.x + room.w/2,
+        baseY: room.y + room.h/2,
+      };
+      for (const m of data.members) {
+        const g = {
+          id: personId++,
+          groupId: i,
+          name: m.name, gender: m.gender, age: m.age,
+          room: roomNum, floor: room.floor,
+          x: group.baseX, y: group.baseY,
+          baseX: group.baseX, baseY: group.baseY,
+          radius: 13,
+          phase: Math.random()*Math.PI*2,
+          color: pick(['#1a2a4a','#2a3a4a','#3a4a5a','#2a4a3a','#4a3a2a','#3a2a4a','#2a4a4a']),
+          hair: pick(['#1a1a1a','#3a2a1a','#5a4a2a','#7a6a3a']),
+          talkedRoom: false,
+          location: 'room',
+          walkMode: 'idle',
+          walkPhase: null,
+          walkTargetX: 0,
+          walkTargetY: 0,
+          walkSpeed: 0,
+          walkFramesLeft: 0,
+        };
+        group.members.push(g);
+        guests.push(g);
+      }
+      guestGroups.push(group);
+    }
+  }
+
+  function buildPresenter() {
+    const startCell = grid[11][6];
+    presenter = {
+      id:'presenter', name:'山田 太郎',
+      x: startCell.x + startCell.w/2 - 200,
+      y: startCell.y + startCell.h/2,
+      radius: 16, angle: 0,
+      color:'#4a3a2a', hair:'#3a2a1a',
+    };
+    presenterState = 'idle';
+    presenterPath = null;
+    presenterPathIdx = 0;
+  }
+
+  function buildComedians() {
+    const entryCell = grid[1][6];
+    taxiY = entryCell.y + entryCell.h/2;
+    taxiX = -300;
+    taxiVisible = false;
+    comedians = [
+      { id:'comedian0', name:'田中 健太', x: taxiX, y: taxiY, radius:14,
+        color:'#4a2a3a', hair:'#1a1a1a', state:'taxi', role:'Boke', angle:0 },
+      { id:'comedian1', name:'鈴木 裕介', x: taxiX, y: taxiY, radius:14,
+        color:'#2a3a4a', hair:'#1a1a1a', state:'taxi', role:'Tsukkomi', angle:0 },
+    ];
+    comedyState = 'before';
+    comedianPath = null;
+    comedianPathIdx = 0;
+    comedianExitTimer = 0;
+    comedianExitPhase = 'none';
+  }
+
+  function initGame() {
+    buildMap();
+    assignGuests();
+    buildPresenter();
+    buildComedians();
+    const startCell = grid[11][6];
+    player.x = startCell.x + startCell.w/2;
+    player.y = startCell.y + startCell.h/2;
+    gameHours = 4; gameMinutes = 0; timeAccum = 0;
+    money = 10000; hotelPaid = false; hasKey = false;
+    guestKeys = []; slept = false; checkedOut = false;
+    invested = false; investReturnHour = null; investResult = null;
+    currentComedy = null; comedyProgress = 0;
+    presViewOpen = false; presSlideIndex = 0; currentPresentation = null;
+    walkingTo = null;
+    elevatorPanel.classList.add('hidden');
+    npcPanel.classList.remove('open');
+    dialogue.classList.remove('open');
+    gachaOverlay.classList.remove('show');
+    gachaAnim.active = false;
+    checkoutLink.classList.add('hidden');
+    updateGuestLocations();
+    updateHUD();
+    buildInfoPanel();
+  }
+
+  function cellAt(x, y) {
+    const c = clamp(Math.floor(x / MAP_W), 0, MAP_COLS-1);
+    const r = clamp(Math.floor(y / MAP_H), 0, MAP_ROWS-1);
+    return grid[r][c];
+  }
+  function currentAreaName() { return cellAt(player.x, player.y).areaName; }
+
+  function updateHUD() {
+    timeDisplay.textContent = fmt(gameHours, gameMinutes);
+    moneyDisplay.textContent = money;
+    roomDisplay.textContent = (hasKey && !checkedOut) ? myRoom : '???';
+    areaDisplay.textContent = currentAreaName();
+    const cx = Math.floor(player.x / MAP_W) + 1;
+    const cy = Math.floor(player.y / MAP_H) + 1;
+    mapDisplay.textContent = `${cx},${cy}`;
+    ipTime.textContent = fmt(gameHours, gameMinutes);
+    ipMoney.textContent = '¥' + money;
+    ipRoom.textContent = (hasKey && !checkedOut) ? myRoom : '???';
+    ipSleep.textContent = slept ? 'Slept' : 'Awake';
+  }
+
+  function buildInfoPanel() {
+    itemsList.innerHTML = '';
+    if (hasKey && !checkedOut) {
+      const row = document.createElement('div');
+      row.className = 'item-row';
+      row.innerHTML = `<span class="item-name">🔑 Key (My Room ${myRoom})</span>
+        <span class="item-actions">
+          <button class="mini-btn" data-action="use-my-key">USE</button>
+          <button class="mini-btn warn" data-action="cancel-key">CANCEL</button>
+        </span>`;
+      itemsList.appendChild(row);
+    }
+    for (const rn of guestKeys) {
+      const g = guestGroups.find(gr => gr.room === rn);
+      const label = g ? g.members[0].name + "'s Room" : 'Guest Room';
+      const row = document.createElement('div');
+      row.className = 'item-row';
+      row.innerHTML = `<span class="item-name">🔑 ${label} (${rn})</span>
+        <span class="item-actions">
+          <button class="mini-btn" data-action="use-guest-key" data-room="${rn}">USE</button>
+          <button class="mini-btn warn" data-action="cancel-key">CANCEL</button>
+        </span>`;
+      itemsList.appendChild(row);
+    }
+    if ((!hasKey || checkedOut) && guestKeys.length === 0) {
+      const n = document.createElement('div');
+      n.className = 'empty-note'; n.textContent = 'No items.';
+      itemsList.appendChild(n);
+    }
+    actionsList.innerHTML = '';
+    if (!hotelPaid) {
+      const canPay = (gameHours >= 7 && gameHours < 19);
+      const suffix = canPay ? '' : ' (7:00-19:00)';
+      const row = document.createElement('div');
+      row.className = 'item-row';
+      row.innerHTML = `<span class="item-name">Pay Hotel ¥10,000${suffix}</span>
+        <span class="item-actions">
+          <button class="mini-btn" data-action="pay-hotel">USE</button>
+          <button class="mini-btn warn" data-action="cancel-key">CANCEL</button>
+        </span>`;
+      actionsList.appendChild(row);
+    }
+    if (money >= 100) {
+      const row = document.createElement('div');
+      row.className = 'item-row';
+      row.innerHTML = `<span class="item-name">Gachapon ¥100 (3F)</span>
+        <span class="item-actions">
+          <button class="mini-btn" data-action="gachapon">USE</button>
+        </span>`;
+      actionsList.appendChild(row);
+    }
+    if (isPlayerInMyRoom() && (gameHours >= 19 || gameHours < 3) && !slept && !checkedOut) {
+      const row = document.createElement('div');
+      row.className = 'item-row';
+      row.innerHTML = `<span class="item-name">Sleep (7 hours)</span>
+        <span class="item-actions">
+          <button class="mini-btn" data-action="sleep">SLEEP</button>
+        </span>`;
+      actionsList.appendChild(row);
+    }
+    if (actionsList.children.length === 0) {
+      const n = document.createElement('div');
+      n.className = 'empty-note'; n.textContent = 'No actions available.';
+      actionsList.appendChild(n);
+    }
+  }
+
+  function isPlayerInMyRoom() {
+    if (!myRoom || !hasKey || checkedOut) return false;
+    const r = rooms.find(rr => rr.num === myRoom);
+    if (!r) return false;
+    return dist(player.x, player.y, r.x + r.w/2, r.y + r.h/2) < 300;
+  }
+
+  function isPlayerAtReception() {
+    const recCell = grid[10][6];
+    const recX = recCell.x + recCell.w/2;
+    const recY = recCell.y + recCell.h/2 - 120;
+    return dist(player.x, player.y, recX, recY) < 400;
+  }
+
+  function updateTime(dt) {
+    if (slept) return;
+    if (gachaAnim.active) return;
+    timeAccum += dt / (HOUR_SECONDS * 60);
+    while (timeAccum >= 1) {
+      timeAccum -= 1;
+      gameHours++;
+      if (gameHours >= 24) gameHours -= 24;
+      onHourChanged();
+    }
+  }
+
+  function getRandomPublicPosition() {
+    const publicCells = [];
+    for (let r = 0; r < MAP_ROWS; r++) {
+      for (let c = 0; c < MAP_COLS; c++) {
+        if (PUBLIC_CELL_TYPES.includes(grid[r][c].type)) {
+          publicCells.push(grid[r][c]);
+        }
+      }
+    }
+    if (publicCells.length === 0) return { x: 0, y: 0 };
+    const cell = pick(publicCells);
+    return {
+      x: cell.x + randFloat(60, cell.w - 60),
+      y: cell.y + randFloat(60, cell.h - 60),
+    };
+  }
+
+  function startStrolling(g, phase, frames) {
+    g.walkMode = 'strolling';
+    g.walkPhase = phase;
+    g.walkFramesLeft = frames;
+    g.walkSpeed = randFloat(2.5, 12.5);
+    const pos = getRandomPublicPosition();
+    g.x = pos.x;
+    g.y = pos.y;
+    g.baseX = g.x;
+    g.baseY = g.y;
+    const target = getRandomPublicPosition();
+    g.walkTargetX = target.x;
+    g.walkTargetY = target.y;
+  }
+
+  // ============================================================
+  //  時間イベント
+  // ============================================================
+  function onHourChanged() {
+    if (gameHours === 7) showToast('It is 7:00. The rest room and reception are open.', 2.5);
+    if (gameHours === 11) showToast('It is 11:00. The rest room closes.', 2);
+    if (gameHours === 17) {
+      // ★ タクシー 17:00 発
+      showToast('A taxi is approaching the hotel.', 3);
+      comedyState = 'arriving';
+      taxiVisible = true;
+      taxiX = -300;
+    }
+    if (gameHours === 18) {
+      // ★ 18:00：トースト表示のみ。タクシー停止は update() の arriving ブロックに任せる
+      showToast('The comedians arrive at the hotel.', 3);
+    }
+    if (gameHours === 19) {
+      comedyState = 'onstage';
+      currentComedy = pick(COMEDY_THEMES);
+      comedyProgress = 0;
+      showToast('The banquet begins and the comedy show starts in the banquet hall (4F)!', 3);
+      showToast('The reception is now closed.', 2);
+    }
+    if (gameHours === 21) {
+      comedyState = 'finished';
+      showToast('The comedy show ends.', 2);
+      startComediansLeave();
+    }
+    if (gameHours === 22) {
+      comedyState = 'done';
+      taxiVisible = false;
+      showToast('The hotel lights dim for the night.', 2.5);
+    }
+    if (gameHours === 5) {
+      showToast('The morning light returns.', 2.5);
+    }
+
+    handleGuestWalking();
+
+    updateGuestLocations();
+    updateHUD();
+    buildInfoPanel();
+  }
+
+  function handleGuestWalking() {
+    for (const g of guests) {
+      const group = guestGroups[g.groupId];
+      const eventType = group.eventType;
+
+      let eventStart, eventEnd;
+      if (eventType === 'rest')      { eventStart = 7;  eventEnd = 11; }
+      else if (eventType === 'onsen') { eventStart = 18; eventEnd = 22; }
+      else if (eventType === 'banquet') { eventStart = 19; eventEnd = 22; }
+      else { continue; }
+
+      if (gameHours === (eventStart - 2 + 24) % 24 && g.walkMode === 'idle') {
+        startStrolling(g, 'toEvent', 14 * 60);
+      }
+      if (gameHours === eventStart && g.walkMode === 'strolling' && g.walkPhase === 'toEvent') {
+        g.walkMode = 'idle';
+        g.walkPhase = null;
+        g.walkFramesLeft = 0;
+      }
+      if (gameHours === eventEnd && g.walkMode === 'idle') {
+        startStrolling(g, 'home', 14 * 60);
+      }
+      if (gameHours === (eventEnd + 2) % 24 && g.walkMode === 'strolling' && g.walkPhase === 'home') {
+        g.walkMode = 'idle';
+        g.walkPhase = null;
+        g.walkFramesLeft = 0;
+        const r = rooms.find(rr => rr.num === g.room);
+        if (r) {
+          g.x = r.x + r.w/2;
+          g.y = r.y + r.h/2;
+          g.baseX = g.x;
+          g.baseY = g.y;
+        }
+        g.location = 'room';
+      }
+    }
+  }
+
+  function updateGuestLocations() {
+    for (const g of guests) {
+      if (g.walkMode === 'strolling') continue;
+
+      const group = guestGroups[g.groupId];
+      let loc = 'room';
+      if (group.eventType === 'rest' && gameHours >= 7 && gameHours < 11) loc = 'rest';
+      else if (group.eventType === 'onsen' && gameHours >= 18 && gameHours < 22) loc = 'onsen';
+      else if (group.eventType === 'banquet' && gameHours >= 19 && gameHours < 22) loc = 'banquet';
+      g.location = loc;
+
+      if (loc === 'room') {
+        const r = rooms.find(rr => rr.num === g.room);
+        const offX = (g.age < 18 ? 40 : 0);
+        const offY = (g.age < 18 ? 50 : 0);
+        g.baseX = r.x + r.w/2 + offX;
+        g.baseY = r.y + r.h/2 + offY;
+      } else if (loc === 'rest') {
+        const c = grid[8][0];
+        g.baseX = c.x + 150 + (g.id % 4) * 150;
+        g.baseY = c.y + 220 + Math.floor((g.id/4) % 3) * 110;
+      } else if (loc === 'onsen') {
+        const c = grid[6][0];
+        g.baseX = c.x + 150 + (g.id % 4) * 150;
+        g.baseY = c.y + 220 + Math.floor((g.id/4) % 3) * 110;
+      } else if (loc === 'banquet') {
+        const c = grid[2][0];
+        const cols = 5;
+        const idx = g.id % (cols * 3);
+        const col = idx % cols;
+        const row = Math.floor(idx / cols);
+        g.baseX = c.x + 100 + col * 140;
+        g.baseY = c.y + 340 + row * 90;
+      }
+      g.x = g.baseX;
+      g.y = g.baseY;
+    }
+  }
+
+  // ============================================================
+  //  Input
+  // ============================================================
+  window.addEventListener('keydown', e => {
+    if (gachaAnim.active) {
+      if (e.key === 'Escape') { /* ignore */ }
+      return;
+    }
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) {
+      e.preventDefault(); keys[e.key] = true;
+    }
+    if (e.key === 'Escape') {
+      closeDialogue(); closeInfoPanel();
+      elevatorPanel.classList.add('hidden');
+    }
+  });
+  window.addEventListener('keyup', e => {
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) {
+      e.preventDefault(); keys[e.key] = false;
+    }
+  });
+  canvas.addEventListener('mousemove', e => {
+    const rect = canvas.getBoundingClientRect();
+    const sx = canvas.width / rect.width;
+    const sy = canvas.height / rect.height;
+    mouseX = (e.clientX - rect.left) * sx;
+    mouseY = (e.clientY - rect.top) * sy;
+  });
+
+  canvas.addEventListener('mousedown', e => {
+    if (gachaAnim.active) return;
+    if (e.button !== 0) return;
+    if (elevatorPanel.classList.contains('hidden') === false) return;
+    if (conversation) { e.preventDefault(); nextDialogue(); return; }
+    if (presViewOpen && currentPresentation) {
+      e.preventDefault();
+      if (presSlideIndex < currentPresentation.slides.length - 1) {
+        presSlideIndex++;
+      } else {
+        presViewOpen = false;
+        presenterState = 'presented';
+        conversation = { npc: presenter, page:0, lines:[
+          "以上でプレゼンは終わりです。",
+          "宣伝しますか？それとも投資しますか？",
+        ], choices:[
+          { label:'Promote (+¥100)', action: () => { money += 100; showToast('You promoted. +¥100', 2); updateHUD(); buildInfoPanel(); } },
+          { label:'Invest (¥10,000 / 4h)', action: () => {
+            if (hotelPaid) { showToast('You already paid the hotel. Investment not available.', 2); }
+            else if (money >= 10000) {
+              money -= 10000; invested = true;
+              investReturnHour = (gameHours + 4) % 24;
+              investResult = null;
+              showToast('You invested ¥10,000. Return in 4 hours.', 3);
+              updateHUD(); buildInfoPanel();
+            } else { showToast('You need ¥10,000 to invest.', 2); }
+          } },
+        ]};
+        dialogue.classList.add('open');
+        renderDialogue();
+      }
+      return;
+    }
+
+    if (activeNPC) {
+      e.preventDefault();
+      justOpenedDialogue = true;
+      startDialogue(activeNPC);
+      return;
+    }
+
+    const rect = canvas.getBoundingClientRect();
+    const sx = canvas.width / rect.width;
+    const sy = canvas.height / rect.height;
+    const clickX = (e.clientX - rect.left) * sx;
+    const clickY = (e.clientY - rect.top) * sy;
+    const camX = clamp(player.x - W/2, 0, WORLD_W - W);
+    const camY = clamp(player.y - H/2, 0, WORLD_H - H);
+    const wClickX = clickX + camX;
+    const wClickY = clickY + camY;
+    const clickedCell = cellAt(wClickX, wClickY);
+    if (clickedCell.type === CELL.ROOM && clickedCell.lamp) {
+      if (dist(wClickX, wClickY, clickedCell.lamp.x, clickedCell.lamp.y) < 50) {
+        e.preventDefault();
+        clickedCell.lamp.on = !clickedCell.lamp.on;
+        showToast(clickedCell.lamp.on ? 'Light ON' : 'Light OFF', 1.2);
+        return;
+      }
+    }
+
+    if (activeElevator) { e.preventDefault(); handleElevatorClick(); return; }
+    if (activeStairs) { e.preventDefault(); handleStairsClick(); return; }
+    if (activeDoor) { e.preventDefault(); tryToggleDoor(activeDoor); return; }
+  });
+
+  dialogue.addEventListener('click', e => {
+    if (justOpenedDialogue) {
+      justOpenedDialogue = false;
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    if (e.target.closest('.choice-row')) return;
+    e.preventDefault();
+    nextDialogue();
+  });
+
+  infoBtn.addEventListener('click', e => {
+    e.preventDefault();
+    infoPanel.classList.toggle('open');
+    buildInfoPanel();
+  });
+  helpBtn.addEventListener('click', e => {
+    e.preventDefault();
+    showToast('Move: Arrows / Talk: Approach a person & click / Door: stand & click / EV: choose floor / Stairs: maze!', 5);
+  });
+  minimapBtn.addEventListener('click', e => {
+    e.preventDefault();
+    showMinimap = !showMinimap;
+    minimapBtn.textContent = showMinimap ? '🗺 HIDE MINIMAP' : '🗺 SHOW MINIMAP';
+  });
+  mapToggleBtn.addEventListener('click', e => {
+    e.preventDefault();
+    showMapCoord = !showMapCoord;
+    if (showMapCoord) {
+      mapCoordSpan.classList.remove('hidden-coord');
+      mapToggleBtn.textContent = '📍 HIDE COORDS';
+    } else {
+      mapCoordSpan.classList.add('hidden-coord');
+      mapToggleBtn.textContent = '📍 SHOW COORDS';
+    }
+  });
+  ipClose.addEventListener('click', e => { e.preventDefault(); closeInfoPanel(); });
+  ipReset.addEventListener('click', e => {
+    e.preventDefault();
+    if (confirm('Reset the whole day?')) {
+      initGame();
+      closeInfoPanel();
+      showToast('Day reset.', 2);
+    }
+  });
+  function closeInfoPanel() { infoPanel.classList.remove('open'); }
+
+  infoPanel.addEventListener('click', e => {
+    const btn = e.target.closest('button[data-action]');
+    if (!btn) return;
+    const action = btn.dataset.action;
+    const room = btn.dataset.room ? parseInt(btn.dataset.room) : null;
+    if (action === 'use-my-key') tryUseKey(myRoom);
+    else if (action === 'cancel-key') showToast('Key kept in inventory.', 1.2);
+    else if (action === 'use-guest-key') tryUseKey(room);
+    else if (action === 'pay-hotel') payHotel();
+    else if (action === 'gachapon') doGachapon();
+    else if (action === 'sleep') doSleep();
+    buildInfoPanel();
+  });
+
+  // ============================================================
+  //  Actions
+  // ============================================================
+  function tryUseKey(roomNum) {
+    if (!roomNum) return;
+    const r = rooms.find(rr => rr.num === roomNum);
+    if (!r) return;
+    const doorCx = r.x + r.w/2;
+    const doorCy = r.y + r.h + 60;
+    if (dist(player.x, player.y, doorCx, doorCy) > 300) {
+      showToast('Stand in front of the room door.', 2); return;
+    }
+    const dr = doors.find(d => d.roomNum === roomNum);
+    if (dr) { dr.locked = false; dr.open = true; }
+    r.doorOpen = true;
+    if (roomNum === myRoom) {
+      showToast('Your room is open. You can rest here.', 2);
+    } else {
+      const group = guestGroups.find(gr => gr.room === roomNum);
+      if (group) {
+        showToast(`Room ${roomNum} opened. ${group.members[0].name} is inside.`, 2.5);
+        const adult = group.members.find(m => m.age >= 18) || group.members[0];
+        startDialogue(adult);
+      }
+    }
+  }
+
+  function tryToggleDoor(dr) {
+    if (dr.isPresentationDoor) {
+      if (presenterState !== 'presented' && presenterState !== 'atRoom') {
+        showToast('This door is locked until the presenter arrives.', 2); return;
+      }
+      dr.open = !dr.open;
+    } else if (dr.roomNum) {
+      if (dr.locked) {
+        showToast('This room is locked. Use a key from the INFO PANEL.', 2); return;
+      }
+      dr.open = !dr.open;
+      const r = rooms.find(rr => rr.num === dr.roomNum);
+      if (r) r.doorOpen = dr.open;
+    }
+  }
+
+  function payHotel() {
+    if (hotelPaid) return;
+    if (!(gameHours >= 7 && gameHours < 19)) {
+      showToast('Reception is open from 7:00 to 19:00.', 2.5); return;
+    }
+    if (money < 10000) { showToast('Not enough money.', 2); return; }
+    if (!isPlayerAtReception()) {
+      showToast('Stand in front of the receptionist (Lobby).', 2); return;
+    }
+    money -= 10000;
+    hotelPaid = true;
+    hasKey = true;
+    showToast('Paid ¥10,000. Received key to room ' + myRoom + '.', 3);
+    updateHUD(); buildInfoPanel();
+  }
+
+  function doCheckout() {
+    if (checkedOut) return;
+    if (!hotelPaid || !hasKey) return;
+    checkedOut = true;
+    hasKey = false;
+
+    if (myRoom !== null) {
+      const dr = doors.find(d => d.roomNum === myRoom);
+      if (dr) { dr.open = false; dr.locked = true; }
+      const r = rooms.find(rr => rr.num === myRoom);
+      if (r) r.doorOpen = false;
+    }
+
+    checkoutLink.classList.remove('hidden');
+    showToast('You have checked out. Thank you for staying with us!', 3);
+    updateHUD(); buildInfoPanel();
+  }
+
+  // ============================================================
+  //  GACHAPON
+  // ============================================================
+  function doGachapon() {
+    if (gachaAnim.active) return;
+    if (money < 100) { showToast('Not enough money.', 2); return; }
+    const gcell = grid[4][0];
+    const gx = gcell.x + gcell.w/2;
+    const gy = gcell.y + gcell.h/2;
+    if (dist(player.x, player.y, gx, gy) > 400) {
+      showToast('The gachapon is on the 3rd floor.', 2); return;
+    }
+    const available = guestGroups.filter(g => g.room !== myRoom && !guestKeys.includes(g.room));
+    if (available.length === 0) { showToast('No more keys available.', 2); return; }
+
+    money -= 100;
+    updateHUD(); buildInfoPanel();
+    closeInfoPanel();
+
+    const g = pick(available);
+    startGachaAnimation(g.room);
+  }
+
+  function startGachaAnimation(roomNum) {
+    gachaAnim.active = true;
+    gachaAnim.phase = 'chart';
+    gachaAnim.t = 0;
+    gachaAnim.points = [];
+    gachaAnim.peakReached = false;
+    gachaAnim.peakTimer = 0;
+    gachaAnim.pendingKey = roomNum;
+
+    gachaSub.textContent = '-¥100';
+    gachaVault.classList.remove('show');
+    gachaVault.src = 'img225door.jpg';
+    gachaResult.classList.remove('show');
+    gachaResult.textContent = '';
+    gachaHint.classList.remove('show');
+    gachaSkip.classList.remove('hidden');
+    gachaOverlay.classList.add('show');
+
+    const baseY = gachaCanvas.height * 0.75;
+    gachaAnim.targetY = gachaCanvas.height * 0.15;
+    for (let i = 0; i < 30; i++) {
+      gachaAnim.points.push({ x: i * 12, y: baseY });
+    }
+  }
+
+  function skipGachaAnimation() {
+    if (!gachaAnim.active) return;
+    if (gachaAnim.phase === 'result') return;
+    gachaAnim.phase = 'result';
+    gachaAnim.t = 0;
+    gachaVault.src = 'img226door.jpg';
+    gachaVault.classList.add('show');
+    gachaResult.textContent = `🔑 Room ${gachaAnim.pendingKey} の鍵を手に入れた！`;
+    gachaResult.classList.add('show');
+    gachaHint.classList.add('show');
+    gachaSkip.classList.add('hidden');
+  }
+
+  function updateGachaAnimation(dt) {
+    if (!gachaAnim.active) return;
+    gachaAnim.t += dt;
+
+    if (gachaAnim.phase === 'chart') {
+      if (gachaAnim.t % 3 < 1) {
+        const last = gachaAnim.points[gachaAnim.points.length - 1];
+        const canvasH = gachaCanvas.height;
+
+        const progress = Math.min(1, gachaAnim.points.length / 55);
+        const baseY = canvasH * 0.75 - progress * (canvasH * 0.6);
+        const noise = (Math.random() - 0.5) * 40;
+        const crash = Math.random() < 0.15 ? (Math.random() * 30) : 0;
+
+        const newY = clamp(baseY + noise + crash, canvasH * 0.1, canvasH * 0.85);
+        const newX = last.x + 12;
+        gachaAnim.points.push({ x: newX, y: newY });
+
+        if (gachaAnim.points.length > 60) gachaAnim.points.shift();
+
+        if (progress >= 0.95 && !gachaAnim.peakReached) {
+          gachaAnim.peakReached = true;
+          gachaAnim.peakTimer = 0;
+        }
+      }
+
+      if (gachaAnim.peakReached) {
+        gachaAnim.peakTimer += dt;
+        if (gachaAnim.peakTimer > 25) {
+          gachaAnim.phase = 'vault';
+          gachaAnim.t = 0;
+          gachaVault.classList.add('show');
+        }
+      }
+    } else if (gachaAnim.phase === 'vault') {
+      if (gachaAnim.t > 30) {
+        gachaAnim.phase = 'open';
+        gachaAnim.t = 0;
+        gachaVault.src = 'img226door.jpg';
+      }
+    } else if (gachaAnim.phase === 'open') {
+      if (gachaAnim.t > 40) {
+        gachaAnim.phase = 'result';
+        gachaAnim.t = 0;
+        gachaResult.textContent = `🔑 Room ${gachaAnim.pendingKey} の鍵を手に入れた！`;
+        gachaResult.classList.add('show');
+        gachaHint.classList.add('show');
+        gachaSkip.classList.add('hidden');
+      }
+    }
+  }
+
+  function drawGachaChart() {
+    const cw = gachaCanvas.width;
+    const ch = gachaCanvas.height;
+    gachaCtx.clearRect(0, 0, cw, ch);
+
+    gachaCtx.strokeStyle = 'rgba(0,230,176,0.08)';
+    gachaCtx.lineWidth = 1;
+    for (let i = 0; i <= 8; i++) {
+      const y = (ch / 8) * i;
+      gachaCtx.beginPath();
+      gachaCtx.moveTo(0, y);
+      gachaCtx.lineTo(cw, y);
+      gachaCtx.stroke();
+    }
+    for (let i = 0; i <= 12; i++) {
+      const x = (cw / 12) * i;
+      gachaCtx.beginPath();
+      gachaCtx.moveTo(x, 0);
+      gachaCtx.lineTo(x, ch);
+      gachaCtx.stroke();
+    }
+
+    if (gachaAnim.points.length > 1) {
+      gachaCtx.strokeStyle = '#00e6b0';
+      gachaCtx.lineWidth = 3;
+      gachaCtx.shadowColor = '#00e6b0';
+      gachaCtx.shadowBlur = 15;
+      gachaCtx.beginPath();
+      gachaCtx.moveTo(gachaAnim.points[0].x, gachaAnim.points[0].y);
+      for (let i = 1; i < gachaAnim.points.length; i++) {
+        gachaCtx.lineTo(gachaAnim.points[i].x, gachaAnim.points[i].y);
+      }
+      gachaCtx.stroke();
+      gachaCtx.shadowBlur = 0;
+
+      const lastPt = gachaAnim.points[gachaAnim.points.length - 1];
+      const firstPt = gachaAnim.points[0];
+      const grad = gachaCtx.createLinearGradient(0, 0, 0, ch);
+      grad.addColorStop(0, 'rgba(0,230,176,0.35)');
+      grad.addColorStop(1, 'rgba(0,230,176,0)');
+      gachaCtx.fillStyle = grad;
+      gachaCtx.beginPath();
+      gachaCtx.moveTo(firstPt.x, ch);
+      for (const p of gachaAnim.points) gachaCtx.lineTo(p.x, p.y);
+      gachaCtx.lineTo(lastPt.x, ch);
+      gachaCtx.closePath();
+      gachaCtx.fill();
+
+      gachaCtx.fillStyle = '#ffd166';
+      gachaCtx.shadowColor = '#ffd166';
+      gachaCtx.shadowBlur = 20;
+      gachaCtx.beginPath();
+      gachaCtx.arc(lastPt.x, lastPt.y, 5, 0, Math.PI * 2);
+      gachaCtx.fill();
+      gachaCtx.shadowBlur = 0;
+    }
+  }
+
+  function endGachaAnimation() {
+    if (!gachaAnim.active) return;
+    if (gachaAnim.pendingKey !== null) {
+      guestKeys.push(gachaAnim.pendingKey);
+      showToast(`Gachapon! You got the key to room ${gachaAnim.pendingKey}.`, 2.5);
+      updateHUD();
+      buildInfoPanel();
+    }
+    gachaAnim.active = false;
+    gachaAnim.pendingKey = null;
+    gachaOverlay.classList.remove('show');
+    gachaSkip.classList.add('hidden');
+  }
+
+  gachaOverlay.addEventListener('click', e => {
+    if (gachaAnim.phase === 'result') {
+      endGachaAnimation();
+    }
+  });
+
+  gachaSkip.addEventListener('click', e => {
+    e.stopPropagation();
+    skipGachaAnimation();
+  });
+
+  function doSleep() {
+    if (slept) return;
+    if (checkedOut) { showToast('You have already checked out.', 2); return; }
+    if (!isPlayerInMyRoom()) { showToast('You must be in your own room.', 2); return; }
+    if (!(gameHours >= 19 || gameHours < 3)) {
+      showToast('You can only sleep between 19:00 and 3:00.', 2); return;
+    }
+    slept = true;
+    gameHours = (gameHours + 7) % 24;
+    showToast('You slept for 7 hours...', 2);
+    updateHUD(); buildInfoPanel();
+    setTimeout(() => {
+      slept = false;
+      showToast('You woke up. A new day begins.', 2.5);
+      updateHUD(); buildInfoPanel();
+    }, HOUR_SECONDS * 1000);
+  }
+
+  function handleElevatorClick() {
+    if (walkingTo) return;
+    if (!elevatorPanel.classList.contains('hidden')) return;
+    buildElevatorPanel();
+    elevatorPanel.classList.remove('hidden');
+  }
+  function buildElevatorPanel() {
+    epFloors.innerHTML = '';
+    const cur = cellAt(player.x, player.y).floorTag || 1;
+    const floorsAvailable = elevatorCells.map(c => c.floorTag).sort();
+    for (const f of floorsAvailable) {
+      const btn = document.createElement('button');
+      btn.textContent = f + 'F';
+      if (f === cur) btn.classList.add('current');
+      btn.addEventListener('click', () => {
+        elevatorPanel.classList.add('hidden');
+        if (f === cur) { showToast(`You are already on ${f}F.`, 1.5); return; }
+        goToFloorByElevator(f);
+      });
+      epFloors.appendChild(btn);
+    }
+  }
+  function goToFloorByElevator(targetFloor) {
+    if (walkingTo) return;
+    const target = elevatorCells.find(c => c.floorTag === targetFloor);
+    if (!target) return;
+    showToast(`Elevator moving to ${targetFloor}F...`, 1.5);
+    walkingTo = {
+      x: target.x + target.w/2,
+      y: target.y + target.h + 80,
+      msg: `Arrived at ${targetFloor}F.`,
+      speed: 24,
+    };
+  }
+  epClose.addEventListener('click', e => {
+    e.preventDefault();
+    elevatorPanel.classList.add('hidden');
+  });
+
+  function handleStairsClick() {
+    if (walkingTo) return;
+    const cur = cellAt(player.x, player.y).floorTag || 1;
+    let next = cur + 1;
+    if (next > 4) next = 1;
+    const target = stairsCells.find(c => c.floorTag === next);
+    if (!target) return;
+    showToast(`Taking stairs to ${next}F...`, 1.5);
+    walkingTo = {
+      x: target.x + target.w/2,
+      y: target.y + target.h + 80,
+      msg: `Arrived at ${next}F.`,
+      speed: 4,
+    };
+  }
+
+  function resolveRectCollision(cx, cy, r, rx, ry, rw, rh) {
+    const nx = clamp(cx, rx, rx + rw);
+    const ny = clamp(cy, ry, ry + rh);
+    const dx = cx - nx;
+    const dy = cy - ny;
+    const d2 = dx*dx + dy*dy;
+    if (d2 >= r*r) return null;
+    if (d2 > 0.0001) {
+      const d = Math.sqrt(d2);
+      const overlap = r - d;
+      return { x: cx + (dx / d) * overlap, y: cy + (dy / d) * overlap };
+    }
+    const left   = cx - rx;
+    const right  = rx + rw - cx;
+    const top    = cy - ry;
+    const bottom = ry + rh - cy;
+    const min = Math.min(left, right, top, bottom);
+    if (min === left)   return { x: rx - r, y: cy };
+    if (min === right)  return { x: rx + rw + r, y: cy };
+    if (min === top)    return { x: cx, y: ry - r };
+    return { x: cx, y: ry + rh + r };
+  }
+
+  function tryMovePlayer(dx, dy) {
+    let nx = clamp(player.x + dx, 20, WORLD_W - 20);
+    player.x = nx;
+    for (const w of walls) {
+      const res = resolveRectCollision(player.x, player.y, player.radius, w.x, w.y, w.w, w.h);
+      if (res) { player.x = res.x; player.y = res.y; }
+    }
+    for (const dr of doors) {
+      if (dr.open) continue;
+      const res = resolveRectCollision(player.x, player.y, player.radius, dr.x, dr.y, dr.w, dr.h);
+      if (res) { player.x = res.x; player.y = res.y; }
+    }
+    let ny = clamp(player.y + dy, 20, WORLD_H - 20);
+    player.y = ny;
+    for (const w of walls) {
+      const res = resolveRectCollision(player.x, player.y, player.radius, w.x, w.y, w.w, w.h);
+      if (res) { player.x = res.x; player.y = res.y; }
+    }
+    for (const dr of doors) {
+      if (dr.open) continue;
+      const res = resolveRectCollision(player.x, player.y, player.radius, dr.x, dr.y, dr.w, dr.h);
+      if (res) { player.x = res.x; player.y = res.y; }
+    }
+  }
+
+  function startComediansToBanquet() {
+    const enterX = grid[1][6].x + grid[1][6].w/2;
+    const lobbyX = grid[10][6].x + grid[10][6].w/2;
+    const lobbyY = grid[10][6].y + grid[10][6].h/2;
+    const ev4 = elevatorCells.find(c => c.floorTag === 4);
+    const evX = ev4.x + ev4.w/2;
+    const evY = ev4.y + ev4.h + 80;
+    const banX = grid[2][0].x + grid[2][0].w/2;
+    const banY = grid[2][0].y + 160;
+    comedianPath = [
+      { x: enterX, y: taxiY + 100 },
+      { x: lobbyX, y: lobbyY },
+      { x: evX, y: evY },
+      { x: banX, y: banY },
+    ];
+    comedianPathIdx = 0;
+  }
+  function startComediansLeave() {
+    const enterX = grid[1][6].x + grid[1][6].w/2;
+    const lobbyX = grid[10][6].x + grid[10][6].w/2;
+    const lobbyY = grid[10][6].y + grid[10][6].h/2;
+    const ev4 = elevatorCells.find(c => c.floorTag === 4);
+    const evX = ev4.x + ev4.w/2;
+    const evY = ev4.y + ev4.h + 80;
+    const stopX = grid[1][6].x - 400;
+    comedianPath = [
+      { x: evX, y: evY },
+      { x: lobbyX, y: lobbyY },
+      { x: enterX, y: taxiY + 100 },
+      { x: stopX + 40, y: taxiY },
+    ];
+    comedianPathIdx = 0;
+    comedyState = 'leaving';
+  }
+
+  // ============================================================
+  //  Dialogue
+  // ============================================================
+  function startDialogue(npc) {
+    if (!npc) return;
+    npcPanel.classList.remove('open');
+    conversation = { npc, page:0, lines:[], choices:null };
+
+    if (npc.groupId !== undefined) {
+      let lines;
+      if (npc.walkMode === 'strolling') {
+        const group = guestGroups[npc.groupId];
+        const et = group.eventType;
+        if (et === 'rest') lines = REST_LINES;
+        else if (et === 'onsen') lines = ONSEN_LINES;
+        else if (et === 'banquet') lines = BANQUET_LINES;
+        else lines = ROOM_LINES;
+      } else if (npc.location === 'rest') lines = REST_LINES;
+      else if (npc.location === 'onsen') lines = ONSEN_LINES;
+      else if (npc.location === 'banquet') lines = BANQUET_LINES;
+      else lines = ROOM_LINES;
+
+      const len = randInt(1, Math.min(4, lines.length));
+      conversation.lines = shuffle(lines).slice(0, len);
+      if (npc.age < 18) {
+        if (npc.location === 'banquet' || (npc.walkMode === 'strolling' && guestGroups[npc.groupId].eventType === 'banquet')) {
+          conversation.lines.unshift(pick(CHILD_LINES_BANQUET));
+        } else if (npc.location === 'onsen' || (npc.walkMode === 'strolling' && guestGroups[npc.groupId].eventType === 'onsen')) {
+          conversation.lines.unshift(pick(CHILD_LINES_ONSEN));
+        } else {
+          conversation.lines.unshift(pick(CHILD_LINES_ROOM));
+        }
+      }
+      npc.talkedRoom = true;
+    } else if (npc.id === 'presenter') {
+      if (presenterState === 'idle') {
+        conversation.lines = [
+          "Hey! You look like someone who could use some money.",
+          "I'm giving a business presentation in the presentation room nearby.",
+          "Follow me!",
+        ];
+        conversation.onEnd = () => {
+          presenterState = 'walking';
+          const target = grid[11][2];
+          const doorX = target.x + target.w/2;
+          const doorOutY = target.y + target.h + 60;
+          const insideY = target.y + target.h/2;
+          presenterPath = [
+            { x: doorX, y: doorOutY },
+            { x: doorX, y: doorOutY, openDoor: true },
+            { x: doorX, y: insideY },
+          ];
+          presenterPathIdx = 0;
+          showToast('The presenter is heading to the presentation room. Follow him.', 3);
+        };
+      } else if (presenterState === 'walking') {
+        conversation.lines = ["Follow me! The presentation room is this way."];
+      } else if (presenterState === 'atRoom') {
+        conversation.lines = ["You made it! Ready for my presentation?"];
+        conversation.choices = [
+          { label:'Yes, begin', action: () => { openPresentation(); } },
+          { label:'No', action: () => {} },
+        ];
+      } else if (presenterState === 'presented') {
+        if (investReturnHour !== null && gameHours >= investReturnHour && investResult === null) {
+          const result = pick([0, 13000]);
+          investResult = result;
+          if (result > 0) {
+            money += result;
+            conversation.lines = [
+              `Great news! Your investment returned ¥${result}.`,
+              "Thank you for believing in me.",
+            ];
+          } else {
+            conversation.lines = [
+              "I'm sorry... the investment returned ¥0.",
+              "The market is unpredictable.",
+            ];
+          }
+          investReturnHour = null;
+        } else if (investReturnHour !== null) {
+          conversation.lines = [`Your investment returns at ${investReturnHour}:00. Come back then.`];
+        } else {
+          conversation.lines = [
+            "Thanks for watching my presentation.",
+            "Would you like to invest again?",
+          ];
+          conversation.choices = [
+            { label:'Invest (¥10,000 / 4h)', action: () => {
+              if (hotelPaid) { showToast('You already paid the hotel. Investment not available.', 2); }
+              else if (money >= 10000) {
+                money -= 10000; invested = true;
+                investReturnHour = (gameHours + 4) % 24;
+                investResult = null;
+                showToast('You invested ¥10,000. Return in 4 hours.', 3);
+                updateHUD(); buildInfoPanel();
+              } else { showToast('You need ¥10,000 to invest.', 2); }
+            } },
+            { label:'Not now', action: () => {} },
+          ];
+        }
+      } else {
+        conversation.lines = ["I'm busy preparing my presentation."];
+      }
+    } else if (typeof npc.id === 'string' && npc.id.startsWith('comedian')) {
+      conversation.lines = [
+        "We're the comedy duo!",
+        comedyState === 'onstage' ? "Enjoy the show!" : "We perform at 19:00 in the banquet hall (4F).",
+      ];
+    } else {
+      conversation.lines = ["Hello there."];
+    }
+
+    renderDialogue();
+    dialogue.classList.add('open');
+  }
+
+  function renderDialogue() {
+    if (!conversation) return;
+    const { npc, page, lines } = conversation;
+    dName.textContent = npc.name || '???';
+    if (npc.groupId !== undefined) {
+      dMeta.textContent = `${npc.gender} / Age ${npc.age} / Room ${npc.room}`;
+    } else if (npc.role) {
+      dMeta.textContent = npc.role;
+    } else {
+      dMeta.textContent = '';
+    }
+    dText.textContent = lines[page] || '';
+    dPage.textContent = `${page+1} / ${lines.length}`;
+    choiceRow.innerHTML = '';
+    if (page === lines.length - 1 && conversation.choices) {
+      choiceRow.classList.remove('hidden');
+      for (const ch of conversation.choices) {
+        const btn = document.createElement('button');
+        btn.className = 'ui-btn';
+        btn.textContent = ch.label;
+        btn.addEventListener('click', e => {
+          e.preventDefault();
+          e.stopPropagation();
+          const act = ch.action;
+          closeDialogue();
+          if (act) act();
+        });
+        choiceRow.appendChild(btn);
+      }
+    } else {
+      choiceRow.classList.add('hidden');
+    }
+  }
+
+  function nextDialogue() {
+    if (!conversation) return;
+    if (conversation.page < conversation.lines.length - 1) {
+      conversation.page++;
+      renderDialogue();
+    } else {
+      const onEnd = conversation.onEnd;
+      closeDialogue();
+      if (onEnd) onEnd();
+    }
+  }
+
+  function closeDialogue() {
+    conversation = null;
+    dialogue.classList.remove('open');
+    choiceRow.classList.add('hidden');
+  }
+
+  function openPresentation() {
+    const isPro = Math.random() < 0.5;
+    currentPresentation = isPro ? pick(PRES_PRO) : pick(PRES_BAD);
+    presSlideIndex = 0;
+    presViewOpen = true;
+    showToast('The projector shows the first slide. Click to advance.', 3);
+  }
+
+  function isNight() {
+    return gameHours >= 22 || gameHours < 5;
+  }
+
+  // ============================================================
+  //  Update
+  // ============================================================
+  function update(dt) {
+    if (!gameStarted) return;
+
+    if (gachaAnim.active) {
+      updateGachaAnimation(dt);
+      drawGachaChart();
+      return;
+    }
+
+    updateTime(dt);
+
+    if (walkingTo) {
+      const dx = walkingTo.x - player.x;
+      const dy = walkingTo.y - player.y;
+      const d = Math.hypot(dx, dy);
+      if (d < 8) {
+        player.x = walkingTo.x;
+        player.y = walkingTo.y;
+        const msg = walkingTo.msg;
+        walkingTo = null;
+        showToast(msg, 1.5);
+        updateGuestLocations();
+        updateHUD();
+        return;
+      }
+      const spd = walkingTo.speed || 4;
+      tryMovePlayer(dx/d * spd, dy/d * spd);
+      player.angle = Math.atan2(dy, dx);
+      updateHUD();
+      return;
+    }
+
+    const spd = player.speed * 0.4;
+    let dx = 0, dy = 0;
+    if (keys.ArrowUp)    dy -= 1;
+    if (keys.ArrowDown)  dy += 1;
+    if (keys.ArrowLeft)  dx -= 1;
+    if (keys.ArrowRight) dx += 1;
+    if (dx !== 0 || dy !== 0) {
+      const len = Math.hypot(dx, dy);
+      dx = dx/len*spd; dy = dy/len*spd;
+      const total = Math.hypot(dx, dy);
+      const steps = Math.max(1, Math.ceil(total / 4));
+      const stepX = dx / steps;
+      const stepY = dy / steps;
+      for (let s = 0; s < steps; s++) tryMovePlayer(stepX, stepY);
+    }
+
+    const camX = clamp(player.x - W/2, 0, WORLD_W - W);
+    const camY = clamp(player.y - H/2, 0, WORLD_H - H);
+    const wmx = mouseX + camX;
+    const wmy = mouseY + camY;
+    player.angle = Math.atan2(wmy - player.y, wmx - player.x);
+
+    if (presenter && presenterState === 'walking' && presenterPath) {
+      const target = presenterPath[presenterPathIdx];
+      if (!target) {
+        presenterState = 'atRoom';
+        showToast('The presenter has arrived. Talk to him.', 2.5);
+        presenterPath = null;
+      } else {
+        const pdx = target.x - presenter.x;
+        const pdy = target.y - presenter.y;
+        const pd = Math.hypot(pdx, pdy);
+        if (pd < 8) {
+          if (target.openDoor) {
+            const dr = doors.find(d => d.isPresentationDoor);
+            if (dr) dr.open = true;
+            showToast('The presenter opened the door.', 1.8);
+          }
+          presenterPathIdx++;
+        } else {
+          presenter.x += pdx/pd * 12.5;
+          presenter.y += pdy/pd * 12.5;
+          presenter.angle = Math.atan2(pdy, pdx);
+        }
+      }
+    }
+
+    // ★ タクシー＆コメディアン降車演出
+    if (taxiVisible) {
+      const stopX = grid[1][6].x - 400;
+
+      // タクシー到着中（17:00〜到着まで）
+      if (comedyState === 'arriving') {
+        taxiX += 40;   // ★ 高速化（実時間 約2秒で到着）
+        if (taxiX >= stopX) {
+          taxiX = stopX;
+          comedyState = 'stopped';
+          comedianExitPhase = 'exiting';
+          comedianExitTimer = 0;
+        } else {
+          for (const c of comedians) {
+            c.x = taxiX + 40;
+            c.y = taxiY;
+          }
+        }
+      }
+
+      // コメディアン降車演出（到着後1秒）
+      if (comedyState === 'stopped') {
+        if (comedianExitPhase === 'exiting') {
+          comedianExitTimer += dt;
+          const t = Math.min(1, comedianExitTimer / (1 * 60));  // ★ 1秒で降車完了
+          for (let i = 0; i < comedians.length; i++) {
+            const c = comedians[i];
+            const baseX = taxiX + 40 + (i === 0 ? -30 : 30);
+            const insideX = taxiX + 40;
+            const insideY = taxiY + 10;
+            const outsideX = baseX;
+            const outsideY = taxiY + 100;
+            c.x = lerp(insideX, outsideX, t);
+            c.y = lerp(insideY, outsideY, t);
+            c.state = 'walking';
+          }
+          if (t >= 1) {
+            comedianExitPhase = 'walking';
+            comedianExitTimer = 0;
+          }
+        }
+      }
+    }
+
+    // 漫才師の移動（19:00以降）
+    if (comedianPath && comedians[0].state === 'walking' && comedyState === 'onstage') {
+      const target = comedianPath[comedianPathIdx];
+      if (!target) {
+        comedianPath = null;
+      } else {
+        let allArrived = true;
+        for (let i = 0; i < comedians.length; i++) {
+          const c = comedians[i];
+          const tx = target.x + (i === 0 ? -30 : 30);
+          const ty = target.y;
+          const cx = tx - c.x;
+          const cy = ty - c.y;
+          const cd = Math.hypot(cx, cy);
+          if (cd > 8) {
+            allArrived = false;
+            c.x += cx/cd * 2.2;
+            c.y += cy/cd * 2.2;
+            c.angle = Math.atan2(cy, cx);
+          }
+        }
+        if (allArrived) comedianPathIdx++;
+      }
+    }
+
+    if (comedyState === 'onstage' && currentComedy) {
+      const total = 14 * 60;
+      comedyProgress += dt;
+      if (comedyProgress >= total) {
+        comedyState = 'finished';
+      }
+    }
+
+    // ★ 客の散歩更新
+    for (const g of guests) {
+      if (g.walkMode !== 'strolling') continue;
+
+      g.walkFramesLeft -= dt;
+
+      const dx = g.walkTargetX - g.x;
+      const dy = g.walkTargetY - g.y;
+      const d = Math.hypot(dx, dy);
+      if (d < 8) {
+        const target = getRandomPublicPosition();
+        g.walkTargetX = target.x;
+        g.walkTargetY = target.y;
+      } else {
+        g.x += dx/d * g.walkSpeed;
+        g.y += dy/d * g.walkSpeed;
+        g.angle = Math.atan2(dy, dx);
+      }
+      g.baseX = g.x;
+      g.baseY = g.y;
+
+      if (g.walkFramesLeft <= 0) {
+        if (g.walkPhase === 'toEvent') {
+          g.walkMode = 'idle';
+          g.walkPhase = null;
+          updateGuestLocations();
+        } else if (g.walkPhase === 'home') {
+          g.walkMode = 'idle';
+          g.walkPhase = null;
+          const r = rooms.find(rr => rr.num === g.room);
+          if (r) {
+            g.x = r.x + r.w/2;
+            g.y = r.y + r.h/2;
+            g.baseX = g.x;
+            g.baseY = g.y;
+          }
+          g.location = 'room';
+        }
+      }
+    }
+
+    for (const g of guests) {
+      if (g.walkMode === 'strolling') continue;
+      g.phase += 0.01;
+      g.x = g.baseX + Math.cos(g.phase) * 6;
+      g.y = g.baseY + Math.sin(g.phase * 0.8) * 4;
+    }
+
+    activeNPC = null;
+    let bestD = 260;
+    const candidates = [];
+    if (presenter) candidates.push(presenter);
+    for (const c of comedians) {
+      if (c.state !== 'taxi' && c.state !== 'done') candidates.push(c);
+    }
+    for (const g of guests) candidates.push(g);
+    for (const n of candidates) {
+      const nx = (n.baseX !== undefined) ? n.baseX : n.x;
+      const ny = (n.baseY !== undefined) ? n.baseY : n.y;
+      const d = dist(nx, ny, player.x, player.y);
+      if (d < bestD) { bestD = d; activeNPC = n; }
+    }
+
+    activeDoor = null;
+    let bestDoorD = 70;
+    for (const dr of doors) {
+      const cx = dr.x + dr.w/2;
+      const cy = dr.y + dr.h/2;
+      const d = dist(cx, cy, player.x, player.y);
+      if (d < bestDoorD) { bestDoorD = d; activeDoor = dr; }
+    }
+
+    activeElevator = null;
+    for (const c of elevatorCells) {
+      if (dist(player.x, player.y, c.x + c.w/2, c.y + c.h/2) < 200) activeElevator = c;
+    }
+    activeStairs = null;
+    for (const c of stairsCells) {
+      const ex = c.x + c.w/2;
+      const ey = c.y + c.h - 60;
+      if (dist(player.x, player.y, ex, ey) < 120) activeStairs = c;
+    }
+
+    if (activeNPC && !conversation) {
+      npName.textContent = activeNPC.name || '???';
+      if (activeNPC.groupId !== undefined) {
+        npInfo.textContent = `${activeNPC.gender} / Age ${activeNPC.age} / Room ${activeNPC.room}`;
+      } else if (activeNPC.id === 'presenter') {
+        npInfo.textContent = presenterState === 'presented' ? 'Presented' : 'Presenter';
+      } else {
+        npInfo.textContent = 'Comedian';
+      }
+      npHint.textContent = activeNPC.id === 'presenter' && presenterState === 'idle'
+        ? 'Click to talk (follow)' : 'Click to talk';
+      npcPanel.classList.add('open');
+    } else {
+      npcPanel.classList.remove('open');
+    }
+
+    if (toastTimer > 0) {
+      toastTimer -= dt;
+      if (toastTimer <= 0) toast.classList.remove('show');
+    }
+
+    if (slept && !checkedOut && hotelPaid && hasKey) {
+      if (isPlayerAtReception()) {
+        doCheckout();
+      }
+    }
+
+    updateHUD();
+  }
+
+  function draw() {
+    ctx.clearRect(0,0,W,H);
+    if (!gameStarted) {
+      ctx.fillStyle = '#0a0c0f';
+      ctx.fillRect(0,0,W,H);
+      return;
+    }
+    if (gachaAnim.active) return;
+
+    const camX = clamp(player.x - W/2, 0, WORLD_W - W);
+    const camY = clamp(player.y - H/2, 0, WORLD_H - H);
+    ctx.save();
+    ctx.translate(-camX, -camY);
+
+    const c0 = clamp(Math.floor(camX / MAP_W) - 1, 0, MAP_COLS-1);
+    const c1 = clamp(Math.floor((camX + W) / MAP_W) + 1, 0, MAP_COLS-1);
+    const r0 = clamp(Math.floor(camY / MAP_H) - 1, 0, MAP_ROWS-1);
+    const r1 = clamp(Math.floor((camY + H) / MAP_H) + 1, 0, MAP_ROWS-1);
+    for (let r = r0; r <= r1; r++) {
+      for (let c = c0; c <= c1; c++) drawCell(grid[r][c]);
+    }
+
+    for (const w of walls) {
+      if (w.x > camX + W || w.x + w.w < camX || w.y > camY + H || w.y + w.h < camY) continue;
+      ctx.fillStyle = w.isMaze ? '#1a1a1a' : '#3a4a5a';
+      ctx.fillRect(w.x, w.y, w.w, w.h);
+      ctx.strokeStyle = w.isMaze ? '#2a2a2a' : '#5a6a7a';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(w.x, w.y, w.w, w.h);
+    }
+
+    for (const dr of doors) {
+      if (dr.x > camX + W || dr.x + dr.w < camX || dr.y > camY + H || dr.y + dr.h < camY) continue;
+      drawDoor(dr, dr.open);
+    }
+
+    for (const g of guests) {
+      if (g.x < camX - 60 || g.x > camX + W + 60 || g.y < camY - 60 || g.y > camY + H + 60) continue;
+      drawPerson(g.x, g.y, g.color, g.hair, g.name, g.angle || 0);
+      if (g.age < 18) {
+        ctx.fillStyle = '#ff8ad8';
+        ctx.font = 'bold 14px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('👶', g.x, g.y - 28);
+      }
+      if (g.talkedRoom) {
+        ctx.fillStyle = '#00e6b0';
+        ctx.font = 'bold 14px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('✔', g.x + 16, g.y - 24);
+      }
+    }
+
+    if (presenter) {
+      drawPerson(presenter.x, presenter.y, presenter.color, presenter.hair, presenter.name, presenter.angle);
+      if (presenterState === 'idle') {
+        ctx.fillStyle = '#00e6b0';
+        ctx.font = 'bold 14px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Talk to me!', presenter.x, presenter.y - 40);
+      }
+    }
+
+    if (taxiVisible) drawTaxi(taxiX, taxiY - 30);
+
+    for (const c of comedians) {
+      if (c.state === 'taxi' || c.state === 'done') continue;
+      drawPerson(c.x, c.y, c.color, c.hair, c.name, c.angle);
+    }
+
+    if (comedyState === 'onstage' && currentComedy) {
+      const c = grid[2][0];
+      const stageCx = c.x + c.w/2;
+      const stageCy = c.y + 160;
+      drawPerson(stageCx - 60, stageCy, comedians[0].color, comedians[0].hair, comedians[0].name, 0);
+      drawPerson(stageCx + 60, stageCy, comedians[1].color, comedians[1].hair, comedians[1].name, 0);
+      const idx = Math.min(currentComedy.lines.length-1, Math.floor(comedyProgress / 40));
+      const lineText = currentComedy.lines[idx];
+
+      ctx.font = 'bold 18px "Hiragino Sans","Yu Gothic",sans-serif';
+      const textW = ctx.measureText(lineText).width;
+      const boxW = Math.max(textW + 80, 400);
+      const boxH = 50;
+      const boxX = stageCx - boxW/2;
+      const boxY = c.y + c.h - 90;
+
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.fillRect(boxX + 4, boxY + 4, boxW, boxH);
+      ctx.fillStyle = 'rgba(0,0,0,0.92)';
+      ctx.fillRect(boxX, boxY, boxW, boxH);
+      ctx.strokeStyle = '#ffd166';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(boxX, boxY, boxW, boxH);
+      ctx.fillStyle = '#ffd166';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(lineText, stageCx, boxY + boxH/2 + 2);
+      ctx.textBaseline = 'alphabetic';
+    }
+
+    if (presViewOpen && currentPresentation) {
+      drawPresentationSlide();
+    }
+
+    drawPlayer();
+    ctx.restore();
+
+    drawOverlay();
+    if (isNight()) applyNightDarkness(camX, camY);
+    if (showMinimap) drawMinimap();
+  }
+
+  function applyNightDarkness(camX, camY) {
+    const sx = player.x - camX;
+    const sy = player.y - camY;
+    const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, 180);
+    grad.addColorStop(0, 'rgba(0,0,0,0)');
+    grad.addColorStop(0.6, 'rgba(0,0,0,0.55)');
+    grad.addColorStop(1, 'rgba(0,0,20,0.9)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+
+    for (const room of rooms) {
+      const c = grid[room.row][room.col];
+      if (!c.lamp || !c.lamp.on) continue;
+      const lx = c.lamp.x - camX;
+      const ly = c.lamp.y - camY;
+      if (lx < -450 || lx > W+450 || ly < -450 || ly > H+450) continue;
+      const g2 = ctx.createRadialGradient(lx, ly, 0, lx, ly, 350);
+      g2.addColorStop(0, 'rgba(255,244,176,0.4)');
+      g2.addColorStop(0.5, 'rgba(255,244,176,0.18)');
+      g2.addColorStop(1, 'rgba(255,244,176,0)');
+      ctx.fillStyle = g2;
+      ctx.beginPath();
+      ctx.arc(lx, ly, 350, 0, Math.PI*2);
+      ctx.fill();
+    }
+  }
+
+  function drawPresentationSlide() {
+    const c = grid[11][2];
+    const slide = currentPresentation.slides[presSlideIndex];
+    ctx.fillStyle = '#0d131a';
+    ctx.fillRect(c.x + 80, c.y + 60, c.w - 160, c.h - 200);
+    ctx.strokeStyle = '#00e6b0';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(c.x + 80, c.y + 60, c.w - 160, c.h - 200);
+    ctx.fillStyle = '#00e6b0';
+    ctx.font = 'bold 22px "Hiragino Sans","Yu Gothic",sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(slide.t, c.x + c.w/2, c.y + 110);
+    ctx.fillStyle = '#7ad7ff';
+    ctx.font = '15px "Hiragino Sans","Yu Gothic",sans-serif';
+    ctx.textAlign = 'left';
+    for (let i = 0; i < slide.l.length; i++) {
+      ctx.fillText('• ' + slide.l[i], c.x + 130, c.y + 170 + i*28);
+    }
+    const ax = c.x + c.w - 260;
+    const ay = c.y + 180;
+    drawSlideArt(slide.art, ax, ay);
+  }
+
+  function drawSlideArt(kind, x, y) {
+    ctx.save();
+    if (kind === 'bread') {
+      ctx.fillStyle = '#d4a373';
+      ctx.beginPath(); ctx.ellipse(x, y, 50, 30, 0, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#8a5a2a';
+      for (let i = 0; i < 4; i++) ctx.fillRect(x - 35 + i*20, y - 20, 6, 40);
+    } else if (kind === 'drone') {
+      ctx.fillStyle = '#7ad7ff';
+      ctx.fillRect(x - 30, y - 10, 60, 20);
+      ctx.fillStyle = '#00e6b0';
+      ctx.fillRect(x - 50, y - 20, 30, 6);
+      ctx.fillRect(x + 20, y - 20, 30, 6);
+      ctx.beginPath(); ctx.arc(x - 40, y - 20, 6, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(x + 40, y - 20, 6, 0, Math.PI*2); ctx.fill();
+    } else if (kind === 'chart') {
+      ctx.strokeStyle = '#7ad7ff'; ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(x - 50, y + 40);
+      for (let i = 0; i <= 8; i++) ctx.lineTo(x - 50 + i*14, y + 40 - i*8 - Math.sin(i)*6);
+      ctx.stroke();
+      ctx.fillStyle = '#00e6b0';
+      for (let i = 0; i < 5; i++) ctx.fillRect(x - 50 + i*22, y + 20 - i*10, 12, 20 + i*10);
+    } else if (kind === 'money') {
+      ctx.fillStyle = '#ffd166';
+      ctx.fillRect(x - 40, y - 20, 80, 40);
+      ctx.fillStyle = '#0a0c0f';
+      ctx.font = 'bold 22px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('¥', x, y + 8);
+    } else if (kind === 'rain') {
+      ctx.strokeStyle = '#7ad7ff'; ctx.lineWidth = 2;
+      for (let i = 0; i < 8; i++) {
+        ctx.beginPath();
+        ctx.moveTo(x - 50 + i*14, y - 30);
+        ctx.lineTo(x - 55 + i*14, y + 10);
+        ctx.stroke();
+      }
+    } else if (kind === 'phone') {
+      ctx.fillStyle = '#1a2a3a';
+      ctx.fillRect(x - 25, y - 40, 50, 80);
+      ctx.fillStyle = '#00e6b0';
+      ctx.fillRect(x - 20, y - 35, 40, 65);
+    } else if (kind === 'umbrella') {
+      ctx.fillStyle = '#ff8ad8';
+      ctx.beginPath(); ctx.arc(x, y - 10, 45, Math.PI, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(x, y - 10); ctx.lineTo(x, y + 40); ctx.stroke();
+    } else if (kind === 'heart') {
+      ctx.fillStyle = '#ff4d6d';
+      ctx.beginPath(); ctx.arc(x - 15, y, 20, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(x + 15, y, 20, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(x - 30, y + 5); ctx.lineTo(x, y + 45); ctx.lineTo(x + 30, y + 5); ctx.closePath(); ctx.fill();
+    } else if (kind === 'cat') {
+      ctx.fillStyle = '#4a3a2a';
+      ctx.beginPath(); ctx.arc(x, y, 40, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(x - 35, y - 25); ctx.lineTo(x - 20, y - 55); ctx.lineTo(x - 5, y - 30); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(x + 35, y - 25); ctx.lineTo(x + 20, y - 55); ctx.lineTo(x + 5, y - 30); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#ffd166';
+      ctx.beginPath(); ctx.arc(x - 14, y - 5, 5, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(x + 14, y - 5, 5, 0, Math.PI*2); ctx.fill();
+    } else if (kind === 'collar') {
+      ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.arc(x, y, 40, 0, Math.PI*2); ctx.stroke();
+      ctx.fillStyle = '#00e6b0';
+      ctx.fillRect(x - 8, y + 34, 16, 20);
+    } else if (kind === 'solar') {
+      ctx.fillStyle = '#1a2a3a';
+      ctx.fillRect(x - 60, y - 30, 120, 60);
+      ctx.fillStyle = '#7ad7ff';
+      for (let i = 0; i < 4; i++) for (let j = 0; j < 2; j++)
+        ctx.fillRect(x - 55 + i*30, y - 25 + j*30, 25, 25);
+    } else if (kind === 'plant') {
+      ctx.fillStyle = '#3a2a1a';
+      ctx.fillRect(x - 20, y + 20, 40, 30);
+      ctx.fillStyle = '#1a5a2a';
+      ctx.beginPath(); ctx.arc(x, y - 10, 30, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(x - 20, y - 20, 20, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(x + 20, y - 20, 20, 0, Math.PI*2); ctx.fill();
+    } else if (kind === 'hospital') {
+      ctx.fillStyle = '#e0e0e0';
+      ctx.fillRect(x - 40, y - 40, 80, 80);
+      ctx.fillStyle = '#ff4d6d';
+      ctx.fillRect(x - 8, y - 30, 16, 60);
+      ctx.fillRect(x - 30, y - 8, 60, 16);
+    }
+    ctx.restore();
+  }
+
+  function drawMinimap() {
+    const mw = 160, mh = 120;
+    const mx = W - mw - 12, my = H - mh - 12;
+    ctx.fillStyle = 'rgba(10,12,15,0.85)';
+    ctx.fillRect(mx, my, mw, mh);
+    ctx.strokeStyle = '#1e3a4a';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(mx, my, mw, mh);
+    const sx = mw / WORLD_W, sy = mh / WORLD_H;
+    for (const row of grid) {
+      for (const c of row) {
+        let color = '#1a222c';
+        if (c.type === CELL.ROOM) color = c.lamp && c.lamp.on ? '#6a5a3a' : '#2a2a3a';
+        else if (c.type === CELL.PARK || c.type === CELL.GARDEN) color = '#1a3a2a';
+        else if (c.type === CELL.ROAD || c.type === CELL.PARKING) color = '#2a2a2a';
+        else if (c.type === CELL.ONSEN) color = '#1a3a4a';
+        else if (c.type === CELL.GACHA || c.type === CELL.BANQUET) color = '#3a1a2a';
+        else if (c.type === CELL.LOBBY) color = '#1e2833';
+        else if (c.type === CELL.ELEVATOR) color = '#1a2a3a';
+        else if (c.type === CELL.STAIRS) color = '#1a1a1a';
+        else if (c.type === CELL.PRESENTATION) color = '#1a1e2a';
+        ctx.fillStyle = color;
+        ctx.fillRect(mx + c.x*sx, my + c.y*sy, c.w*sx, c.h*sy);
+      }
+    }
+    ctx.fillStyle = '#00e6b0';
+    ctx.fillRect(mx + player.x*sx - 2, my + player.y*sy - 2, 4, 4);
+    ctx.fillStyle = '#ffd166';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('MINIMAP', mx + 4, my + 12);
+  }
+
+  function drawCell(cell) {
+    const x = cell.x, y = cell.y, w = cell.w, h = cell.h;
+    switch(cell.type) {
+      case CELL.PARKING:
+        ctx.fillStyle = '#15181d'; ctx.fillRect(x, y, w, h);
+        ctx.strokeStyle = '#e0e0e0'; ctx.lineWidth = 2;
+        for (let i = 0; i < 4; i++) ctx.strokeRect(x + 60 + i*180, y + 120, 120, 200);
+        for (let i = 0; i < 3; i++) {
+          ctx.fillStyle = '#2a4a6a'; ctx.fillRect(x + 80 + i*180, y + 160, 100, 50);
+          ctx.fillStyle = '#1a2a3a'; ctx.fillRect(x + 95 + i*180, y + 168, 70, 20);
+        }
+        break;
+      case CELL.ROAD:
+        ctx.fillStyle = '#1a1d22'; ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = '#e0e0e0';
+        for (let i = 0; i < 8; i++) ctx.fillRect(x + 40 + i*90, y + h/2 - 3, 50, 6);
+        for (let i = 0; i < 4; i++) {
+          ctx.fillStyle = '#3a4a5a'; ctx.fillRect(x + 80 + i*180, y + h/2 - 40, 4, 30);
+          ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(x + 82 + i*180, y + h/2 - 42, 6, 0, Math.PI*2); ctx.fill();
+        }
+        break;
+      case CELL.PARK:
+      case CELL.GARDEN:
+        ctx.fillStyle = '#14301e'; ctx.fillRect(x, y, w, h);
+        for (let i = 0; i < 6; i++) {
+          const tx = x + 80 + (i * 110) % (w - 120);
+          const ty = y + 80 + Math.floor(i / 3) * 200;
+          drawTree(tx, ty);
+        }
+        for (let i = 0; i < 8; i++) {
+          ctx.fillStyle = ['#ff8ad8','#ffd166','#ff4d6d'][i%3];
+          ctx.beginPath(); ctx.arc(x + 60 + i*90, y + h - 80, 5, 0, Math.PI*2); ctx.fill();
+        }
+        break;
+      case CELL.ENTRANCE:
+        ctx.fillStyle = '#0d131a'; ctx.fillRect(x, y, w, h);
+        ctx.strokeStyle = '#00e6b0'; ctx.lineWidth = 4;
+        ctx.strokeRect(x + 200, y + 250, w - 400, h - 300);
+        ctx.fillStyle = '#00e6b0';
+        ctx.font = 'bold 24px sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText('HOTEL ENTRANCE', x + w/2, y + 60);
+        drawTree(x + 120, y + 350);
+        drawTree(x + w - 120, y + 350);
+        break;
+      case CELL.ROOM:
+        drawRoomCell(cell);
+        break;
+      case CELL.HALL:
+        drawHallCell(cell);
+        break;
+      case CELL.LOBBY:
+        ctx.fillStyle = '#1e2833'; ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = '#2a3a4a';
+        for (let i = 0; i < 8; i++) for (let j = 0; j < 4; j++)
+          ctx.fillRect(x + 40 + i*90, y + 40 + j*130, 60, 60);
+        ctx.fillStyle = '#ffd166';
+        ctx.beginPath(); ctx.arc(x + w/2, y + 60, 20, 0, Math.PI*2); ctx.fill();
+        if (cell.col === 6 && cell.row === 10) {
+          ctx.fillStyle = '#2a3a4a';
+          ctx.fillRect(x + w/2 - 200, y + h/2 - 80, 400, 160);
+          ctx.fillStyle = '#00e6b0';
+          ctx.fillRect(x + w/2 - 200, y + h/2 - 80, 400, 8);
+          ctx.fillStyle = '#7ad7ff';
+          ctx.font = 'bold 24px sans-serif'; ctx.textAlign = 'center';
+          ctx.fillText('RECEPTION', x + w/2, y + h/2 + 20);
+          drawPerson(x + w/2, y + h/2 - 120, '#7ad7ff', '#ffd166', '佐藤 美咲', 0);
+        }
+        break;
+      case CELL.REST:
+        drawRestCell(cell);
+        break;
+      case CELL.ONSEN:
+        drawOnsenCell(cell);
+        break;
+      case CELL.GACHA:
+        drawGachaCell(cell);
+        break;
+      case CELL.BANQUET:
+        drawBanquetCell(cell);
+        break;
+      case CELL.ELEVATOR:
+        drawElevatorCell(cell);
+        break;
+      case CELL.STAIRS:
+        drawStairsCell(cell);
+        break;
+      case CELL.PRESENTATION:
+        drawPresentationCell(cell);
+        break;
+      case CELL.OUTSIDE:
+      default:
+        ctx.fillStyle = '#1a2a1e'; ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = '#2a2a2a';
+        ctx.fillRect(x + w/2 - 80, y, 160, h);
+        break;
+    }
+  }
+
+  function drawRoomCell(cell) {
+    const x = cell.x, y = cell.y, w = cell.w, h = cell.h;
+    ctx.fillStyle = '#3a3040'; ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = '#4a3a2a'; ctx.fillRect(x + 20, y + 20, w - 40, h - 40);
+    ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 1;
+    for (let i = 0; i < 8; i++) {
+      ctx.beginPath();
+      ctx.moveTo(x + 20, y + 60 + i*60);
+      ctx.lineTo(x + w - 20, y + 60 + i*60);
+      ctx.stroke();
+    }
+
+    // ★ 窓の描画（昼夜で切り替え）
+    const night = isNight();
+    const winX = x + w - 180, winY = y + 60, winW = 140, winH = 110;
+
+    if (night) {
+      ctx.fillStyle = '#0d1a2a'; ctx.fillRect(winX, winY, winW, winH);
+      ctx.fillStyle = '#ffffff';
+      const stars = [[20,20],[40,35],[70,15],[100,40],[120,25],[30,70],[80,80],[110,90],[55,50],[95,60]];
+      for (const [sx, sy] of stars) {
+        ctx.beginPath(); ctx.arc(winX + sx, winY + sy, 1.5, 0, Math.PI*2); ctx.fill();
+      }
+      ctx.fillStyle = '#f0f0c0';
+      ctx.beginPath(); ctx.arc(winX + 110, winY + 30, 10, 0, Math.PI*2); ctx.fill();
+    } else {
+      const skyGrad = ctx.createLinearGradient(winX, winY, winX, winY + winH);
+      skyGrad.addColorStop(0, '#87ceeb');
+      skyGrad.addColorStop(1, '#b0e0f0');
+      ctx.fillStyle = skyGrad; ctx.fillRect(winX, winY, winW, winH);
+      ctx.fillStyle = '#fff4b0';
+      ctx.beginPath(); ctx.arc(winX + 110, winY + 25, 14, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#ffe070';
+      ctx.beginPath(); ctx.arc(winX + 110, winY + 25, 10, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.beginPath(); ctx.arc(winX + 30, winY + 30, 12, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(winX + 45, winY + 28, 15, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(winX + 60, winY + 32, 11, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(winX + 50, winY + 75, 10, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(winX + 65, winY + 73, 12, 0, Math.PI*2); ctx.fill();
+    }
+
+    ctx.strokeStyle = night ? '#7ad7ff' : '#ffffff';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(winX, winY, winW, winH);
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(winX + winW/2, winY); ctx.lineTo(winX + winW/2, winY + winH); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(winX, winY + winH/2); ctx.lineTo(winX + winW, winY + winH/2); ctx.stroke();
+
+    ctx.fillStyle = '#5a4a3a'; ctx.fillRect(x + 80, y + 200, 280, 200);
+    ctx.fillStyle = '#e0e0e0'; ctx.fillRect(x + 80, y + 200, 280, 60);
+    ctx.fillStyle = '#7ad7ff'; ctx.fillRect(x + 80, y + 260, 280, 140);
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(x + 100, y + 215, 80, 35);
+    ctx.fillStyle = '#3a2a1a'; ctx.fillRect(x + 380, y + 220, 70, 70);
+    const lampOn = cell.lamp && cell.lamp.on;
+    ctx.fillStyle = '#3a2a1a'; ctx.fillRect(x + 412, y + 200, 6, 22);
+    ctx.fillStyle = lampOn ? '#fff4b0' : '#ffd166';
+    ctx.beginPath(); ctx.arc(x + 415, y + 200, 15, 0, Math.PI*2); ctx.fill();
+    if (lampOn) {
+      const g = ctx.createRadialGradient(x + 415, y + 200, 0, x + 415, y + 200, 140);
+      g.addColorStop(0, 'rgba(255,244,176,0.45)');
+      g.addColorStop(1, 'rgba(255,244,176,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(x + 415, y + 200, 140, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.fillStyle = '#0a0c0f'; ctx.fillRect(x + 200, y + 80, 160, 90);
+    ctx.strokeStyle = '#00e6b0'; ctx.lineWidth = 2;
+    ctx.strokeRect(x + 200, y + 80, 160, 90);
+    ctx.fillStyle = '#00e6b0'; ctx.fillRect(x + 210, y + 90, 140, 70);
+    ctx.fillStyle = '#00e6b0';
+    ctx.beginPath(); ctx.arc(x + w - 80, y + 220, 30, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#0a0c0f';
+    ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(fmt(gameHours, gameMinutes), x + w - 80, y + 226);
+    ctx.fillStyle = '#2a2a3a';
+    ctx.fillRect(x + 30, y + 30, 180, 50);
+    ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 2;
+    ctx.strokeRect(x + 30, y + 30, 180, 50);
+    ctx.fillStyle = '#ffd166';
+    ctx.font = 'bold 26px sans-serif';
+    ctx.fillText('Room ' + cell.roomNum, x + 120, y + 64);
+    if (cell.roomNum === myRoom && hasKey && !checkedOut) {
+      ctx.fillStyle = '#00e6b0';
+      ctx.font = 'bold 16px sans-serif';
+      ctx.fillText('MY ROOM', x + 120, y + 100);
+    }
+    ctx.fillStyle = '#3a2a1a'; ctx.fillRect(x + 30, y + h - 130, 40, 40);
+    ctx.fillStyle = '#1a5a2a';
+    ctx.beginPath(); ctx.arc(x + 50, y + h - 150, 30, 0, Math.PI*2); ctx.fill();
+  }
+
+  function drawHallCell(cell) {
+    const x = cell.x, y = cell.y, w = cell.w, h = cell.h;
+    ctx.fillStyle = '#2a2030'; ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = '#3a2a40';
+    for (let i = 0; i < 5; i++) ctx.fillRect(x + 40 + i*160, y + 40, 80, h - 80);
+    ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x, y + 30); ctx.lineTo(x + w, y + 30); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x, y + h - 30); ctx.lineTo(x + w, y + h - 30); ctx.stroke();
+    for (let i = 0; i < 3; i++) {
+      ctx.fillStyle = '#ffd166';
+      ctx.beginPath(); ctx.arc(x + 150 + i*250, y + 60, 8, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(x + 150 + i*250, y + h - 60, 8, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.fillStyle = '#3a1a2a';
+    ctx.fillRect(x + 80, y + 10, 80, 50);
+    ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 2;
+    ctx.strokeRect(x + 80, y + 10, 80, 50);
+    ctx.fillStyle = '#ff4d6d'; ctx.beginPath(); ctx.arc(x + 120, y + 35, 15, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#1a3a4a';
+    ctx.fillRect(x + 300, y + 10, 80, 50);
+    ctx.strokeStyle = '#ffd166'; ctx.strokeRect(x + 300, y + 10, 80, 50);
+    ctx.fillStyle = '#7ad7ff'; ctx.beginPath(); ctx.arc(x + 340, y + 35, 15, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#0a0c0f';
+    ctx.fillRect(x + 500, y + 20, 200, 40);
+    ctx.strokeStyle = '#00e6b0'; ctx.lineWidth = 2;
+    ctx.strokeRect(x + 500, y + 20, 200, 40);
+    ctx.fillStyle = '#00e6b0';
+    ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('← Rooms  Elevator →', x + 600, y + 46);
+  }
+
+  function drawRestCell(cell) {
+    const x = cell.x, y = cell.y, w = cell.w, h = cell.h;
+    ctx.fillStyle = '#3a2a1a'; ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = '#4a3a2a'; ctx.fillRect(x + 20, y + 20, w - 40, h - 40);
+    ctx.fillStyle = '#5a2a3a'; ctx.fillRect(x + 40, y + 60, w - 80, h - 120);
+    for (let i = 0; i < 3; i++) {
+      ctx.fillStyle = '#2a3a5a';
+      ctx.fillRect(x + 80 + i*220, y + 130, 180, 80);
+      ctx.fillStyle = '#1a2a4a';
+      ctx.fillRect(x + 80 + i*220, y + 130, 180, 20);
+    }
+    ctx.fillStyle = '#3a2a1a'; ctx.fillRect(x + 200, y + 300, 400, 80);
+    ctx.fillStyle = '#5a4a3a'; ctx.fillRect(x + 220, y + 320, 360, 40);
+    for (let i = 0; i < 3; i++) {
+      ctx.fillStyle = '#e0e0e0';
+      ctx.beginPath(); ctx.arc(x + 280 + i*120, y + 340, 12, 0, Math.PI*2); ctx.fill();
+    }
+    drawTree(x + 50, y + h - 100);
+    drawTree(x + w - 50, y + h - 100);
+    ctx.fillStyle = '#ffd166';
+    ctx.font = 'bold 26px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('REST ROOM', x + w/2, y + 50);
+  }
+
+  function drawOnsenCell(cell) {
+    const x = cell.x, y = cell.y, w = cell.w, h = cell.h;
+    ctx.fillStyle = '#0d1a1a'; ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = '#2a3a3a';
+    for (let i = 0; i < 30; i++) {
+      const rx = x + (i*137)%w;
+      const ry = y + (i*89)%h;
+      ctx.beginPath(); ctx.arc(rx, ry, 20, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.fillStyle = '#1a3a4a';
+    ctx.beginPath(); ctx.arc(x + w/2, y + h/2 + 60, 220, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#7ad7ff'; ctx.lineWidth = 4; ctx.stroke();
+    ctx.fillStyle = 'rgba(200,230,255,0.4)';
+    for (let i = 0; i < 12; i++) {
+      ctx.beginPath();
+      ctx.arc(x + w/2 - 150 + (i%4)*100, y + h/2 + 20 + Math.floor(i/4)*60, 4, 0, Math.PI*2);
+      ctx.fill();
+    }
+    for (let i = 0; i < 6; i++) {
+      ctx.fillStyle = 'rgba(200,230,255,0.15)';
+      ctx.beginPath(); ctx.arc(x + 200 + i*80, y + 200 - (i%3)*30, 50, 0, Math.PI*2); ctx.fill();
+    }
+    for (let i = 0; i < 8; i++) {
+      ctx.fillStyle = '#5a4a2a';
+      ctx.fillRect(x + 40 + i*100, y + 50, 8, 60);
+    }
+    ctx.fillStyle = '#7ad7ff';
+    ctx.font = 'bold 28px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('ONSEN', x + w/2, y + 130);
+  }
+
+  function drawGachaCell(cell) {
+    const x = cell.x, y = cell.y, w = cell.w, h = cell.h;
+    ctx.fillStyle = '#1a1a24'; ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = '#2a1a2a'; ctx.fillRect(x + 20, y + 20, w - 40, h - 40);
+    ctx.fillStyle = '#3a1a2a';
+    ctx.fillRect(x + w/2 - 220, y + h/2 - 120, 440, 260);
+    ctx.strokeStyle = '#ff8ad8'; ctx.lineWidth = 4;
+    ctx.strokeRect(x + w/2 - 220, y + h/2 - 120, 440, 260);
+    ctx.fillStyle = '#1a0a14';
+    ctx.fillRect(x + w/2 - 180, y + h/2 - 80, 360, 180);
+    for (let i = 0; i < 12; i++) {
+      ctx.fillStyle = ['#ff4d6d','#00e6b0','#ffd166','#7ad7ff','#ff8ad8'][i%5];
+      ctx.beginPath(); ctx.arc(x + w/2 - 160 + (i%4)*100, y + h/2 - 40 + Math.floor(i/4)*60, 26, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.fillStyle = '#ffd166';
+    ctx.beginPath(); ctx.arc(x + w/2 + 180, y + h/2 + 40, 20, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#ff8ad8';
+    ctx.font = 'bold 28px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('GACHAPON', x + w/2, y + 80);
+  }
+
+  function drawBanquetCell(cell) {
+    const x = cell.x, y = cell.y, w = cell.w, h = cell.h;
+    ctx.fillStyle = '#1a1218'; ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = '#2a1a2a'; ctx.fillRect(x + 20, y + 20, w - 40, h - 40);
+    ctx.fillStyle = '#3a1a2a';
+    ctx.fillRect(x + w/2 - 280, y + 80, 560, 160);
+    ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 3;
+    ctx.strokeRect(x + w/2 - 280, y + 80, 560, 160);
+    ctx.fillStyle = '#5a2a3a';
+    for (let i = 0; i < 8; i++) {
+      ctx.beginPath();
+      ctx.moveTo(x + w/2 - 280 + i*70, y + 80);
+      ctx.lineTo(x + w/2 - 280 + i*70 + 35, y + 80);
+      ctx.lineTo(x + w/2 - 280 + i*70 + 35, y + 140);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.fillStyle = 'rgba(255,209,102,0.15)';
+    ctx.beginPath();
+    ctx.moveTo(x + w/2 - 100, y + 80);
+    ctx.lineTo(x + w/2 + 100, y + 80);
+    ctx.lineTo(x + w/2 + 200, y + h);
+    ctx.lineTo(x + w/2 - 200, y + h);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#ffd166';
+    ctx.font = 'bold 28px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('BANQUET HALL', x + w/2, y + 50);
+    for (let i = 0; i < 6; i++) {
+      const tx = x + 130 + (i%3)*260;
+      const ty = y + 400 + Math.floor(i/3)*130;
+      ctx.fillStyle = '#e0e0e0';
+      ctx.beginPath(); ctx.arc(tx, ty, 55, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 2;
+      ctx.stroke();
+      for (let j = 0; j < 6; j++) {
+        const ang = j / 6 * Math.PI * 2;
+        ctx.fillStyle = '#3a2a1a';
+        ctx.beginPath();
+        ctx.arc(tx + Math.cos(ang)*80, ty + Math.sin(ang)*80, 12, 0, Math.PI*2);
+        ctx.fill();
+      }
+    }
+  }
+
+  function drawElevatorCell(cell) {
+    const x = cell.x, y = cell.y, w = cell.w, h = cell.h;
+    ctx.fillStyle = '#1a2a3a'; ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = '#2a4a6a';
+    ctx.fillRect(x + w/2 - 140, y + h/2 - 140, 280, 280);
+    ctx.strokeStyle = '#7ad7ff'; ctx.lineWidth = 4;
+    ctx.strokeRect(x + w/2 - 140, y + h/2 - 140, 280, 280);
+    ctx.fillStyle = '#0a0c0f';
+    ctx.fillRect(x + w/2 - 2, y + h/2 - 140, 4, 280);
+    ctx.fillStyle = '#0a0c0f';
+    ctx.fillRect(x + w/2 - 60, y + h/2 - 220, 120, 50);
+    ctx.fillStyle = '#7ad7ff';
+    ctx.font = 'bold 32px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText((cell.floorTag||1) + 'F', x + w/2, y + h/2 - 180);
+    ctx.fillStyle = '#ffd166';
+    ctx.beginPath();
+    ctx.moveTo(x + w/2 - 30, y + h/2 - 220);
+    ctx.lineTo(x + w/2 - 20, y + h/2 - 240);
+    ctx.lineTo(x + w/2 - 10, y + h/2 - 220);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(x + w/2 + 10, y + h/2 - 220);
+    ctx.lineTo(x + w/2 + 20, y + h/2 - 200);
+    ctx.lineTo(x + w/2 + 30, y + h/2 - 220);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#7ad7ff';
+    ctx.font = 'bold 24px sans-serif';
+    ctx.fillText('ELEVATOR', x + w/2, y + h/2 + 40);
+  }
+
+  function drawStairsCell(cell) {
+    const x = cell.x, y = cell.y, w = cell.w, h = cell.h;
+    ctx.fillStyle = '#2a2a2a';
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = '#3a3a3a';
+    for (let i = 0; i < 40; i++) {
+      const rx = x + (i*137)%w;
+      const ry = y + (i*89)%h;
+      ctx.fillRect(rx, ry, 20, 20);
+    }
+    ctx.fillStyle = 'rgba(0,230,176,0.2)';
+    ctx.fillRect(x, y, w, 40);
+    ctx.fillStyle = '#00e6b0';
+    ctx.font = 'bold 16px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('▼ ENTRANCE ▼', x + w/2, y + 26);
+    ctx.fillStyle = 'rgba(255,209,102,0.2)';
+    ctx.fillRect(x, y + h - 40, w, 40);
+    ctx.fillStyle = '#ffd166';
+    ctx.font = 'bold 16px sans-serif';
+    ctx.fillText('▼ EXIT ▼', x + w/2, y + h - 14);
+    ctx.fillStyle = '#00e6b0';
+    ctx.font = 'bold 20px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('STAIRS ' + (cell.floorTag||1) + 'F', x + w/2, y + h - 50);
+    ctx.beginPath();
+    ctx.moveTo(x + w/2 - 20, y + h - 80);
+    ctx.lineTo(x + w/2 + 20, y + h - 80);
+    ctx.lineTo(x + w/2, y + h - 60);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function drawPresentationCell(cell) {
+    const x = cell.x, y = cell.y, w = cell.w, h = cell.h;
+    ctx.fillStyle = '#1a1e2a'; ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = '#7ad7ff'; ctx.lineWidth = 3;
+    ctx.strokeRect(x, y, w, h);
+    ctx.fillStyle = '#7ad7ff';
+    ctx.font = 'bold 26px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('PRESENTATION ROOM', x + w/2, y + 50);
+    ctx.fillStyle = '#0d131a';
+    ctx.fillRect(x + 80, y + 60, w - 160, h - 200);
+    ctx.strokeStyle = '#00e6b0';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(x + 80, y + 60, w - 160, h - 200);
+    for (let i = 0; i < 3; i++) {
+      for (let j = 0; j < 4; j++) {
+        ctx.fillStyle = '#2a3a4a';
+        ctx.fillRect(x + 150 + j*130, y + h - 120 + i*0, 60, 40);
+      }
+    }
+  }
+
+  function drawDoor(dr, open) {
+    if (open) {
+      ctx.fillStyle = 'rgba(42,90,58,0.55)';
+      ctx.fillRect(dr.x, dr.y, dr.w, dr.h);
+      ctx.strokeStyle = '#00e6b0'; ctx.lineWidth = 2;
+      ctx.strokeRect(dr.x, dr.y, dr.w, dr.h);
+    } else {
+      ctx.fillStyle = '#5a3a1a';
+      ctx.fillRect(dr.x, dr.y, dr.w, dr.h);
+      ctx.strokeStyle = dr.locked ? '#ff4d6d' : '#ffd166';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(dr.x, dr.y, dr.w, dr.h);
+      ctx.fillStyle = dr.locked ? '#ff4d6d' : '#ffd166';
+      ctx.beginPath();
+      ctx.arc(dr.x + dr.w/2, dr.y + dr.h/2, 3, 0, Math.PI*2);
+      ctx.fill();
+    }
+  }
+
+  function drawTree(x, y) {
+    ctx.fillStyle = '#3a2a1a';
+    ctx.fillRect(x - 6, y, 12, 30);
+    ctx.fillStyle = '#1a5a2a';
+    ctx.beginPath(); ctx.arc(x, y - 10, 26, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#2a7a3a';
+    ctx.beginPath(); ctx.arc(x - 10, y - 20, 18, 0, Math.PI*2); ctx.fill();
+  }
+
+  function drawTaxi(x, y) {
+    ctx.fillStyle = '#ffd166';
+    ctx.fillRect(x, y, 140, 60);
+    ctx.fillStyle = '#1a2a3a';
+    ctx.fillRect(x + 25, y + 10, 90, 26);
+    ctx.fillStyle = '#0a0c0f';
+    ctx.beginPath(); ctx.arc(x + 30, y + 60, 13, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x + 110, y + 60, 13, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#000';
+    ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('TAXI', x + 70, y + 36);
+  }
+
+  function drawPerson(x, y, bodyColor, hairColor, name, angle) {
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.beginPath(); ctx.ellipse(x, y+18, 14, 5, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = bodyColor;
+    ctx.fillRect(x-10, y-6, 20, 26);
+    ctx.fillStyle = '#e0b090';
+    ctx.beginPath(); ctx.arc(x, y-16, 10, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = hairColor;
+    ctx.beginPath(); ctx.arc(x, y-20, 10, Math.PI, Math.PI*2); ctx.fill();
+    if (angle !== undefined) {
+      ctx.strokeStyle = bodyColor; ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + Math.cos(angle)*18, y + Math.sin(angle)*18);
+      ctx.stroke();
+    }
+    if (name) {
+      ctx.fillStyle = '#b0c8d8';
+      ctx.font = 'bold 13px "Hiragino Sans","Yu Gothic",sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(name, x, y - 34);
+    }
+  }
+
+  function drawPlayer() {
+    const x = player.x, y = player.y;
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.beginPath(); ctx.ellipse(x, y+16, 12, 4, 0, 0, Math.PI*2); ctx.fill();
+    ctx.shadowColor = '#00e6b0'; ctx.shadowBlur = 18;
+    ctx.fillStyle = '#0a1a1a';
+    ctx.beginPath(); ctx.arc(x, y, player.radius, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#00e6b0'; ctx.lineWidth = 2.5; ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#00e6b0'; ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + Math.cos(player.angle)*26, y + Math.sin(player.angle)*26);
+    ctx.stroke();
+    ctx.fillStyle = '#00e6b0';
+    ctx.beginPath();
+    ctx.arc(x + Math.cos(player.angle)*26, y + Math.sin(player.angle)*26, 4, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  function drawOverlay() {
+    if (activeDoor && !conversation) {
+      ctx.fillStyle = '#7ad7ff';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.textAlign = 'center';
+      let label;
+      if (activeDoor.locked) label = 'Locked - use key from INFO PANEL';
+      else if (activeDoor.open) label = 'Click to close';
+      else label = 'Click to open';
+      ctx.fillText(label, activeDoor.x + activeDoor.w/2, activeDoor.y - 10);
+    }
+    if (activeElevator && !conversation) {
+      ctx.fillStyle = '#7ad7ff'; ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('Click to choose a floor', W/2, 40);
+    }
+    if (activeStairs && !conversation) {
+      ctx.fillStyle = '#00e6b0'; ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('Click to use the stairs (next floor)', W/2, 70);
+    }
+    ctx.fillStyle = '#00e6b0';
+    ctx.font = 'bold 20px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(currentAreaName(), 20, 30);
+    if (activeNPC && !conversation) {
+      ctx.fillStyle = '#00e6b0';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.textAlign = 'center';
+      const nx = (activeNPC.baseX !== undefined) ? activeNPC.baseX : activeNPC.x;
+      const ny = (activeNPC.baseY !== undefined) ? activeNPC.baseY : activeNPC.y;
+      ctx.fillText('Click to talk', nx, ny - 50);
+    }
+    if (presViewOpen && currentPresentation) {
+      ctx.fillStyle = 'rgba(13,19,26,0.9)';
+      ctx.fillRect(W/2 - 300, H - 80, 600, 60);
+      ctx.strokeStyle = '#00e6b0'; ctx.lineWidth = 2;
+      ctx.strokeRect(W/2 - 300, H - 80, 600, 60);
+      ctx.fillStyle = '#00e6b0';
+      ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(`Presentation ${presSlideIndex+1} / ${currentPresentation.slides.length} — Click to advance`, W/2, H - 45);
+    }
+  }
+
+  function gameLoop(timestamp) {
+    const dt = Math.min(2, (timestamp - lastTime) / (1000/60));
+    lastTime = timestamp;
+    update(dt);
+    draw();
+    requestAnimationFrame(gameLoop);
+  }
+
+  const opening = document.getElementById('opening');
+  const startBtn = document.getElementById('startBtn');
+  const bgViewBtn = document.getElementById('bgViewBtn');
+  const bgViewer = document.getElementById('bgViewer');
+  const closeBgBtn = document.getElementById('closeBgBtn');
+
+  startBtn.addEventListener('click', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    gameStarted = true;
+    if (opening && opening.parentNode) {
+      opening.parentNode.removeChild(opening);
+    }
+    lastTime = performance.now();
+    showToast('Welcome to the hotel! Pay ¥10,000 at the reception (Lobby, 7:00-19:00).', 4);
+  });
+  bgViewBtn.addEventListener('click', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    bgViewer.classList.remove('hidden');
+  });
+  closeBgBtn.addEventListener('click', e => {
+    e.preventDefault();
+    bgViewer.classList.add('hidden');
+  });
+
+  initGame();
+  requestAnimationFrame(gameLoop);
+})();
+</script>
+</body>
+</html>
