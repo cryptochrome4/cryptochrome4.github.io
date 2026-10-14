@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ROBOT CARD GAME</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    background: #000;
+    font-family: "Segoe UI", "Hiragino Sans", "Yu Gothic", sans-serif;
+    color: #cff;
+  }
+
+  /* =====================
+     オープニング
+  ===================== */
+  #opening {
+    position: fixed; inset: 0;
+    background-image: url("img229card.jpg");
+    background-size: 100% 100%;
+    background-position: center;
+    background-repeat: no-repeat;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+  }
+  #opening::before {
+    content: ""; position: absolute; inset: 0;
+    background: rgba(0,0,0,0.4); z-index: 0;
+  }
+  #opening .title {
+    position: relative; z-index: 1;
+    color: #fff;
+    font-size: clamp(28px, 6vw, 64px);
+    letter-spacing: 0.15em;
+    text-shadow: 0 0 10px #0ff, 0 0 20px #0af, 0 0 40px #06f;
+    margin-bottom: 20px;
+    text-align: center;
+  }
+  #opening .subtitle {
+    position: relative; z-index: 1;
+    color: #cff;
+    font-size: clamp(12px, 2vw, 18px);
+    letter-spacing: 0.3em;
+    margin-bottom: 50px;
+    text-shadow: 0 0 8px #0af;
+  }
+  .btn-area {
+    position: relative; z-index: 1;
+    display: flex; flex-direction: column; gap: 16px; align-items: center;
+  }
+  .btn {
+    min-width: 220px;
+    padding: 12px 28px;
+    font-size: clamp(14px, 2vw, 20px);
+    letter-spacing: 0.2em;
+    color: #e8ffff;
+    background: linear-gradient(180deg, #0a2a3a 0%, #041018 100%);
+    border: 2px solid #0ff;
+    border-radius: 8px;
+    cursor: pointer;
+    text-shadow: 0 0 6px #0ff;
+    box-shadow: 0 0 10px rgba(0,255,255,0.5), inset 0 0 12px rgba(0,255,255,0.2);
+    transition: all 0.2s ease;
+  }
+  .btn:hover {
+    background: linear-gradient(180deg, #0f4a5a 0%, #062028 100%);
+    box-shadow: 0 0 20px rgba(0,255,255,0.9), inset 0 0 18px rgba(0,255,255,0.4);
+    transform: translateY(-2px);
+  }
+  .btn:active { transform: translateY(1px); }
+  .btn:disabled {
+    opacity: 0.35; cursor: not-allowed;
+    box-shadow: none; transform: none;
+  }
+
+  /* 背景ビューア */
+  #bgViewer {
+    position: fixed; inset: 0; z-index: 200;
+    background: #000;
+    display: none; justify-content: center; align-items: center;
+  }
+  #bgViewer.active { display: flex; }
+  #bgViewer img {
+    width: 100%; height: 100%;
+    object-fit: fill; display: block;
+  }
+  #bgViewer .close-viewer {
+    position: absolute; top: 20px; right: 20px; z-index: 210;
+    padding: 10px 24px;
+    color: #fff;
+    background: rgba(0,0,0,0.6);
+    border: 2px solid #0ff;
+    border-radius: 6px;
+    cursor: pointer;
+    letter-spacing: 0.15em;
+  }
+  #bgViewer .close-viewer:hover { background: rgba(0,255,255,0.3); }
+
+  /* =====================
+     ゲーム画面
+  ===================== */
+  #game {
+    position: fixed; inset: 0;
+    display: none;
+    flex-direction: column;
+    background: radial-gradient(circle at 50% 0%, #0a1a2a 0%, #03060a 70%);
+    z-index: 50;
+    overflow: hidden;
+  }
+  #game.active { display: flex; }
+
+  #topBar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 16px;
+    background: rgba(0,20,30,0.85);
+    border-bottom: 1px solid #0ff;
+    font-size: 14px;
+    letter-spacing: 0.1em;
+    flex-shrink: 0;
+  }
+  #topBar .clock { color: #0ff; text-shadow: 0 0 6px #0ff; }
+  #topBar .money { color: #ff0; text-shadow: 0 0 6px #ff0; }
+
+  #main {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+  }
+
+  #packArea {
+    flex: 1.4;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 12px;
+    position: relative;
+  }
+
+  #packCardWrap {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+  #packCardWrap.active { display: flex; }
+
+  /* 遊戯王風カード */
+  .ygo-card {
+    width: 260px;
+    height: 380px;
+    background: linear-gradient(160deg, #d4a24a 0%, #b07d2a 40%, #8a5f1c 100%);
+    border-radius: 10px;
+    padding: 8px;
+    box-shadow: 0 0 20px rgba(255,200,80,0.5), 0 0 40px rgba(0,0,0,0.8);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+  .ygo-card.space {
+    background: linear-gradient(160deg, #4a6ad4 0%, #2a3fb0 40%, #1c288a 100%);
+    box-shadow: 0 0 20px rgba(120,160,255,0.6), 0 0 40px rgba(0,0,0,0.8);
+  }
+  .ygo-card.ur {
+    background: linear-gradient(160deg, #e0c060 0%, #c09020 30%, #8050a0 70%, #5030a0 100%);
+    box-shadow: 0 0 30px rgba(255,220,100,0.9), 0 0 60px rgba(160,100,255,0.6);
+  }
+  .ygo-card.sr {
+    background: linear-gradient(160deg, #b0a0e0 0%, #7050c0 40%, #4030a0 100%);
+    box-shadow: 0 0 25px rgba(180,150,255,0.8), 0 0 50px rgba(0,0,0,0.8);
+  }
+
+  .ygo-name {
+    font-size: 12px;
+    font-weight: bold;
+    color: #fff;
+    background: rgba(0,0,0,0.5);
+    padding: 4px 8px;
+    border-radius: 4px;
+    text-align: center;
+    letter-spacing: 0.05em;
+    min-height: 24px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+  }
+  .ygo-attr-mark {
+    display: inline-block;
+    width: 18px; height: 18px;
+    line-height: 18px;
+    text-align: center;
+    border-radius: 50%;
+    font-size: 11px;
+    font-weight: bold;
+  }
+  .ygo-attr-mark.earth { background: #2a8a2a; color: #fff; }
+  .ygo-attr-mark.space { background: #2a4ad0; color: #fff; }
+
+  .ygo-art {
+    flex: 1;
+    margin: 6px 0;
+    background: #0a0a12;
+    border: 2px solid rgba(255,255,255,0.4);
+    border-radius: 4px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+  }
+  .ygo-art canvas {
+    width: 100%; height: 100%;
+    image-rendering: pixelated;
+  }
+
+  .ygo-stats {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    font-weight: bold;
+    color: #fff;
+    background: rgba(0,0,0,0.5);
+    padding: 3px 8px;
+    border-radius: 4px;
+  }
+  .ygo-effect {
+    font-size: 10px;
+    color: #fff;
+    background: rgba(0,0,0,0.45);
+    padding: 4px 6px;
+    border-radius: 4px;
+    margin-top: 4px;
+    min-height: 34px;
+    line-height: 1.2;
+  }
+
+  .pack-controls {
+    display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
+    margin-top: 8px;
+  }
+  .pack-controls .btn { min-width: 90px; padding: 8px 14px; font-size: 12px; }
+
+  #buyArea {
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+  }
+
+  #infoPanel {
+    flex: 1;
+    border-left: 1px solid #0ff;
+    display: flex;
+    flex-direction: column;
+    background: rgba(0,10,20,0.9);
+    overflow: hidden;
+  }
+  #infoPanel h3 {
+    font-size: 13px;
+    padding: 8px;
+    letter-spacing: 0.15em;
+    color: #0ff;
+    border-bottom: 1px solid #0ff;
+    text-shadow: 0 0 6px #0ff;
+  }
+  #sortSelect {
+    margin: 6px 8px;
+    padding: 4px;
+    background: #041018;
+    color: #cff;
+    border: 1px solid #0ff;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+  #infoList {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px 8px 8px;
+  }
+  .info-item {
+    padding: 5px 6px;
+    font-size: 12px;
+    border-bottom: 1px solid rgba(0,255,255,0.15);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #cff;
+  }
+  .info-item:hover { background: rgba(0,255,255,0.12); }
+
+  #priceTable {
+    border-top: 1px solid #0ff;
+    max-height: 38%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  #priceTable h3 {
+    font-size: 12px;
+    padding: 6px 8px;
+    color: #ff0;
+    border-bottom: 1px solid #ff0;
+    letter-spacing: 0.1em;
+    text-shadow: 0 0 6px #ff0;
+  }
+  #priceList {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+  .price-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 2px 0;
+    border-bottom: 1px dashed rgba(255,255,0,0.2);
+    color: #ffd;
+  }
+  .price-row .up { color: #4f4; }
+  .price-row .down { color: #f66; }
+
+  /* モーダル */
+  #modal {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.85);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 300;
+  }
+  #modal.active { display: flex; }
+  #modalInner {
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+  }
+  #modalControls {
+    display: flex; gap: 12px;
+  }
+  #modalControls .btn { min-width: 120px; }
+
+  /* footer */
+  #footer {
+    flex-shrink: 0;
+    height: 22px;
+    background: rgba(0,0,0,0.9);
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    padding: 0 12px;
+    font-size: 11px;
+  }
+  #studyLink {
+    display: none;
+    color: #0a4a4a;
+    text-decoration: none;
+    letter-spacing: 0.1em;
+  }
+  #studyLink:hover { color: #0ff; text-shadow: 0 0 6px #0ff; }
+  #studyLink.visible { display: inline; }
+</style>
+</head>
+<body>
+
+<!-- オープニング -->
+<div id="opening">
+  <div class="title">ROBOT CARD GAME</div>
+  <div class="subtitle">- EARTH &amp; SPACE -</div>
+  <div class="btn-area">
+    <button class="btn" id="startBtn">はじめる</button>
+    <button class="btn" id="viewBgBtn">背景画像を見る</button>
+  </div>
+</div>
+
+<!-- 背景ビューア -->
+<div id="bgViewer">
+  <img src="img229card.jpg" alt="背景画像">
+  <button class="close-viewer" id="closeViewerBtn">CLOSE</button>
+</div>
+
+<!-- ゲーム -->
+<div id="game">
+  <div id="topBar">
+    <div class="clock" id="clock">00:00:00</div>
+    <div class="money" id="moneyDisplay">所持金：200円</div>
+  </div>
+
+  <div id="main">
+    <div id="packArea">
+      <div id="buyArea">
+        <button class="btn" id="buyPackBtn">パックを買う（200円）</button>
+        <div style="font-size:11px;color:#8ac;">1パック = 7枚</div>
+      </div>
+
+      <div id="packCardWrap">
+        <div class="ygo-card" id="packCard">
+          <div class="ygo-name" id="packName"></div>
+          <div class="ygo-art"><canvas id="packCanvas" width="120" height="120"></canvas></div>
+          <div class="ygo-stats">
+            <span id="packAtk">ATK 0</span>
+            <span id="packDef">DEF 0</span>
+          </div>
+          <div class="ygo-effect" id="packEffect"></div>
+        </div>
+        <div class="pack-controls">
+          <button class="btn" id="prevBtn">PREV</button>
+          <button class="btn" id="nextBtn">NEXT</button>
+          <button class="btn" id="sellNowBtn">その場で売る</button>
+          <button class="btn" id="endPackBtn">売らずに開封終了</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="infoPanel">
+      <h3>入手カード</h3>
+      <select id="sortSelect">
+        <option value="obtained">入手順</option>
+        <option value="rarity">レア度順</option>
+        <option value="atk">攻撃力が高い順</option>
+        <option value="defLow">守備力が低い順</option>
+        <option value="earth">地球属性順</option>
+        <option value="space">宇宙属性順</option>
+      </select>
+      <div id="infoList"></div>
+
+      <div id="priceTable">
+        <h3>買取相場表</h3>
+        <div id="priceList"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="footer">
+    <a href="control.html" id="studyLink">control.html</a>
+  </div>
+</div>
+
+<!-- モーダル -->
+<div id="modal">
+  <div id="modalInner">
+    <div class="ygo-card" id="modalCard">
+      <div class="ygo-name" id="modalName"></div>
+      <div class="ygo-art"><canvas id="modalCanvas" width="120" height="120"></canvas></div>
+      <div class="ygo-stats">
+        <span id="modalAtk">ATK 0</span>
+        <span id="modalDef">DEF 0</span>
+      </div>
+      <div class="ygo-effect" id="modalEffect"></div>
+    </div>
+    <div id="modalControls">
+      <button class="btn" id="modalCloseBtn">CLOSE</button>
+      <button class="btn" id="modalSellBtn">売る</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   完全固定カードマスター（50枚）
+   ノーマル30 / レア12 / スーパーレア6 / ウルトラレア2
+========================================================= */
+
+const CARD_MASTER = [
+  /* ---------- ノーマル 30枚 ---------- */
+  { name:"IRON GUARD",          attr:"地", rarity:"N",  atk:15, def:25, effect:"守備力+5",                 basePrice:8,  robot:{head:"square",  eyes:2, body:"armor",arms:"normal",legs:"biped",wings:false,antenna:false,core:false,color:"#6a6a5a",accent:"#ccff66"}},
+  { name:"TERRA SOLDIER",       attr:"地", rarity:"N",  atk:20, def:18, effect:"攻撃力+5",                 basePrice:9,  robot:{head:"square",  eyes:2, body:"slim", arms:"normal",legs:"biped",wings:false,antenna:true, core:false,color:"#8a7a4a",accent:"#ffcc44"}},
+  { name:"SPACE SCOUT",         attr:"宇", rarity:"N",  atk:18, def:14, effect:"宇宙属性として扱う",       basePrice:10, robot:{head:"round",   eyes:1, body:"slim", arms:"normal",legs:"hover",wings:false,antenna:true, core:false,color:"#4a6a8a",accent:"#66ccff"}},
+  { name:"アイアンのまもり",     attr:"地", rarity:"N",  atk:10, def:30, effect:"守備力+8",                 basePrice:7,  robot:{head:"square",  eyes:2, body:"thick",arms:"normal",legs:"biped",wings:false,antenna:false,core:false,color:"#7a6a4a",accent:"#aaff88"}},
+  { name:"コスモのはばたき",     attr:"宇", rarity:"N",  atk:16, def:16, effect:"攻撃力+5",                 basePrice:10, robot:{head:"round",   eyes:2, body:"slim", arms:"normal",legs:"hover",wings:true, antenna:false,core:false,color:"#5a5a9a",accent:"#88ddff"}},
+  { name:"GIGA BREAKER",        attr:"地", rarity:"N",  atk:28, def:12, effect:"攻撃力+6",                 basePrice:12, robot:{head:"hex",     eyes:1, body:"thick",arms:"drill", legs:"tank", wings:false,antenna:false,core:false,color:"#8a5a3a",accent:"#ffaa33"}},
+  { name:"ORBIT CANNON",        attr:"宇", rarity:"N",  atk:26, def:14, effect:"攻撃力+6",                 basePrice:12, robot:{head:"square",  eyes:2, body:"armor",arms:"cannon",legs:"biped",wings:false,antenna:true, core:true, color:"#3a4a7a",accent:"#66ddff"}},
+  { name:"グラビティのしずみ",   attr:"宇", rarity:"N",  atk:14, def:26, effect:"守備力+6",                 basePrice:9,  robot:{head:"round",   eyes:3, body:"thick",arms:"normal",legs:"quad", wings:false,antenna:false,core:true, color:"#4a3a6a",accent:"#bb88ff"}},
+  { name:"メテオのながれ",       attr:"宇", rarity:"N",  atk:24, def:16, effect:"攻撃力+5",                 basePrice:11, robot:{head:"triangle",eyes:2, body:"slim", arms:"claw",  legs:"hover",wings:true, antenna:false,core:false,color:"#6a4a3a",accent:"#ff8844"}},
+  { name:"サンライズのあけぼの", attr:"地", rarity:"N",  atk:18, def:20, effect:"守備力+5",                 basePrice:9,  robot:{head:"round",   eyes:2, body:"slim", arms:"normal",legs:"biped",wings:false,antenna:true, core:false,color:"#aa7a3a",accent:"#ffee66"}},
+  { name:"ルナティックのつきかげ",attr:"宇", rarity:"N", atk:22, def:18, effect:"攻撃力+5",                 basePrice:11, robot:{head:"triangle",eyes:1, body:"slim", arms:"claw",  legs:"hover",wings:false,antenna:true, core:false,color:"#3a3a5a",accent:"#ccccff"}},
+  { name:"ZERO FRAME",          attr:"地", rarity:"N",  atk:12, def:22, effect:"守備力+6",                 basePrice:7,  robot:{head:"square",  eyes:2, body:"frame",arms:"normal",legs:"biped",wings:false,antenna:false,core:false,color:"#666666",accent:"#99ff99"}},
+  { name:"NOVA SHIELD",         attr:"地", rarity:"N",  atk:14, def:28, effect:"守備力+8",                 basePrice:9,  robot:{head:"hex",     eyes:2, body:"armor",arms:"normal",legs:"biped",wings:false,antenna:false,core:true, color:"#5a6a5a",accent:"#ccffaa"}},
+  { name:"ASTRO DRONE",         attr:"宇", rarity:"N",  atk:20, def:12, effect:"攻撃力+6",                 basePrice:10, robot:{head:"round",   eyes:3, body:"slim", arms:"normal",legs:"hover",wings:true, antenna:true, core:false,color:"#3a5a7a",accent:"#66aaff"}},
+  { name:"テラのめざめ",         attr:"地", rarity:"N",  atk:16, def:22, effect:"守備力+6",                 basePrice:9,  robot:{head:"round",   eyes:2, body:"thick",arms:"normal",legs:"biped",wings:false,antenna:false,core:true, color:"#7a7a4a",accent:"#ffee88"}},
+  { name:"COSMO FANG",          attr:"宇", rarity:"N",  atk:27, def:11, effect:"攻撃力+7",                 basePrice:12, robot:{head:"triangle",eyes:1, body:"slim", arms:"claw",  legs:"quad", wings:false,antenna:false,core:false,color:"#4a4a8a",accent:"#aa88ff"}},
+  { name:"BOLT RUNNER",         attr:"地", rarity:"N",  atk:22, def:14, effect:"攻撃力+5",                 basePrice:10, robot:{head:"square",  eyes:2, body:"slim", arms:"normal",legs:"biped",wings:false,antenna:true, core:false,color:"#8a8a3a",accent:"#ffff66"}},
+  { name:"SPACE EDGE",          attr:"宇", rarity:"N",  atk:25, def:15, effect:"攻撃力+6",                 basePrice:11, robot:{head:"hex",     eyes:2, body:"frame",arms:"claw",  legs:"hover",wings:false,antenna:true, core:false,color:"#3a6a6a",accent:"#66ffdd"}},
+  { name:"オービットのまわり",   attr:"宇", rarity:"N",  atk:13, def:27, effect:"守備力+7",                 basePrice:9,  robot:{head:"round",   eyes:2, body:"armor",arms:"normal",legs:"hover",wings:false,antenna:false,core:true, color:"#4a5a8a",accent:"#88ccff"}},
+  { name:"IRON WALL",           attr:"地", rarity:"N",  atk:11, def:32, effect:"守備力+9",                 basePrice:8,  robot:{head:"square",  eyes:2, body:"thick",arms:"normal",legs:"biped",wings:false,antenna:false,core:false,color:"#6a5a4a",accent:"#ffcc88"}},
+  { name:"LUNA SCOUT",          attr:"宇", rarity:"N",  atk:17, def:19, effect:"攻撃力+4",                 basePrice:10, robot:{head:"round",   eyes:1, body:"slim", arms:"normal",legs:"hover",wings:false,antenna:true, core:false,color:"#5a5a7a",accent:"#ccccff"}},
+  { name:"ギガのはしり",         attr:"地", rarity:"N",  atk:24, def:13, effect:"攻撃力+6",                 basePrice:11, robot:{head:"hex",     eyes:2, body:"slim", arms:"drill", legs:"biped",wings:false,antenna:false,core:false,color:"#8a6a3a",accent:"#ffbb44"}},
+  { name:"METEOR FIST",         attr:"宇", rarity:"N",  atk:26, def:14, effect:"攻撃力+6",                 basePrice:12, robot:{head:"triangle",eyes:2, body:"thick",arms:"claw",  legs:"biped",wings:false,antenna:false,core:false,color:"#7a4a3a",accent:"#ff8866"}},
+  { name:"AURORA CORE",         attr:"宇", rarity:"N",  atk:15, def:25, effect:"守備力+6",                 basePrice:10, robot:{head:"round",   eyes:3, body:"armor",arms:"normal",legs:"hover",wings:true, antenna:false,core:true, color:"#3a7a7a",accent:"#88ffee"}},
+  { name:"アイアンのいのり",     attr:"地", rarity:"N",  atk:12, def:24, effect:"守備力+7",                 basePrice:8,  robot:{head:"square",  eyes:2, body:"frame",arms:"normal",legs:"biped",wings:false,antenna:true, core:false,color:"#7a7a6a",accent:"#ccffcc"}},
+  { name:"STORM LANCE",         attr:"宇", rarity:"N",  atk:23, def:17, effect:"攻撃力+5",                 basePrice:11, robot:{head:"triangle",eyes:2, body:"slim", arms:"cannon",legs:"hover",wings:false,antenna:true, core:false,color:"#4a6a8a",accent:"#66ddff"}},
+  { name:"テラのちかい",         attr:"地", rarity:"N",  atk:19, def:21, effect:"守備力+5",                 basePrice:9,  robot:{head:"square",  eyes:2, body:"slim", arms:"normal",legs:"biped",wings:false,antenna:false,core:true, color:"#8a8a5a",accent:"#ffeeaa"}},
+  { name:"COSMO SPHERE",        attr:"宇", rarity:"N",  atk:21, def:19, effect:"攻撃力+5",                 basePrice:10, robot:{head:"round",   eyes:3, body:"armor",arms:"normal",legs:"hover",wings:true, antenna:false,core:true, color:"#4a4a8a",accent:"#aaaaff"}},
+  { name:"EDGE WALKER",         attr:"地", rarity:"N",  atk:20, def:20, effect:"攻撃力+4",                 basePrice:9,  robot:{head:"hex",     eyes:2, body:"frame",arms:"normal",legs:"quad", wings:false,antenna:true, core:false,color:"#6a6a6a",accent:"#99ffcc"}},
+  { name:"ゼロのひかり",         attr:"宇", rarity:"N",  atk:18, def:22, effect:"守備力+5",                 basePrice:10, robot:{head:"round",   eyes:1, body:"slim", arms:"normal",legs:"hover",wings:false,antenna:true, core:true, color:"#3a3a5a",accent:"#ffffff"}},
+
+  /* ---------- レア 12枚 ---------- */
+  { name:"COSMO WING",          attr:"宇", rarity:"R",  atk:55, def:45, effect:"攻撃力+15",                basePrice:60, robot:{head:"round",   eyes:2, body:"slim", arms:"cannon",legs:"hover",wings:true, antenna:true, core:true, color:"#4a6ad4",accent:"#88ddff"}},
+  { name:"TERRA GUARDIAN",      attr:"地", rarity:"R",  atk:45, def:60, effect:"守備力+15",                basePrice:60, robot:{head:"square",  eyes:2, body:"armor",arms:"normal",legs:"biped",wings:false,antenna:false,core:true, color:"#8a7a3a",accent:"#ffee66"}},
+  { name:"オービットの砲",       attr:"宇", rarity:"R",  atk:65, def:40, effect:"攻撃力+20",                basePrice:70, robot:{head:"hex",     eyes:1, body:"thick",arms:"cannon",legs:"tank", wings:false,antenna:true, core:true, color:"#3a4a8a",accent:"#66ddff"}},
+  { name:"グラビティの核",       attr:"宇", rarity:"R",  atk:50, def:55, effect:"守備力+15",                basePrice:65, robot:{head:"round",   eyes:3, body:"armor",arms:"normal",legs:"hover",wings:false,antenna:false,core:true, color:"#5a3a8a",accent:"#cc88ff"}},
+  { name:"メテオの騎士",         attr:"宇", rarity:"R",  atk:70, def:45, effect:"攻撃力+20",                basePrice:75, robot:{head:"triangle",eyes:2, body:"thick",arms:"claw",  legs:"biped",wings:true, antenna:false,core:true, color:"#7a4a3a",accent:"#ff8866"}},
+  { name:"サンライズの鎧",       attr:"地", rarity:"R",  atk:40, def:70, effect:"守備力+20",                basePrice:70, robot:{head:"square",  eyes:2, body:"armor",arms:"normal",legs:"biped",wings:false,antenna:true, core:true, color:"#aa7a3a",accent:"#ffee66"}},
+  { name:"GIGA BLAZE",          attr:"地", rarity:"R",  atk:68, def:42, effect:"攻撃力+18",                basePrice:72, robot:{head:"hex",     eyes:1, body:"thick",arms:"drill", legs:"tank", wings:false,antenna:false,core:true, color:"#8a3a2a",accent:"#ffaa33"}},
+  { name:"STORM PHOENIX",       attr:"宇", rarity:"R",  atk:60, def:50, effect:"1ターン攻撃2倍",           basePrice:68, robot:{head:"triangle",eyes:3, body:"slim", arms:"cannon",legs:"hover",wings:true, antenna:true, core:true, color:"#3a6a8a",accent:"#66ddff"}},
+  { name:"アイアンのさけび",     attr:"地", rarity:"R",  atk:58, def:52, effect:"攻撃力+15",                basePrice:64, robot:{head:"square",  eyes:2, body:"frame",arms:"claw",  legs:"biped",wings:false,antenna:true, core:true, color:"#7a6a3a",accent:"#ffdd44"}},
+  { name:"ルナティックの爪",     attr:"宇", rarity:"R",  atk:66, def:44, effect:"攻撃力+18",                basePrice:73, robot:{head:"triangle",eyes:1, body:"slim", arms:"claw",  legs:"quad", wings:false,antenna:true, core:true, color:"#3a3a5a",accent:"#ccccff"}},
+  { name:"NOVA ARMOR",          attr:"地", rarity:"R",  atk:48, def:62, effect:"守備力+18",                basePrice:66, robot:{head:"hex",     eyes:2, body:"armor",arms:"normal",legs:"biped",wings:false,antenna:false,core:true, color:"#5a6a4a",accent:"#ccffaa"}},
+  { name:"SPACE LANCE",         attr:"宇", rarity:"R",  atk:62, def:48, effect:"攻撃力+16",                basePrice:69, robot:{head:"hex",     eyes:2, body:"slim", arms:"cannon",legs:"hover",wings:false,antenna:true, core:true, color:"#4a4a8a",accent:"#88aaff"}},
+
+  /* ---------- スーパーレア 6枚 ---------- */
+  { name:"GRAVITY CORE",        attr:"宇", rarity:"SR", atk:100,def:90, effect:"宇宙属性なら攻撃3倍",       basePrice:280,robot:{head:"round",   eyes:3, body:"armor",arms:"cannon",legs:"hover",wings:true, antenna:true, core:true, color:"#5a3ad4",accent:"#cc88ff"}},
+  { name:"TERRA NOVA",          attr:"地", rarity:"SR", atk:110,def:100,effect:"攻守を2倍",                  basePrice:300,robot:{head:"hex",     eyes:2, body:"thick",arms:"cannon",legs:"tank", wings:true, antenna:true, core:true, color:"#d4a24a",accent:"#ffee66"}},
+  { name:"ORBIT JUDGMENT",      attr:"宇", rarity:"SR", atk:120,def:85, effect:"相手の攻撃力を半減",         basePrice:290,robot:{head:"triangle",eyes:1, body:"armor",arms:"cannon",legs:"hover",wings:true, antenna:false,core:true, color:"#3a4ad4",accent:"#66ddff"}},
+  { name:"サンライズの盾",       attr:"地", rarity:"SR", atk:85, def:130,effect:"守備力+60",                  basePrice:260,robot:{head:"square",  eyes:2, body:"armor",arms:"normal",legs:"biped",wings:true, antenna:true, core:true, color:"#d4a24a",accent:"#ffee66"}},
+  { name:"メテオの皇帝",         attr:"宇", rarity:"SR", atk:130,def:90, effect:"攻撃力+50",                  basePrice:310,robot:{head:"hex",     eyes:3, body:"thick",arms:"claw",  legs:"quad", wings:true, antenna:true, core:true, color:"#8a3ad4",accent:"#ff88ff"}},
+  { name:"COSMO EMPEROR",       attr:"宇", rarity:"SR", atk:115,def:105,effect:"1ターン攻撃4倍",             basePrice:300,robot:{head:"round",   eyes:2, body:"armor",arms:"cannon",legs:"hover",wings:true, antenna:true, core:true, color:"#3a6ad4",accent:"#88ddff"}},
+
+  /* ---------- ウルトラレア 2枚 ---------- */
+  { name:"TERRA NOVA ZERO",     attr:"地", rarity:"UR", atk:200,def:180,effect:"攻守を入れ替えて3倍",        basePrice:1200,robot:{head:"hex",    eyes:3, body:"armor",arms:"cannon",legs:"tank", wings:true, antenna:true, core:true, color:"#e0c060",accent:"#ffffff"}},
+  { name:"ルナティックのつきかげ",attr:"宇",rarity:"UR", atk:180,def:200,effect:"相手の効果を全て無効",        basePrice:1000,robot:{head:"triangle",eyes:1,body:"slim", arms:"claw",  legs:"hover",wings:true, antenna:true, core:true, color:"#5030a0",accent:"#ffffff"}}
+];
+
+/* レア度順のランク */
+function rarityRank(r) {
+  return { N: 0, R: 1, SR: 2, UR: 3 }[r];
+}
+
+/* =========================================================
+   ロボット描画（ドット絵 + 図形学）
+========================================================= */
+function drawRobot(canvas, robot, rarity, attr) {
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const bg = ctx.createLinearGradient(0,0,0,H);
+  bg.addColorStop(0, attr === "宇" ? "#0a1030" : "#101a10");
+  bg.addColorStop(1, "#000");
+  ctx.fillStyle = bg;
+  ctx.fillRect(0,0,W,H);
+
+  const cx = W/2, cy = H/2;
+  const s = W/120;
+
+  const main = robot.color;
+  const accent = robot.accent;
+  const dark = "#111";
+  const metal = "#888";
+
+  ctx.save();
+  ctx.translate(cx, cy);
+
+  /* 脚 */
+  ctx.fillStyle = metal;
+  if (robot.legs === "biped") {
+    ctx.fillRect(-18*s, 20*s, 12*s, 28*s);
+    ctx.fillRect(6*s, 20*s, 12*s, 28*s);
+  } else if (robot.legs === "quad") {
+    ctx.fillRect(-28*s, 22*s, 8*s, 24*s);
+    ctx.fillRect(-14*s, 22*s, 8*s, 24*s);
+    ctx.fillRect(6*s, 22*s, 8*s, 24*s);
+    ctx.fillRect(20*s, 22*s, 8*s, 24*s);
+  } else if (robot.legs === "tank") {
+    ctx.fillRect(-30*s, 28*s, 60*s, 16*s);
+    ctx.fillStyle = dark;
+    ctx.fillRect(-24*s, 30*s, 8*s, 12*s);
+    ctx.fillRect(-8*s, 30*s, 8*s, 12*s);
+    ctx.fillRect(8*s, 30*s, 8*s, 12*s);
+  } else {
+    ctx.fillStyle = accent;
+    ctx.beginPath();
+    ctx.ellipse(0, 34*s, 26*s, 8*s, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(0,255,255,0.3)";
+    ctx.beginPath();
+    ctx.ellipse(0, 40*s, 30*s, 10*s, 0, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  /* 胴体 */
+  ctx.fillStyle = main;
+  if (robot.body === "slim") {
+    ctx.fillRect(-16*s, -8*s, 32*s, 30*s);
+  } else if (robot.body === "thick") {
+    ctx.fillRect(-22*s, -10*s, 44*s, 34*s);
+  } else if (robot.body === "armor") {
+    ctx.fillRect(-20*s, -12*s, 40*s, 36*s);
+    ctx.fillStyle = metal;
+    ctx.fillRect(-20*s, -12*s, 40*s, 6*s);
+    ctx.fillRect(-20*s, 18*s, 40*s, 6*s);
+  } else {
+    ctx.fillRect(-18*s, -8*s, 6*s, 30*s);
+    ctx.fillRect(12*s, -8*s, 6*s, 30*s);
+    ctx.fillRect(-18*s, -8*s, 36*s, 6*s);
+    ctx.fillRect(-18*s, 16*s, 36*s, 6*s);
+  }
+
+  /* コア */
+  if (robot.core) {
+    ctx.fillStyle = accent;
+    ctx.beginPath();
+    ctx.arc(0, 6*s, 6*s, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.beginPath();
+    ctx.arc(0, 6*s, 3*s, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  /* 腕 */
+  ctx.fillStyle = main;
+  if (robot.arms === "normal") {
+    ctx.fillRect(-30*s, -6*s, 10*s, 26*s);
+    ctx.fillRect(20*s, -6*s, 10*s, 26*s);
+  } else if (robot.arms === "cannon") {
+    ctx.fillRect(-34*s, -4*s, 14*s, 14*s);
+    ctx.fillRect(20*s, -4*s, 14*s, 14*s);
+    ctx.fillStyle = dark;
+    ctx.fillRect(-38*s, -2*s, 6*s, 10*s);
+    ctx.fillRect(32*s, -2*s, 6*s, 10*s);
+  } else if (robot.arms === "drill") {
+    ctx.fillRect(-32*s, -6*s, 10*s, 22*s);
+    ctx.fillRect(22*s, -6*s, 10*s, 22*s);
+    ctx.fillStyle = metal;
+    ctx.beginPath();
+    ctx.moveTo(-32*s, 16*s); ctx.lineTo(-22*s, 16*s); ctx.lineTo(-27*s, 28*s);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(22*s, 16*s); ctx.lineTo(32*s, 16*s); ctx.lineTo(27*s, 28*s);
+    ctx.closePath(); ctx.fill();
+  } else {
+    ctx.fillRect(-32*s, -6*s, 10*s, 20*s);
+    ctx.fillRect(22*s, -6*s, 10*s, 20*s);
+    ctx.fillStyle = accent;
+    ctx.fillRect(-36*s, 14*s, 6*s, 12*s);
+    ctx.fillRect(-28*s, 14*s, 6*s, 12*s);
+    ctx.fillRect(22*s, 14*s, 6*s, 12*s);
+    ctx.fillRect(30*s, 14*s, 6*s, 12*s);
+  }
+
+  /* 翼 */
+  if (robot.wings) {
+    ctx.fillStyle = attr === "宇" ? "rgba(120,200,255,0.7)" : "rgba(255,230,120,0.7)";
+    ctx.beginPath();
+    ctx.moveTo(-20*s, -6*s); ctx.lineTo(-48*s, -20*s); ctx.lineTo(-40*s, 4*s);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(20*s, -6*s); ctx.lineTo(48*s, -20*s); ctx.lineTo(40*s, 4*s);
+    ctx.closePath(); ctx.fill();
+  }
+
+  /* 頭 */
+  ctx.fillStyle = main;
+  if (robot.head === "square") {
+    ctx.fillRect(-20*s, -40*s, 40*s, 30*s);
+  } else if (robot.head === "round") {
+    ctx.beginPath();
+    ctx.arc(0, -25*s, 20*s, 0, Math.PI*2);
+    ctx.fill();
+  } else if (robot.head === "triangle") {
+    ctx.beginPath();
+    ctx.moveTo(0, -45*s); ctx.lineTo(-22*s, -12*s); ctx.lineTo(22*s, -12*s);
+    ctx.closePath(); ctx.fill();
+  } else {
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const a = Math.PI/3 * i - Math.PI/6;
+      const x = Math.cos(a) * 20*s;
+      const y = Math.sin(a) * 20*s - 25*s;
+      i === 0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    }
+    ctx.closePath(); ctx.fill();
+  }
+
+  /* アンテナ */
+  if (robot.antenna) {
+    ctx.strokeStyle = metal;
+    ctx.lineWidth = 2*s;
+    ctx.beginPath();
+    ctx.moveTo(0, -45*s); ctx.lineTo(0, -58*s);
+    ctx.stroke();
+    ctx.fillStyle = accent;
+    ctx.beginPath();
+    ctx.arc(0, -60*s, 3*s, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  /* 目 */
+  ctx.fillStyle = accent;
+  if (robot.eyes === 1) {
+    ctx.beginPath();
+    ctx.arc(0, -25*s, 6*s, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.beginPath();
+    ctx.arc(0, -25*s, 2*s, 0, Math.PI*2);
+    ctx.fill();
+  } else if (robot.eyes === 2) {
+    ctx.fillRect(-12*s, -30*s, 8*s, 8*s);
+    ctx.fillRect(4*s, -30*s, 8*s, 8*s);
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(-10*s, -28*s, 3*s, 3*s);
+    ctx.fillRect(6*s, -28*s, 3*s, 3*s);
+  } else {
+    ctx.fillRect(-14*s, -28*s, 6*s, 6*s);
+    ctx.fillRect(-3*s, -30*s, 6*s, 8*s);
+    ctx.fillRect(8*s, -28*s, 6*s, 6*s);
+  }
+
+  ctx.restore();
+
+  /* レアリティオーラ */
+  if (rarity === "UR") {
+    ctx.strokeStyle = "rgba(255,220,100,0.9)";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(2,2,W-4,H-4);
+  } else if (rarity === "SR") {
+    ctx.strokeStyle = "rgba(180,150,255,0.7)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(2,2,W-4,H-4);
+  } else if (rarity === "R") {
+    ctx.strokeStyle = "rgba(120,200,255,0.5)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(2,2,W-4,H-4);
+  }
+}
+
+/* =========================================================
+   カードプール
+========================================================= */
+const NORMAL_POOL = CARD_MASTER.filter(c => c.rarity === "N");   // 30
+const RARE_POOL   = CARD_MASTER.filter(c => c.rarity !== "N");   // 20
+
+/* =========================================================
+   ゲーム状態
+========================================================= */
+let money = 200;
+let currentPack = [];
+let currentIndex = 0;
+let obtainedCards = [];
+let sortMode = "obtained";
+let packsBought = 0;
+let startTime = Date.now();
+let gameStarted = false;
+
+const opening = document.getElementById("opening");
+const startBtn = document.getElementById("startBtn");
+const viewBgBtn = document.getElementById("viewBgBtn");
+const bgViewer = document.getElementById("bgViewer");
+const closeViewerBtn = document.getElementById("closeViewerBtn");
+const game = document.getElementById("game");
+
+const clockEl = document.getElementById("clock");
+const moneyDisplay = document.getElementById("moneyDisplay");
+const buyPackBtn = document.getElementById("buyPackBtn");
+const buyArea = document.getElementById("buyArea");
+const packCardWrap = document.getElementById("packCardWrap");
+
+const packCard = document.getElementById("packCard");
+const packName = document.getElementById("packName");
+const packCanvas = document.getElementById("packCanvas");
+const packAtk = document.getElementById("packAtk");
+const packDef = document.getElementById("packDef");
+const packEffect = document.getElementById("packEffect");
+
+const prevBtn = document.getElementById("prevBtn");
+const nextBtn = document.getElementById("nextBtn");
+const sellNowBtn = document.getElementById("sellNowBtn");
+const endPackBtn = document.getElementById("endPackBtn");
+
+const infoList = document.getElementById("infoList");
+const sortSelect = document.getElementById("sortSelect");
+const priceList = document.getElementById("priceList");
+const studyLink = document.getElementById("studyLink");
+
+const modal = document.getElementById("modal");
+const modalCard = document.getElementById("modalCard");
+const modalName = document.getElementById("modalName");
+const modalCanvas = document.getElementById("modalCanvas");
+const modalAtk = document.getElementById("modalAtk");
+const modalDef = document.getElementById("modalDef");
+const modalEffect = document.getElementById("modalEffect");
+const modalCloseBtn = document.getElementById("modalCloseBtn");
+const modalSellBtn = document.getElementById("modalSellBtn");
+
+/* =========================================================
+   時計・相場
+========================================================= */
+function updateClock() {
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2,"0");
+  const mm = String(now.getMinutes()).padStart(2,"0");
+  const ss = String(now.getSeconds()).padStart(2,"0");
+  clockEl.textContent = `${hh}:${mm}:${ss}`;
+}
+
+/* =========================================================
+   相場更新：マスター・開封中パック・入手済みすべてを更新
+========================================================= */
+function updateAllPrices() {
+  const elapsed = Math.floor((Date.now() - startTime) / 1000);
+
+  const apply = (card) => {
+    if (card.trend === "up") {
+      card.currentPrice = Math.min(card.maxPrice, card.basePrice + elapsed);
+    } else {
+      card.currentPrice = Math.max(card.minPrice, card.basePrice - elapsed);
+    }
+  };
+
+  CARD_MASTER.forEach(apply);
+  currentPack.forEach(apply);
+  obtainedCards.forEach(apply);
+}
+
+function renderPriceTable() {
+  priceList.innerHTML = CARD_MASTER.map(card => {
+    const cls = card.trend === "up" ? "up" : "down";
+    const arrow = card.trend === "up" ? "▲" : "▼";
+    return `<div class="price-row">
+      <span>${card.name}</span>
+      <span class="${cls}">${arrow} ${card.currentPrice}円</span>
+    </div>`;
+  }).join("");
+}
+
+/* =========================================================
+   情報パネル
+========================================================= */
+function sortCards(mode) {
+  const cards = [...obtainedCards];
+  switch (mode) {
+    case "rarity":  return cards.sort((a,b) => rarityRank(b.rarity) - rarityRank(a.rarity));
+    case "atk":     return cards.sort((a,b) => b.atk - a.atk);
+    case "defLow":  return cards.sort((a,b) => a.def - b.def);
+    case "earth":   return cards.sort((a,b) => (a.attr === "地" ? -1 : 1));
+    case "space":   return cards.sort((a,b) => (a.attr === "宇" ? -1 : 1));
+    default:        return cards.sort((a,b) => a.obtainedAt - b.obtainedAt);
+  }
+}
+
+function renderInfoList() {
+  const cards = sortCards(sortMode);
+  infoList.innerHTML = cards.map((card, i) => {
+    const mark = card.attr === "地"
+      ? `<span class="ygo-attr-mark earth">地</span>`
+      : `<span class="ygo-attr-mark space">宇</span>`;
+    return `<div class="info-item" data-id="${card.uid}">
+      <span>${i+1}.</span>${mark}<span>${card.name}</span>
+    </div>`;
+  }).join("");
+
+  infoList.querySelectorAll(".info-item").forEach(el => {
+    el.addEventListener("click", () => {
+      const id = el.dataset.id;
+      const card = obtainedCards.find(c => c.uid === id);
+      if (card) openModal(card);
+    });
+  });
+}
+
+/* =========================================================
+   カード表示
+========================================================= */
+function renderCardToUI(card, cardEl, nameEl, canvasEl, atkEl, defEl, effectEl) {
+  cardEl.classList.remove("space", "ur", "sr");
+  if (card.attr === "宇") cardEl.classList.add("space");
+  if (card.rarity === "UR") cardEl.classList.add("ur");
+  if (card.rarity === "SR") cardEl.classList.add("sr");
+
+  const mark = card.attr === "地"
+    ? `<span class="ygo-attr-mark earth">地</span>`
+    : `<span class="ygo-attr-mark space">宇</span>`;
+
+  nameEl.innerHTML = `${mark}<span>${card.name}</span>`;
+  drawRobot(canvasEl, card.robot, card.rarity, card.attr);
+  atkEl.textContent = `ATK ${card.atk}`;
+  defEl.textContent = `DEF ${card.def}`;
+  effectEl.textContent = card.effect;
+}
+
+function showPackCard() {
+  const card = currentPack[currentIndex];
+  if (!card) return;
+  renderCardToUI(card, packCard, packName, packCanvas, packAtk, packDef, packEffect);
+  prevBtn.disabled = currentIndex === 0;
+  nextBtn.disabled = currentIndex === currentPack.length - 1;
+}
+
+/* =========================================================
+   パック
+========================================================= */
+function makeInstance(master) {
+  const trend = Math.random() < 0.5 ? "up" : "down";
+  const basePrice = master.basePrice;
+  return {
+    uid: "U" + Math.random().toString(36).slice(2,10),
+    name: master.name,
+    attr: master.attr,
+    rarity: master.rarity,
+    atk: master.atk,
+    def: master.def,
+    effect: master.effect,
+    robot: master.robot,
+    basePrice: basePrice,
+    trend: trend,
+    maxPrice: basePrice * 2,
+    minPrice: 0,
+    currentPrice: basePrice,
+    obtainedAt: 0
+  };
+}
+
+function buyPack() {
+  if (money < 200) return;
+  money -= 200;
+  packsBought++;
+  updateMoneyDisplay();
+
+  currentPack = [];
+  currentIndex = 0;
+
+  // 1〜6枚目：ノーマル30枚からランダム6枚
+  for (let i = 0; i < 6; i++) {
+    const master = NORMAL_POOL[Math.floor(Math.random() * NORMAL_POOL.length)];
+    currentPack.push(makeInstance(master));
+  }
+  // 7枚目：レア以上20枚からランダム1枚
+  const masterRare = RARE_POOL[Math.floor(Math.random() * RARE_POOL.length)];
+  currentPack.push(makeInstance(masterRare));
+
+  buyArea.style.display = "none";
+  packCardWrap.classList.add("active");
+  showPackCard();
+}
+
+function nextCard() { if (currentIndex < currentPack.length - 1) { currentIndex++; showPackCard(); } }
+function prevCard() { if (currentIndex > 0) { currentIndex--; showPackCard(); } }
+
+/* =========================================================
+   売却：売る瞬間の currentPrice を使う（時間経過反映済み）
+========================================================= */
+function sellCurrentCard() {
+  const card = currentPack[currentIndex];
+  if (!card) return;
+
+  // 売る直前に最新の相場を反映
+  updateAllPrices();
+
+  money += card.currentPrice;
+  updateMoneyDisplay();
+  currentPack.splice(currentIndex, 1);
+
+  if (currentPack.length === 0) {
+    endPack();
+  } else {
+    currentIndex = Math.min(currentIndex, currentPack.length - 1);
+    showPackCard();
+  }
+}
+
+function endPack() {
+  currentPack.forEach(card => {
+    card.obtainedAt = obtainedCards.length;
+    obtainedCards.push(card);
+  });
+  currentPack = [];
+  currentIndex = 0;
+  packCardWrap.classList.remove("active");
+  buyArea.style.display = "flex";
+  renderInfoList();
+}
+
+/* =========================================================
+   モーダル
+========================================================= */
+let modalCardData = null;
+
+function openModal(card) {
+  modalCardData = card;
+  renderCardToUI(card, modalCard, modalName, modalCanvas, modalAtk, modalDef, modalEffect);
+  modal.classList.add("active");
+}
+function closeModal() {
+  modal.classList.remove("active");
+  modalCardData = null;
+}
+
+function sellFromModal() {
+  if (!modalCardData) return;
+
+  // 売る直前に最新の相場を反映
+  updateAllPrices();
+
+  money += modalCardData.currentPrice;
+  updateMoneyDisplay();
+  obtainedCards = obtainedCards.filter(c => c.uid !== modalCardData.uid);
+  renderInfoList();
+  closeModal();
+}
+
+function updateMoneyDisplay() {
+  moneyDisplay.textContent = `所持金：${money}円`;
+}
+
+function checkStudyLink() {
+  if (packsBought >= 3) studyLink.classList.add("visible");
+}
+
+/* =========================================================
+   初期化：マスターカードの市場を初期化
+========================================================= */
+CARD_MASTER.forEach(card => {
+  card.trend = Math.random() < 0.5 ? "up" : "down";
+  card.maxPrice = card.basePrice * 2;
+  card.minPrice = 0;
+  card.currentPrice = card.basePrice;
+});
+
+/* =========================================================
+   イベント
+========================================================= */
+startBtn.addEventListener("click", () => {
+  opening.style.display = "none";
+  game.classList.add("active");
+  gameStarted = true;
+  startTime = Date.now();
+  updateMoneyDisplay();
+  renderInfoList();
+  renderPriceTable();
+});
+
+viewBgBtn.addEventListener("click", () => bgViewer.classList.add("active"));
+closeViewerBtn.addEventListener("click", () => bgViewer.classList.remove("active"));
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && bgViewer.classList.contains("active")) {
+    bgViewer.classList.remove("active");
+  }
+});
+
+buyPackBtn.addEventListener("click", () => {
+  buyPack();
+  checkStudyLink();
+});
+
+prevBtn.addEventListener("click", prevCard);
+nextBtn.addEventListener("click", nextCard);
+sellNowBtn.addEventListener("click", sellCurrentCard);
+endPackBtn.addEventListener("click", endPack);
+
+sortSelect.addEventListener("change", () => {
+  sortMode = sortSelect.value;
+  renderInfoList();
+});
+
+modalCloseBtn.addEventListener("click", closeModal);
+modalSellBtn.addEventListener("click", sellFromModal);
+
+/* =========================================================
+   ループ
+========================================================= */
+setInterval(() => {
+  updateClock();
+  if (gameStarted) {
+    updateAllPrices();
+    renderPriceTable();
+  }
+}, 1000);
+
+updateClock();
+</script>
+
+</body>
+</html>
