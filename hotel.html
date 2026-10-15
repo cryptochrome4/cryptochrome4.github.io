@@ -505,6 +505,7 @@
   let toastTimer = 0;
 
   let walkingTo = null;
+  let walkingToElapsed = 0;   // ★ 追加：自動移動の経過秒数（ゲーム内時間換算）
 
   let justOpenedDialogue = false;
 
@@ -1118,6 +1119,7 @@
     currentComedy = null; comedyProgress = 0;
     presViewOpen = false; presSlideIndex = 0; currentPresentation = null;
     walkingTo = null;
+    walkingToElapsed = 0;   // ★ 追加：自動移動の経過時間をリセット
     elevatorPanel.classList.add('hidden');
     npcPanel.classList.remove('open');
     dialogue.classList.remove('open');
@@ -1929,6 +1931,7 @@
     const target = elevatorCells.find(c => c.floorTag === targetFloor);
     if (!target) return;
     showToast(`Elevator moving to ${targetFloor}F...`, 1.5);
+    walkingToElapsed = 0;   // ★ 追加：新しい自動移動開始時に経過時間リセット
     walkingTo = {
       x: target.x + target.w/2,
       y: target.y + target.h + 80,
@@ -1949,6 +1952,7 @@
     const target = stairsCells.find(c => c.floorTag === next);
     if (!target) return;
     showToast(`Taking stairs to ${next}F...`, 1.5);
+    walkingToElapsed = 0;   // ★ 追加：新しい自動移動開始時に経過時間リセット
     walkingTo = {
       x: target.x + target.w/2,
       y: target.y + target.h + 80,
@@ -2198,6 +2202,18 @@
     updateTime(dt);
 
     if (walkingTo) {
+      // ★ 追加：自動移動の経過時間をカウント（dt は 60fps 基準のフレーム数 → 秒換算）
+      walkingToElapsed += dt / 60;
+
+      // ★ 追加：ゲーム内1時間（HOUR_SECONDS 秒）経過したら強制解除
+      if (walkingToElapsed >= HOUR_SECONDS) {
+        walkingTo = null;
+        walkingToElapsed = 0;
+        showToast('Elevator movement timed out.', 1.5);
+        updateHUD();
+        return;
+      }
+
       const dx = walkingTo.x - player.x;
       const dy = walkingTo.y - player.y;
       const d = Math.hypot(dx, dy);
@@ -2206,6 +2222,7 @@
         player.y = walkingTo.y;
         const msg = walkingTo.msg;
         walkingTo = null;
+        walkingToElapsed = 0;   // ★ 追加：正常完了時もリセット
         showToast(msg, 1.5);
         updateGuestLocations();
         updateHUD();
