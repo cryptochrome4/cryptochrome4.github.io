@@ -668,9 +668,7 @@
       opacity: 0;
       font-family: 'Noto Sans JP', 'Courier New', monospace;
       letter-spacing: 1px;
-      max-width: 75vw;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      /* 長いコメントも省略せず全文表示（はみ出しOK、流れて消える） */
     }
 
     .yt-comment.show {
@@ -696,7 +694,8 @@
       width: 100%;
       height: 100%;
       max-height: none;
-      object-fit: contain;
+      /* 全表示時は fill（引き伸ばして画面いっぱい） */
+      object-fit: fill;
     }
 
     .yt-player-wrap.fullscreen-mode .yt-overlay {
@@ -1074,7 +1073,7 @@
       </div>
 
       <div class="yt-player-wrap" id="ytPlayerWrap">
-        <!-- 10秒動画をループして7分間として扱う -->
+        <!-- 10秒動画をループして7分間として扱う。デフォルトはミュート（音なし） -->
         <video class="yt-video" id="mainVideo" preload="metadata" playsinline loop muted>
           <source src="video1streamer.mp4" type="video/mp4">
           お使いのブラウザは動画タグに対応していません。
@@ -1098,6 +1097,8 @@
         <button class="yt-btn" id="rewindBtn">⏪ 10秒戻る</button>
         <button class="yt-btn" id="forwardBtn">⏩ 10秒進む</button>
         <button class="yt-btn" id="fullscreenBtn">⛶ 全表示</button>
+        <!-- 音声ON/OFFボタン（デフォルトはミュート＝音なし） -->
+        <button class="yt-btn" id="muteBtn">🔇 音なし</button>
       </div>
 
       <!-- 動画メタ情報 -->
@@ -1105,7 +1106,7 @@
         <div class="yt-title">早まった一般化（不完全な帰納）とは？ ～ 7分でわかる論理学 ～</div>
         <div class="yt-channel">論理チャンネル ／ 登録者 12.3万人</div>
         <div style="margin-top:0.3rem; font-size:0.85rem; color:#777;">
-          10秒のクリップをループして7分間の動画として構成。コメントが動画上を流れます。
+          10秒のクリップをループして7分間の動画として構成。デフォルトは音なし（🔇ボタンで音声ON/OFF）。
         </div>
       </div>
 
@@ -1172,6 +1173,7 @@
   const rewindBtn = document.getElementById('rewindBtn');
   const forwardBtn = document.getElementById('forwardBtn');
   const fullscreenBtn = document.getElementById('fullscreenBtn');
+  const muteBtn = document.getElementById('muteBtn');
   const commentOverlay = document.getElementById('commentOverlay');
   const ytPlayerWrap = document.getElementById('ytPlayerWrap');
 
@@ -1211,8 +1213,8 @@
     { time: 400, text: "ご視聴ありがとうございました。論理的に考えましょう！" }
   ];
 
-  let shownComments = new Set(); // 表示済みコメント管理（virtualTime基準）
-  let activeComments = [];       // 現在表示中のコメント要素
+  let shownComments = new Set();
+  let activeComments = [];
 
   function formatTime(sec) {
     const m = Math.floor(sec / 60);
@@ -1234,13 +1236,10 @@
   function seekTo(vt) {
     virtualTime = Math.max(0, Math.min(TOTAL_DURATION, vt));
     shownComments.clear();
-    // 現在時刻より前のコメントは「表示済み」にする
     commentData.forEach(c => {
       if (c.time < virtualTime) shownComments.add(c.time);
     });
-    // アクティブコメントを全削除
     clearComments();
-    // 動画実時間をループ位置に同期
     if (video.duration) {
       const clipPos = virtualTime % video.duration;
       video.currentTime = clipPos;
@@ -1272,9 +1271,30 @@
   video.addEventListener('play', () => { playPauseBtn.textContent = '⏸ 一時停止'; });
   video.addEventListener('pause', () => { playPauseBtn.textContent = '▶ 再生'; });
 
-  // 10秒戻る/進む（仮想時間基準）
+  // 10秒戻る/進む
   rewindBtn.addEventListener('click', () => { seekTo(virtualTime - 10); });
   forwardBtn.addEventListener('click', () => { seekTo(virtualTime + 10); });
+
+  // ===== 音声ON/OFF（デフォルトはミュート） =====
+  function updateMuteBtn() {
+    if (video.muted) {
+      muteBtn.textContent = '🔇 音なし';
+      muteBtn.classList.remove('active');
+    } else {
+      muteBtn.textContent = '🔊 音あり';
+      muteBtn.classList.add('active');
+    }
+  }
+
+  muteBtn.addEventListener('click', () => {
+    video.muted = !video.muted;
+    if (!video.muted && video.volume === 0) {
+      video.volume = 1;
+    }
+    updateMuteBtn();
+  });
+
+  updateMuteBtn();
 
   // ===== 全表示（フルスクリーン風） =====
   function enterFullscreen() {
@@ -1282,9 +1302,7 @@
     ytPlayerWrap.classList.add('fullscreen-mode');
     fullscreenBtn.classList.add('active');
     fullscreenBtn.textContent = '✕ 戻る';
-    // 全画面中はどこをクリックしても戻る
     ytPlayerWrap.addEventListener('click', exitFullscreenHandler, true);
-    // 念のためESCでも戻れるように
     document.addEventListener('keydown', escHandler);
   }
 
@@ -1298,7 +1316,6 @@
   }
 
   function exitFullscreenHandler(e) {
-    // コントロール類のクリックは無視（全画面中はそれらは隠れているが一応）
     e.preventDefault();
     e.stopPropagation();
     exitFullscreen();
@@ -1323,10 +1340,8 @@
   function tick() {
     if (videoPageActive && !video.paused) {
       const realTime = video.currentTime;
-      // ループ検出：実時間が前回より小さくなったら1周したとみなす
       let delta;
       if (realTime < lastRealTime - 0.5) {
-        // ループ発生
         const dur = video.duration || CLIP_DURATION;
         delta = (dur - lastRealTime) + realTime;
       } else {
@@ -1335,7 +1350,6 @@
       lastRealTime = realTime;
       virtualTime += delta;
 
-      // 7分到達で終了
       if (virtualTime >= TOTAL_DURATION) {
         virtualTime = TOTAL_DURATION;
         video.pause();
@@ -1405,6 +1419,9 @@
     virtualTime = 0;
     shownComments.clear();
     clearComments();
+    // デフォルトはミュート
+    video.muted = true;
+    updateMuteBtn();
     if (video.duration) {
       video.currentTime = 0;
       lastRealTime = 0;
@@ -1415,7 +1432,6 @@
       }, { once: true });
     }
     updateProgress();
-    // 自動再生はしない（ユーザー操作で再生）
     video.pause();
     playPauseBtn.textContent = '▶ 再生';
   }
@@ -1430,14 +1446,8 @@
 
   // 動画のメタデータ読み込み後
   video.addEventListener('loadedmetadata', () => {
-    // loop属性が効いているか確認（HTMLでloop指定済み）
     if (!video.loop) video.loop = true;
     lastRealTime = video.currentTime;
-  });
-
-  // 動画終了（loop指定してるので基本発生しないが念のため）
-  video.addEventListener('ended', () => {
-    // ループが効いていれば発生しない
   });
 
   // 毎フレーム処理開始
