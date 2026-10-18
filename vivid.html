@@ -563,6 +563,7 @@
             gap: 8px;
             margin-top: 8px;
             width: 100%;
+            flex-wrap: wrap;
         }
         .toggle-btn {
             padding: 6px 18px;
@@ -788,9 +789,10 @@
             </div>
             <div id="controllerStatus">🎮 未接続</div>
         </div>
-        <!-- 背景画像モード切替 -->
+        <!-- 背景画像モード切替 / MINIMAP -->
         <div class="toggle-row">
             <button class="toggle-btn" id="bgImageToggle">🖼 背景画像: OFF</button>
+            <button class="toggle-btn" id="bgModeToggle">📐 モード: タイル</button>
             <button class="toggle-btn" id="minimapToggle">🗺 MINIMAP: OFF</button>
         </div>
         <div class="hint">【操作】←→移動 / ↑ジャンプ / ↓足元を掘る / クリックで掘る / 赤ボタンで弾発射 / 👁️で範囲表示</div>
@@ -880,13 +882,25 @@ var ROYAL_RANGE = 1;
 var showAura = false;
 var FLEE_DURATION = 90;
 
+// ============================================
 // 新規：背景画像モード & MINIMAP表示
+// bgMode: 'tile' = タイル / 'stretch' = 引き伸ばし / 'cover' = 縦横比維持
+// ============================================
 var useBgImage = false;
 var showMinimap = false;
+var bgMode = 'tile';
 var bgImage = new Image();
 var bgImageLoaded = false;
 bgImage.onload = function() { bgImageLoaded = true; };
 bgImage.src = 'img347apex.jpg';
+
+function updateBgModeLabel() {
+    var btn = document.getElementById('bgModeToggle');
+    if (bgMode === 'tile') btn.textContent = '📐 モード: タイル';
+    else if (bgMode === 'stretch') btn.textContent = '📐 モード: ストレッチ';
+    else btn.textContent = '📐 モード: カバー(高画質)';
+    btn.classList.toggle('active', bgMode !== 'tile');
+}
 
 // ============================================
 // 画面遷移
@@ -1310,13 +1324,11 @@ function fireBullets() {
 // ============================================
 // 洞窟背景（APEX風ドット絵/図形）
 // ============================================
-// 背景用の決定論的擬似乱数
 function bgRand(seed) {
     var x = Math.sin(seed * 12.9898) * 43758.5453;
     return x - Math.floor(x);
 }
 
-// 背景の滝位置（ワールド座標で固定）
 var waterfalls = [
     { x: 8, width: 3, top: 0 },
     { x: 22, width: 2, top: 0 },
@@ -1326,12 +1338,6 @@ var waterfalls = [
 
 function drawCaveBackground() {
     var time = Date.now() / 1000;
-    var sx = Math.floor(camera.x / BW);
-    var sy = Math.floor(camera.y / BW);
-    var ex = Math.ceil((camera.x + W) / BW) + 1;
-    var ey = Math.ceil((camera.y + H) / BW) + 1;
-
-    // ---- 背景ベース：深い青黒グラデ + 赤い雰囲気 ----
     var bgGrad = ctx.createRadialGradient(
         W/2 - camera.x*0.02, H/2 - camera.y*0.02, 50,
         W/2, H/2, W*0.8
@@ -1342,7 +1348,7 @@ function drawCaveBackground() {
     ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, W, H);
 
-    // ---- 遠景の鍾乳石シルエット（パララックス0.3） ----
+    // 遠景の鍾乳石シルエット
     ctx.save();
     ctx.globalAlpha = 0.35;
     for (var i = -2; i < Math.ceil(W / 60) + 2; i++) {
@@ -1359,7 +1365,7 @@ function drawCaveBackground() {
     }
     ctx.restore();
 
-    // ---- 遠景の発光クリスタル（パララックス0.4） ----
+    // 遠景の発光クリスタル
     for (var i = 0; i < 14; i++) {
         var seed2 = i * 7.3;
         var cxp = (bgRand(seed2) * COLS * BW * 0.8 - camera.x * 0.4) % (COLS * BW);
@@ -1383,13 +1389,12 @@ function drawCaveBackground() {
         ctx.restore();
     }
 
-    // ---- 滝（ワールド座標で固定、パララックスなし） ----
+    // 滝
     for (var w = 0; w < waterfalls.length; w++) {
         var wf = waterfalls[w];
         var wfx = wf.x * BW - camera.x;
         if (wfx < -100 || wfx > W + 100) continue;
         var wfw = wf.width * BW;
-        // 滝の流れ
         for (var yy = 0; yy < H; yy += 8) {
             var flowOffset = (time * 120 + yy * 3) % 8;
             ctx.fillStyle = 'rgba(79,195,247,' + (0.08 + bgRand(wf.x + yy) * 0.08) + ')';
@@ -1397,7 +1402,6 @@ function drawCaveBackground() {
             ctx.fillStyle = 'rgba(150,220,255,' + (0.15 + bgRand(wf.x + yy + 1) * 0.1) + ')';
             ctx.fillRect(wfx + wfw * 0.3, yy + flowOffset + 1, wfw * 0.15, 3);
         }
-        // 滝の縁のネオン
         ctx.strokeStyle = 'rgba(79,195,247,0.4)';
         ctx.lineWidth = 1;
         ctx.beginPath();
@@ -1406,7 +1410,6 @@ function drawCaveBackground() {
         ctx.moveTo(wfx + wfw, 0);
         ctx.lineTo(wfx + wfw, H);
         ctx.stroke();
-        // 飛沫
         for (var sp = 0; sp < 6; sp++) {
             var spSeed = w * 100 + sp + Math.floor(time * 3);
             var spx = wfx + bgRand(spSeed) * wfw;
@@ -1416,7 +1419,7 @@ function drawCaveBackground() {
         }
     }
 
-    // ---- 中景の岩壁テクスチャ（パララックス0.6） ----
+    // 中景の岩壁
     ctx.save();
     ctx.globalAlpha = 0.25;
     var rockOffset = camera.x * 0.6;
@@ -1436,7 +1439,7 @@ function drawCaveBackground() {
     }
     ctx.restore();
 
-    // ---- 中景の鍾乳石（下向き、パララックス0.6） ----
+    // 中景の鍾乳石
     ctx.save();
     ctx.globalAlpha = 0.4;
     for (var i = -2; i < Math.ceil(W / 50) + 2; i++) {
@@ -1456,7 +1459,7 @@ function drawCaveBackground() {
     }
     ctx.restore();
 
-    // ---- 前景のほこり/胞子（ゆっくり漂う） ----
+    // 前景のほこり
     for (var i = 0; i < 20; i++) {
         var seed5 = i * 13.7;
         var dx2 = (bgRand(seed5) * W + time * (10 + bgRand(seed5+1) * 20)) % W;
@@ -1465,12 +1468,55 @@ function drawCaveBackground() {
         ctx.fillRect(dx2, dy2, 1.5, 1.5);
     }
 
-    // ---- 赤い環境光のビネット ----
+    // ビネット
     var vig = ctx.createRadialGradient(W/2, H/2, H*0.3, W/2, H/2, H*0.9);
     vig.addColorStop(0, 'rgba(0,0,0,0)');
     vig.addColorStop(1, 'rgba(40,0,0,0.4)');
     ctx.fillStyle = vig;
     ctx.fillRect(0, 0, W, H);
+}
+
+// ============================================
+// 背景画像を3モードで描画する関数
+// ============================================
+function drawBgImageMode() {
+    ctx.save();
+    if (bgMode === 'tile') {
+        // タイル（複数羅列）
+        var imgW = 400;
+        var imgH = 250;
+        var offX = (camera.x * 0.3) % imgW;
+        var offY = (camera.y * 0.3) % imgH;
+        for (var bx = -offX; bx < W; bx += imgW) {
+            for (var by = -offY; by < H; by += imgH) {
+                ctx.drawImage(bgImage, bx, by, imgW, imgH);
+            }
+        }
+    } else if (bgMode === 'stretch') {
+        // ストレッチ（縦横比無視で画面全体）
+        ctx.drawImage(bgImage, 0, 0, W, H);
+    } else if (bgMode === 'cover') {
+        // カバー（縦横比維持、画面全体を覆う、はみ出しクロップ）
+        var imgRatio = bgImage.width / bgImage.height;
+        var canvasRatio = W / H;
+        var drawW, drawH, drawX, drawY;
+        if (imgRatio > canvasRatio) {
+            drawH = H;
+            drawW = H * imgRatio;
+            drawX = (W - drawW) / 2;
+            drawY = 0;
+        } else {
+            drawW = W;
+            drawH = W / imgRatio;
+            drawX = 0;
+            drawY = (H - drawH) / 2;
+        }
+        ctx.drawImage(bgImage, drawX, drawY, drawW, drawH);
+    }
+    // 暗いオーバーレイ
+    ctx.fillStyle = 'rgba(10,5,15,0.55)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
 }
 
 // ============================================
@@ -1481,24 +1527,8 @@ function draw() {
 
     // ---- 背景描画 ----
     if (useBgImage && bgImageLoaded) {
-        // 背景画像モード：img347apex.jpg を背景に
-        ctx.save();
-        // 画像をタイル状に描画（スクロールに追従）
-        var imgW = 400;
-        var imgH = 250;
-        var offX = (camera.x * 0.3) % imgW;
-        var offY = (camera.y * 0.3) % imgH;
-        for (var bx = -offX; bx < W; bx += imgW) {
-            for (var by = -offY; by < H; by += imgH) {
-                ctx.drawImage(bgImage, bx, by, imgW, imgH);
-            }
-        }
-        // 暗いオーバーレイ
-        ctx.fillStyle = 'rgba(10,5,15,0.55)';
-        ctx.fillRect(0, 0, W, H);
-        ctx.restore();
+        drawBgImageMode();
     } else {
-        // APEX風洞窟背景
         drawCaveBackground();
     }
 
@@ -2004,6 +2034,14 @@ document.getElementById('bgImageToggle').addEventListener('click', function() {
     this.textContent = '🖼 背景画像: ' + (useBgImage ? 'ON' : 'OFF');
 });
 
+// ---- 背景描画モード切替（タイル → ストレッチ → カバー） ----
+document.getElementById('bgModeToggle').addEventListener('click', function() {
+    if (bgMode === 'tile') bgMode = 'stretch';
+    else if (bgMode === 'stretch') bgMode = 'cover';
+    else bgMode = 'tile';
+    updateBgModeLabel();
+});
+
 // ---- MINIMAP表示切替 ----
 document.getElementById('minimapToggle').addEventListener('click', function() {
     showMinimap = !showMinimap;
@@ -2073,13 +2111,14 @@ function updateGamepad() {
 
 updateSettingsUI();
 updateAuraButton();
+updateBgModeLabel();
 showTitle();
 gameLoop();
 updateGamepad();
 
-console.log('🎮 APEX風 GRT- 蜂蟻の巣 v1.1');
+console.log('🎮 APEX風 GRT- 蜂蟻の巣 v1.2');
 console.log('✅ 遷移先: premium.html');
-console.log('✅ 背景画像: img347apex.jpg');
+console.log('✅ 背景画像: img347apex.jpg（タイル / ストレッチ / カバー）');
 console.log('✅ 洞窟背景 / 滝 / 背景画像モード / MINIMAPトグル 実装');
 </script>
 </body>
