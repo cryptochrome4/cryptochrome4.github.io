@@ -48,7 +48,6 @@
       box-shadow: 0 6px 0 #0f0e0b, 0 4px 12px #000000aa;
       transition: transform 0.1s, box-shadow 0.1s;
       text-shadow: 2px 2px 0 #1e1813;
-      image-rendering: pixelated;
     }
 
     .nav-btn:hover {
@@ -543,7 +542,7 @@
       object-fit: contain;
     }
 
-    /* 巻き戻しバー */
+    /* 巻き戻しバー（7分間通算） */
     .yt-progress-container {
       background: #1a1a1a;
       padding: 0.55rem 0.8rem;
@@ -678,25 +677,46 @@
       opacity: 1;
     }
 
-    /* コメント全表示トグル */
-    .yt-comment-toggle {
-      background: #272727;
-      color: #aaa;
-      border: 1px solid #444;
-      border-radius: 20px;
-      padding: 0.35rem 1rem;
-      font-family: 'Courier New', monospace;
-      font-size: 0.8rem;
-      font-weight: 700;
+    /* ===== 全表示（フルスクリーン風） ===== */
+    .yt-player-wrap.fullscreen-mode {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 9999;
+      border-radius: 0;
+      border: none;
+      background: #000;
+      max-height: none;
       cursor: pointer;
-      letter-spacing: 1px;
-      transition: all 0.2s;
     }
 
-    .yt-comment-toggle.on {
-      background: #ff0000;
-      color: #fff;
-      border-color: #ff0000;
+    .yt-player-wrap.fullscreen-mode .yt-video {
+      width: 100%;
+      height: 100%;
+      max-height: none;
+      object-fit: contain;
+    }
+
+    .yt-player-wrap.fullscreen-mode .yt-overlay {
+      /* フルスクリーン時もコメント表示 */
+    }
+
+    .yt-player-wrap.fullscreen-mode::after {
+      content: "画面のどこかをクリックで戻る";
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      color: #fffc;
+      background: #000a;
+      padding: 0.4rem 1rem;
+      border-radius: 20px;
+      font-size: 0.9rem;
+      letter-spacing: 2px;
+      pointer-events: none;
+      z-index: 10000;
+      border: 1px solid #ff0000;
     }
 
     .yt-video-meta {
@@ -1045,7 +1065,7 @@
   </div>
 
   <!-- ============================================================ -->
-  <!-- PAGE 4 : 早まった一般化（YouTube動画風） -->
+  <!-- PAGE 4 : 早まった一般化（YouTube動画風・ループ7分版） -->
   <!-- ============================================================ -->
   <div class="page" id="page-video">
     <div class="menu-board">
@@ -1053,8 +1073,9 @@
         <h1>🎬 早まった一般化（不完全な帰納）</h1>
       </div>
 
-      <div class="yt-player-wrap">
-        <video class="yt-video" id="mainVideo" preload="metadata" playsinline>
+      <div class="yt-player-wrap" id="ytPlayerWrap">
+        <!-- 10秒動画をループして7分間として扱う -->
+        <video class="yt-video" id="mainVideo" preload="metadata" playsinline loop muted>
           <source src="video1streamer.mp4" type="video/mp4">
           お使いのブラウザは動画タグに対応していません。
         </video>
@@ -1063,7 +1084,7 @@
         <div class="yt-overlay" id="commentOverlay"></div>
       </div>
 
-      <!-- 巻き戻しバー -->
+      <!-- 巻き戻しバー（7分間通算） -->
       <div class="yt-progress-container">
         <div class="yt-progress-bar" id="progressBar">
           <div class="yt-progress-fill" id="progressFill"></div>
@@ -1076,7 +1097,7 @@
         <button class="yt-btn" id="playPauseBtn">▶ 再生</button>
         <button class="yt-btn" id="rewindBtn">⏪ 10秒戻る</button>
         <button class="yt-btn" id="forwardBtn">⏩ 10秒進む</button>
-        <button class="yt-btn yt-comment-toggle on" id="commentToggle">💬 コメント全表示 ON</button>
+        <button class="yt-btn" id="fullscreenBtn">⛶ 全表示</button>
       </div>
 
       <!-- 動画メタ情報 -->
@@ -1084,7 +1105,7 @@
         <div class="yt-title">早まった一般化（不完全な帰納）とは？ ～ 7分でわかる論理学 ～</div>
         <div class="yt-channel">論理チャンネル ／ 登録者 12.3万人</div>
         <div style="margin-top:0.3rem; font-size:0.85rem; color:#777;">
-          少ない事例から一般法則を導き出す「早まった一般化」を、コメント形式でたんたんと解説。
+          10秒のクリップをループして7分間の動画として構成。コメントが動画上を流れます。
         </div>
       </div>
 
@@ -1119,7 +1140,6 @@
     nextBtn.disabled = currentPage === pages.length - 1;
     navIndicator.textContent = (currentPage + 1) + ' / ' + pages.length;
 
-    // ページごとの背景色
     const bgMap = {
       'page-koizumi': '#1e1a16',
       'page-slope': '#0a121e',
@@ -1128,7 +1148,6 @@
     };
     document.body.style.background = bgMap[pages[currentPage].id] || '#1e1a16';
 
-    // 動画ページに来たらコメント開始
     if (pages[currentPage].id === 'page-video') {
       startVideoPage();
     } else {
@@ -1137,17 +1156,11 @@
   }
 
   prevBtn.addEventListener('click', () => {
-    if (currentPage > 0) {
-      currentPage--;
-      updateNav();
-    }
+    if (currentPage > 0) { currentPage--; updateNav(); }
   });
 
   nextBtn.addEventListener('click', () => {
-    if (currentPage < pages.length - 1) {
-      currentPage++;
-      updateNav();
-    }
+    if (currentPage < pages.length - 1) { currentPage++; updateNav(); }
   });
 
   // ===== 動画ページ ロジック =====
@@ -1158,18 +1171,19 @@
   const playPauseBtn = document.getElementById('playPauseBtn');
   const rewindBtn = document.getElementById('rewindBtn');
   const forwardBtn = document.getElementById('forwardBtn');
-  const commentToggle = document.getElementById('commentToggle');
+  const fullscreenBtn = document.getElementById('fullscreenBtn');
   const commentOverlay = document.getElementById('commentOverlay');
+  const ytPlayerWrap = document.getElementById('ytPlayerWrap');
+
+  const TOTAL_DURATION = 420; // 7分 = 420秒（見かけの長さ）
+  const CLIP_DURATION = 10;   // 元動画は約10秒（ループ）
 
   let videoPageActive = false;
-  let commentTimer = null;
-  let commentQueue = [];
-  let commentIndex = 0;
-  let commentsEnabled = true;
-  let videoDuration = 420; // デフォルト7分（実際の動画長に後で合わせる）
+  let virtualTime = 0;          // ループ通算の経過時間（0〜420）
+  let lastRealTime = 0;         // 前フレームの動画実時間
+  let isFullscreen = false;
 
-  // コメントデータ（タイムスタンプは秒）
-  // 動画は7分（420秒）を想定。コメントは「たんたんと」流れるように配置。
+  // コメントデータ（virtualTime に対して表示）
   const commentData = [
     { time: 5,   text: "早まった一般化（hasty generalization）は、少ない事例から一般法則を導く誤謬です。" },
     { time: 18,  text: "「私の友達3人はみんなタバコで長生きした。だからタバコは健康に良い」→これが典型的。" },
@@ -1197,11 +1211,8 @@
     { time: 400, text: "ご視聴ありがとうございました。論理的に考えましょう！" }
   ];
 
-  // 動画のメタデータ読み込み後に時間表示更新
-  video.addEventListener('loadedmetadata', () => {
-    videoDuration = video.duration || 420;
-    updateTimeDisplay();
-  });
+  let shownComments = new Set(); // 表示済みコメント管理（virtualTime基準）
+  let activeComments = [];       // 現在表示中のコメント要素
 
   function formatTime(sec) {
     const m = Math.floor(sec / 60);
@@ -1210,15 +1221,33 @@
   }
 
   function updateTimeDisplay() {
-    const cur = video.currentTime || 0;
-    timeDisplay.textContent = formatTime(cur) + ' / ' + formatTime(videoDuration);
+    timeDisplay.textContent = formatTime(virtualTime) + ' / ' + formatTime(TOTAL_DURATION);
   }
 
   function updateProgress() {
-    if (!video.duration) return;
-    const pct = (video.currentTime / video.duration) * 100;
-    progressFill.style.width = pct + '%';
+    const pct = (virtualTime / TOTAL_DURATION) * 100;
+    progressFill.style.width = Math.min(100, pct) + '%';
     updateTimeDisplay();
+  }
+
+  // 仮想時間をシーク
+  function seekTo(vt) {
+    virtualTime = Math.max(0, Math.min(TOTAL_DURATION, vt));
+    shownComments.clear();
+    // 現在時刻より前のコメントは「表示済み」にする
+    commentData.forEach(c => {
+      if (c.time < virtualTime) shownComments.add(c.time);
+    });
+    // アクティブコメントを全削除
+    clearComments();
+    // 動画実時間をループ位置に同期
+    if (video.duration) {
+      const clipPos = virtualTime % video.duration;
+      video.currentTime = clipPos;
+    }
+    lastRealTime = video.currentTime;
+    updateProgress();
+    showDueComments();
   }
 
   // プログレスバークリック
@@ -1226,9 +1255,7 @@
     const rect = progressBar.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const pct = x / rect.width;
-    if (video.duration) {
-      video.currentTime = pct * video.duration;
-    }
+    seekTo(pct * TOTAL_DURATION);
   });
 
   // 再生/一時停止
@@ -1242,116 +1269,123 @@
     }
   });
 
-  video.addEventListener('play', () => {
-    playPauseBtn.textContent = '⏸ 一時停止';
-  });
-  video.addEventListener('pause', () => {
-    playPauseBtn.textContent = '▶ 再生';
-  });
+  video.addEventListener('play', () => { playPauseBtn.textContent = '⏸ 一時停止'; });
+  video.addEventListener('pause', () => { playPauseBtn.textContent = '▶ 再生'; });
 
-  // 10秒戻る/進む
-  rewindBtn.addEventListener('click', () => {
-    video.currentTime = Math.max(0, video.currentTime - 10);
-  });
-  forwardBtn.addEventListener('click', () => {
-    video.currentTime = Math.min(video.duration || videoDuration, video.currentTime + 10);
-  });
+  // 10秒戻る/進む（仮想時間基準）
+  rewindBtn.addEventListener('click', () => { seekTo(virtualTime - 10); });
+  forwardBtn.addEventListener('click', () => { seekTo(virtualTime + 10); });
 
-  // コメント全表示トグル
-  commentToggle.addEventListener('click', () => {
-    commentsEnabled = !commentsEnabled;
-    commentToggle.textContent = commentsEnabled ? '💬 コメント全表示 ON' : '💬 コメント全表示 OFF';
-    commentToggle.classList.toggle('on', commentsEnabled);
-    if (!commentsEnabled) {
-      commentOverlay.innerHTML = '';
+  // ===== 全表示（フルスクリーン風） =====
+  function enterFullscreen() {
+    isFullscreen = true;
+    ytPlayerWrap.classList.add('fullscreen-mode');
+    fullscreenBtn.classList.add('active');
+    fullscreenBtn.textContent = '✕ 戻る';
+    // 全画面中はどこをクリックしても戻る
+    ytPlayerWrap.addEventListener('click', exitFullscreenHandler, true);
+    // 念のためESCでも戻れるように
+    document.addEventListener('keydown', escHandler);
+  }
+
+  function exitFullscreen() {
+    isFullscreen = false;
+    ytPlayerWrap.classList.remove('fullscreen-mode');
+    fullscreenBtn.classList.remove('active');
+    fullscreenBtn.textContent = '⛶ 全表示';
+    ytPlayerWrap.removeEventListener('click', exitFullscreenHandler, true);
+    document.removeEventListener('keydown', escHandler);
+  }
+
+  function exitFullscreenHandler(e) {
+    // コントロール類のクリックは無視（全画面中はそれらは隠れているが一応）
+    e.preventDefault();
+    e.stopPropagation();
+    exitFullscreen();
+  }
+
+  function escHandler(e) {
+    if (e.key === 'Escape' && isFullscreen) {
+      exitFullscreen();
+    }
+  }
+
+  fullscreenBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (isFullscreen) {
+      exitFullscreen();
     } else {
-      // 再表示：現在の時間以降のコメントを再キュー
-      rebuildCommentQueue();
+      enterFullscreen();
     }
   });
 
-  // 動画時間更新
-  video.addEventListener('timeupdate', () => {
-    updateProgress();
-    if (commentsEnabled && videoPageActive) {
+  // ===== 動画ループ同期 =====
+  function tick() {
+    if (videoPageActive && !video.paused) {
+      const realTime = video.currentTime;
+      // ループ検出：実時間が前回より小さくなったら1周したとみなす
+      let delta;
+      if (realTime < lastRealTime - 0.5) {
+        // ループ発生
+        const dur = video.duration || CLIP_DURATION;
+        delta = (dur - lastRealTime) + realTime;
+      } else {
+        delta = realTime - lastRealTime;
+      }
+      lastRealTime = realTime;
+      virtualTime += delta;
+
+      // 7分到達で終了
+      if (virtualTime >= TOTAL_DURATION) {
+        virtualTime = TOTAL_DURATION;
+        video.pause();
+        playPauseBtn.textContent = '▶ 再生';
+        updateProgress();
+        clearComments();
+        return;
+      }
+
+      updateProgress();
       showDueComments();
     }
-  });
-
-  // ページ離脱時に動画停止
-  function stopVideoPage() {
-    videoPageActive = false;
-    if (!video.paused) {
-      video.pause();
-    }
-    if (commentTimer) {
-      clearInterval(commentTimer);
-      commentTimer = null;
-    }
-    commentOverlay.innerHTML = '';
-    commentQueue = [];
-    commentIndex = 0;
+    requestAnimationFrame(tick);
   }
 
-  // ページ表示時に動画初期化
-  function startVideoPage() {
-    if (videoPageActive) return;
-    videoPageActive = true;
-    commentsEnabled = true;
-    commentToggle.textContent = '💬 コメント全表示 ON';
-    commentToggle.classList.add('on');
-    commentOverlay.innerHTML = '';
-    rebuildCommentQueue();
-    updateProgress();
-  }
-
-  // コメントキュー再構築（現在の時間以降のコメントを対象）
-  function rebuildCommentQueue() {
-    commentOverlay.innerHTML = '';
-    const cur = video.currentTime || 0;
-    commentQueue = commentData.filter(c => c.time >= cur).map(c => ({ ...c }));
-    commentIndex = 0;
-  }
-
-  // 時間に応じてコメント表示
+  // コメント表示
   function showDueComments() {
-    if (!commentsEnabled || !videoPageActive) return;
-    const cur = video.currentTime || 0;
-    while (commentIndex < commentQueue.length && commentQueue[commentIndex].time <= cur) {
-      const c = commentQueue[commentIndex];
-      addCommentToOverlay(c.text, c.time);
-      commentIndex++;
+    if (!videoPageActive) return;
+    const cur = virtualTime;
+    for (const c of commentData) {
+      if (!shownComments.has(c.time) && c.time <= cur) {
+        shownComments.add(c.time);
+        addCommentToOverlay(c.text);
+      }
     }
   }
 
-  // コメントをオーバーレイに追加（右から左へ流れる）
-  function addCommentToOverlay(text, startTime) {
-    if (!commentsEnabled) return;
-    // 重複防止：同時刻近辺のコメントが多すぎる場合は間引く（簡単に）
-    const existing = commentOverlay.querySelectorAll('.yt-comment');
-    if (existing.length > 6) {
-      // 古いものを削除
-      existing[0].remove();
-    }
+  function clearComments() {
+    commentOverlay.innerHTML = '';
+    activeComments = [];
+  }
 
+  function addCommentToOverlay(text) {
     const el = document.createElement('div');
     el.className = 'yt-comment show';
     el.textContent = text;
 
-    // 縦位置をランダムに（真ん中を避ける必要はないが、重なり防止でランダム）
-    const topPct = 8 + Math.random() * 70; // 8%〜78%
+    const topPct = 8 + Math.random() * 70;
     el.style.top = topPct + '%';
     el.style.left = '100%';
 
     commentOverlay.appendChild(el);
+    activeComments.push(el);
 
-    // アニメーション：右から左へ（動画の長さに合わせて速度調整）
-    // コメントの流れる速度：動画7分に対して、1コメント約18秒かけて流れる
-    const duration = 18000; // 18秒
+    // コメントの流れる速度：遅めに設定（18秒で横断）
+    const duration = 18000;
     const distance = commentOverlay.clientWidth + el.clientWidth + 200;
 
     el.animate([
-      { transform: 'translateX(0)', opacity: 0.9 },
+      { transform: 'translateX(0)', opacity: 0.95 },
       { transform: 'translateX(-' + distance + 'px)', opacity: 0.6 }
     ], {
       duration: duration,
@@ -1359,45 +1393,64 @@
       fill: 'forwards'
     }).onfinish = () => {
       el.remove();
+      const idx = activeComments.indexOf(el);
+      if (idx >= 0) activeComments.splice(idx, 1);
     };
-
-    // 万が一アニメーションが動かない場合のフォールバック
-    setTimeout(() => {
-      if (el.parentNode) el.remove();
-    }, duration + 2000);
   }
 
-  // 動画終了時
-  video.addEventListener('ended', () => {
+  // ===== ページ開始/停止 =====
+  function startVideoPage() {
+    if (videoPageActive) return;
+    videoPageActive = true;
+    virtualTime = 0;
+    shownComments.clear();
+    clearComments();
+    if (video.duration) {
+      video.currentTime = 0;
+      lastRealTime = 0;
+    } else {
+      video.addEventListener('loadedmetadata', () => {
+        video.currentTime = 0;
+        lastRealTime = 0;
+      }, { once: true });
+    }
+    updateProgress();
+    // 自動再生はしない（ユーザー操作で再生）
+    video.pause();
     playPauseBtn.textContent = '▶ 再生';
-    commentOverlay.innerHTML = '';
-  });
+  }
 
-  // シーク時：コメントキュー再構築
-  video.addEventListener('seeked', () => {
-    if (videoPageActive && commentsEnabled) {
-      rebuildCommentQueue();
-      commentOverlay.innerHTML = '';
-      // 現在時刻以降のコメントを再表示
-      showDueComments();
-    }
-  });
+  function stopVideoPage() {
+    videoPageActive = false;
+    video.pause();
+    playPauseBtn.textContent = '▶ 再生';
+    clearComments();
+    if (isFullscreen) exitFullscreen();
+  }
 
-  // 初期表示
-  updateNav();
-
-  // 動画の時間表示初期化
+  // 動画のメタデータ読み込み後
   video.addEventListener('loadedmetadata', () => {
-    updateTimeDisplay();
+    // loop属性が効いているか確認（HTMLでloop指定済み）
+    if (!video.loop) video.loop = true;
+    lastRealTime = video.currentTime;
   });
-  updateTimeDisplay();
 
-  // 動画がロードされる前のデフォルト時間表示
-  setInterval(() => {
-    if (!video.paused && videoPageActive) {
-      updateTimeDisplay();
-    }
-  }, 500);
+  // 動画終了（loop指定してるので基本発生しないが念のため）
+  video.addEventListener('ended', () => {
+    // ループが効いていれば発生しない
+  });
+
+  // 毎フレーム処理開始
+  requestAnimationFrame(tick);
+
+  // 初期化
+  updateNav();
+  updateProgress();
+
+  // ページ離脱時にフルスクリーン解除
+  window.addEventListener('beforeunload', () => {
+    if (isFullscreen) exitFullscreen();
+  });
 
 </script>
 
