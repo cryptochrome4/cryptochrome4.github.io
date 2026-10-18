@@ -68,7 +68,7 @@
       align-items: center;
       color: #e6d5b8;
       text-shadow: 2px 2px 4px #0a0503, 0 0 10px rgba(180, 140, 90, 0.6);
-      transition: transform 0.2s, box-shadow 0.2s;
+      transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1), box-shadow 0.8s ease;
       transform-origin: left center;
       cursor: pointer;
       border-left: 8px solid #4a3727;
@@ -171,6 +171,7 @@
       color: #3d2b1a;
       overflow: hidden;
       border-left: 2px solid #d9c9b2;
+      transition: box-shadow 0.6s ease;
     }
 
     /* 高級紙の質感：微細なテクスチャ */
@@ -217,6 +218,7 @@
       font-family: 'Times New Roman', 'Yu Mincho', 'Hiragino Mincho ProN', serif;
       border: 1px solid rgba(180, 140, 100, 0.2);
       backdrop-filter: blur(1px);
+      transition: opacity 0.3s ease, transform 0.3s ease;
     }
 
     .page-content i {
@@ -229,18 +231,23 @@
       padding-top: 0.8rem;
     }
 
-    /* ページめくりボタン（NEXT） */
-    .next-btn {
+    /* ===== ナビゲーションボタン ===== */
+    .nav-row {
       position: absolute;
       bottom: 20px;
       right: 30px;
       z-index: 40;
+      display: flex;
+      gap: 0.8rem;
+    }
+
+    .nav-btn {
       background: #221a14;
       border: 2px solid #b89b70;
       color: #f0e2cc;
-      font-size: 1.2rem;
+      font-size: 1.1rem;
       font-weight: bold;
-      padding: 0.6rem 1.6rem;
+      padding: 0.55rem 1.4rem;
       border-radius: 40px;
       letter-spacing: 0.2em;
       cursor: pointer;
@@ -251,16 +258,23 @@
       transform: translateY(-3px);
     }
 
-    .next-btn:hover {
+    .nav-btn:hover:not(:disabled) {
       background: #382a1e;
       box-shadow: 0 5px 0 #0a0603, 0 12px 20px rgba(0, 0, 0, 0.6);
       transform: translateY(-1px);
       color: #ffeac2;
     }
 
-    .next-btn:active {
+    .nav-btn:active:not(:disabled) {
       transform: translateY(4px);
       box-shadow: 0 2px 0 #0a0603, 0 8px 12px rgba(0, 0, 0, 0.5);
+    }
+
+    .nav-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+      transform: translateY(0);
+      box-shadow: 0 2px 0 #0a0603;
     }
 
     /* ページめくりアニメーション（表紙が開く） */
@@ -270,7 +284,6 @@
         inset 0 0 30px rgba(255, 235, 200, 0.4),
         inset -10px 0 20px rgba(0, 0, 0, 0.8),
         -20px 10px 30px rgba(0, 0, 0, 0.6);
-      transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1), box-shadow 0.8s ease;
     }
 
     /* めくった後のページ強調 */
@@ -279,7 +292,6 @@
         inset -10px 0 20px rgba(120, 80, 50, 0.3),
         inset 10px 0 15px rgba(100, 70, 40, 0.2),
         -5px 10px 25px rgba(0, 0, 0, 0.7);
-      transition: box-shadow 0.6s ease;
     }
 
     /* 小さな注釈 */
@@ -320,11 +332,14 @@
         font-size: 0.9rem;
         padding: 1rem;
       }
-      .next-btn {
-        font-size: 1rem;
-        padding: 0.4rem 1.2rem;
+      .nav-btn {
+        font-size: 0.85rem;
+        padding: 0.4rem 1rem;
+      }
+      .nav-row {
         bottom: 12px;
         right: 18px;
+        gap: 0.5rem;
       }
     }
   </style>
@@ -345,12 +360,15 @@
         <div class="page-content" id="pageContent">
           <span>高級紙の質感</span>
           <i>— 上質な風合い —</i>
-          <div style="margin-top: 1.5rem; font-size: 0.7em; letter-spacing: 0.2em; color: #7a624a;">NEXT</div>
+          <div style="margin-top: 1.5rem; font-size: 0.7em; letter-spacing: 0.2em; color: #7a624a;">PAGE 1</div>
         </div>
       </div>
       
-      <!-- めくりボタン -->
-      <button class="next-btn" id="nextBtn">NEXT</button>
+      <!-- ナビゲーションボタン -->
+      <div class="nav-row">
+        <button class="nav-btn" id="prevBtn">PREV</button>
+        <button class="nav-btn" id="nextBtn">NEXT</button>
+      </div>
       
       <!-- ヒント -->
       <div class="hint">CLICK "NEXT" OR COVER</div>
@@ -362,60 +380,19 @@
       const cover = document.getElementById('cover');
       const pages = document.getElementById('pages');
       const nextBtn = document.getElementById('nextBtn');
+      const prevBtn = document.getElementById('prevBtn');
       const pageContent = document.getElementById('pageContent');
 
-      // ページ内容のバリエーション（高級紙に印刷されたテキスト）
+      // ページ内容のバリエーション
       const pageTexts = [
-        {
-          main: '高級紙の質感',
-          sub: '— 上質な風合い —',
-          extra: 'NEXT'
-        },
-        {
-          main: '滑らかな手触り',
-          sub: '— コットン100% —',
-          extra: 'PAGE 2'
-        },
-        {
-          main: '耳付きの風合い',
-          sub: '— 手漉き風 —',
-          extra: 'PAGE 3'
-        },
-        {
-          main: '深みのあるインク',
-          sub: '— 顔料系 —',
-          extra: 'FIN'
-        }
+        { main: '高級紙の質感', sub: '— 上質な風合い —', extra: 'PAGE 1' },
+        { main: '滑らかな手触り', sub: '— コットン100% —', extra: 'PAGE 2' },
+        { main: '耳付きの風合い', sub: '— 手漉き風 —', extra: 'PAGE 3' },
+        { main: '深みのあるインク', sub: '— 顔料系 —', extra: 'FIN' }
       ];
 
       let currentPage = 0;
       let isCoverOpen = false;
-
-      // 次のページへ（テキスト更新と表紙をめくる）
-      function nextPage() {
-        // 表紙がまだ開いていなければ開く
-        if (!isCoverOpen) {
-          cover.classList.add('flip');
-          pages.classList.add('reveal');
-          isCoverOpen = true;
-          
-          // 表紙が開いたらテキストを最初のページに更新（既に表示されているが、一応）
-          updatePageContent(0);
-        } else {
-          // 既に開いている場合はページ内容を進める
-          currentPage = (currentPage + 1) % pageTexts.length;
-          updatePageContent(currentPage);
-          
-          // 小さなアニメーション：ページを軽く光らせる
-          pageContent.style.transition = 'opacity 0.3s, transform 0.3s';
-          pageContent.style.opacity = '0.6';
-          pageContent.style.transform = 'scale(0.98)';
-          setTimeout(() => {
-            pageContent.style.opacity = '1';
-            pageContent.style.transform = 'scale(1)';
-          }, 150);
-        }
-      }
 
       // ページ内容の更新
       function updatePageContent(index) {
@@ -427,25 +404,90 @@
         `;
       }
 
+      // ボタン状態の同期
+      function syncButtons() {
+        if (!isCoverOpen) {
+          // 表紙が閉じている：PREV無効、NEXT有効
+          prevBtn.disabled = true;
+          nextBtn.disabled = false;
+        } else {
+          // 表紙が開いている：PREVは常に有効（表紙に戻れる）
+          prevBtn.disabled = false;
+          nextBtn.disabled = (currentPage >= pageTexts.length - 1);
+        }
+      }
+
+      // ページの小さなフラッシュアニメーション
+      function flashContent() {
+        pageContent.style.opacity = '0.6';
+        pageContent.style.transform = 'scale(0.98)';
+        setTimeout(() => {
+          pageContent.style.opacity = '1';
+          pageContent.style.transform = 'scale(1)';
+        }, 150);
+      }
+
+      // 次のページ
+      function nextPage() {
+        if (!isCoverOpen) {
+          // 表紙を開く
+          cover.classList.add('flip');
+          pages.classList.add('reveal');
+          isCoverOpen = true;
+          currentPage = 0;
+          updatePageContent(0);
+        } else {
+          // 次のページへ
+          if (currentPage < pageTexts.length - 1) {
+            currentPage++;
+            updatePageContent(currentPage);
+          }
+        }
+        syncButtons();
+        flashContent();
+      }
+
+      // 前のページ
+      function prevPage() {
+        if (!isCoverOpen) return;
+
+        if (currentPage > 0) {
+          // 前のページへ
+          currentPage--;
+          updatePageContent(currentPage);
+        } else {
+          // ページ0でPREV → 表紙を閉じる
+          cover.classList.remove('flip');
+          pages.classList.remove('reveal');
+          isCoverOpen = false;
+          currentPage = 0;
+          updatePageContent(0);
+        }
+        syncButtons();
+        flashContent();
+      }
+
+      // 初期化
+      updatePageContent(0);
+      syncButtons();
+
+      // イベントリスナー
+      nextBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        nextPage();
+      });
+
+      prevBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        prevPage();
+      });
+
       // 表紙をクリックしても開く
       cover.addEventListener('click', function(e) {
         if (!isCoverOpen) {
           nextPage();
         }
       });
-
-      // NEXTボタン
-      nextBtn.addEventListener('click', function(e) {
-        e.stopPropagation();
-        nextPage();
-      });
-
-      // 初期状態：表紙は閉じている（ページは見えないが下にある）
-      // 初期ページ内容は最初のまま
-      updatePageContent(0);
-
-      // 表紙が閉じている状態でページが見えないようにz-index調整はCSSで実施
-      // ただし、表紙が開くとページが完全に見える
     })();
   </script>
 </body>
