@@ -345,11 +345,11 @@
         #canvas {
             display: block;
             width: 100%; height: 100%;
-            background: #0d0d0d;
+            background: transparent;
             image-rendering: pixelated;
         }
 
-        /* ===== 操作ボタン（APEX HUD風） ===== */
+        /* ===== 操作ボタン ===== */
         #controls {
             position: absolute;
             bottom: 12px; right: 12px;
@@ -466,6 +466,7 @@
         #hpBar {
             display: flex; align-items: center; gap: 8px;
             color: #FF3C3C; font-size: 13px; font-weight: 900;
+            position: relative;
         }
         #hpBar .bar {
             width: 120px; height: 10px;
@@ -553,6 +554,40 @@
             color: #FF3C3C;
             border-color: #FF3C3C;
             box-shadow: 0 0 15px rgba(255,60,60,0.3);
+        }
+
+        /* ===== 追加トグルボタン（背景画像 / MINIMAP） ===== */
+        .toggle-row {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 8px;
+            width: 100%;
+        }
+        .toggle-btn {
+            padding: 6px 18px;
+            font-size: 12px;
+            font-family: 'Arial Black', sans-serif;
+            font-weight: 900;
+            letter-spacing: 2px;
+            background: rgba(20,20,20,0.85);
+            color: #888;
+            border: 1px solid #555;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.15s;
+            clip-path: polygon(6% 0%, 100% 0%, 94% 100%, 0% 100%);
+        }
+        .toggle-btn:hover {
+            color: #FF3C3C;
+            border-color: #FF3C3C;
+            box-shadow: 0 0 15px rgba(255,60,60,0.3);
+        }
+        .toggle-btn.active {
+            color: #fff;
+            background: linear-gradient(135deg, #FF3C3C, #8B0000);
+            border-color: #FF3C3C;
+            box-shadow: 0 0 20px rgba(255,60,60,0.6);
         }
 
         /* ===== 勝利/ゲームオーバー ===== */
@@ -753,6 +788,11 @@
             </div>
             <div id="controllerStatus">🎮 未接続</div>
         </div>
+        <!-- 背景画像モード切替 -->
+        <div class="toggle-row">
+            <button class="toggle-btn" id="bgImageToggle">🖼 背景画像: OFF</button>
+            <button class="toggle-btn" id="minimapToggle">🗺 MINIMAP: OFF</button>
+        </div>
         <div class="hint">【操作】←→移動 / ↑ジャンプ / ↓足元を掘る / クリックで掘る / 赤ボタンで弾発射 / 👁️で範囲表示</div>
     </div>
 </div>
@@ -839,6 +879,14 @@ var gameRunning = false;
 var ROYAL_RANGE = 1;
 var showAura = false;
 var FLEE_DURATION = 90;
+
+// 新規：背景画像モード & MINIMAP表示
+var useBgImage = false;
+var showMinimap = false;
+var bgImage = new Image();
+var bgImageLoaded = false;
+bgImage.onload = function() { bgImageLoaded = true; };
+bgImage.src = 'img300animal.html';
 
 // ============================================
 // 画面遷移
@@ -1260,18 +1308,199 @@ function fireBullets() {
 }
 
 // ============================================
+// 洞窟背景（APEX風ドット絵/図形）
+// ============================================
+// 背景用の決定論的擬似乱数
+function bgRand(seed) {
+    var x = Math.sin(seed * 12.9898) * 43758.5453;
+    return x - Math.floor(x);
+}
+
+// 背景の滝位置（ワールド座標で固定）
+var waterfalls = [
+    { x: 8, width: 3, top: 0 },
+    { x: 22, width: 2, top: 0 },
+    { x: 38, width: 4, top: 0 },
+    { x: 52, width: 2, top: 0 }
+];
+
+function drawCaveBackground() {
+    var time = Date.now() / 1000;
+    var sx = Math.floor(camera.x / BW);
+    var sy = Math.floor(camera.y / BW);
+    var ex = Math.ceil((camera.x + W) / BW) + 1;
+    var ey = Math.ceil((camera.y + H) / BW) + 1;
+
+    // ---- 背景ベース：深い青黒グラデ + 赤い雰囲気 ----
+    var bgGrad = ctx.createRadialGradient(
+        W/2 - camera.x*0.02, H/2 - camera.y*0.02, 50,
+        W/2, H/2, W*0.8
+    );
+    bgGrad.addColorStop(0, '#1a1020');
+    bgGrad.addColorStop(0.5, '#0d0a14');
+    bgGrad.addColorStop(1, '#050308');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, W, H);
+
+    // ---- 遠景の鍾乳石シルエット（パララックス0.3） ----
+    ctx.save();
+    ctx.globalAlpha = 0.35;
+    for (var i = -2; i < Math.ceil(W / 60) + 2; i++) {
+        var bx = i * 60 - (camera.x * 0.3) % 60;
+        var seed = Math.floor((i * 60 + camera.x * 0.3) / 60);
+        var hgt = 40 + bgRand(seed) * 80;
+        ctx.fillStyle = '#0a0610';
+        ctx.beginPath();
+        ctx.moveTo(bx, 0);
+        ctx.lineTo(bx + 30, hgt);
+        ctx.lineTo(bx + 60, 0);
+        ctx.closePath();
+        ctx.fill();
+    }
+    ctx.restore();
+
+    // ---- 遠景の発光クリスタル（パララックス0.4） ----
+    for (var i = 0; i < 14; i++) {
+        var seed2 = i * 7.3;
+        var cxp = (bgRand(seed2) * COLS * BW * 0.8 - camera.x * 0.4) % (COLS * BW);
+        if (cxp < -20) cxp += COLS * BW;
+        var cyp = (bgRand(seed2 + 1) * ROWS * BW * 0.6 - camera.y * 0.4) % (ROWS * BW);
+        if (cyp < -20) cyp += ROWS * BW;
+        var csize = 3 + bgRand(seed2 + 2) * 5;
+        var pulse = 0.4 + Math.sin(time * 2 + i) * 0.3;
+        ctx.save();
+        ctx.globalAlpha = pulse * 0.5;
+        ctx.shadowColor = '#4FC3F7';
+        ctx.shadowBlur = 12;
+        ctx.fillStyle = '#4FC3F7';
+        ctx.beginPath();
+        ctx.moveTo(cxp, cyp - csize);
+        ctx.lineTo(cxp + csize * 0.6, cyp);
+        ctx.lineTo(cxp, cyp + csize);
+        ctx.lineTo(cxp - csize * 0.6, cyp);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+    }
+
+    // ---- 滝（ワールド座標で固定、パララックスなし） ----
+    for (var w = 0; w < waterfalls.length; w++) {
+        var wf = waterfalls[w];
+        var wfx = wf.x * BW - camera.x;
+        if (wfx < -100 || wfx > W + 100) continue;
+        var wfw = wf.width * BW;
+        // 滝の流れ
+        for (var yy = 0; yy < H; yy += 8) {
+            var flowOffset = (time * 120 + yy * 3) % 8;
+            ctx.fillStyle = 'rgba(79,195,247,' + (0.08 + bgRand(wf.x + yy) * 0.08) + ')';
+            ctx.fillRect(wfx, yy + flowOffset, wfw, 6);
+            ctx.fillStyle = 'rgba(150,220,255,' + (0.15 + bgRand(wf.x + yy + 1) * 0.1) + ')';
+            ctx.fillRect(wfx + wfw * 0.3, yy + flowOffset + 1, wfw * 0.15, 3);
+        }
+        // 滝の縁のネオン
+        ctx.strokeStyle = 'rgba(79,195,247,0.4)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(wfx, 0);
+        ctx.lineTo(wfx, H);
+        ctx.moveTo(wfx + wfw, 0);
+        ctx.lineTo(wfx + wfw, H);
+        ctx.stroke();
+        // 飛沫
+        for (var sp = 0; sp < 6; sp++) {
+            var spSeed = w * 100 + sp + Math.floor(time * 3);
+            var spx = wfx + bgRand(spSeed) * wfw;
+            var spy = (bgRand(spSeed + 1) * H + time * 60) % H;
+            ctx.fillStyle = 'rgba(150,220,255,' + (0.3 + bgRand(spSeed + 2) * 0.3) + ')';
+            ctx.fillRect(spx, spy, 2, 2);
+        }
+    }
+
+    // ---- 中景の岩壁テクスチャ（パララックス0.6） ----
+    ctx.save();
+    ctx.globalAlpha = 0.25;
+    var rockOffset = camera.x * 0.6;
+    for (var i = -3; i < Math.ceil(W / 40) + 3; i++) {
+        var rx = i * 40 - rockOffset % 40;
+        var seed3 = Math.floor((i * 40 + rockOffset) / 40);
+        var rh = 60 + bgRand(seed3) * 120;
+        var ry = H - rh;
+        ctx.fillStyle = bgRand(seed3 + 5) > 0.5 ? '#1a1410' : '#140f0a';
+        ctx.beginPath();
+        ctx.moveTo(rx, H);
+        ctx.lineTo(rx + 10, ry + 20);
+        ctx.lineTo(rx + 25, ry + bgRand(seed3 + 3) * 30);
+        ctx.lineTo(rx + 40, H);
+        ctx.closePath();
+        ctx.fill();
+    }
+    ctx.restore();
+
+    // ---- 中景の鍾乳石（下向き、パララックス0.6） ----
+    ctx.save();
+    ctx.globalAlpha = 0.4;
+    for (var i = -2; i < Math.ceil(W / 50) + 2; i++) {
+        var bx2 = i * 50 - (camera.x * 0.6) % 50;
+        var seed4 = Math.floor((i * 50 + camera.x * 0.6) / 50);
+        var hgt2 = 30 + bgRand(seed4) * 70;
+        ctx.fillStyle = '#0a0608';
+        ctx.beginPath();
+        ctx.moveTo(bx2, 0);
+        ctx.lineTo(bx2 + 12, hgt2);
+        ctx.lineTo(bx2 + 10, hgt2 * 0.7);
+        ctx.lineTo(bx2 + 25, hgt2 * 0.95);
+        ctx.lineTo(bx2 + 22, hgt2 * 0.5);
+        ctx.lineTo(bx2 + 50, 0);
+        ctx.closePath();
+        ctx.fill();
+    }
+    ctx.restore();
+
+    // ---- 前景のほこり/胞子（ゆっくり漂う） ----
+    for (var i = 0; i < 20; i++) {
+        var seed5 = i * 13.7;
+        var dx2 = (bgRand(seed5) * W + time * (10 + bgRand(seed5+1) * 20)) % W;
+        var dy2 = (bgRand(seed5 + 2) * H + Math.sin(time + i) * 15) % H;
+        ctx.fillStyle = 'rgba(255,200,150,' + (0.15 + Math.sin(time * 2 + i) * 0.1) + ')';
+        ctx.fillRect(dx2, dy2, 1.5, 1.5);
+    }
+
+    // ---- 赤い環境光のビネット ----
+    var vig = ctx.createRadialGradient(W/2, H/2, H*0.3, W/2, H/2, H*0.9);
+    vig.addColorStop(0, 'rgba(0,0,0,0)');
+    vig.addColorStop(1, 'rgba(40,0,0,0.4)');
+    ctx.fillStyle = vig;
+    ctx.fillRect(0, 0, W, H);
+}
+
+// ============================================
 // 描画（APEX風）
 // ============================================
 function draw() {
     ctx.clearRect(0, 0, W, H);
 
-    // 背景：暗い放射グラデ＋走査線
-    var grad = ctx.createRadialGradient(W/2, H/2, 100, W/2, H/2, W*0.75);
-    grad.addColorStop(0, '#15151c');
-    grad.addColorStop(0.6, '#0b0b10');
-    grad.addColorStop(1, '#050508');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, W, H);
+    // ---- 背景描画 ----
+    if (useBgImage && bgImageLoaded) {
+        // 背景画像モード：img300animal.html を背景に
+        ctx.save();
+        // 画像をタイル状に描画（スクロールに追従）
+        var imgW = 400;
+        var imgH = 250;
+        var offX = (camera.x * 0.3) % imgW;
+        var offY = (camera.y * 0.3) % imgH;
+        for (var bx = -offX; bx < W; bx += imgW) {
+            for (var by = -offY; by < H; by += imgH) {
+                ctx.drawImage(bgImage, bx, by, imgW, imgH);
+            }
+        }
+        // 暗いオーバーレイ
+        ctx.fillStyle = 'rgba(10,5,15,0.55)';
+        ctx.fillRect(0, 0, W, H);
+        ctx.restore();
+    } else {
+        // APEX風洞窟背景
+        drawCaveBackground();
+    }
 
     // 走査線
     ctx.fillStyle = 'rgba(255,60,60,0.02)';
@@ -1284,7 +1513,7 @@ function draw() {
     var ex = Math.ceil((camera.x + W) / BW) + 1;
     var ey = Math.ceil((camera.y + H) / BW) + 1;
 
-    // ---- ブロック描画（APEX風：暗い金属＋ネオン縁） ----
+    // ---- ブロック描画 ----
     for (var r = sy; r < ey && r < ROWS; r++) {
         for (var c = sx; c < ex && c < COLS; c++) {
             var type = world[r][c];
@@ -1294,7 +1523,7 @@ function draw() {
             var depthFade = Math.max(0.4, 1 - (r - 15) * 0.02);
 
             switch(type) {
-                case 1: // 土：ダークブラウン金属
+                case 1:
                     ctx.fillStyle = 'rgba(' + Math.floor(90*depthFade) + ',' + Math.floor(70*depthFade) + ',' + Math.floor(60*depthFade) + ',1)';
                     ctx.fillRect(x, y, BW-1, BW-1);
                     ctx.fillStyle = 'rgba(255,60,60,0.08)';
@@ -1302,7 +1531,7 @@ function draw() {
                     ctx.fillStyle = 'rgba(0,0,0,0.35)';
                     ctx.fillRect(x, y + BW-2, BW-1, 1);
                     break;
-                case 2: // 草：ネオン緑ライン
+                case 2:
                     ctx.fillStyle = 'rgba(30,' + Math.floor(90*depthFade) + ',40,1)';
                     ctx.fillRect(x, y, BW-1, BW-1);
                     ctx.fillStyle = '#39FF88';
@@ -1312,7 +1541,7 @@ function draw() {
                     ctx.fillStyle = 'rgba(0,0,0,0.3)';
                     ctx.fillRect(x, y + BW-2, BW-1, 1);
                     break;
-                case 3: // 石：ダークグレー＋赤ネオンひび
+                case 3:
                     ctx.fillStyle = 'rgba(' + Math.floor(70*depthFade) + ',' + Math.floor(70*depthFade) + ',' + Math.floor(75*depthFade) + ',1)';
                     ctx.fillRect(x, y, BW-1, BW-1);
                     ctx.fillStyle = 'rgba(255,60,60,0.12)';
@@ -1323,13 +1552,13 @@ function draw() {
                     ctx.lineWidth = 1;
                     ctx.strokeRect(x+0.5, y+0.5, BW-2, BW-2);
                     break;
-                case 4: // 木：ダークで赤いライン
+                case 4:
                     ctx.fillStyle = 'rgba(' + Math.floor(100*depthFade) + ',' + Math.floor(70*depthFade) + ',' + Math.floor(60*depthFade) + ',1)';
                     ctx.fillRect(x, y, BW-1, BW-1);
                     ctx.fillStyle = 'rgba(255,60,60,0.15)';
                     ctx.fillRect(x + BW/2 - 1, y, 2, BW-1);
                     break;
-                case 6: // GRT：ゴールドのAPEXロゴ風
+                case 6:
                     ctx.fillStyle = '#0a0a0a';
                     ctx.fillRect(x, y, BW-1, BW-1);
                     ctx.save();
@@ -1351,7 +1580,7 @@ function draw() {
         }
     }
 
-    // ---- オーラ（赤いAPEXスキャンリング） ----
+    // ---- オーラ ----
     if (showAura) {
         var auraX = player.x * BW - camera.x;
         var auraY = player.y * BW - camera.y;
@@ -1362,7 +1591,6 @@ function draw() {
         ctx.setLineDash([6, 4]);
         ctx.strokeRect(auraX - BW, auraY - BW, BW * 3, BW * 3);
         ctx.setLineDash([]);
-        // 四隅のコーナー
         ctx.lineWidth = 3;
         ctx.strokeStyle = '#FF3C3C';
         var size = 8;
@@ -1377,19 +1605,17 @@ function draw() {
         ctx.restore();
     }
 
-    // ---- 弾（赤いネオントレイル） ----
+    // ---- 弾 ----
     for (var i = 0; i < bullets.length; i++) {
         var b = bullets[i];
         var bx = b.x * BW - camera.x;
         var by = b.y * BW - camera.y;
-        // トレイル
         ctx.strokeStyle = 'rgba(255,60,60,0.4)';
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.moveTo(bx + BW/2 - b.vx*14, by + BW/2 - b.vy*14);
         ctx.lineTo(bx + BW/2, by + BW/2);
         ctx.stroke();
-        // 本体
         ctx.fillStyle = '#FF3C3C';
         ctx.shadowColor = '#FF3C3C';
         ctx.shadowBlur = 14;
@@ -1399,7 +1625,7 @@ function draw() {
         ctx.fillRect(bx + BW/2 - 1, by + BW/2 - 1, 2, 2);
     }
 
-    // ---- 蜂蟻（APEXドローン風） ----
+    // ---- 蜂蟻 ----
     for (var i = 0; i < enemies.length; i++) {
         var e = enemies[i];
         var ex = e.x * BW - camera.x;
@@ -1408,13 +1634,11 @@ function draw() {
         var isFleeing = e.fleeTimer > 0;
         var wingAngle = Math.sin(e.wingPhase) * 0.7;
 
-        // 発光ハロー
         ctx.fillStyle = isFleeing ? 'rgba(79,195,247,0.15)' : 'rgba(255,60,60,0.15)';
         ctx.beginPath();
         ctx.arc(cx, cy, 14, 0, Math.PI*2);
         ctx.fill();
 
-        // ウィング（稲妻型のネオン）
         ctx.strokeStyle = isFleeing ? 'rgba(79,195,247,0.9)' : 'rgba(255,60,60,0.9)';
         ctx.lineWidth = 1.5;
         ctx.beginPath();
@@ -1428,7 +1652,6 @@ function draw() {
         ctx.lineTo(cx + 12, cy - 2);
         ctx.stroke();
 
-        // 装甲ボディ（六角形）
         ctx.save();
         ctx.translate(cx, cy);
         ctx.beginPath();
@@ -1457,18 +1680,15 @@ function draw() {
         ctx.strokeStyle = isFleeing ? '#4FC3F7' : '#FF3C3C';
         ctx.lineWidth = 1.5;
         ctx.stroke();
-        // コア
         ctx.fillStyle = isFleeing ? '#4FC3F7' : '#FF3C3C';
         ctx.beginPath();
         ctx.arc(0, 0, 2.5, 0, Math.PI*2);
         ctx.fill();
-        // アイ（赤いスリット）
         ctx.fillStyle = '#fff';
         ctx.fillRect(-3, -2, 2, 1.5);
         ctx.fillRect(1, -2, 2, 1.5);
         ctx.restore();
 
-        // 足（下向きアンテナ）
         ctx.strokeStyle = isFleeing ? 'rgba(79,195,247,0.6)' : 'rgba(255,60,60,0.6)';
         ctx.lineWidth = 1;
         ctx.beginPath();
@@ -1476,7 +1696,6 @@ function draw() {
         ctx.moveTo(cx + 4, cy + 6); ctx.lineTo(cx + 7, cy + 11);
         ctx.stroke();
 
-        // HPバー（APEX HUD風）
         if (e.hp < e.maxHp) {
             ctx.fillStyle = 'rgba(0,0,0,0.7)';
             ctx.fillRect(ex + 1, ey - 5, BW - 2, 3);
@@ -1485,24 +1704,21 @@ function draw() {
         }
     }
 
-    // ---- プレイヤー（APEX レジェンド風） ----
+    // ---- プレイヤー ----
     var px = player.x * BW - camera.x;
     var py = player.y * BW - camera.y;
     var pcx = px + BW/2, pcy = py + BW/2 - 2;
 
-    // 影
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
     ctx.beginPath();
     ctx.ellipse(px + BW/2, py + BW - 1, 8, 3, 0, 0, Math.PI*2);
     ctx.fill();
 
-    // オーラ
     ctx.fillStyle = 'rgba(255,60,60,0.12)';
     ctx.beginPath();
     ctx.arc(pcx, pcy, 14, 0, Math.PI*2);
     ctx.fill();
 
-    // ボディ（角張ったAPEX調）
     ctx.save();
     ctx.translate(pcx, pcy);
     var bodyGrad2 = ctx.createRadialGradient(0, -3, 1, 0, 0, 10);
@@ -1526,14 +1742,12 @@ function draw() {
     ctx.strokeStyle = '#FF3C3C';
     ctx.lineWidth = 1.5;
     ctx.stroke();
-    // バイザー
     ctx.fillStyle = '#0a0a0a';
     ctx.fillRect(-4, -5, 8, 3);
     ctx.fillStyle = '#FF3C3C';
     ctx.fillRect(-3, -4.5, 6, 1);
     ctx.restore();
 
-    // チャージリング
     if (charge > 0) {
         ctx.strokeStyle = 'rgba(255,60,60,' + (0.4 + Math.sin(Date.now()/180) * 0.3) + ')';
         ctx.lineWidth = 2;
@@ -1542,8 +1756,10 @@ function draw() {
         ctx.stroke();
     }
 
-    // ---- ミニマップ（APEX HUD風） ----
-    drawMinimap();
+    // ---- MINIMAP（表示時のみ） ----
+    if (showMinimap) {
+        drawMinimap();
+    }
 
     // 落下警告
     if (isFalling && vy > 1) {
@@ -1558,7 +1774,7 @@ function draw() {
         }
     }
 
-    // ビネット（APEXの画面端の暗さ）
+    // ビネット
     var vg = ctx.createRadialGradient(W/2, H/2, H*0.4, W/2, H/2, H*0.85);
     vg.addColorStop(0, 'rgba(0,0,0,0)');
     vg.addColorStop(1, 'rgba(0,0,0,0.55)');
@@ -1572,13 +1788,11 @@ function drawMinimap() {
     var my = 12;
     var sc = size / Math.max(COLS, ROWS);
 
-    // 外枠（APEX HUD）
     ctx.fillStyle = 'rgba(0,0,0,0.75)';
     ctx.fillRect(mx - 4, my - 4, size + 8, size + 8);
     ctx.strokeStyle = '#FF3C3C';
     ctx.lineWidth = 2;
     ctx.strokeRect(mx - 4, my - 4, size + 8, size + 8);
-    // コーナー強調
     ctx.lineWidth = 3;
     var cs = 10;
     [[mx-4,my-4],[mx+size+4,my-4],[mx-4,my+size+4],[mx+size+4,my+size+4]].forEach(function(p, idx) {
@@ -1618,7 +1832,6 @@ function drawMinimap() {
         ctx.globalAlpha = 1;
     }
 
-    // プレイヤー（白い点滅）
     ctx.fillStyle = '#fff';
     ctx.shadowColor = '#FF3C3C';
     ctx.shadowBlur = 6;
@@ -1627,7 +1840,6 @@ function drawMinimap() {
     ctx.fill();
     ctx.shadowBlur = 0;
 
-    // 方位マーク
     ctx.fillStyle = '#FF3C3C';
     ctx.font = 'bold 10px "Arial Black", sans-serif';
     ctx.textAlign = 'center';
@@ -1784,6 +1996,21 @@ document.getElementById('auraToggleBtn').addEventListener('click', function(e) {
     showAura = !showAura;
     updateAuraButton();
 });
+
+// ---- 背景画像モード切替 ----
+document.getElementById('bgImageToggle').addEventListener('click', function() {
+    useBgImage = !useBgImage;
+    this.classList.toggle('active', useBgImage);
+    this.textContent = '🖼 背景画像: ' + (useBgImage ? 'ON' : 'OFF');
+});
+
+// ---- MINIMAP表示切替 ----
+document.getElementById('minimapToggle').addEventListener('click', function() {
+    showMinimap = !showMinimap;
+    this.classList.toggle('active', showMinimap);
+    this.textContent = '🗺 MINIMAP: ' + (showMinimap ? 'ON' : 'OFF');
+});
+
 canvas.addEventListener('mousemove', function(e) { lastMouseX = e.clientX; lastMouseY = e.clientY; });
 canvas.addEventListener('click', function(e) { digBlock(); });
 document.addEventListener('keydown', function(e) {
@@ -1850,8 +2077,9 @@ showTitle();
 gameLoop();
 updateGamepad();
 
-console.log('🎮 APEX風 GRT- 蜂蟻の巣 v1.0');
+console.log('🎮 APEX風 GRT- 蜂蟻の巣 v1.1');
 console.log('✅ 遷移先: premium.html');
+console.log('✅ 洞窟背景 / 滝 / 背景画像モード / MINIMAPトグル 実装');
 </script>
 </body>
 </html>
