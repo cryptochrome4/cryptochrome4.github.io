@@ -357,7 +357,7 @@
       <button class="ui-btn list" id="checklistBtn">学習チェックリスト</button>
     </div>
 
-    <div class="hint">自分の手番のときだけサイコロを振れます。CPUの手番は自動で進みます。止まったマスでイベントが発生します。</div>
+    <div class="hint">自分の手番のときだけサイコロを振れます。CPUの手番は自動で進みます。勉強パートは自分のマスだけです。</div>
   </div>
 
   <div class="checklist-panel" id="checklistPanel">
@@ -450,12 +450,15 @@
 
   const randInt = (a,b)=>Math.floor(Math.random()*(b-a+1))+a;
   const pick = arr=>arr[Math.floor(Math.random()*arr.length)];
+  const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
 
   // ============================================================
-  //  Board (40マス蛇行)
+  //  Board (横長・蛇行なし、一直線に40マス)
+  //  世界座標は横に長い。カメラが追従。
   // ============================================================
-  const TILE_W = 90, TILE_H = 70;
-  const COLS = 8;
+  const TILE_W = 100, TILE_H = 120;
+  const TILE_GAP = 24;
+  const TILES = 40;
   const tileDefs = [
     'start','quiz','sbi','chance','nisa','quiz','risk','sbi',
     'chance','quiz','sbi','nisa','risk','chance','quiz','sbi',
@@ -474,23 +477,25 @@
     goal:'#ffffff',
   };
   const board = [];
+  let WORLD_W = 0, WORLD_H = 0;
 
   function buildBoard() {
     board.length = 0;
-    const marginX = 60, marginY = 70;
-    const gapX = 12, gapY = 18;
-    for (let i = 0; i < tileDefs.length; i++) {
-      const r = Math.floor(i / COLS);
-      const cInRow = i % COLS;
-      const c = (r % 2 === 0) ? cInRow : (COLS - 1 - cInRow);
-      const x = marginX + c * (TILE_W + gapX);
-      const y = marginY + r * (TILE_H + gapY);
+    // 横一直線（少し上下にうねらせる）
+    const baseY = 240;
+    for (let i = 0; i < TILES; i++) {
+      const x = 80 + i * (TILE_W + TILE_GAP);
+      const wave = Math.sin(i * 0.5) * 40;
+      const y = baseY + wave;
       const type = tileDefs[i];
       board.push({
         index:i, x, y, w:TILE_W, h:TILE_H, type,
         label:labelMap[type], color:colorMap[type],
       });
     }
+    const last = board[board.length-1];
+    WORLD_W = last.x + last.w + 120;
+    WORLD_H = H;
   }
 
   // ============================================================
@@ -506,7 +511,7 @@
       color:PIECE_COLORS[i],
       pos:0, money:1000000,
       finished:false,
-      skipTurns:0,   // 休みターン数
+      skipTurns:0,
       x:0, y:0, targetX:0, targetY:0,
     }));
     for (const p of pieces) {
@@ -575,7 +580,6 @@
     { q:'SORとは？', choices:['株式公開買付','最良価格を選ぶ仕組み','税金の控除','NISAの旧制度'], answer:1, term:'Smart Order Routingの略です。' },
   ];
 
-  // プラスイベント
   const CHANCE_EVENTS = [
     { text:'優良株が値上がり！ 資産が増えました。', delta:150000 },
     { text:'配当金を受け取りました。', delta:50000 },
@@ -584,7 +588,6 @@
     { text:'長期保有で株主優待を獲得！', delta:30000 },
     { text:'好決算で保有株が急騰！', delta:200000 },
   ];
-  // マイナスイベント（金銭以外のペナルティ含む）
   const RISK_EVENTS = [
     { text:'市場が暴落… 資産が減りました。', delta:-120000 },
     { text:'保有株が急落しました。', delta:-80000 },
@@ -606,10 +609,13 @@
   let reading = null;
   let movingPiece = null;
   let moveQueue = [];
-  let moveT = 0;
   let finishedCount = 0;
 
-  const STORAGE_KEY = 'sbi_sugoroku_v2';
+  // カメラ
+  let camX = 0;
+  let camTargetX = 0;
+
+  const STORAGE_KEY = 'sbi_sugoroku_v3';
 
   // ============================================================
   //  Init
@@ -623,6 +629,7 @@
     phase = 'idle';
     finishedCount = 0;
     diceValue = 0;
+    camX = 0; camTargetX = 0;
     updateHUD();
     buildChecklist();
     renderTurnbar();
@@ -716,6 +723,7 @@
 
     updateHUD();
     renderTurnbar();
+    focusCameraOn(cp);
 
     if (cp.isPlayer) {
       phase = 'idle';
@@ -737,9 +745,7 @@
     turnIndex++;
     if (turnIndex >= turnOrder.length) {
       turnIndex = 0;
-      if (pieces.every(p=>p.finished)) { finishGame(); return; }
     }
-    // 全員ゴール済みチェック
     if (pieces.every(p=>p.finished)) { finishGame(); return; }
     startTurn();
   }
@@ -750,6 +756,14 @@
     if (!cp || !cp.isPlayer || cp.finished) return;
     startRoll();
   });
+
+  // ============================================================
+  //  Camera
+  // ============================================================
+  function focusCameraOn(piece) {
+    const targetCenter = piece.targetX;
+    camTargetX = clamp(targetCenter - W/2, 0, Math.max(0, WORLD_W - W));
+  }
 
   // ============================================================
   //  Dice & Move
@@ -781,7 +795,6 @@
       const next = Math.min(piece.pos + i, board.length - 1);
       moveQueue.push(next);
     }
-    moveT = 0;
     moveStep();
   }
 
@@ -797,7 +810,7 @@
     const t = board[nextPos];
     movingPiece.targetX = t.x + t.w/2;
     movingPiece.targetY = t.y + t.h/2;
-    moveT = 0;
+    focusCameraOn(movingPiece);
     setTimeout(moveStep, 180);
   }
 
@@ -847,62 +860,87 @@
   }
 
   // --- Quiz ---
+  // プレイヤー: 選択肢UI / CPU: 自動判定でコメントのみ
   function triggerQuiz(piece) {
     const q = pick(QUIZZES);
     phase = 'event';
     dName.textContent = '用語クイズ';
     dMeta.textContent = piece.name;
-    dText.textContent = q.q;
     quizArea.innerHTML = '';
     dFoot.innerHTML = '';
-    const wrap = document.createElement('div');
-    wrap.className = 'quiz-choices';
-    q.choices.forEach((c, i)=>{
-      const btn = document.createElement('button');
-      btn.textContent = `${String.fromCharCode(65+i)}. ${c}`;
-      btn.onclick = ()=>{
-        const buttons = wrap.querySelectorAll('button');
-        buttons.forEach(b=>b.disabled = true);
-        if (i === q.answer) {
-          btn.classList.add('correct');
-          if (piece.isPlayer) {
+
+    if (piece.isPlayer) {
+      dText.textContent = q.q;
+      const wrap = document.createElement('div');
+      wrap.className = 'quiz-choices';
+      q.choices.forEach((c, i)=>{
+        const btn = document.createElement('button');
+        btn.textContent = `${String.fromCharCode(65+i)}. ${c}`;
+        btn.onclick = ()=>{
+          const buttons = wrap.querySelectorAll('button');
+          buttons.forEach(b=>b.disabled = true);
+          if (i === q.answer) {
+            btn.classList.add('correct');
             const bonus = 30000;
             piece.money += bonus;
             learnedTerms.add('q_'+q.q);
             saveState();
             dText.textContent = q.q + '\n\n正解！ ' + q.term + `\n+¥${bonus.toLocaleString()} 獲得`;
           } else {
-            dText.textContent = q.q + '\n\n正解！ ' + q.term;
+            btn.classList.add('wrong');
+            buttons[q.answer].classList.add('correct');
+            dText.textContent = q.q + '\n\n不正解… 正解は「' + q.choices[q.answer] + '」。\n' + q.term;
           }
-        } else {
-          btn.classList.add('wrong');
-          buttons[q.answer].classList.add('correct');
-          dText.textContent = q.q + '\n\n不正解… 正解は「' + q.choices[q.answer] + '」。\n' + q.term;
-        }
-        const ok = document.createElement('button');
-        ok.textContent = 'OK';
-        ok.onclick = ()=>{ closeDialogue(); advanceTurn(); };
-        dFoot.innerHTML = '';
-        dFoot.appendChild(ok);
-        updateHUD();
-      };
-      wrap.appendChild(btn);
-    });
-    quizArea.appendChild(wrap);
-    dialogue.classList.add('open');
+          const ok = document.createElement('button');
+          ok.textContent = 'OK';
+          ok.onclick = ()=>{ closeDialogue(); advanceTurn(); };
+          dFoot.innerHTML = '';
+          dFoot.appendChild(ok);
+          updateHUD();
+        };
+        wrap.appendChild(btn);
+      });
+      quizArea.appendChild(wrap);
+      dialogue.classList.add('open');
+    } else {
+      // CPUは自動判定、コメントのみ
+      const correct = Math.random() < 0.6;
+      if (correct) {
+        piece.money += 30000;
+        dText.textContent = `${piece.name} はクイズに正解した！\n「${q.term}」\n+¥30,000`;
+      } else {
+        dText.textContent = `${piece.name} はクイズに不正解…\n正解は「${q.choices[q.answer]}」。\n${q.term}`;
+      }
+      const ok = document.createElement('button');
+      ok.textContent = 'OK';
+      ok.onclick = ()=>{ closeDialogue(); advanceTurn(); };
+      dFoot.appendChild(ok);
+      updateHUD();
+      dialogue.classList.add('open');
+    }
   }
 
+  // SBI証券マス：プレイヤーだけ教材リーダー、CPUはコメントのみ
   function triggerSbi(piece) {
     const sbiBooks = TERM_BOOKS.filter(b=>['t05','t06','t07','t08','t10'].includes(b.id));
     const book = pick(sbiBooks);
-    if (piece.isPlayer) { learnedTerms.add(book.id); saveState(); buildChecklist(); }
-    openReader(book);
+    if (piece.isPlayer) {
+      learnedTerms.add(book.id); saveState(); buildChecklist();
+      openReader(book);
+    } else {
+      showDialogue('SBI証券', `${piece.name} は「${book.title}」を学んだ。`, ()=>advanceTurn(), piece.name);
+    }
   }
 
+  // NISAマス：プレイヤーだけ教材リーダー、CPUはコメントのみ
   function triggerNisa(piece) {
     const book = TERM_BOOKS.find(b=>b.id==='t09') || TERM_BOOKS[0];
-    if (piece.isPlayer) { learnedTerms.add(book.id); saveState(); buildChecklist(); }
-    openReader(book);
+    if (piece.isPlayer) {
+      learnedTerms.add(book.id); saveState(); buildChecklist();
+      openReader(book);
+    } else {
+      showDialogue('NISA・税金', `${piece.name} は「${book.title}」を学んだ。`, ()=>advanceTurn(), piece.name);
+    }
   }
 
   function triggerChance(piece) {
@@ -913,26 +951,23 @@
   }
 
   function triggerRisk(piece) {
-    // 3種類のペナルティから抽選
     const kind = randInt(0,2);
     if (kind === 0) {
-      // 金銭マイナス
       const ev = pick(RISK_EVENTS);
       piece.money = Math.max(0, piece.money + ev.delta);
       updateHUD();
       showDialogue('マイナスイベント', `${ev.text}\n¥${ev.delta.toLocaleString()}`, ()=>advanceTurn(), piece.name);
     } else if (kind === 1) {
-      // 次のターン休み
       piece.skipTurns = 1;
       showDialogue('マイナスイベント', `不祥事で取引停止…\n${piece.name} は次のターン休みです。`, ()=>advanceTurn(), piece.name);
     } else {
-      // 強制的に戻される
       const back = randInt(2,4);
       const target = Math.max(0, piece.pos - back);
       piece.pos = target;
       const t = board[target];
       piece.targetX = t.x + t.w/2;
       piece.targetY = t.y + t.h/2;
+      focusCameraOn(piece);
       showDialogue('マイナスイベント', `相場急変で巻き戻し…\n${back}マス戻されます。`, ()=>advanceTurn(), piece.name);
     }
   }
@@ -971,29 +1006,40 @@
   // ============================================================
   let lastTime = 0;
   function update(dt) {
+    // コマ補間
     for (const p of pieces) {
-      p.x += (p.targetX - p.x) * 0.25;
-      p.y += (p.targetY - p.y) * 0.25;
+      p.x += (p.targetX - p.x) * 0.18;
+      p.y += (p.targetY - p.y) * 0.18;
     }
+    // カメラ補間
+    camX += (camTargetX - camX) * 0.12;
   }
 
   // ============================================================
   //  Draw
   // ============================================================
   function draw() {
-    ctx.clearRect(0,0,W,H);
+    // 背景
     const grd = ctx.createLinearGradient(0,0,0,H);
     grd.addColorStop(0,'#0b0f14');
     grd.addColorStop(1,'#11161c');
     ctx.fillStyle = grd;
     ctx.fillRect(0,0,W,H);
 
+    // 世界をカメラ分ずらして描画
+    ctx.save();
+    ctx.translate(-camX, 0);
+
+    // タイトル
     ctx.fillStyle = '#1e3a4a';
     ctx.font = 'bold 14px sans-serif';
     ctx.textAlign = 'left';
-    ctx.fillText('SUGOROKU SBI  —  BOARD', 24, 34);
+    ctx.fillText('SUGOROKU SBI  —  BOARD', camX + 24, 34);
 
+    // マス
     for (const t of board) {
+      // 画面外カリング
+      if (t.x + t.w < camX - 20 || t.x > camX + W + 20) continue;
       ctx.fillStyle = 'rgba(0,0,0,0.4)';
       ctx.fillRect(t.x+3, t.y+3, t.w, t.h);
       ctx.fillStyle = '#141b22';
@@ -1012,8 +1058,14 @@
       ctx.fillText(String(t.index), t.x + t.w/2, t.y + t.h - 6);
     }
 
-    drawDice();
+    // コマ
     drawPieces();
+
+    ctx.restore();
+
+    // 画面固定UI
+    drawDice();
+    drawMinimap();
   }
 
   function drawDice() {
@@ -1044,6 +1096,8 @@
       byTile[p.pos].push(p);
     }
     for (const p of pieces) {
+      // 画面外カリング
+      if (p.x < camX - 40 || p.x > camX + W + 40) continue;
       const group = byTile[p.pos];
       let ox = 0;
       if (group.length > 1) {
@@ -1066,6 +1120,46 @@
       ctx.textAlign = 'center';
       ctx.fillText(p.isPlayer ? 'YOU' : p.name.replace('CPU ',''), px, py - 14);
     }
+  }
+
+  function drawMinimap() {
+    const mw = 220, mh = 46;
+    const mx = 12, my = H - mh - 12;
+    ctx.fillStyle = 'rgba(10,12,15,0.85)';
+    ctx.fillRect(mx, my, mw, mh);
+    ctx.strokeStyle = '#1e3a4a';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(mx, my, mw, mh);
+
+    // 盤面全体の縮尺
+    const sx = (mw - 16) / WORLD_W;
+    const sy = (mh - 16) / TILE_H; // 高さはマス1個分
+    const ox = mx + 8;
+    const oy = my + 8;
+
+    // マス
+    for (const t of board) {
+      ctx.fillStyle = t.color;
+      ctx.globalAlpha = 0.35;
+      ctx.fillRect(ox + t.x*sx, oy + (t.y - 200)*sy*0.5, Math.max(2, t.w*sx), Math.max(2, 4));
+      ctx.globalAlpha = 1;
+    }
+    // コマ
+    for (const p of pieces) {
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(ox + p.x*sx, oy + 18, p.isPlayer ? 4 : 3, 0, Math.PI*2);
+      ctx.fill();
+    }
+    // 視野枠
+    ctx.strokeStyle = '#00e6b0';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(ox + camX*sx, oy, Math.max(2, W*sx), 36);
+
+    ctx.fillStyle = '#4a5a6a';
+    ctx.font = '9px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('MAP', mx + 4, my - 4);
   }
 
   function roundRect(ctx, x, y, w, h, r) {
@@ -1108,6 +1202,7 @@
     phase = 'idle';
     diceValue = 0;
     finishedCount = 0;
+    camX = 0; camTargetX = 0;
     rollBtn.disabled = false;
     rollBtn.textContent = 'サイコロを振る';
     updateHUD();
