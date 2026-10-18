@@ -1,0 +1,1181 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>すごろく SBI証券ゲーム</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; user-select:none; }
+  body {
+    background:#0a0c0f;
+    font-family:'Segoe UI','Hiragino Kaku Gothic ProN','Helvetica Neue',sans-serif;
+    display:flex; justify-content:center; align-items:flex-start;
+    min-height:100vh; color:#e0e0e0;
+    padding:20px 0; overflow-y:auto;
+  }
+  .game-wrapper {
+    background:#11161c; border-radius:24px; padding:20px 20px 14px;
+    box-shadow:0 20px 40px rgba(0,0,0,0.8), 0 0 0 1px #2a3a4a inset;
+    display:flex; flex-direction:column; align-items:center; gap:12px;
+    width:fit-content;
+  }
+  canvas {
+    display:block; border-radius:16px; background:#0b0f14;
+    box-shadow:0 0 30px rgba(0,255,200,0.1);
+    cursor:default; width:800px; height:600px;
+  }
+  .footer {
+    display:flex; flex-direction:column; gap:6px;
+    width:100%; padding:4px 8px 0; font-size:13px; color:#7a8b9b;
+    letter-spacing:0.5px;
+  }
+  .footer .status { display:flex; gap:16px; flex-wrap:wrap; align-items:center; }
+  .footer .status span { color:#b0c8d8; font-weight:500; }
+  .footer .status .highlight { color:#00e6b0; text-shadow:0 0 8px #00e6b088; }
+  .footer .status .sp { color:#ffd166; text-shadow:0 0 8px #ffd16688; }
+  .footer .status .turn-now { color:#ff8ad8; font-weight:800; }
+
+  .btn-row {
+    display:flex; gap:8px; flex-wrap:wrap; justify-content:center;
+    width:100%; padding:4px 0;
+  }
+  .ui-btn {
+    background:#1a2530; color:#00e6b0; border:2px solid #00e6b0;
+    border-radius:40px; padding:8px 18px; font-size:13px; font-weight:700;
+    letter-spacing:1px; cursor:pointer; transition:all 0.15s ease;
+    box-shadow:0 0 10px #00e6b033; font-family:inherit;
+  }
+  .ui-btn:hover { background:#00e6b0; color:#0a0c0f; box-shadow:0 0 20px #00e6b0aa; }
+  .ui-btn:active { transform:scale(0.96); }
+  .ui-btn:disabled { opacity:0.35; cursor:not-allowed; }
+  .ui-btn.warn { color:#ff4d6d; border-color:#ff4d6d; }
+  .ui-btn.warn:hover { background:#ff4d6d; color:#0a0c0f; }
+  .ui-btn.list { color:#ffd166; border-color:#ffd166; }
+  .ui-btn.list:hover { background:#ffd166; color:#0a0c0f; }
+  .ui-btn.roll { color:#7ad7ff; border-color:#7ad7ff; }
+  .ui-btn.roll:hover { background:#7ad7ff; color:#0a0c0f; }
+
+  .hidden { display:none !important; }
+
+  /* Opening */
+  .opening {
+    position: fixed; inset: 0;
+    background-image: url('img346rilu.jpg');
+    background-size: 100% 100%;
+    background-position: center;
+    background-repeat: no-repeat;
+    display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
+    gap: 30px; z-index: 9999;
+    transition: opacity 0.5s ease;
+  }
+  .opening::before {
+    content:''; position:absolute; inset:0;
+    background: rgba(0,0,0,0.55);
+    z-index: 0;
+  }
+  .opening h1, .opening .subtitle, .opening .opening-btns {
+    position: relative; z-index: 1;
+  }
+  .opening h1 {
+    color: #00e6b0; font-size: 60px; font-weight: 800;
+    letter-spacing: 6px; text-align:center;
+    text-shadow: 0 0 30px #00e6b0aa, 0 0 60px #00e6b055;
+  }
+  .opening .subtitle {
+    color: #b0c8d8; font-size: 16px;
+    letter-spacing: 4px; margin-top: -20px; text-align:center;
+  }
+  .opening .opening-btns {
+    display: flex; gap: 16px; flex-wrap: wrap; justify-content: center;
+  }
+  .start-btn {
+    background: #00e6b0; color: #0a0c0f; border: none;
+    border-radius: 50px; padding: 18px 72px;
+    font-size: 22px; font-weight: 800; letter-spacing: 4px;
+    cursor: pointer; font-family: inherit;
+    box-shadow: 0 0 30px #00e6b0cc, 0 0 60px #00e6b066;
+    transition: all 0.2s ease;
+  }
+  .start-btn:hover { transform: scale(1.06); background: #1affc0; }
+  .start-btn:active { transform: scale(0.98); }
+  .bgview-btn {
+    background: transparent; color: #7ad7ff;
+    border: 2px solid #7ad7ff; border-radius: 50px;
+    padding: 16px 40px; font-size: 16px; font-weight: 700;
+    letter-spacing: 3px; cursor: pointer; font-family: inherit;
+    box-shadow: 0 0 20px #7ad7ff55; transition: all 0.2s ease;
+  }
+  .bgview-btn:hover { background: #7ad7ff; color: #0a0c0f; box-shadow: 0 0 40px #7ad7ffaa; }
+  .opening.hidden-opening { opacity: 0; pointer-events: none; }
+
+  .bg-viewer {
+    position: fixed; inset: 0; background: #000; z-index: 10000;
+    display: flex; justify-content: center; align-items: center;
+  }
+  .bg-viewer img {
+    width: 100%; height: 100%; object-fit: fill; background: #000;
+  }
+  .bg-viewer .close-bg {
+    position: absolute; top: 20px; right: 20px;
+    background: #ff4d6d; color: #fff; border: none;
+    border-radius: 40px; padding: 10px 24px;
+    font-size: 16px; font-weight: 700; cursor: pointer;
+    font-family: inherit; box-shadow: 0 0 20px #ff4d6daa;
+  }
+  .bg-viewer .close-bg:hover { background: #ff8ad8; }
+
+  /* Checklist */
+  .checklist-panel {
+    position: fixed; top: 0; right: 0; bottom: 0;
+    width: 340px; background: #0d131a;
+    border-left: 2px solid #00e6b0;
+    box-shadow: -10px 0 40px rgba(0,0,0,0.8);
+    z-index: 9000; display: flex; flex-direction: column;
+    padding: 16px; transform: translateX(100%);
+    transition: transform 0.25s ease;
+  }
+  .checklist-panel.open { transform: translateX(0); }
+  .checklist-panel h2 {
+    color: #00e6b0; font-size: 18px;
+    letter-spacing: 2px; margin-bottom: 12px;
+  }
+  .checklist-panel .progress {
+    color: #b0c8d8; font-size: 13px; margin-bottom: 12px;
+  }
+  .checklist-panel .progress b { color: #00e6b0; }
+  .checklist-scroll {
+    flex: 1; overflow-y: auto;
+    border-top: 1px solid #1e3a4a;
+    border-bottom: 1px solid #1e3a4a;
+    padding: 8px 0;
+  }
+  .checklist-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 8px; border-radius: 8px;
+    font-size: 13px; color: #b0c8d8;
+  }
+  .checklist-item.checked { color: #00e6b0; background: #00e6b010; }
+  .checklist-item .mark { width: 16px; text-align: center; }
+  .checklist-item .cat { color: #ffd166; font-size: 11px; margin-left: auto; }
+  .checklist-panel .panel-btns { display: flex; gap: 8px; margin-top: 12px; }
+  .checklist-panel .panel-btns button { flex: 1; }
+
+  /* Dialogue */
+  .dialogue {
+    position: fixed; left: 50%; bottom: 24px;
+    transform: translateX(-50%) translateY(20px);
+    width: 720px; max-width: 92vw;
+    background: #0d131aee; border: 2px solid #00e6b0;
+    border-radius: 16px; padding: 18px 22px;
+    z-index: 9500; box-shadow: 0 0 40px #00e6b055;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+  .dialogue.open { opacity: 1; pointer-events: auto; transform: translateX(-50%) translateY(0); }
+  .dialogue .d-head {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 10px; flex-wrap: wrap;
+  }
+  .dialogue .d-name {
+    color: #00e6b0; font-size: 18px; font-weight: 800;
+    letter-spacing: 1px;
+  }
+  .dialogue .d-meta { color: #7a8b9b; font-size: 12px; }
+  .dialogue .d-meta b { color: #ffd166; }
+  .dialogue .d-text {
+    color: #e0e0e0; font-size: 16px; line-height: 1.7;
+    min-height: 60px; letter-spacing: 0.3px;
+  }
+  .dialogue .d-foot {
+    display: flex; gap: 10px; margin-top: 14px;
+    justify-content: flex-end; flex-wrap: wrap;
+  }
+  .dialogue .d-foot button {
+    background:#1a2530; color:#00e6b0; border:2px solid #00e6b0;
+    border-radius:40px; padding:8px 18px; font-size:13px; font-weight:700;
+    cursor:pointer; font-family:inherit;
+  }
+  .dialogue .d-foot button:hover { background:#00e6b0; color:#0a0c0f; }
+
+  /* Quiz choices */
+  .quiz-choices { display:flex; flex-direction:column; gap:8px; margin-top:10px; }
+  .quiz-choices button {
+    background:#1a2530; color:#e0e0e0; border:2px solid #2a3a4a;
+    border-radius:10px; padding:10px 14px; font-size:14px;
+    text-align:left; cursor:pointer; font-family:inherit;
+    transition:all 0.15s ease;
+  }
+  .quiz-choices button:hover { border-color:#00e6b0; background:#00e6b015; }
+  .quiz-choices button.correct { border-color:#00e6b0; background:#00e6b033; color:#00e6b0; font-weight:800; }
+  .quiz-choices button.wrong { border-color:#ff4d6d; background:#ff4d6d22; color:#ff4d6d; }
+
+  /* Reader */
+  .reader {
+    position: fixed; inset: 0; background: rgba(4,6,8,0.92);
+    z-index: 9800; display: none;
+    justify-content: center; align-items: center; padding: 24px;
+  }
+  .reader.open { display: flex; }
+  .reader-inner {
+    background: #f4ecd8; color: #2a2018;
+    border: 4px solid #6b4a2a; border-radius: 12px;
+    max-width: 760px; width: 100%;
+    max-height: 88vh; display: flex; flex-direction: column;
+    box-shadow: 8px 8px 0 #2a1a0a;
+  }
+  .reader-header {
+    background: linear-gradient(180deg,#6b4a2a,#4a3018);
+    color: #ffd166; padding: 14px 20px;
+    border-bottom: 4px solid #2a1a0a;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .reader-header h2 { font-size: 18px; letter-spacing: 1px; }
+  .reader-close {
+    background: #d45a2a; color: #fff; border: 2px solid #2a1a0a;
+    border-radius: 50%; width: 32px; height: 32px;
+    font-size: 16px; cursor: pointer; font-weight: 800;
+  }
+  .reader-body {
+    padding: 28px 32px; overflow-y: auto; flex: 1;
+    font-size: 15px; line-height: 1.9;
+    font-family: 'Georgia', 'Times New Roman', serif;
+  }
+  .reader-body h3 {
+    font-size: 19px; margin-bottom: 14px;
+    border-bottom: 2px dashed #8a7554; padding-bottom: 8px;
+  }
+  .reader-body p { margin-bottom: 12px; }
+  .reader-body .term {
+    background: #e8dfc8; border-left: 4px solid #d45a2a;
+    padding: 10px 14px; margin: 12px 0; font-size: 14px;
+    border-radius: 0 6px 6px 0;
+  }
+  .reader-body .term b { color: #d45a2a; }
+  .reader-body .step {
+    background: #eef4e8; border-left: 4px solid #2d4a2d;
+    padding: 10px 14px; margin: 12px 0; font-size: 14px;
+    border-radius: 0 6px 6px 0;
+  }
+  .reader-body .step b { color: #2d4a2d; }
+  .reader-footer {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 20px; border-top: 3px dashed #8a7554;
+    background: #e8dfc8;
+  }
+  .reader-footer .page-info { font-size: 13px; color: #5a4a38; }
+  .reader-footer button {
+    background: #6b4a2a; color: #f4ecd8; border: 2px solid #2a1a0a;
+    border-radius: 6px; padding: 8px 18px; font-weight: 800;
+    cursor: pointer; font-family: inherit;
+  }
+  .reader-footer button:hover { background: #8a6a42; }
+  .reader-footer button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Result */
+  .result {
+    position: fixed; inset: 0; background: rgba(4,6,8,0.95);
+    z-index: 9900; display: none;
+    justify-content: center; align-items: center; padding: 24px;
+  }
+  .result.open { display: flex; }
+  .result-inner {
+    background: #0d131a; border: 3px solid #00e6b0;
+    border-radius: 20px; padding: 32px 40px;
+    max-width: 560px; width: 100%;
+    box-shadow: 0 0 60px #00e6b066; text-align: center;
+  }
+  .result-inner h2 {
+    color: #00e6b0; font-size: 32px; margin-bottom: 8px;
+    letter-spacing: 3px;
+  }
+  .result-inner .r-sub { color: #b0c8d8; font-size: 14px; margin-bottom: 20px; }
+  .result-inner .r-list {
+    display: flex; flex-direction: column; gap: 8px;
+    margin-bottom: 24px; text-align: left;
+  }
+  .result-inner .r-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; border-radius: 10px;
+    background: #1a2530; font-size: 15px;
+  }
+  .result-inner .r-row.win { background: #00e6b020; border: 1px solid #00e6b0; }
+  .result-inner .r-row .r-rank { color: #ffd166; font-weight: 800; width: 36px; }
+  .result-inner .r-row .r-name { flex: 1; font-weight: 700; }
+  .result-inner .r-row .r-money { color: #00e6b0; font-weight: 800; }
+  .result-inner button {
+    background: #00e6b0; color: #0a0c0f; border: none;
+    border-radius: 50px; padding: 14px 48px;
+    font-size: 16px; font-weight: 800; letter-spacing: 2px;
+    cursor: pointer; font-family: inherit;
+    box-shadow: 0 0 30px #00e6b0aa;
+  }
+  .result-inner button:hover { background: #1affc0; }
+
+  .hint { font-size:11px; color:#4a5a6a; margin-top:2px; text-align:center; width:100%; }
+</style>
+</head>
+<body>
+
+  <!-- Opening -->
+  <div class="opening" id="opening">
+    <h1>すごろく SBI証券</h1>
+    <div class="subtitle">- 歩いて学ぶ投資の世界 -</div>
+    <div class="opening-btns">
+      <button class="start-btn" id="startBtn">はじめる</button>
+      <button class="bgview-btn" id="bgViewBtn">背景画像を見る</button>
+    </div>
+  </div>
+
+  <div class="bg-viewer hidden" id="bgViewer">
+    <button class="close-bg" id="closeBgBtn">CLOSE X</button>
+    <img src="img346rilu.jpg" alt="background">
+  </div>
+
+  <!-- Main -->
+  <div class="game-wrapper">
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+    <div class="footer" id="footer">
+      <div class="status" id="statusBar">
+        <span>手番: <span id="turnDisplay" class="turn-now">-</span></span>
+        <span>あなた: <span id="moneyDisplay" class="highlight">¥1,000,000</span></span>
+        <span>学んだ用語: <span id="learnedDisplay" class="sp">0</span>/20</span>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="ui-btn roll" id="rollBtn">サイコロを振る</button>
+      <button class="ui-btn list" id="checklistBtn">学習チェックリスト</button>
+    </div>
+
+    <div class="hint">サイコロを振ってマスを進もう。止まったマスでSBI証券の知識や投資イベントが発生します。</div>
+  </div>
+
+  <!-- Checklist -->
+  <div class="checklist-panel" id="checklistPanel">
+    <h2>学習チェックリスト</h2>
+    <div class="progress">学んだ用語: <b id="clProgress">0</b> / 20</div>
+    <div class="checklist-scroll" id="checklistScroll"></div>
+    <div class="panel-btns">
+      <button class="ui-btn" id="clClose">CLOSE</button>
+      <button class="ui-btn warn" id="clReset">RESET</button>
+    </div>
+  </div>
+
+  <!-- Dialogue -->
+  <div class="dialogue" id="dialogue">
+    <div class="d-head">
+      <div class="d-name" id="dName">イベント</div>
+      <div class="d-meta" id="dMeta"></div>
+    </div>
+    <div class="d-text" id="dText"></div>
+    <div id="quizArea"></div>
+    <div class="d-foot" id="dFoot">
+      <button id="dNext">NEXT</button>
+      <button id="dCloseBtn" class="warn" style="color:#ff4d6d;border-color:#ff4d6d;">CLOSE</button>
+    </div>
+  </div>
+
+  <!-- Reader (教材) -->
+  <div class="reader" id="reader">
+    <div class="reader-inner">
+      <div class="reader-header">
+        <h2 id="readerTitle">Title</h2>
+        <button class="reader-close" id="readerClose">X</button>
+      </div>
+      <div class="reader-body" id="readerBody"></div>
+      <div class="reader-footer">
+        <div class="page-info" id="readerPageInfo">1 / 1</div>
+        <div style="display:flex;gap:8px;">
+          <button id="readerPrev">PREV</button>
+          <button id="readerNext">NEXT</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Result -->
+  <div class="result" id="result">
+    <div class="result-inner">
+      <h2 id="resultTitle">RESULT</h2>
+      <div class="r-sub" id="resultSub">最終資産ランキング</div>
+      <div class="r-list" id="resultList"></div>
+      <button id="resultClose">もう一度あそぶ</button>
+    </div>
+  </div>
+
+<script>
+(function(){
+  // ============================================================
+  //  Basic setup
+  // ============================================================
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = 800, H = 600;
+
+  const turnDisplay = document.getElementById('turnDisplay');
+  const moneyDisplay = document.getElementById('moneyDisplay');
+  const learnedDisplay = document.getElementById('learnedDisplay');
+
+  const rollBtn = document.getElementById('rollBtn');
+  const checklistBtn = document.getElementById('checklistBtn');
+  const checklistPanel = document.getElementById('checklistPanel');
+  const checklistScroll = document.getElementById('checklistScroll');
+  const clProgress = document.getElementById('clProgress');
+  const clClose = document.getElementById('clClose');
+  const clReset = document.getElementById('clReset');
+
+  const dialogue = document.getElementById('dialogue');
+  const dName = document.getElementById('dName');
+  const dMeta = document.getElementById('dMeta');
+  const dText = document.getElementById('dText');
+  const dNext = document.getElementById('dNext');
+  const dCloseBtn = document.getElementById('dCloseBtn');
+  const quizArea = document.getElementById('quizArea');
+  const dFoot = document.getElementById('dFoot');
+
+  const reader = document.getElementById('reader');
+  const readerTitle = document.getElementById('readerTitle');
+  const readerBody = document.getElementById('readerBody');
+  const readerPageInfo = document.getElementById('readerPageInfo');
+  const readerPrev = document.getElementById('readerPrev');
+  const readerNext = document.getElementById('readerNext');
+  const readerClose = document.getElementById('readerClose');
+
+  const result = document.getElementById('result');
+  const resultTitle = document.getElementById('resultTitle');
+  const resultList = document.getElementById('resultList');
+  const resultClose = document.getElementById('resultClose');
+
+  const rand = (a,b)=>Math.random()*(b-a)+a;
+  const randInt = (a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+  const pick = arr=>arr[Math.floor(Math.random()*arr.length)];
+  const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+
+  // ============================================================
+  //  Board definition (すごろく盤)
+  //  マス目は一直線ではなく、蛇行する座標列で表現
+  // ============================================================
+  // 各マス: {x,y,w,h,type,label}
+  // type: start, quiz, sbi, chance, risk, nisa, goal
+  const TILE_W = 90, TILE_H = 70;
+  const COLS = 8;
+  const board = [];
+  const tileDefs = [
+    // 蛇行パターン（8列 x 5行 = 40マス）
+    'start','quiz','sbi','chance','nisa','quiz','risk','sbi',
+    'chance','quiz','sbi','nisa','risk','chance','quiz','sbi',
+    'nisa','quiz','chance','risk','sbi','nisa','quiz','chance',
+    'risk','sbi','nisa','quiz','chance','risk','sbi','nisa',
+    'quiz','chance','risk','sbi','nisa','quiz','chance','goal',
+  ];
+  const labelMap = {
+    start:'スタート', quiz:'用語クイズ', sbi:'SBI証券の使い方',
+    chance:'投資チャンス', risk:'暴落・リスク', nisa:'NISA・税金',
+    goal:'ゴール',
+  };
+  const colorMap = {
+    start:'#00e6b0', quiz:'#7ad7ff', sbi:'#ffd166',
+    chance:'#8affa0', risk:'#ff4d6d', nisa:'#ff8ad8',
+    goal:'#ffffff',
+  };
+
+  function buildBoard() {
+    board.length = 0;
+    const marginX = 60, marginY = 60;
+    const gapX = 12, gapY = 18;
+    const rows = 5;
+    for (let i = 0; i < tileDefs.length; i++) {
+      const r = Math.floor(i / COLS);
+      const cInRow = i % COLS;
+      // 蛇行: 偶数行は左→右、奇数行は右→左
+      const c = (r % 2 === 0) ? cInRow : (COLS - 1 - cInRow);
+      const x = marginX + c * (TILE_W + gapX);
+      const y = marginY + r * (TILE_H + gapY);
+      const type = tileDefs[i];
+      board.push({
+        index: i, x, y, w: TILE_W, h: TILE_H, type,
+        label: labelMap[type], color: colorMap[type],
+      });
+    }
+  }
+
+  // ============================================================
+  //  Pieces (5人)
+  // ============================================================
+  const PIECE_COLORS = ['#00e6b0','#ff4d6d','#ffd166','#7ad7ff','#ff8ad8'];
+  const PIECE_NAMES = ['あなた','CPU A','CPU B','CPU C','CPU D'];
+  let pieces = [];
+
+  function initPieces() {
+    pieces = PIECE_NAMES.map((name, i) => ({
+      id: i, name, isPlayer: i === 0,
+      color: PIECE_COLORS[i],
+      pos: 0,          // マス番号
+      money: 1000000,
+      finished: false,
+      // 描画用
+      x: board[0].x + board[0].w/2,
+      y: board[0].y + board[0].h/2,
+      targetX: board[0].x + board[0].w/2,
+      targetY: board[0].y + board[0].h/2,
+    }));
+  }
+
+  // ============================================================
+  //  教材データ（元コードのREAL_BOOKSを流用・簡略版）
+  // ============================================================
+  const TERM_BOOKS = [
+    {
+      id:'t01', title:'株式会社とは？',
+      pages:[
+        '<h3>株式会社の基本</h3><p>株式会社とは、お金を集めて事業をするための仕組みです。株式を発行して資金を集め、出資者は有限責任を負います。</p><div class="term"><b>有限責任とは？</b><br>出資した金額を超えて責任を負わないこと。株式会社が広まった最大の理由です。</div>',
+        '<h3>株主と経営</h3><p>株主は会社を所有し、取締役は経営を担います。これを所有と経営の分離といいます。株主総会で取締役を選びます。</p><div class="term"><b>配当とは？</b><br>会社の利益の一部を株主に分配するものです。必ず出るものではありません。</div>',
+      ],
+    },
+    {
+      id:'t02', title:'法人とは？',
+      pages:[
+        '<h3>法人は法律上の「人」</h3><p>法人とは、法律の上で人と同じように扱われる存在です。契約を結び、財産を持ち、訴えることができます。</p><div class="term"><b>自然人とは？</b><br>私たち人間のことです。法人と対比して使われます。</div>',
+        '<h3>法人の種類</h3><p>株式会社、合同会社、合名会社、一般社団法人、NPO法人などがあります。SBI証券で扱う株式は株式会社のものです。</p>',
+      ],
+    },
+    {
+      id:'t03', title:'会社と株式の違い',
+      pages:[
+        '<h3>会社は組織、株式は権利</h3><p>会社は事業を行う組織、株式はその所有権を細かく分けたものです。株式を買うと株主になります。</p><div class="term"><b>議決権とは？</b><br>株主総会で投票できる権利です。通常は1株1票、単元株制度では100株で1票の会社もあります。</div>',
+        '<h3>増資と希薄化</h3><p>株式を新たに発行することを増資といいます。増資すると既存株主の持株比率が下がることがあり、これを希薄化といいます。</p>',
+      ],
+    },
+    {
+      id:'t04', title:'株が株式の単位であるとは？',
+      pages:[
+        '<h3>株という最小単位</h3><p>株式は会社の所有権を細かく分けたもので、その最小単位が「株」です。100株持てば100分の1を所有します。</p><div class="term"><b>発行済株式数とは？</b><br>会社が発行した株式の総数です。</div>',
+        '<h3>単元株制度</h3><p>日本では多くの銘柄で100株を1単元として売買します。1単元未満は端株・単元未満株と呼ばれます。</p>',
+      ],
+    },
+    {
+      id:'t05', title:'1枚＝100株の仕組み',
+      pages:[
+        '<h3>なぜ100株なのか</h3><p>売買を分かりやすくし、事務処理を効率化するためです。昔は会社ごとに売買単位がばらばらでした。</p><div class="term"><b>売買単位とは？</b><br>売買できる最小の株数のことです。</div>',
+        '<h3>SBI証券での実践</h3><p>枚数欄に1と入れると100株、価格欄には1株あたりの円を入れます。1000円の株を1枚買うと10万円が必要です。</p><div class="step"><b>入力手順</b><br>1. 取引種別で現物買<br>2. 銘柄コード入力<br>3. 枚数（1枚＝100株）<br>4. 価格（1株あたりの円）<br>5. 期間・預かり区分を選ぶ</div>',
+      ],
+    },
+    {
+      id:'t06', title:'寄指・寄成・引指・引成・不成',
+      pages:[
+        '<h3>寄と引</h3><p>寄付はその日の最初の取引で決まる価格（始値）、引けは最後の取引で決まる価格（終値）です。</p><div class="term"><b>寄指とは？</b><br>寄付で指値注文を出すことです。寄成は寄付で成行注文です。</div>',
+        '<h3>不成</h3><p>不成は指値で約定しなかった場合に取り消される注文です。成行にはなりません。価格を守りたいときに使います。</p>',
+      ],
+    },
+    {
+      id:'t07', title:'IOC指・IOC成・逆指値',
+      pages:[
+        '<h3>IOCとは</h3><p>Immediate or Cancel の略で、即時執行、できなければ取消という意味です。素早く売買したいときに使います。</p><div class="term"><b>IOC指とは？</b><br>即時執行できなければ取消になる指値注文です。</div>',
+        '<h3>指値と逆指値</h3><p>指値は価格指定、逆指値は指定価格に達したら注文を出す条件付き注文です。逆指値は損切りや利益確定に使います。</p>',
+      ],
+    },
+    {
+      id:'t08', title:'期間：当日中・今週中・期間指定',
+      pages:[
+        '<h3>注文の有効期限</h3><p>期間とは出した注文が有効な期限です。当日中、今週中、期間指定があります。株式市場は取引時間が決まっています。</p><div class="term"><b>当日中とは？</b><br>その日の取引時間内だけ有効な注文です。</div>',
+        '<h3>bitFlyerとの違い</h3><p>bitFlyerは24時間取引なので期間の概念が薄いです。SBI証券は取引時間が決まっているため、期間を必ず意識しましょう。</p>',
+      ],
+    },
+    {
+      id:'t09', title:'預かり区分はどれを選ぶ？',
+      pages:[
+        '<h3>預かり区分とは</h3><p>株式をどの口座で保有するかの区分です。特定預り、一般預り、NISA預り、旧NISA預りの4つがあります。</p><div class="term"><b>特定預りとは？</b><br>証券会社が税金を計算して納めてくれる区分です。確定申告が不要になります。</div>',
+        '<h3>NISA預り</h3><p>NISAは少額投資非課税制度です。一定額までの投資で得た利益が非課税になります。審査に通ればNISA預りを選べます。</p>',
+      ],
+    },
+    {
+      id:'t10', title:'銘柄コード検索の初心者へ',
+      pages:[
+        '<h3>銘柄コードとは</h3><p>会社を識別する4桁の番号です。トヨタは7203、ソニーは6758です。SBI証券の検索欄に会社名を入れても候補が出ます。</p><div class="term"><b>SORとは？</b><br>複数の市場から最良の価格を選んで注文してくれる仕組みです。</div>',
+        '<h3>よくある間違い</h3><p>価格を枚数欄に入れてしまうミスに注意。注文確認画面で会社名・枚数・価格・期間・預かり区分を必ず確認しましょう。</p>',
+      ],
+    },
+  ];
+
+  // ============================================================
+  //  クイズデータ
+  // ============================================================
+  const QUIZZES = [
+    { q:'SBI証券の国内株式で、1枚は通常何株？', choices:['1株','10株','100株','1000株'], answer:2, term:'1枚＝100株が基本です。' },
+    { q:'「有限責任」の意味は？', choices:['出資額を超えて責任を負う','出資額までしか責任を負わない','責任を負わない','利益を保証する'], answer:1, term:'株主は出資額を超えて責任を負いません。' },
+    { q:'寄付（よりつき）とは？', choices:['その日の最後の価格','その日の最初の価格','前日の終値','指値のこと'], answer:1, term:'寄付は始値、引けは終値です。' },
+    { q:'「不成（ふなり）」の意味は？', choices:['成行になる','指値で約定しなければ取消','必ず約定する','期間を延長する'], answer:1, term:'不成は成行にならず、約定しなければ取消です。' },
+    { q:'IOCとは何の略？', choices:['Immediate or Cancel','Interest On Capital','Index Of Cost','Invest Or Cash'], answer:0, term:'即時執行、できなければ取消です。' },
+    { q:'特定預りのメリットは？', choices:['税金がかからない','確定申告が不要','必ず利益が出る','株主優待が増える'], answer:1, term:'証券会社が税金を計算して納めてくれます。' },
+    { q:'NISAの特徴は？', choices:['損失が保証される','一定額まで非課税','必ず配当が出る','24時間取引できる'], answer:1, term:'少額投資非課税制度です。' },
+    { q:'東証の後場の取引時間は？', choices:['9:00-11:30','12:30-15:30','9:00-15:00','24時間'], answer:1, term:'前場9:00-11:30、後場12:30-15:30です。' },
+    { q:'逆指値は何に使う？', choices:['損切りや利益確定','配当の受け取り','株主総会の投票','NISAの申請'], answer:0, term:'指定価格に達したら注文を出します。' },
+    { q:'SORとは？', choices:['株式公開買付','最良価格を選ぶ仕組み','税金の控除','NISAの旧制度'], answer:1, term:'Smart Order Routingの略です。' },
+  ];
+
+  // ============================================================
+  //  Chance / Risk イベント
+  // ============================================================
+  const CHANCE_EVENTS = [
+    { text:'優良株が値上がり！ 資産が増えました。', delta:150000 },
+    { text:'配当金を受け取りました。', delta:50000 },
+    { text:'NISA枠を活用して節税に成功！', delta:80000 },
+    { text:'新規上場株が当選しました。', delta:120000 },
+    { text:'長期保有で株主優待を獲得！', delta:30000 },
+  ];
+  const RISK_EVENTS = [
+    { text:'市場が暴落… 資産が減りました。', delta:-120000 },
+    { text:'保有株が急落しました。', delta:-80000 },
+    { text:'信用取引で損失が出ました。', delta:-150000 },
+    { text:'為替変動で外国株が下落。', delta:-60000 },
+    { text:'決算不振で株価が下落。', delta:-100000 },
+  ];
+
+  // ============================================================
+  //  Game state
+  // ============================================================
+  let turnOrder = [];
+  let turnIndex = 0;
+  let phase = 'idle'; // idle | rolling | moving | event | cpu | end
+  let diceValue = 0;
+  let diceAnimTimer = null;
+  let learnedTerms = new Set();
+  let currentDialogueQueue = [];
+  let dialogueIndex = 0;
+  let dialogueOnFinish = null;
+  let reading = null;
+  let movingPiece = null;
+  let moveFrom = 0, moveTo = 0, moveT = 0;
+  let eventResolved = false;
+  let pendingEvent = null;
+
+  const STORAGE_KEY = 'sbi_sugoroku_v1';
+
+  // ============================================================
+  //  Camera
+  // ============================================================
+  let camX = 0, camY = 0;
+  const WORLD_W = 800; // 盤面はcanvas内に収まる
+  const WORLD_H = 600;
+
+  // ============================================================
+  //  Init
+  // ============================================================
+  function init() {
+    buildBoard();
+    initPieces();
+    loadState();
+    shuffleTurnOrder();
+    turnIndex = 0;
+    phase = 'idle';
+    updateHUD();
+    buildChecklist();
+    rollBtn.disabled = false;
+    rollBtn.textContent = 'サイコロを振る';
+  }
+
+  function shuffleTurnOrder() {
+    turnOrder = pieces.map(p=>p.id);
+    for (let i = turnOrder.length-1; i > 0; i--) {
+      const j = Math.floor(Math.random()*(i+1));
+      [turnOrder[i],turnOrder[j]] = [turnOrder[j],turnOrder[i]];
+    }
+  }
+
+  function currentPiece() {
+    return pieces[turnOrder[turnIndex]];
+  }
+
+  function loadState() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const data = JSON.parse(raw);
+        learnedTerms = new Set(data.learnedTerms || []);
+      }
+    } catch(e) { learnedTerms = new Set(); }
+  }
+  function saveState() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ learnedTerms:[...learnedTerms] }));
+    } catch(e) {}
+  }
+
+  function updateHUD() {
+    const cp = currentPiece();
+    turnDisplay.textContent = cp ? cp.name : '-';
+    moneyDisplay.textContent = '¥' + pieces[0].money.toLocaleString();
+    learnedDisplay.textContent = learnedTerms.size;
+  }
+
+  // ============================================================
+  //  Checklist
+  // ============================================================
+  function buildChecklist() {
+    checklistScroll.innerHTML = '';
+    for (const b of TERM_BOOKS) {
+      const div = document.createElement('div');
+      div.className = 'checklist-item' + (learnedTerms.has(b.id) ? ' checked' : '');
+      div.innerHTML = `<span class="mark">${learnedTerms.has(b.id)?'V':'-'}</span>
+        <span>${b.title}</span><span class="cat">用語</span>`;
+      checklistScroll.appendChild(div);
+    }
+    clProgress.textContent = learnedTerms.size;
+  }
+
+  checklistBtn.addEventListener('click', ()=>{ checklistPanel.classList.toggle('open'); buildChecklist(); });
+  clClose.addEventListener('click', ()=>checklistPanel.classList.remove('open'));
+  clReset.addEventListener('click', ()=>{
+    if (confirm('学習チェックリストをリセットしますか？')) {
+      learnedTerms = new Set();
+      saveState(); buildChecklist(); updateHUD();
+    }
+  });
+
+  // ============================================================
+  //  Dice
+  // ============================================================
+  function rollDice() { return randInt(1,6); }
+
+  rollBtn.addEventListener('click', ()=>{
+    if (phase !== 'idle') return;
+    const cp = currentPiece();
+    if (!cp || cp.finished) { nextTurn(); return; }
+    if (!cp.isPlayer) return; // CPUの手番は自動
+    startRoll();
+  });
+
+  function startRoll() {
+    phase = 'rolling';
+    rollBtn.disabled = true;
+    let count = 0;
+    diceAnimTimer = setInterval(()=>{
+      diceValue = rollDice();
+      count++;
+      if (count > 12) {
+        clearInterval(diceAnimTimer);
+        diceAnimTimer = null;
+        diceValue = rollDice();
+        beginMove(currentPiece(), diceValue);
+      }
+    }, 60);
+  }
+
+  function beginMove(piece, steps) {
+    phase = 'moving';
+    movingPiece = piece;
+    moveFrom = piece.pos;
+    moveTo = Math.min(piece.pos + steps, board.length - 1);
+    moveT = 0;
+  }
+
+  // ============================================================
+  //  Turn control
+  // ============================================================
+  function nextTurn() {
+    if (phase === 'end') return;
+    turnIndex++;
+    if (turnIndex >= turnOrder.length) {
+      turnIndex = 0;
+      // 全員ゴールしていないかチェック
+      if (pieces.every(p=>p.finished)) { finishGame(); return; }
+    }
+    const cp = currentPiece();
+    if (cp.finished) { nextTurn(); return; }
+    updateHUD();
+    if (cp.isPlayer) {
+      phase = 'idle';
+      rollBtn.disabled = false;
+      rollBtn.textContent = 'サイコロを振る';
+    } else {
+      phase = 'cpu';
+      rollBtn.disabled = true;
+      rollBtn.textContent = 'CPUの手番...';
+      setTimeout(()=>{ if (phase==='cpu') startRoll(); }, 800);
+    }
+  }
+
+  // ============================================================
+  //  Event handling
+  // ============================================================
+  function onLand(piece) {
+    const tile = board[piece.pos];
+    if (!tile) { endTurn(); return; }
+    if (tile.type === 'goal') {
+      piece.finished = true;
+      showDialogue('ゴール！', `${piece.name} がゴールしました！`, ()=>endTurn());
+      return;
+    }
+    switch(tile.type) {
+      case 'start': showDialogue('スタート', 'ここがスタート地点です。', ()=>endTurn()); break;
+      case 'quiz': triggerQuiz(piece); break;
+      case 'sbi': triggerSbi(piece); break;
+      case 'nisa': triggerNisa(piece); break;
+      case 'chance': triggerChance(piece); break;
+      case 'risk': triggerRisk(piece); break;
+      default: endTurn();
+    }
+  }
+
+  function endTurn() {
+    eventResolved = false;
+    pendingEvent = null;
+    if (phase === 'end') return;
+    nextTurn();
+  }
+
+  // --- Dialogue helpers ---
+  function showDialogue(title, text, onFinish, meta='') {
+    phase = 'event';
+    dName.textContent = title;
+    dMeta.textContent = meta;
+    dText.textContent = text;
+    quizArea.innerHTML = '';
+    dFoot.innerHTML = '';
+    const nextBtn = document.createElement('button');
+    nextBtn.textContent = 'OK';
+    nextBtn.onclick = ()=>{ closeDialogue(); if (onFinish) onFinish(); };
+    dFoot.appendChild(nextBtn);
+    dialogue.classList.add('open');
+  }
+
+  function closeDialogue() {
+    dialogue.classList.remove('open');
+    quizArea.innerHTML = '';
+    dFoot.innerHTML = '';
+  }
+
+  // --- Quiz ---
+  function triggerQuiz(piece) {
+    const q = pick(QUIZZES);
+    phase = 'event';
+    dName.textContent = '用語クイズ';
+    dMeta.textContent = piece.name;
+    dText.textContent = q.q;
+    quizArea.innerHTML = '';
+    dFoot.innerHTML = '';
+    const wrap = document.createElement('div');
+    wrap.className = 'quiz-choices';
+    q.choices.forEach((c, i)=>{
+      const btn = document.createElement('button');
+      btn.textContent = `${String.fromCharCode(65+i)}. ${c}`;
+      btn.onclick = ()=>{
+        const buttons = wrap.querySelectorAll('button');
+        buttons.forEach(b=>b.disabled = true);
+        if (i === q.answer) {
+          btn.classList.add('correct');
+          if (piece.isPlayer) {
+            const bonus = 30000;
+            piece.money += bonus;
+            learnedTerms.add('q_'+q.q);
+            saveState();
+            dText.textContent = q.q + '\n\n正解！ ' + q.term + `\n+¥${bonus.toLocaleString()} 獲得`;
+          } else {
+            dText.textContent = q.q + '\n\n正解！ ' + q.term;
+          }
+        } else {
+          btn.classList.add('wrong');
+          buttons[q.answer].classList.add('correct');
+          dText.textContent = q.q + '\n\n不正解… 正解は「' + q.choices[q.answer] + '」。\n' + q.term;
+        }
+        const ok = document.createElement('button');
+        ok.textContent = 'OK';
+        ok.onclick = ()=>{ closeDialogue(); endTurn(); };
+        dFoot.innerHTML = '';
+        dFoot.appendChild(ok);
+        updateHUD();
+      };
+      wrap.appendChild(btn);
+    });
+    quizArea.appendChild(wrap);
+    dialogue.classList.add('open');
+  }
+
+  // --- SBI手順 ---
+  function triggerSbi(piece) {
+    const book = pick(TERM_BOOKS.filter(b=>b.id.includes('t0') && (b.id==='t05'||b.id==='t08'||b.id==='t09'||b.id==='t10')));
+    if (book) {
+      if (piece.isPlayer) {
+        learnedTerms.add(book.id); saveState(); buildChecklist();
+      }
+      openReader(book);
+    } else {
+      showDialogue('SBI証券の使い方', 'SBI証券の発注画面では、取引種別・銘柄コード・市場・枚数・価格・期間・預かり区分の順に入力します。', ()=>endTurn());
+    }
+  }
+
+  // --- NISA ---
+  function triggerNisa(piece) {
+    const book = TERM_BOOKS.find(b=>b.id==='t09') || TERM_BOOKS[0];
+    if (piece.isPlayer) { learnedTerms.add(book.id); saveState(); buildChecklist(); }
+    openReader(book);
+  }
+
+  // --- Chance ---
+  function triggerChance(piece) {
+    const ev = pick(CHANCE_EVENTS);
+    piece.money += ev.delta;
+    updateHUD();
+    showDialogue('投資チャンス', `${ev.text}\n+¥${ev.delta.toLocaleString()}`, ()=>endTurn(), piece.name);
+  }
+
+  // --- Risk ---
+  function triggerRisk(piece) {
+    const ev = pick(RISK_EVENTS);
+    piece.money = Math.max(0, piece.money + ev.delta);
+    updateHUD();
+    showDialogue('暴落・リスク', `${ev.text}\n¥${ev.delta.toLocaleString()}`, ()=>endTurn(), piece.name);
+  }
+
+  // ============================================================
+  //  Reader
+  // ============================================================
+  function openReader(book) {
+    reading = { book, page: 0 };
+    readerTitle.textContent = book.title;
+    renderReader();
+    reader.classList.add('open');
+    if (book.id.startsWith('t')) {
+      learnedTerms.add(book.id); saveState(); buildChecklist(); updateHUD();
+    }
+  }
+  function renderReader() {
+    if (!reading) return;
+    const { book, page } = reading;
+    readerBody.innerHTML = book.pages[page] || '';
+    readerPageInfo.textContent = `${page+1} / ${book.pages.length}`;
+    readerPrev.disabled = page === 0;
+    readerNext.disabled = page >= book.pages.length - 1;
+  }
+  function closeReader() {
+    reading = null;
+    reader.classList.remove('open');
+    if (phase === 'event') endTurn();
+  }
+  readerPrev.addEventListener('click', ()=>{ if (reading && reading.page>0){ reading.page--; renderReader(); } });
+  readerNext.addEventListener('click', ()=>{ if (reading && reading.page<reading.book.pages.length-1){ reading.page++; renderReader(); } });
+  readerClose.addEventListener('click', closeReader);
+
+  // ============================================================
+  //  Update
+  // ============================================================
+  let lastTime = 0;
+  function update(dt) {
+    // コマ移動アニメーション
+    if (phase === 'moving' && movingPiece) {
+      moveT += dt * 0.08;
+      if (moveT >= 1) {
+        moveT = 0;
+        if (movingPiece.pos < moveTo) {
+          movingPiece.pos++;
+          const tile = board[movingPiece.pos];
+          movingPiece.targetX = tile.x + tile.w/2;
+          movingPiece.targetY = tile.y + tile.h/2;
+        } else {
+          // 到着
+          movingPiece = null;
+          onLand(currentPiece());
+        }
+      }
+    }
+    // コマの位置補間
+    for (const p of pieces) {
+      p.x += (p.targetX - p.x) * 0.25;
+      p.y += (p.targetY - p.y) * 0.25;
+    }
+    // カメラ（盤面全体が収まるので固定）
+    camX = 0; camY = 0;
+    updateHUD();
+  }
+
+  // ============================================================
+  //  Draw
+  // ============================================================
+  function draw() {
+    ctx.clearRect(0,0,W,H);
+    drawBoard();
+    drawDice();
+    drawPieces();
+  }
+
+  function drawBoard() {
+    // 背景
+    const grd = ctx.createLinearGradient(0,0,0,H);
+    grd.addColorStop(0,'#0b0f14');
+    grd.addColorStop(1,'#11161c');
+    ctx.fillStyle = grd;
+    ctx.fillRect(0,0,W,H);
+
+    // タイトル
+    ctx.fillStyle = '#1e3a4a';
+    ctx.font = 'bold 14px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('SUGOROKU SBI  —  BOARD', 24, 30);
+
+    // マス
+    for (const t of board) {
+      // 影
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      ctx.fillRect(t.x+3, t.y+3, t.w, t.h);
+      // 本体
+      ctx.fillStyle = '#141b22';
+      ctx.fillRect(t.x, t.y, t.w, t.h);
+      // 枠
+      ctx.strokeStyle = t.color;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(t.x, t.y, t.w, t.h);
+      // 色帯
+      ctx.fillStyle = t.color;
+      ctx.fillRect(t.x, t.y, t.w, 4);
+      // ラベル
+      ctx.fillStyle = '#b0c8d8';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(t.label, t.x + t.w/2, t.y + t.h/2 + 4);
+      // 番号
+      ctx.fillStyle = '#3a5a6a';
+      ctx.font = '9px sans-serif';
+      ctx.fillText(String(t.index), t.x + t.w/2, t.y + t.h - 6);
+    }
+  }
+
+  function drawDice() {
+    const cx = W - 70, cy = H - 70, size = 60;
+    ctx.fillStyle = '#0d131a';
+    ctx.strokeStyle = '#00e6b0';
+    ctx.lineWidth = 2;
+    roundRect(ctx, cx-size/2, cy-size/2, size, size, 10);
+    ctx.fill(); ctx.stroke();
+    if (diceValue > 0) {
+      ctx.fillStyle = '#00e6b0';
+      ctx.font = 'bold 32px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(String(diceValue), cx, cy+2);
+      ctx.textBaseline = 'alphabetic';
+    }
+    ctx.fillStyle = '#4a5a6a';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('DICE', cx, cy + size/2 + 16);
+  }
+
+  function drawPieces() {
+    // 同じマスにいる場合は少しずらす
+    const byTile = {};
+    for (const p of pieces) {
+      if (!byTile[p.pos]) byTile[p.pos] = [];
+      byTile[p.pos].push(p);
+    }
+    for (const p of pieces) {
+      const tile = board[p.pos];
+      let ox = 0, oy = 0;
+      const group = byTile[p.pos];
+      if (group.length > 1) {
+        const idx = group.indexOf(p);
+        ox = (idx - (group.length-1)/2) * 14;
+      }
+      const px = p.x + ox;
+      const py = p.y + oy;
+      // 影
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      ctx.beginPath(); ctx.ellipse(px, py+10, 10, 4, 0, 0, Math.PI*2); ctx.fill();
+      // コマ
+      ctx.shadowColor = p.color; ctx.shadowBlur = p.isPlayer ? 16 : 8;
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(px, py, p.isPlayer ? 12 : 10, 0, Math.PI*2); ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = '#0a0c0f';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      // 名前
+      ctx.fillStyle = p.isPlayer ? '#ffffff' : '#e0e0e0';
+      ctx.font = 'bold 9px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(p.isPlayer ? 'YOU' : p.name.replace('CPU ',''), px, py - 14);
+    }
+  }
+
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x+r, y);
+    ctx.arcTo(x+w, y, x+w, y+h, r);
+    ctx.arcTo(x+w, y+h, x, y+h, r);
+    ctx.arcTo(x, y+h, x, y, r);
+    ctx.arcTo(x, y, x+w, y, r);
+    ctx.closePath();
+  }
+
+  // ============================================================
+  //  Result
+  // ============================================================
+  function finishGame() {
+    phase = 'end';
+    rollBtn.disabled = true;
+    rollBtn.textContent = 'ゲーム終了';
+    const sorted = [...pieces].sort((a,b)=>b.money - a.money);
+    const playerRank = sorted.findIndex(p=>p.isPlayer) + 1;
+    resultTitle.textContent = playerRank === 1 ? 'WINNER!' : `${playerRank}位`;
+    resultList.innerHTML = '';
+    sorted.forEach((p, i)=>{
+      const row = document.createElement('div');
+      row.className = 'r-row' + (i===0 ? ' win' : '');
+      row.innerHTML = `<span class="r-rank">${i+1}位</span>
+        <span class="r-name">${p.name}</span>
+        <span class="r-money">¥${p.money.toLocaleString()}</span>`;
+      resultList.appendChild(row);
+    });
+    result.classList.add('open');
+  }
+
+  resultClose.addEventListener('click', ()=>{
+    result.classList.remove('open');
+    // リセット
+    initPieces();
+    shuffleTurnOrder();
+    turnIndex = 0;
+    phase = 'idle';
+    diceValue = 0;
+    rollBtn.disabled = false;
+    rollBtn.textContent = 'サイコロを振る';
+    updateHUD();
+  });
+
+  // ============================================================
+  //  Loop
+  // ============================================================
+  function gameLoop(timestamp) {
+    const dt = Math.min(2, (timestamp - lastTime) / (1000/60));
+    lastTime = timestamp;
+    update(dt);
+    draw();
+    requestAnimationFrame(gameLoop);
+  }
+
+  // ============================================================
+  //  Opening
+  // ============================================================
+  const opening = document.getElementById('opening');
+  const startBtn = document.getElementById('startBtn');
+  const bgViewBtn = document.getElementById('bgViewBtn');
+  const bgViewer = document.getElementById('bgViewer');
+  const closeBgBtn = document.getElementById('closeBgBtn');
+
+  startBtn.addEventListener('click', ()=>{
+    opening.classList.add('hidden-opening');
+    setTimeout(()=>{ opening.style.display = 'none'; }, 500);
+  });
+  bgViewBtn.addEventListener('click', ()=>bgViewer.classList.remove('hidden'));
+  closeBgBtn.addEventListener('click', ()=>bgViewer.classList.add('hidden'));
+
+  // ============================================================
+  //  Start
+  // ============================================================
+  init();
+  requestAnimationFrame(gameLoop);
+})();
+</script>
+</body>
+</html>
