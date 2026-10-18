@@ -232,11 +232,10 @@
       display: block;
       font-size: 0.85em;
       font-style: italic;
-      opacity: 0.8;
+      opacity: 0.55;
       border-top: 1px solid currentColor;
       padding-top: 0.6rem;
       margin-top: 0.6rem;
-      opacity: 0.55;
     }
 
     .page-content .pc-page {
@@ -277,14 +276,14 @@
       max-width: 130px;
     }
 
-    .nav-btn:hover {
+    .nav-btn:hover:not(:disabled) {
       background: #3a2e22;
       box-shadow: 0 2px 0 #0a0603, 0 8px 14px rgba(0,0,0,0.6);
       transform: translateY(0);
       color: #ffeac2;
     }
 
-    .nav-btn:active {
+    .nav-btn:active:not(:disabled) {
       transform: translateY(3px);
       box-shadow: 0 1px 0 #0a0603, 0 4px 8px rgba(0,0,0,0.5);
     }
@@ -297,7 +296,41 @@
     }
 
     /* =========================================================
-       ① クラシック・レザー（旧サンプル改良）
+       CLASSIC LEATHER 専用：sample.html への誘導リンク
+       ========================================================= */
+    .sample-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      margin-top: 0.9rem;
+      padding: 0.3rem 0.9rem;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.65rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: #b8a58b;
+      text-decoration: none;
+      border: 1px solid rgba(184, 165, 139, 0.35);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.03);
+      transition: all 0.2s ease;
+      opacity: 0.75;
+    }
+
+    .sample-link:hover {
+      color: #ffeac2;
+      border-color: rgba(255, 234, 194, 0.6);
+      background: rgba(255, 255, 255, 0.08);
+      opacity: 1;
+    }
+
+    .sample-link::after {
+      content: "↗";
+      font-size: 0.85em;
+    }
+
+    /* =========================================================
+       ① クラシック・レザー
        ========================================================= */
     .s-classic-leather .cover {
       background: #2d1f14;
@@ -880,6 +913,8 @@
         <button class="nav-btn" data-prev>PREV</button>
         <button class="nav-btn" data-next>NEXT</button>
       </div>
+      <!-- sample.html への誘導リンク -->
+      <a class="sample-link" href="sample.html" target="_blank" rel="noopener">Sample.html</a>
     </div>
 
     <!-- ② 漆黒・金箔押し -->
@@ -1070,10 +1105,8 @@
 
 <script>
   (function() {
-    // 各本の状態を管理
     const bookCards = document.querySelectorAll('.book-card');
 
-    // ページ内容のバリエーション（本ごとに共通で使用）
     const pageData = [
       { main: '高級紙の質感', sub: '— 上質な風合い —' },
       { main: '滑らかな手触り', sub: '— コットン100% —' },
@@ -1087,74 +1120,72 @@
       const cover = card.querySelector('[data-cover]');
       const pages = card.querySelector('[data-pages]');
       const pageContent = card.querySelector('[data-page-content]');
-      const pageNumEl = card.querySelector('[data-page-num]');
       const prevBtn = card.querySelector('[data-prev]');
       const nextBtn = card.querySelector('[data-next]');
 
       let currentPage = 0;
       let isCoverOpen = false;
 
-      // ページ内容更新
       function updatePage(index) {
         const data = pageData[index % pageData.length];
         pageContent.innerHTML = `
           <span class="pc-main">${data.main}</span>
           <span class="pc-sub">${data.sub}</span>
-          <span class="pc-page" data-page-num>PAGE ${index + 1}</span>
+          <span class="pc-page">PAGE ${index + 1}</span>
         `;
       }
 
-      // 初期化
-      updatePage(0);
-      prevBtn.disabled = true;
+      function syncButtons() {
+        // 表紙が閉じている：PREV無効、NEXT有効
+        if (!isCoverOpen) {
+          prevBtn.disabled = true;
+          nextBtn.disabled = false;
+          return;
+        }
+        // 表紙が開いている：ページ位置に応じて
+        prevBtn.disabled = false; // 常にPREV有効（表紙に戻れる）
+        nextBtn.disabled = (currentPage >= pageData.length - 1);
+      }
 
-      // 次のページ
+      updatePage(0);
+      syncButtons();
+
       function next() {
         if (!isCoverOpen) {
+          // 表紙を開く
           cover.classList.add('flip');
           isCoverOpen = true;
-          prevBtn.disabled = false;
-          // 表紙を開いた直後はページ1のまま
+          currentPage = 0;
           updatePage(0);
-          nextBtn.disabled = false;
         } else {
           if (currentPage < pageData.length - 1) {
             currentPage++;
             updatePage(currentPage);
-            prevBtn.disabled = false;
-            if (currentPage === pageData.length - 1) {
-              nextBtn.disabled = true;
-            }
           }
         }
-        // 小さなフェードアニメーション
-        pageContent.style.opacity = '0.6';
-        pageContent.style.transform = 'scale(0.98)';
-        setTimeout(() => {
-          pageContent.style.opacity = '1';
-          pageContent.style.transform = 'scale(1)';
-        }, 120);
+        syncButtons();
+        flashContent();
       }
 
-      // 前のページ
       function prev() {
         if (!isCoverOpen) return;
+
         if (currentPage > 0) {
+          // 前のページへ
           currentPage--;
           updatePage(currentPage);
-          nextBtn.disabled = false;
-          if (currentPage === 0) {
-            // ページ1に戻ったらPREVを無効化
-            prevBtn.disabled = true;
-          }
         } else {
           // ページ0でPREV → 表紙を閉じる
           cover.classList.remove('flip');
           isCoverOpen = false;
-          prevBtn.disabled = true;
-          nextBtn.disabled = false;
+          currentPage = 0;
           updatePage(0);
         }
+        syncButtons();
+        flashContent();
+      }
+
+      function flashContent() {
         pageContent.style.opacity = '0.6';
         pageContent.style.transform = 'scale(0.98)';
         setTimeout(() => {
@@ -1163,7 +1194,6 @@
         }, 120);
       }
 
-      // イベントリスナー
       nextBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         next();
@@ -1174,11 +1204,8 @@
         prev();
       });
 
-      // 表紙クリックでも開く
       cover.addEventListener('click', () => {
-        if (!isCoverOpen) {
-          next();
-        }
+        if (!isCoverOpen) next();
       });
     });
   })();
