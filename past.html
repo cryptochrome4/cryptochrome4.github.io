@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PAST - 戦国トーナメント審判</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; user-select:none; }
+  body {
+    background:#0a0805; font-family:'Segoe UI','Helvetica Neue',sans-serif;
+    display:flex; justify-content:center; align-items:flex-start;
+    min-height:100vh; color:#e0e0e0; padding:20px 0; overflow-y:auto;
+  }
+  .game-wrapper {
+    background:#1a1208; border-radius:24px; padding:20px 20px 14px;
+    box-shadow:0 20px 40px rgba(0,0,0,0.8), 0 0 0 1px #4a3520 inset;
+    display:flex; flex-direction:column; align-items:center; gap:12px; width:fit-content;
+  }
+  canvas {
+    display:block; border-radius:16px; background:#050505;
+    box-shadow:0 0 30px rgba(200,160,80,0.15); cursor:crosshair; width:800px; height:600px;
+  }
+  .info-panel {
+    display:flex; flex-direction:column; gap:8px; width:100%; padding:12px 16px;
+    background:#1a1208; border:1px solid #4a3520; border-radius:16px; font-size:13px; color:#d4b896;
+  }
+  .info-panel .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .info-panel .stat {
+    display:flex; align-items:center; gap:6px; background:#0f0a05; padding:4px 12px;
+    border-radius:20px; border:1px solid #3a2818;
+  }
+  .info-panel .stat .label { color:#8a6b4a; font-size:11px; letter-spacing:1px; }
+  .info-panel .stat .value { font-weight:800; font-size:14px; }
+  .value.hp { color:#00e6b0; text-shadow:0 0 8px #00e6b088; }
+  .value.timer { color:#ffd166; text-shadow:0 0 8px #ffd16688; }
+  .value.armyA { color:#7ad7ff; text-shadow:0 0 8px #7ad7ff88; }
+  .value.armyB { color:#ff8ad8; text-shadow:0 0 8px #ff8ad888; }
+  .value.state { color:#c77dff; text-shadow:0 0 8px #c77dff88; }
+  .btn-row { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; width:100%; padding:4px 0; }
+  .ui-btn {
+    background:#2a1e10; color:#ffd166; border:2px solid #c9a227; border-radius:40px;
+    padding:7px 14px; font-size:12px; font-weight:700; letter-spacing:1px; cursor:pointer;
+    transition:all 0.15s ease; box-shadow:0 0 10px #c9a22733; font-family:inherit;
+  }
+  .ui-btn:hover { background:#c9a227; color:#1a1208; box-shadow:0 0 20px #c9a227aa; }
+  .ui-btn:active { transform:scale(0.96); }
+  .ui-btn:disabled { opacity:0.35; cursor:not-allowed; border-color:#4a3520; color:#4a3520; background:#1a1208; box-shadow:none; }
+  .ui-btn.active { background:#ffd166; color:#1a1208; box-shadow:0 0 20px #ffd166aa; }
+  .ui-btn.yellow { color:#ffd166; border-color:#ffd166; }
+  .ui-btn.yellow:hover { background:#ffd166; color:#1a1208; }
+  .ui-btn.red { color:#ff4d6d; border-color:#ff4d6d; }
+  .ui-btn.red:hover { background:#ff4d6d; color:#1a1208; }
+  .ui-btn.bg { color:#7ad7ff; border-color:#7ad7ff; }
+  .ui-btn.bg:hover { background:#7ad7ff; color:#1a1208; }
+  .card-input {
+    width:64px; padding:5px 6px; border-radius:8px; border:1px solid #4a3520;
+    background:#0f0a05; color:#ffd166; font-size:12px; text-align:center; font-family:inherit;
+  }
+  .hint { font-size:11px; color:#6a5038; text-align:center; width:100%; }
+  .opening {
+    position:fixed; inset:0; background-size:cover; background-position:center; background-repeat:no-repeat;
+    display:flex; flex-direction:column; justify-content:center; align-items:center;
+    gap:26px; z-index:9999; transition:opacity 0.5s ease;
+  }
+  .opening::before { content:''; position:absolute; inset:0; background:rgba(0,0,0,0.55); z-index:0; }
+  .opening h1 {
+    position:relative; z-index:1; color:#ffd166; font-size:64px; font-weight:800;
+    letter-spacing:8px; text-shadow:0 0 30px #ffd166aa,0 0 60px #c9a22755; font-family:'Georgia',serif;
+  }
+  .opening .subtitle { position:relative; z-index:1; color:#d4b896; font-size:15px; letter-spacing:4px; margin-top:-16px; }
+  .opening .btn-col { position:relative; z-index:1; display:flex; flex-direction:column; gap:14px; align-items:center; }
+  .start-btn {
+    background:#c9a227; color:#1a1208; border:none; border-radius:50px; padding:16px 68px;
+    font-size:20px; font-weight:800; letter-spacing:4px; cursor:pointer; font-family:inherit;
+    box-shadow:0 0 30px #c9a227cc,0 0 60px #c9a22766; transition:all 0.2s ease;
+  }
+  .start-btn:hover { transform:scale(1.06); box-shadow:0 0 50px #ffd166ff; background:#ffd166; }
+  .view-bg-btn {
+    background:transparent; color:#d4b896; border:1px solid #d4b896; border-radius:40px;
+    padding:8px 24px; font-size:13px; cursor:pointer; font-family:inherit; letter-spacing:2px;
+  }
+  .view-bg-btn:hover { background:#d4b896; color:#1a1208; }
+  .bg-modal { position:fixed; inset:0; background:rgba(0,0,0,0.9); display:flex; justify-content:center; align-items:center; z-index:10000; }
+  .bg-modal img { max-width:92vw; max-height:88vh; border-radius:12px; box-shadow:0 0 40px #000; }
+  .bg-modal .close-btn { position:absolute; top:20px; right:30px; background:transparent; color:#ffd166; border:none; font-size:36px; cursor:pointer; }
+  .result-screen {
+    position:fixed; inset:0; background:rgba(0,0,0,0.92); display:flex; flex-direction:column;
+    justify-content:center; align-items:center; gap:24px; z-index:9998; padding:20px; overflow-y:auto;
+  }
+  .result-screen h2 { color:#ffd166; font-size:40px; font-weight:800; letter-spacing:4px; text-shadow:0 0 24px #ffd166aa; }
+  .result-screen .win-img { max-width:80vw; max-height:52vh; border-radius:14px; box-shadow:0 0 40px #c9a22766; border:2px solid #c9a227; }
+  .result-screen .footer-link {
+    color:#ffd166; text-decoration:none; font-weight:600; font-size:20px; padding:12px 36px;
+    border:2px solid #c9a227; border-radius:40px; background:#c9a22710; letter-spacing:2px; transition:all 0.2s ease;
+  }
+  .result-screen .footer-link:hover { background:#c9a227; color:#1a1208; box-shadow:0 0 24px #c9a227aa; }
+  .hidden { display:none !important; }
+</style>
+</head>
+<body>
+
+<div class="opening" id="opening">
+  <h1>PAST</h1>
+  <div class="subtitle">- 戦国トーナメント審判 -</div>
+  <div class="btn-col">
+    <button class="start-btn" id="startBtn">はじめる</button>
+    <button class="view-bg-btn" id="viewBgBtn">背景画像を見る</button>
+  </div>
+</div>
+
+<div class="bg-modal hidden" id="bgModal">
+  <button class="close-btn" id="bgModalClose">×</button>
+  <img id="bgModalImg" src="" alt="背景画像">
+</div>
+
+<div class="result-screen hidden" id="resultScreen">
+  <h2 id="resultTitle">優勝</h2>
+  <img class="win-img" id="resultImg" src="" alt="勝利画像">
+  <a class="footer-link" href="tale.html">tale.html へ進む</a>
+</div>
+
+<div class="game-wrapper">
+  <canvas id="gameCanvas" width="800" height="600"></canvas>
+  <div class="info-panel" id="infoPanel">
+    <div class="row">
+      <div class="stat"><span class="label">審判HP</span><span class="value hp" id="hpDisplay">100</span></div>
+      <div class="stat"><span class="label">残り</span><span class="value timer" id="timerDisplay">40.0</span></div>
+      <div class="stat"><span class="label">A軍</span><span class="value armyA" id="armyADisplay">-</span></div>
+      <div class="stat"><span class="label">B軍</span><span class="value armyB" id="armyBDisplay">-</span></div>
+      <div class="stat"><span class="label">状態</span><span class="value state" id="stateDisplay">試合前</span></div>
+    </div>
+    <div class="row">
+      <button class="ui-btn" id="nameBtn">名前表示</button>
+      <button class="ui-btn" id="idBtn">ID表示</button>
+      <button class="ui-btn" id="nameIdBtn">名前＋ID表示</button>
+    </div>
+    <div class="row">
+      <input type="text" class="card-input" id="yellowIdInput" placeholder="ID">
+      <button class="ui-btn yellow" id="yellowBtn">イエローカード</button>
+      <input type="text" class="card-input" id="redIdInput" placeholder="ID">
+      <button class="ui-btn red" id="redBtn">レッドカード</button>
+    </div>
+    <div class="row">
+      <button class="ui-btn bg" id="bgToggleBtn">背景: OFF</button>
+      <button class="ui-btn bg" id="bgModeBtn">fill</button>
+    </div>
+  </div>
+  <div class="hint" id="hint">移動: 矢印キー / エイム: マウス / 射撃・剣: クリック / カード: ID入力してボタン</div>
+</div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = 800, H = 600;
+  const WORLD_W = 2400, WORLD_H = 1800;
+
+  const hpDisplay = document.getElementById('hpDisplay');
+  const timerDisplay = document.getElementById('timerDisplay');
+  const armyADisplay = document.getElementById('armyADisplay');
+  const armyBDisplay = document.getElementById('armyBDisplay');
+  const stateDisplay = document.getElementById('stateDisplay');
+  const nameBtn = document.getElementById('nameBtn');
+  const idBtn = document.getElementById('idBtn');
+  const nameIdBtn = document.getElementById('nameIdBtn');
+  const yellowIdInput = document.getElementById('yellowIdInput');
+  const yellowBtn = document.getElementById('yellowBtn');
+  const redIdInput = document.getElementById('redIdInput');
+  const redBtn = document.getElementById('redBtn');
+  const bgToggleBtn = document.getElementById('bgToggleBtn');
+  const bgModeBtn = document.getElementById('bgModeBtn');
+  const resultScreen = document.getElementById('resultScreen');
+  const resultTitle = document.getElementById('resultTitle');
+  const resultImg = document.getElementById('resultImg');
+
+  const rand = (a,b) => Math.random()*(b-a)+a;
+  const randInt = (a,b) => Math.floor(Math.random()*(b-a+1))+a;
+  const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
+  const dist = (x1,y1,x2,y2) => Math.hypot(x2-x1,y2-y1);
+
+  // ===== 家紋（図形で描画） =====
+  function drawEmblem(ctx, clan, x, y, s) {
+    ctx.save(); ctx.translate(x,y);
+    if (clan === 'oda') {
+      ctx.fillStyle = '#ffd166'; ctx.strokeStyle = '#8a6b2a'; ctx.lineWidth = 1.5;
+      for (let i=0;i<5;i++){ const a=(i/5)*Math.PI*2 - Math.PI/2; ctx.beginPath(); ctx.arc(Math.cos(a)*s*0.5, Math.sin(a)*s*0.5, s*0.28, 0, Math.PI*2); ctx.fill(); ctx.stroke(); }
+      ctx.beginPath(); ctx.arc(0,0,s*0.3,0,Math.PI*2); ctx.fillStyle='#ffd166'; ctx.fill(); ctx.stroke();
+    } else if (clan === 'tokugawa') {
+      ctx.fillStyle = '#00c86a'; ctx.strokeStyle = '#0a5a30'; ctx.lineWidth=1.5;
+      for (let i=0;i<3;i++){ const a=(i/3)*Math.PI*2 - Math.PI/2; ctx.beginPath(); ctx.ellipse(Math.cos(a)*s*0.4, Math.sin(a)*s*0.4, s*0.3, s*0.18, a, 0, Math.PI*2); ctx.fill(); ctx.stroke(); }
+    } else if (clan === 'toyotomi') {
+      ctx.fillStyle = '#ffb84d'; ctx.strokeStyle='#7a4a10'; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.moveTo(0,-s); ctx.lineTo(s*0.3,-s*0.2); ctx.lineTo(s,-s*0.1); ctx.lineTo(s*0.4,s*0.3); ctx.lineTo(s*0.6,s); ctx.lineTo(0,s*0.5); ctx.lineTo(-s*0.6,s); ctx.lineTo(-s*0.4,s*0.3); ctx.lineTo(-s,-s*0.1); ctx.lineTo(-s*0.3,-s*0.2); ctx.closePath(); ctx.fill(); ctx.stroke();
+    } else {
+      ctx.fillStyle = '#ff8ad8'; ctx.strokeStyle='#7a2a5a'; ctx.lineWidth=1.5;
+      for (let i=0;i<12;i++){ const a=(i/12)*Math.PI*2; ctx.beginPath(); ctx.ellipse(Math.cos(a)*s*0.5, Math.sin(a)*s*0.5, s*0.22, s*0.09, a, 0, Math.PI*2); ctx.fill(); ctx.stroke(); }
+      ctx.beginPath(); ctx.arc(0,0,s*0.28,0,Math.PI*2); ctx.fillStyle='#ff8ad8'; ctx.fill(); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // ===== チーム定義 =====
+  const CLANS = {
+    oda:      { name:'織田信長軍', color:'#ffd166', img:'img35x.jpg' },
+    toyotomi: { name:'豊臣秀吉軍', color:'#ffb84d', img:'img36x.jpg' },
+    tokugawa: { name:'徳川家康軍', color:'#00c86a', img:'img37x.jpg' },
+    emperor:  { name:'天皇軍',     color:'#ff8ad8', img:'img38x.jpg' },
+  };
+
+  // 史実編成ベース
+  const TEAM_POOL = [
+    { clan:'oda', units:[
+      {name:'織田信長',type:'general',hp:900,atk:60,spd:2.6,rng:300},
+      {name:'明智光秀',type:'general',hp:700,atk:50,spd:2.4,rng:280},
+      {name:'丹羽長秀',type:'general',hp:600,atk:42,spd:2.2,rng:260},
+      {name:'鉄砲隊',type:'gun',hp:120,atk:34,spd:1.8,rng:380},
+      {name:'鉄砲隊',type:'gun',hp:120,atk:34,spd:1.8,rng:380},
+      {name:'鉄砲隊',type:'gun',hp:120,atk:34,spd:1.8,rng:380},
+      {name:'槍足軽',type:'spear',hp:100,atk:18,spd:2.0,rng:40},
+      {name:'槍足軽',type:'spear',hp:100,atk:18,spd:2.0,rng:40},
+      {name:'弓足軽',type:'bow',hp:90,atk:16,spd:2.0,rng:320},
+      {name:'弓足軽',type:'bow',hp:90,atk:16,spd:2.0,rng:320},
+    ]},
+    { clan:'tokugawa', units:[
+      {name:'徳川家康',type:'general',hp:950,atk:58,spd:2.5,rng:280},
+      {name:'本多忠勝',type:'general',hp:850,atk:62,spd:2.7,rng:60},
+      {name:'榊原康政',type:'general',hp:650,atk:46,spd:2.3,rng:260},
+      {name:'三河騎馬',type:'cavalry',hp:220,atk:40,spd:2.8,rng:50},
+      {name:'三河騎馬',type:'cavalry',hp:220,atk:40,spd:2.8,rng:50},
+      {name:'三河武士',type:'spear',hp:130,atk:24,spd:2.2,rng:50},
+      {name:'三河武士',type:'spear',hp:130,atk:24,spd:2.2,rng:50},
+      {name:'鉄砲隊',type:'gun',hp:120,atk:32,spd:1.8,rng:360},
+      {name:'弓足軽',type:'bow',hp:90,atk:16,spd:2.0,rng:320},
+      {name:'弓足軽',type:'bow',hp:90,atk:16,spd:2.0,rng:320},
+    ]},
+    { clan:'toyotomi', units:[
+      {name:'豊臣秀吉',type:'general',hp:850,atk:52,spd:2.6,rng:280},
+      {name:'加藤清正',type:'general',hp:780,atk:56,spd:2.5,rng:60},
+      {name:'福島正則',type:'general',hp:760,atk:54,spd:2.5,rng:60},
+      {name:'黒田官兵衛',type:'general',hp:600,atk:44,spd:2.3,rng:300},
+      {name:'槍足軽',type:'spear',hp:110,atk:20,spd:2.1,rng:45},
+      {name:'槍足軽',type:'spear',hp:110,atk:20,spd:2.1,rng:45},
+      {name:'鉄砲隊',type:'gun',hp:120,atk:33,spd:1.8,rng:370},
+      {name:'鉄砲隊',type:'gun',hp:120,atk:33,spd:1.8,rng:370},
+      {name:'弓足軽',type:'bow',hp:90,atk:16,spd:2.0,rng:320},
+      {name:'水軍衆',type:'bow',hp:110,atk:20,spd:2.2,rng:300},
+    ]},
+    { clan:'emperor', units:[
+      {name:'正親町天皇',type:'general',hp:700,atk:38,spd:2.2,rng:260},
+      {name:'近衛前久',type:'general',hp:650,atk:42,spd:2.3,rng:260},
+      {name:'勧修寺晴右',type:'general',hp:600,atk:40,spd:2.2,rng:260},
+      {name:'僧兵',type:'spear',hp:130,atk:26,spd:2.1,rng:50},
+      {name:'僧兵',type:'spear',hp:130,atk:26,spd:2.1,rng:50},
+      {name:'官軍弓',type:'bow',hp:100,atk:20,spd:2.1,rng:330},
+      {name:'官軍弓',type:'bow',hp:100,atk:20,spd:2.1,rng:330},
+      {name:'官軍槍',type:'spear',hp:110,atk:22,spd:2.1,rng:50},
+      {name:'官軍槍',type:'spear',hp:110,atk:22,spd:2.1,rng:50},
+      {name:'御所護衛',type:'cavalry',hp:200,atk:36,spd:2.6,rng:50},
+    ]},
+  ];
+
+  // ===== 地形（固定・公平） =====
+  // 川: x=1150〜1250 の縦帯。橋3箇所 y=300, 900, 1500
+  // 山: 左右対称 (600,450) と (1800,450) に山、 (600,1350) と (1800,1350)
+  const RIVER_X0 = 1150, RIVER_X1 = 1250;
+  const BRIDGES = [ {y:300,h:120}, {y:900,h:120}, {y:1500,h:120} ];
+  const MOUNTAINS = [
+    {x:600,y:450,r:220}, {x:1800,y:450,r:220},
+    {x:600,y:1350,r:220}, {x:1800,y:1350,r:220},
+  ];
+
+  function isRiver(x,y){
+    if (x < RIVER_X0 || x > RIVER_X1) return false;
+    for (const b of BRIDGES) if (y >= b.y - b.h/2 && y <= b.y + b.h/2) return false;
+    return true;
+  }
+  function isMountain(x,y){
+    for (const m of MOUNTAINS) if (dist(x,y,m.x,m.y) < m.r) return true;
+    return false;
+  }
+
+  // ===== 状態 =====
+  let ref = { x: WORLD_W/2, y: WORLD_H/2, hp:100, maxHp:100, angle:0, mode:'gun', swing:0, cool:0 };
+  let units = [];
+  let bullets = [];
+  let particles = [];
+  let keys = {ArrowUp:false,ArrowDown:false,ArrowLeft:false,ArrowRight:false};
+  let mouseX = W/2, mouseY = H/2, firing = false, fireTimer = 0;
+  let showName = false, showId = false;
+  let bgOn = false, bgMode = 'fill';
+  let bgImg = new Image(); bgImg.src = 'img44x.jpg';
+  let tournament = { round:'A', matches:[], current:-1, winner:null };
+  let matchTime = 40.0;
+  let running = false, finished = false, spectate = false;
+  let lastTime = 0;
+
+  // ===== トーナメント生成（更新ごとランダム） =====
+  function buildTournament(){
+    const pool = TEAM_POOL.slice();
+    // 8チーム: 4軍×2編成（プールを2周）
+    const teams = [];
+    for (let r=0;r<2;r++) for (const t of pool) teams.push(t);
+    for (let i=teams.length-1;i>0;i--){ const j=randInt(0,i); [teams[i],teams[j]]=[teams[j],teams[i]]; }
+    // 8チーム → A:4, B:4 → 各2試合 → 勝者2 → C決勝
+    const shuffled = teams.slice(0,8);
+    tournament.matches = [];
+    for (let i=0;i<8;i+=2) tournament.matches.push({a:shuffled[i], b:shuffled[i+1], winner:null, round:i<4?'A':'B'});
+    tournament.round = 'A';
+    tournament.current = -1;
+    tournament.winner = null;
+    tournament.finalists = [];
+    tournament.finalWinner = null;
+    tournament.stage = 'semis';
+  }
+
+  // ===== ユニット生成 =====
+  let unitIdCounter = 1;
+  function spawnUnits(teamA, teamB){
+    units = []; bullets = []; particles = []; unitIdCounter = 1;
+    const baseY_A = WORLD_H*0.3, baseY_B = WORLD_H*0.7;
+    function place(team, side){
+      const n = team.units.length;
+      team.units.forEach((u,i)=>{
+        const spread = (i - (n-1)/2) * 70;
+        const x = WORLD_W/2 + spread + rand(-30,30);
+        const y = side==='A' ? baseY_A + rand(-60,60) : baseY_B + rand(-60,60);
+        units.push({
+          id: unitIdCounter++, side, clan: team.clan,
+          name: u.name, type: u.type,
+          x, y, hp: u.hp, maxHp: u.hp, atk: u.atk, spd: u.spd*3.0, rng: u.rng,
+          cool: rand(0,30), alive:true, angle: side==='A'?Math.PI/2:-Math.PI/2,
+          yellows:0, red:false, radius: u.type==='general'?18:(u.type==='cavalry'?16:12),
+        });
+      });
+    }
+    place(teamA,'A'); place(teamB,'B');
+    // 審判のHP/攻撃＝全ユニット平均
+    const alive = units;
+    const avgHp = alive.reduce((s,u)=>s+u.hp,0)/alive.length;
+    const avgAtk = alive.reduce((s,u)=>s+u.atk,0)/alive.length;
+    ref = { x: WORLD_W/2, y: WORLD_H/2, hp:Math.round(avgHp), maxHp:Math.round(avgHp),
+            angle:0, mode:'gun', swing:0, cool:0, atk:Math.round(avgAtk) };
+  }
+
+  // ===== 戦闘ロジック =====
+  function unitCanWalk(x,y){
+    if (x<20||x>WORLD_W-20||y<20||y>WORLD_H-20) return false;
+    if (isRiver(x,y)) return false;
+    return true;
+  }
+
+  function findNearestEnemy(u){
+    let best=null, bd=1e9;
+    for (const o of units){
+      if (!o.alive || o.side===u.side) continue;
+      const d = dist(u.x,u.y,o.x,o.y);
+      if (d<bd){bd=d;best=o;}
+    }
+    return best;
+  }
+
+  function updateUnits(dt){
+    for (const u of units){
+      if (!u.alive) continue;
+      const target = findNearestEnemy(u);
+      if (!target) continue;
+      const d = dist(u.x,u.y,target.x,target.y);
+      u.angle = Math.atan2(target.y-u.y, target.x-u.x);
+      const onMt = isMountain(u.x,u.y);
+      const terrSpd = onMt ? 0.55 : 1.0;
+      // 移動（射程外なら接近）
+      if (d > u.rng*0.9){
+        const mx = Math.cos(u.angle)*u.spd*terrSpd*dt*0.6;
+        const my = Math.sin(u.angle)*u.spd*terrSpd*dt*0.6;
+        if (unitCanWalk(u.x+mx,u.y+my)){ u.x+=mx; u.y+=my; }
+        else if (unitCanWalk(u.x+mx,u.y)) u.x+=mx;
+        else if (unitCanWalk(u.x,u.y+my)) u.y+=my;
+      }
+      // 攻撃
+      u.cool -= dt*60;
+      if (d <= u.rng && u.cool<=0){
+        u.cool = 40 + rand(-10,10);
+        let dmg = u.atk;
+        // 地形補正
+        if (u.type==='bow' && onMt) dmg *= 1.35;
+        if (u.type==='gun' && isRiver(target.x,target.y)) dmg *= 0.7;
+        if (u.type==='cavalry' && (onMt||isRiver(u.x,u.y))) dmg *= 0.6;
+        if (u.type==='general') dmg *= 1.2;
+        bullets.push({ x:u.x, y:u.y, tx:target.x, ty:target.y, spd:9*3,
+          dmg, owner:u.id, side:u.side, color: u.side==='A'?'#7ad7ff':'#ff8ad8', life:60 });
+      }
+    }
+  }
+
+  function updateBullets(dt){
+    for (let i=bullets.length-1;i>=0;i--){
+      const b = bullets[i];
+      const a = Math.atan2(b.ty-b.y, b.tx-b.x);
+      b.x += Math.cos(a)*b.spd*dt;
+      b.y += Math.sin(a)*b.spd*dt;
+      b.life -= dt;
+      let hit = false;
+      if (dist(b.x,b.y,b.tx,b.ty) < 20){ hit = true; }
+      if (hit || b.life<=0){
+        // 着弾判定：目標付近の敵
+        for (const u of units){
+          if (!u.alive || u.side===b.side) continue;
+          if (dist(b.x,b.y,u.x,u.y) < u.radius+14){
+            u.hp -= b.dmg;
+            if (u.hp<=0){ u.alive=false; }
+          }
+        }
+        // 審判への流れ弾
+        if (!spectate && dist(b.x,b.y,ref.x,ref.y) < 20){
+          ref.hp -= b.dmg*0.6;
+          if (ref.hp<=0){ ref.hp=0; spectate=true; }
+        }
+        bullets.splice(i,1);
+      }
+    }
+  }
+
+  function updateRef(dt){
+    if (spectate) return;
+    const sp = 7*dt;
+    let dx=0,dy=0;
+    if (keys.ArrowUp) dy-=sp; if (keys.ArrowDown) dy+=sp;
+    if (keys.ArrowLeft) dx-=sp; if (keys.ArrowRight) dx+=sp;
+    if (unitCanWalk(ref.x+dx,ref.y+dy)){ ref.x+=dx; ref.y+=dy; }
+    else if (unitCanWalk(ref.x+dx,ref.y)) ref.x+=dx;
+    else if (unitCanWalk(ref.x,ref.y+dy)) ref.y+=dy;
+    const camX = clamp(ref.x-W/2,0,WORLD_W-W), camY = clamp(ref.y-H/2,0,WORLD_H-H);
+    ref.angle = Math.atan2(mouseY+camY-ref.y, mouseX+camX-ref.x);
+    if (firing){
+      fireTimer -= dt;
+      if (fireTimer<=0){
+        fireTimer = 0.12;
+        const a = ref.angle + rand(-0.03,0.03);
+        bullets.push({ x:ref.x, y:ref.y, tx:ref.x+Math.cos(a)*400, ty:ref.y+Math.sin(a)*400,
+          spd:14*3, dmg:Math.round(ref.atk*0.6), owner:'ref', side:'ref', color:'#ffd166', life:40 });
+      }
+    }
+  }
+
+  function checkMatchEnd(dt){
+    if (!running || finished) return;
+    matchTime -= dt;
+    if (matchTime<=0) matchTime=0;
+    const aAlive = units.filter(u=>u.alive&&u.side==='A').length;
+    const bAlive = units.filter(u=>u.alive&&u.side==='B').length;
+    if (matchTime<=0 || aAlive===0 || bAlive===0){
+      running = false; finished = true;
+      const winnerSide = aAlive>=bAlive ? 'A' : 'B';
+      endMatch(winnerSide);
+    }
+  }
+
+  function endMatch(side){
+    const m = tournament.matches[tournament.current];
+    if (!m) return;
+    m.winner = side==='A'?m.a:m.b;
+    // 次の試合へ
+    setTimeout(()=>{
+      if (tournament.stage==='semis'){
+        tournament.finalists.push(m.winner);
+        if (tournament.finalists.length===2){
+          tournament.stage='final';
+          tournament.matches.push({a:tournament.finalists[0], b:tournament.finalists[1], winner:null, round:'C'});
+        }
+      } else if (tournament.stage==='final'){
+        tournament.finalWinner = m.winner;
+        tournament.stage='done';
+      }
+      advanceMatch();
+    }, 800);
+  }
+
+  function advanceMatch(){
+    if (tournament.stage==='done'){
+      showResult(tournament.finalWinner);
+      return;
+    }
+    let next = -1;
+    for (let i=0;i<tournament.matches.length;i++){
+      if (!tournament.matches[i].winner && (i!==tournament.current || finished)){ next=i; break; }
+    }
+    if (next===-1){
+      // 準決勝の全勝者が出た→決勝戦を追加して開始
+      if (tournament.stage==='final' && tournament.matches.some(m=>m.round==='C'&&!m.winner)){
+        next = tournament.matches.findIndex(m=>m.round==='C'&&!m.winner);
+      }
+    }
+    if (next===-1){ // 決勝が終わった
+      showResult(tournament.finalWinner); return;
+    }
+    tournament.current = next;
+    const m = tournament.matches[next];
+    spawnUnits(m.a, m.b);
+    matchTime = 40.0; running = true; finished = false; spectate = false;
+    stateDisplay.textContent = '試合中';
+    armyADisplay.textContent = CLANS[m.a.clan].name;
+    armyBDisplay.textContent = CLANS[m.b.clan].name;
+    ref.hp = ref.maxHp;
+  }
+
+  function showResult(winnerTeam){
+    resultScreen.classList.remove('hidden');
+    const c = CLANS[winnerTeam.clan];
+    resultTitle.textContent = c.name + ' 勝利';
+    resultImg.src = c.img;
+  }
+
+  // ===== 描画 =====
+  function drawTerrain(camX,camY){
+    // 川
+    ctx.fillStyle = '#0e3a5a';
+    ctx.fillRect(RIVER_X0, 0, RIVER_X1-RIVER_X0, WORLD_H);
+    // 橋
+    ctx.fillStyle = '#6a4a20';
+    for (const b of BRIDGES) ctx.fillRect(RIVER_X0-10, b.y-b.h/2, (RIVER_X1-RIVER_X0)+20, b.h);
+    // 山
+    ctx.fillStyle = '#3a4a2a';
+    for (const m of MOUNTAINS){
+      ctx.beginPath(); ctx.arc(m.x,m.y,m.r,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#5a6a3a';
+      ctx.beginPath(); ctx.arc(m.x,m.y,m.r*0.6,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#3a4a2a';
+    }
+  }
+
+  function drawUnit(u){
+    const col = u.side==='A'?'#7ad7ff':'#ff8ad8';
+    ctx.save(); ctx.translate(u.x,u.y); ctx.rotate(u.angle);
+    if (u.type==='general'){
+      ctx.fillStyle = u.clan==='oda'?'#8a3a10':u.clan==='tokugawa'?'#0a5a30':u.clan==='toyotomi'?'#a06a10':'#7a2a5a';
+      ctx.beginPath(); ctx.arc(0,0,u.radius,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.stroke();
+    } else if (u.type==='cavalry'){
+      ctx.fillStyle = '#5a3a1a'; ctx.fillRect(-u.radius,-u.radius*0.7,u.radius*2,u.radius*1.4);
+      ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.strokeRect(-u.radius,-u.radius*0.7,u.radius*2,u.radius*1.4);
+    } else if (u.type==='gun'){
+      ctx.fillStyle = '#2a2a2a'; ctx.fillRect(-u.radius,-u.radius*0.5,u.radius*2,u.radius);
+      ctx.fillRect(u.radius*0.5,-2,u.radius*1.2,4);
+    } else if (u.type==='bow'){
+      ctx.strokeStyle = col; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(-u.radius,0); ctx.lineTo(u.radius,0); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0,-u.radius); ctx.lineTo(0,u.radius); ctx.stroke();
+    } else {
+      ctx.fillStyle = '#7a5a3a'; ctx.fillRect(-u.radius,-u.radius*0.6,u.radius*2,u.radius*1.2);
+    }
+    ctx.restore();
+    // HPバー
+    const hr = clamp(u.hp/u.maxHp,0,1);
+    ctx.fillStyle = '#1a1208'; ctx.fillRect(u.x-18,u.y-u.radius-14,36,4);
+    ctx.fillStyle = u.side==='A'?'#7ad7ff':'#ff8ad8'; ctx.fillRect(u.x-18,u.y-u.radius-14,36*hr,4);
+    // 名前/ID
+    let label = '';
+    if (showName && showId) label = u.name + ' #' + u.id;
+    else if (showName) label = u.name;
+    else if (showId) label = '#' + u.id;
+    if (label && (u.type==='general' || showName || showId)){
+      ctx.fillStyle = '#fff'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(label, u.x, u.y-u.radius-20);
+      // カードアイコン（名前横）
+      const lw = ctx.measureText(label).width;
+      let cx = u.x + lw/2 + 4;
+      for (let i=0;i<u.yellows;i++){
+        ctx.fillStyle = '#ffd166'; ctx.fillRect(cx, u.y-u.radius-28, 6, 9);
+        cx += 8;
+      }
+      if (u.red){ ctx.fillStyle = '#ff4d6d'; ctx.fillRect(cx, u.y-u.radius-28, 6, 9); }
+    }
+  }
+
+  function draw(){
+    const camX = clamp((spectate?ref.x:ref.x)-W/2,0,WORLD_W-W);
+    const camY = clamp((spectate?ref.y:ref.y)-H/2,0,WORLD_H-H);
+    ctx.fillStyle = '#050505'; ctx.fillRect(0,0,W,H);
+    if (bgOn){
+      if (bgMode==='fill') ctx.drawImage(bgImg,camX,camY,W,H,0,0,W,H);
+      else if (bgMode==='cover'){ const s=Math.max(W/WORLD_W,H/WORLD_H); ctx.drawImage(bgImg,camX,camY,W/s,H/s,0,0,W/s,H/s); }
+      else { ctx.save(); ctx.translate(-camX,-camY); for(let x=0;x<WORLD_W;x+=256)for(let y=0;y<WORLD_H;y+=256)ctx.drawImage(bgImg,x,y,256,256); ctx.restore(); }
+    }
+    ctx.save(); ctx.translate(-camX,-camY);
+    drawTerrain(camX,camY);
+    for (const u of units) if (u.alive) drawUnit(u);
+    for (const b of bullets){
+      ctx.fillStyle = b.color; ctx.shadowColor = b.color; ctx.shadowBlur = 10;
+      ctx.beginPath(); ctx.arc(b.x,b.y,4,0,Math.PI*2); ctx.fill(); ctx.shadowBlur = 0;
+    }
+    if (!spectate){
+      ctx.save(); ctx.translate(ref.x,ref.y); ctx.rotate(ref.angle);
+      ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(0,0,10,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#1a1208'; ctx.fillRect(6,-2,14,4);
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
+  // ===== カード =====
+  function findUnitById(id){ return units.find(u=>u.id===id && u.alive); }
+  function needsDisplay(){ return showName || showId; }
+  yellowBtn.addEventListener('click',()=>{
+    if (!needsDisplay()){ alert('名前かIDを表示してください'); return; }
+    const id = parseInt(yellowIdInput.value); const u = findUnitById(id);
+    if (!u) return; u.yellows++; if (u.yellows>=2) u.alive=false;
+  });
+  redBtn.addEventListener('click',()=>{
+    if (!needsDisplay()){ alert('名前かIDを表示してください'); return; }
+    const id = parseInt(redIdInput.value); const u = findUnitById(id);
+    if (!u) return; u.red=true; u.alive=false;
+  });
+
+  nameBtn.addEventListener('click',()=>{ showName=!showName; nameBtn.classList.toggle('active',showName); });
+  idBtn.addEventListener('click',()=>{ showId=!showId; idBtn.classList.toggle('active',showId); });
+  nameIdBtn.addEventListener('click',()=>{ showName=!showName; showId=showName; nameBtn.classList.toggle('active',showName); idBtn.classList.toggle('active',showId); nameIdBtn.classList.toggle('active',showName); });
+
+  bgToggleBtn.addEventListener('click',()=>{ bgOn=!bgOn; bgToggleBtn.textContent='背景: '+(bgOn?'ON':'OFF'); });
+  bgModeBtn.addEventListener('click',()=>{ bgMode = bgMode==='fill'?'cover':bgMode==='cover'?'tile':'fill'; bgModeBtn.textContent=bgMode; });
+
+  // ===== 入力 =====
+  window.addEventListener('keydown',e=>{ if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();keys[e.key]=true;} });
+  window.addEventListener('keyup',e=>{ if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();keys[e.key]=false;} });
+  canvas.addEventListener('mousemove',e=>{ const r=canvas.getBoundingClientRect(); mouseX=(e.clientX-r.left)*(W/r.width); mouseY=(e.clientY-r.top)*(H/r.height); });
+  canvas.addEventListener('mousedown',e=>{ if(e.button===0){e.preventDefault();firing=true;fireTimer=0;} });
+  window.addEventListener('mouseup',e=>{ if(e.button===0) firing=false; });
+
+  // ===== オープニング =====
+  const opening = document.getElementById('opening');
+  const startBtn = document.getElementById('startBtn');
+  const viewBgBtn = document.getElementById('viewBgBtn');
+  const bgModal = document.getElementById('bgModal');
+  const bgModalImg = document.getElementById('bgModalImg');
+  const bgModalClose = document.getElementById('bgModalClose');
+  const chosenBg = Math.random()<0.5?'img349war.jpg':'img350war.jpg';
+  opening.style.backgroundImage = `url('${chosenBg}')`;
+  startBtn.addEventListener('click',()=>{ opening.style.opacity=0; setTimeout(()=>{opening.style.display='none';},500); });
+  viewBgBtn.addEventListener('click',()=>{ bgModalImg.src=chosenBg; bgModal.classList.remove('hidden'); });
+  bgModalClose.addEventListener('click',()=>bgModal.classList.add('hidden'));
+
+  // ===== メインループ =====
+  function loop(t){
+    const dt = Math.min(0.05,(t-lastTime)/1000); lastTime=t;
+    if (running){ updateRef(dt); updateUnits(dt); updateBullets(dt); checkMatchEnd(dt); }
+    draw();
+    hpDisplay.textContent = Math.max(0,Math.round(ref.hp));
+    timerDisplay.textContent = matchTime.toFixed(1);
+    requestAnimationFrame(loop);
+  }
+
+  buildTournament();
+  advanceMatch();
+  stateDisplay.textContent = '試合中';
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
