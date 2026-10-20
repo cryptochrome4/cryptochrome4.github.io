@@ -36,6 +36,7 @@
   .value.armyA { color:#7ad7ff; text-shadow:0 0 8px #7ad7ff88; }
   .value.armyB { color:#ff8ad8; text-shadow:0 0 8px #ff8ad888; }
   .value.state { color:#c77dff; text-shadow:0 0 8px #c77dff88; }
+  .value.mode { color:#ff8a00; text-shadow:0 0 8px #ff8a0088; }
   .btn-row { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; width:100%; padding:4px 0; }
   .ui-btn {
     background:#2a1e10; color:#ffd166; border:2px solid #c9a227; border-radius:40px;
@@ -52,9 +53,18 @@
   .ui-btn.red:hover { background:#ff4d6d; color:#1a1208; }
   .ui-btn.bg { color:#7ad7ff; border-color:#7ad7ff; }
   .ui-btn.bg:hover { background:#7ad7ff; color:#1a1208; }
+  .ui-btn.sword { color:#ff8a00; border-color:#ff8a00; }
+  .ui-btn.sword:hover { background:#ff8a00; color:#1a1208; }
+  .ui-btn.gravity { color:#c77dff; border-color:#c77dff; }
+  .ui-btn.gravity:hover { background:#c77dff; color:#1a1208; }
+  .ui-btn.gravity.on { background:#c77dff; color:#1a1208; box-shadow:0 0 20px #c77dffaa; }
   .card-input {
     width:64px; padding:5px 6px; border-radius:8px; border:1px solid #4a3520;
     background:#0f0a05; color:#ffd166; font-size:12px; text-align:center; font-family:inherit;
+  }
+  .gravity-input {
+    width:72px; padding:5px 6px; border-radius:8px; border:1px solid #c77dff;
+    background:#0f0a05; color:#c77dff; font-size:12px; text-align:center; font-family:inherit;
   }
   .hint { font-size:11px; color:#6a5038; text-align:center; width:100%; }
   .opening {
@@ -128,11 +138,13 @@
       <div class="stat"><span class="label">A軍</span><span class="value armyA" id="armyADisplay">-</span></div>
       <div class="stat"><span class="label">B軍</span><span class="value armyB" id="armyBDisplay">-</span></div>
       <div class="stat"><span class="label">状態</span><span class="value state" id="stateDisplay">試合前</span></div>
+      <div class="stat"><span class="label">武器</span><span class="value mode" id="modeDisplay">銃</span></div>
     </div>
     <div class="row">
       <button class="ui-btn" id="nameBtn">名前表示</button>
       <button class="ui-btn" id="idBtn">ID表示</button>
       <button class="ui-btn" id="nameIdBtn">名前＋ID表示</button>
+      <button class="ui-btn sword" id="weaponBtn">刀モード切替</button>
     </div>
     <div class="row">
       <input type="text" class="card-input" id="yellowIdInput" placeholder="ID">
@@ -141,11 +153,17 @@
       <button class="ui-btn red" id="redBtn">レッドカード</button>
     </div>
     <div class="row">
+      <button class="ui-btn gravity" id="gravityBtn">重力: OFF</button>
+      <input type="number" class="gravity-input" id="gravityInput" min="0" max="1000" step="10" value="250">
+      <span style="font-size:11px;color:#8a6b4a;">重力度 0〜1000</span>
+    </div>
+    <div class="row">
       <button class="ui-btn bg" id="bgToggleBtn">背景: OFF</button>
       <button class="ui-btn bg" id="bgModeBtn">fill</button>
+      <span class="stat" style="margin-left:auto;"><span class="label">地形</span><span class="value state" id="mapNameDisplay">-</span></span>
     </div>
   </div>
-  <div class="hint" id="hint">移動: 矢印キー / エイム: マウス / 射撃・剣: クリック / カード: ID入力してボタン</div>
+  <div class="hint" id="hint">移動: 矢印キー / エイム: マウス / 射撃・刀: クリック / 武器切替: Q or ボタン / カード: ID入力してボタン / 重力: ボタン＋数値</div>
 </div>
 
 <script>
@@ -160,13 +178,18 @@
   const armyADisplay = document.getElementById('armyADisplay');
   const armyBDisplay = document.getElementById('armyBDisplay');
   const stateDisplay = document.getElementById('stateDisplay');
+  const modeDisplay = document.getElementById('modeDisplay');
+  const mapNameDisplay = document.getElementById('mapNameDisplay');
   const nameBtn = document.getElementById('nameBtn');
   const idBtn = document.getElementById('idBtn');
   const nameIdBtn = document.getElementById('nameIdBtn');
+  const weaponBtn = document.getElementById('weaponBtn');
   const yellowIdInput = document.getElementById('yellowIdInput');
   const yellowBtn = document.getElementById('yellowBtn');
   const redIdInput = document.getElementById('redIdInput');
   const redBtn = document.getElementById('redBtn');
+  const gravityBtn = document.getElementById('gravityBtn');
+  const gravityInput = document.getElementById('gravityInput');
   const bgToggleBtn = document.getElementById('bgToggleBtn');
   const bgModeBtn = document.getElementById('bgModeBtn');
   const resultScreen = document.getElementById('resultScreen');
@@ -178,7 +201,6 @@
   const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
   const dist = (x1,y1,x2,y2) => Math.hypot(x2-x1,y2-y1);
 
-  // ===== 家紋（図形で描画） =====
   function drawEmblem(ctx, clan, x, y, s) {
     ctx.save(); ctx.translate(x,y);
     if (clan === 'oda') {
@@ -199,7 +221,6 @@
     ctx.restore();
   }
 
-  // ===== チーム定義 =====
   const CLANS = {
     oda:      { name:'織田信長軍', color:'#ffd166', img:'img351war.jpg' },
     toyotomi: { name:'豊臣秀吉軍', color:'#ffb84d', img:'img353war.jpg' },
@@ -207,85 +228,153 @@
     emperor:  { name:'天皇軍',     color:'#ff8ad8', img:'img354war.jpg' },
   };
 
-  // 史実編成ベース
   const TEAM_POOL = [
     { clan:'oda', units:[
-      {name:'織田信長',type:'general',hp:900,atk:60,spd:2.6,rng:300},
-      {name:'明智光秀',type:'general',hp:700,atk:50,spd:2.4,rng:280},
-      {name:'丹羽長秀',type:'general',hp:600,atk:42,spd:2.2,rng:260},
-      {name:'鉄砲隊',type:'gun',hp:120,atk:34,spd:1.8,rng:380},
-      {name:'鉄砲隊',type:'gun',hp:120,atk:34,spd:1.8,rng:380},
-      {name:'鉄砲隊',type:'gun',hp:120,atk:34,spd:1.8,rng:380},
-      {name:'槍足軽',type:'spear',hp:100,atk:18,spd:2.0,rng:40},
-      {name:'槍足軽',type:'spear',hp:100,atk:18,spd:2.0,rng:40},
-      {name:'弓足軽',type:'bow',hp:90,atk:16,spd:2.0,rng:320},
-      {name:'弓足軽',type:'bow',hp:90,atk:16,spd:2.0,rng:320},
+      {name:'織田信長',type:'general',hp:900,atk:120,spd:2.6,rng:300},
+      {name:'明智光秀',type:'general',hp:700,atk:100,spd:2.4,rng:280},
+      {name:'丹羽長秀',type:'general',hp:600,atk:84,spd:2.2,rng:260},
+      {name:'鉄砲隊',type:'gun',hp:120,atk:68,spd:1.8,rng:380},
+      {name:'鉄砲隊',type:'gun',hp:120,atk:68,spd:1.8,rng:380},
+      {name:'鉄砲隊',type:'gun',hp:120,atk:68,spd:1.8,rng:380},
+      {name:'槍足軽',type:'spear',hp:100,atk:36,spd:2.0,rng:40},
+      {name:'槍足軽',type:'spear',hp:100,atk:36,spd:2.0,rng:40},
+      {name:'弓足軽',type:'bow',hp:90,atk:32,spd:2.0,rng:320},
+      {name:'弓足軽',type:'bow',hp:90,atk:32,spd:2.0,rng:320},
     ]},
     { clan:'tokugawa', units:[
-      {name:'徳川家康',type:'general',hp:950,atk:58,spd:2.5,rng:280},
-      {name:'本多忠勝',type:'general',hp:850,atk:62,spd:2.7,rng:60},
-      {name:'榊原康政',type:'general',hp:650,atk:46,spd:2.3,rng:260},
-      {name:'三河騎馬',type:'cavalry',hp:220,atk:40,spd:2.8,rng:50},
-      {name:'三河騎馬',type:'cavalry',hp:220,atk:40,spd:2.8,rng:50},
-      {name:'三河武士',type:'spear',hp:130,atk:24,spd:2.2,rng:50},
-      {name:'三河武士',type:'spear',hp:130,atk:24,spd:2.2,rng:50},
-      {name:'鉄砲隊',type:'gun',hp:120,atk:32,spd:1.8,rng:360},
-      {name:'弓足軽',type:'bow',hp:90,atk:16,spd:2.0,rng:320},
-      {name:'弓足軽',type:'bow',hp:90,atk:16,spd:2.0,rng:320},
+      {name:'徳川家康',type:'general',hp:950,atk:116,spd:2.5,rng:280},
+      {name:'本多忠勝',type:'general',hp:850,atk:124,spd:2.7,rng:60},
+      {name:'榊原康政',type:'general',hp:650,atk:92,spd:2.3,rng:260},
+      {name:'三河騎馬',type:'cavalry',hp:220,atk:80,spd:2.8,rng:50},
+      {name:'三河騎馬',type:'cavalry',hp:220,atk:80,spd:2.8,rng:50},
+      {name:'三河武士',type:'spear',hp:130,atk:48,spd:2.2,rng:50},
+      {name:'三河武士',type:'spear',hp:130,atk:48,spd:2.2,rng:50},
+      {name:'鉄砲隊',type:'gun',hp:120,atk:64,spd:1.8,rng:360},
+      {name:'弓足軽',type:'bow',hp:90,atk:32,spd:2.0,rng:320},
+      {name:'弓足軽',type:'bow',hp:90,atk:32,spd:2.0,rng:320},
     ]},
     { clan:'toyotomi', units:[
-      {name:'豊臣秀吉',type:'general',hp:850,atk:52,spd:2.6,rng:280},
-      {name:'加藤清正',type:'general',hp:780,atk:56,spd:2.5,rng:60},
-      {name:'福島正則',type:'general',hp:760,atk:54,spd:2.5,rng:60},
-      {name:'黒田官兵衛',type:'general',hp:600,atk:44,spd:2.3,rng:300},
-      {name:'槍足軽',type:'spear',hp:110,atk:20,spd:2.1,rng:45},
-      {name:'槍足軽',type:'spear',hp:110,atk:20,spd:2.1,rng:45},
-      {name:'鉄砲隊',type:'gun',hp:120,atk:33,spd:1.8,rng:370},
-      {name:'鉄砲隊',type:'gun',hp:120,atk:33,spd:1.8,rng:370},
-      {name:'弓足軽',type:'bow',hp:90,atk:16,spd:2.0,rng:320},
-      {name:'水軍衆',type:'bow',hp:110,atk:20,spd:2.2,rng:300},
+      {name:'豊臣秀吉',type:'general',hp:850,atk:104,spd:2.6,rng:280},
+      {name:'加藤清正',type:'general',hp:780,atk:112,spd:2.5,rng:60},
+      {name:'福島正則',type:'general',hp:760,atk:108,spd:2.5,rng:60},
+      {name:'黒田官兵衛',type:'general',hp:600,atk:88,spd:2.3,rng:300},
+      {name:'槍足軽',type:'spear',hp:110,atk:40,spd:2.1,rng:45},
+      {name:'槍足軽',type:'spear',hp:110,atk:40,spd:2.1,rng:45},
+      {name:'鉄砲隊',type:'gun',hp:120,atk:66,spd:1.8,rng:370},
+      {name:'鉄砲隊',type:'gun',hp:120,atk:66,spd:1.8,rng:370},
+      {name:'弓足軽',type:'bow',hp:90,atk:32,spd:2.0,rng:320},
+      {name:'水軍衆',type:'bow',hp:110,atk:40,spd:2.2,rng:300},
     ]},
     { clan:'emperor', units:[
-      {name:'正親町天皇',type:'general',hp:700,atk:38,spd:2.2,rng:260},
-      {name:'近衛前久',type:'general',hp:650,atk:42,spd:2.3,rng:260},
-      {name:'勧修寺晴右',type:'general',hp:600,atk:40,spd:2.2,rng:260},
-      {name:'僧兵',type:'spear',hp:130,atk:26,spd:2.1,rng:50},
-      {name:'僧兵',type:'spear',hp:130,atk:26,spd:2.1,rng:50},
-      {name:'官軍弓',type:'bow',hp:100,atk:20,spd:2.1,rng:330},
-      {name:'官軍弓',type:'bow',hp:100,atk:20,spd:2.1,rng:330},
-      {name:'官軍槍',type:'spear',hp:110,atk:22,spd:2.1,rng:50},
-      {name:'官軍槍',type:'spear',hp:110,atk:22,spd:2.1,rng:50},
-      {name:'御所護衛',type:'cavalry',hp:200,atk:36,spd:2.6,rng:50},
+      {name:'正親町天皇',type:'general',hp:700,atk:76,spd:2.2,rng:260},
+      {name:'近衛前久',type:'general',hp:650,atk:84,spd:2.3,rng:260},
+      {name:'勧修寺晴右',type:'general',hp:600,atk:80,spd:2.2,rng:260},
+      {name:'僧兵',type:'spear',hp:130,atk:52,spd:2.1,rng:50},
+      {name:'僧兵',type:'spear',hp:130,atk:52,spd:2.1,rng:50},
+      {name:'官軍弓',type:'bow',hp:100,atk:40,spd:2.1,rng:330},
+      {name:'官軍弓',type:'bow',hp:100,atk:40,spd:2.1,rng:330},
+      {name:'官軍槍',type:'spear',hp:110,atk:44,spd:2.1,rng:50},
+      {name:'官軍槍',type:'spear',hp:110,atk:44,spd:2.1,rng:50},
+      {name:'御所護衛',type:'cavalry',hp:200,atk:72,spd:2.6,rng:50},
     ]},
   ];
 
-  // ===== 地形（固定・公平） =====
-  const RIVER_X0 = 1150, RIVER_X1 = 1250;
-  const BRIDGES = [ {y:300,h:120}, {y:900,h:120}, {y:1500,h:120} ];
-  const MOUNTAINS = [
-    {x:600,y:450,r:220}, {x:1800,y:450,r:220},
-    {x:600,y:1350,r:220}, {x:1800,y:1350,r:220},
+  const MAP_PATTERNS = [
+    { id:'plain', name:'平原',
+      river:{x0:1150,x1:1250},
+      bridges:[{y:300,h:120},{y:900,h:120},{y:1500,h:120}],
+      mountains:[{x:600,y:450,r:220},{x:1800,y:450,r:220},{x:600,y:1350,r:220},{x:1800,y:1350,r:220}],
+      forestTrees: [],
+      walls:[], wallGates:[], waypoints:[],
+    },
+    { id:'castle', name:'城攻め',
+      river:{x0:0,x1:0},
+      bridges:[],
+      mountains:[{x:300,y:300,r:150},{x:2100,y:300,r:150},{x:300,y:1500,r:150},{x:2100,y:1500,r:150}],
+      forestTrees: [],
+      walls:[{x0:900,y0:850,x1:1500,y1:850},{x0:900,y0:950,x1:1500,y1:950}],
+      wallGates:[{x:1050,w:100},{x:1350,w:100}],
+      waypoints:[{x:1000,y:900},{x:1400,y:900},{x:800,y:900},{x:1600,y:900}],
+    },
+    { id:'forest', name:'森の中',
+      river:{x0:0,x1:0},
+      bridges:[],
+      mountains:[],
+      forestTrees: [],
+      walls:[], wallGates:[], waypoints:[],
+    },
   ];
+  let mapPattern = MAP_PATTERNS[0];
+
+  function makeForestTrees(){
+    if (mapPattern.id !== 'forest') return;
+    const centers = [
+      {x:1200,y:500},{x:900,y:900},{x:1500,y:900},{x:1200,y:1300},
+    ];
+    const trees = [];
+    for (const c of centers){
+      const count = 14;
+      for (let i=0;i<count;i++){
+        const a = rand(0, Math.PI*2);
+        const r = rand(20, 220);
+        const tx = c.x + Math.cos(a)*r;
+        const ty = c.y + Math.sin(a)*r;
+        if (tx < 30 || tx > WORLD_W-30 || ty < 30 || ty > WORLD_H-30) continue;
+        trees.push({ x:tx, y:ty, r:rand(10,18) });
+      }
+    }
+    mapPattern.forestTrees = trees;
+  }
+
+  function buildCastleWalls(){
+    const w = mapPattern.walls[0];
+    if (!w) return [];
+    const gates = mapPattern.wallGates || [];
+    const segs = [];
+    const y = w.y0;
+    const h = 40;
+    let x = w.x0;
+    const sorted = gates.slice().sort((a,b)=>a.x-b.x);
+    for (const g of sorted){
+      if (g.x > x) segs.push({x0:x, y0:y, x1:g.x, y1:y, h});
+      x = g.x + g.w;
+    }
+    if (x < w.x1) segs.push({x0:x, y0:y, x1:w.x1, y1:y, h});
+    return segs;
+  }
+  let castleWalls = [];
 
   function isRiver(x,y){
-    if (x < RIVER_X0 || x > RIVER_X1) return false;
-    for (const b of BRIDGES) if (y >= b.y - b.h/2 && y <= b.y + b.h/2) return false;
+    const r = mapPattern.river;
+    if (!r || r.x1 <= r.x0) return false;
+    if (x < r.x0 || x > r.x1) return false;
+    for (const b of mapPattern.bridges) if (y >= b.y - b.h/2 && y <= b.y + b.h/2) return false;
     return true;
   }
   function isMountain(x,y){
-    for (const m of MOUNTAINS) if (dist(x,y,m.x,m.y) < m.r) return true;
+    for (const m of mapPattern.mountains) if (dist(x,y,m.x,m.y) < m.r) return true;
+    return false;
+  }
+  function isWall(x,y){
+    for (const w of castleWalls){
+      if (x >= w.x0 - 10 && x <= w.x1 + 10 && y >= w.y0 - w.h/2 && y <= w.y0 + w.h/2) return true;
+    }
+    return false;
+  }
+  function isTree(x,y){
+    for (const t of mapPattern.forestTrees){
+      if (dist(x,y,t.x,t.y) < t.r + 6) return true;
+    }
     return false;
   }
 
-  // ===== 状態 =====
-  let ref = { x: WORLD_W/2, y: WORLD_H/2, hp:100, maxHp:100, angle:0, mode:'gun', swing:0, cool:0, atk:20 };
+  let ref = { x: WORLD_W/2, y: WORLD_H/2, hp:100, maxHp:100, angle:0, mode:'gun', atk:20, swing:0, cool:0 };
   let units = [];
   let bullets = [];
   let keys = {ArrowUp:false,ArrowDown:false,ArrowLeft:false,ArrowRight:false};
   let mouseX = W/2, mouseY = H/2, firing = false, fireTimer = 0;
   let showName = false, showId = false;
   let bgOn = false, bgMode = 'fill';
-  // 背景は更新ごとに2枚からランダム
   const MAP_BG = Math.random()<0.5 ? 'img355war.jpg' : 'img356war.jpg';
   let bgImg = new Image(); bgImg.src = MAP_BG;
   let tournament = { round:'A', matches:[], current:-1, winner:null };
@@ -293,12 +382,39 @@
   let running = false, finished = false, spectate = false;
   let lastTime = 0;
 
-  // 審判スピード（px/秒）
-  const REF_SPEED = 70;
-  // 軍スピード倍率（8倍）
-  const ARMY_SPEED_MULT = 8.0;
+  // 重力モード
+  let gravityOn = false;
+  let gravityPower = 250;
 
-  // ===== トーナメント生成（更新ごとランダム） =====
+  const REF_SPEED = 100;
+  const ARMY_SPEED_MULT = 16.0;
+  const FIRE_COOL_BASE = 120;
+  const SWORD_RANGE = 55;
+  const GRAVITY_INFLUENCE = 600;
+
+  function lineHitsWall(x0,y0,x1,y1){
+    for (const w of castleWalls){
+      const wy = w.y0;
+      const ymin = Math.min(y0,y1), ymax = Math.max(y0,y1);
+      if (wy >= ymin - w.h/2 && wy <= ymax + w.h/2){
+        const t = (wy - y0) / (y1 - y0 || 0.0001);
+        const cx = x0 + (x1 - x0) * t;
+        if (cx >= w.x0 && cx <= w.x1) return true;
+      }
+    }
+    return false;
+  }
+
+  function pickWaypoint(u, target){
+    if (!lineHitsWall(u.x,u.y,target.x,target.y)) return target;
+    let best = null, bd = 1e9;
+    for (const wp of mapPattern.waypoints){
+      const d = dist(u.x,u.y,wp.x,wp.y) + dist(wp.x,wp.y,target.x,target.y);
+      if (d < bd){ bd = d; best = wp; }
+    }
+    return best || target;
+  }
+
   function buildTournament(){
     const pool = TEAM_POOL.slice();
     const teams = [];
@@ -315,11 +431,20 @@
     tournament.stage = 'semis';
   }
 
-  // ===== ユニット生成 =====
   let unitIdCounter = 1;
   function spawnUnits(teamA, teamB){
     units = []; bullets = []; unitIdCounter = 1;
-    const baseY_A = WORLD_H*0.3, baseY_B = WORLD_H*0.7;
+    mapPattern = MAP_PATTERNS[randInt(0, MAP_PATTERNS.length-1)];
+    mapNameDisplay.textContent = mapPattern.name;
+    castleWalls = buildCastleWalls();
+    makeForestTrees();
+
+    let baseY_A, baseY_B;
+    if (mapPattern.id === 'castle'){
+      baseY_A = WORLD_H*0.15; baseY_B = WORLD_H*0.85;
+    } else {
+      baseY_A = WORLD_H*0.3; baseY_B = WORLD_H*0.7;
+    }
     function place(team, side){
       const n = team.units.length;
       team.units.forEach((u,i)=>{
@@ -341,13 +466,14 @@
     const avgHp = units.reduce((s,u)=>s+u.hp,0)/units.length;
     const avgAtk = units.reduce((s,u)=>s+u.atk,0)/units.length;
     ref = { x: WORLD_W/2, y: WORLD_H/2, hp:Math.round(avgHp), maxHp:Math.round(avgHp),
-            angle:0, mode:'gun', swing:0, cool:0, atk:Math.round(avgAtk) };
+            angle:0, mode:'gun', atk:Math.round(avgAtk), swing:0, cool:0 };
   }
 
-  // ===== 戦闘ロジック =====
   function unitCanWalk(x,y){
     if (x<20||x>WORLD_W-20||y<20||y>WORLD_H-20) return false;
     if (isRiver(x,y)) return false;
+    if (isWall(x,y)) return false;
+    if (isTree(x,y)) return false;
     return true;
   }
 
@@ -370,34 +496,62 @@
       const d = dist(u.x,u.y,target.x,target.y);
       u.angle = Math.atan2(target.y-u.y, target.x-u.x);
       const onMt = isMountain(u.x,u.y);
-      const terrSpd = onMt ? 0.55 : 1.0;
+      let terrSpd = onMt ? 0.55 : 1.0;
+      if (mapPattern.id==='forest' && onMt) terrSpd = 0.7;
+
+      // ===== 移動ベクトルを合算（通常移動＋重力を風と同じ外力として加算） =====
+      let moveX = 0, moveY = 0;
+
+      // 通常移動：敵へ向かう
       if (d > u.rng*0.9){
-        const mx = Math.cos(u.angle)*u.spd*terrSpd*dt;
-        const my = Math.sin(u.angle)*u.spd*terrSpd*dt;
-        if (unitCanWalk(u.x+mx,u.y+my)){ u.x+=mx; u.y+=my; }
-        else if (unitCanWalk(u.x+mx,u.y)) u.x+=mx;
-        else if (unitCanWalk(u.x,u.y+my)) u.y+=my;
+        const goal = pickWaypoint(u, target);
+        const ga = Math.atan2(goal.y-u.y, goal.x-u.x);
+        moveX += Math.cos(ga)*u.spd*terrSpd*dt;
+        moveY += Math.sin(ga)*u.spd*terrSpd*dt;
       }
+
+      // 重力：審判へ引き寄せ（外力として加算）
+      if (gravityOn && gravityPower > 0 && !spectate){
+        const gd = dist(u.x,u.y,ref.x,ref.y);
+        if (gd > 20){
+          const ga = Math.atan2(ref.y-u.y, ref.x-u.x);
+          const falloff = Math.max(0, 1 - gd / GRAVITY_INFLUENCE);
+          // 1フレームあたりの固定量。250で約2px（旧1000相当）、1000で約8px
+          const pull = (gravityPower / 1000) * 8.0 * (0.3 + 0.7 * falloff);
+          moveX += Math.cos(ga) * pull;
+          moveY += Math.sin(ga) * pull;
+        }
+      }
+
+      // 合算した移動を適用（1回だけ判定）
+      if (moveX !== 0 || moveY !== 0){
+        if (unitCanWalk(u.x+moveX,u.y+moveY)){ u.x+=moveX; u.y+=moveY; }
+        else if (unitCanWalk(u.x+moveX,u.y)){ u.x+=moveX; }
+        else if (unitCanWalk(u.x,u.y+moveY)){ u.y+=moveY; }
+      }
+
       u.cool -= dt*60;
       if (d <= u.rng && u.cool<=0){
-        // 8倍速に合わせクールダウン短縮
-        u.cool = (40 + rand(-10,10)) / ARMY_SPEED_MULT;
-        let dmg = u.atk;
-        if (u.type==='bow' && onMt) dmg *= 1.35;
-        if (u.type==='gun' && isRiver(target.x,target.y)) dmg *= 0.7;
-        if (u.type==='cavalry' && (onMt||isRiver(u.x,u.y))) dmg *= 0.6;
-        if (u.type==='general') dmg *= 1.2;
-        u.flash = 6;
-        // 兵種ごとに弾の見た目を変える
-        let btype = 'shot';
-        if (u.type==='bow') btype='arrow';
-        else if (u.type==='gun') btype='bullet';
-        else if (u.type==='spear') btype='thrust';
-        else if (u.type==='cavalry') btype='charge';
-        else if (u.type==='general') btype='command';
-        bullets.push({ x:u.x, y:u.y, tx:target.x, ty:target.y, spd:9*ARMY_SPEED_MULT,
-          dmg, owner:u.id, side:u.side, color: u.side==='A'?'#7ad7ff':'#ff8ad8',
-          life:60, btype, angle:u.angle });
+        if (lineHitsWall(u.x,u.y,target.x,target.y)){
+          u.cool = 20;
+        } else {
+          u.cool = (FIRE_COOL_BASE + rand(-20,20)) / ARMY_SPEED_MULT;
+          let dmg = u.atk;
+          if (u.type==='bow' && onMt) dmg *= 1.35;
+          if (u.type==='gun' && isRiver(target.x,target.y)) dmg *= 0.7;
+          if (u.type==='cavalry' && (onMt||isRiver(u.x,u.y))) dmg *= 0.6;
+          if (u.type==='general') dmg *= 1.2;
+          u.flash = 6;
+          let btype = 'shot';
+          if (u.type==='bow') btype='arrow';
+          else if (u.type==='gun') btype='bullet';
+          else if (u.type==='spear') btype='thrust';
+          else if (u.type==='cavalry') btype='charge';
+          else if (u.type==='general') btype='command';
+          bullets.push({ x:u.x, y:u.y, tx:target.x, ty:target.y, spd:9*ARMY_SPEED_MULT,
+            dmg, owner:u.id, side:u.side, color: u.side==='A'?'#7ad7ff':'#ff8ad8',
+            life:60, btype, angle:u.angle });
+        }
       }
     }
   }
@@ -406,23 +560,46 @@
     for (let i=bullets.length-1;i>=0;i--){
       const b = bullets[i];
       const a = Math.atan2(b.ty-b.y, b.tx-b.x);
-      b.x += Math.cos(a)*b.spd*dt;
-      b.y += Math.sin(a)*b.spd*dt;
+      const nx = b.x + Math.cos(a)*b.spd*dt;
+      const ny = b.y + Math.sin(a)*b.spd*dt;
+      if (isWall(nx,ny) || isTree(nx,ny)){
+        bullets.splice(i,1);
+        continue;
+      }
+      b.x = nx; b.y = ny;
       b.life -= dt;
-      let hit = false;
-      if (dist(b.x,b.y,b.tx,b.ty) < 20){ hit = true; }
-      if (hit || b.life<=0){
-        for (const u of units){
-          if (!u.alive || u.side===b.side) continue;
-          if (dist(b.x,b.y,u.x,u.y) < u.radius+14){
+
+      let removed = false;
+      for (const u of units){
+        if (!u.alive) continue;
+        if (b.side === 'ref'){
+          if (dist(b.x,b.y,u.x,u.y) < u.radius+12){
             u.hp -= b.dmg;
-            if (u.hp<=0){ u.alive=false; }
+            if (u.hp<=0) u.alive=false;
+            bullets.splice(i,1);
+            removed = true;
+            break;
+          }
+        } else if (u.side !== b.side){
+          if (dist(b.x,b.y,u.x,u.y) < u.radius+12){
+            u.hp -= b.dmg;
+            if (u.hp<=0) u.alive=false;
+            bullets.splice(i,1);
+            removed = true;
+            break;
           }
         }
-        if (!spectate && dist(b.x,b.y,ref.x,ref.y) < 20){
-          ref.hp -= b.dmg*0.6;
-          if (ref.hp<=0){ ref.hp=0; spectate=true; }
-        }
+      }
+      if (removed) continue;
+
+      if (b.side !== 'ref' && !spectate && dist(b.x,b.y,ref.x,ref.y) < 18){
+        ref.hp -= b.dmg*0.6;
+        if (ref.hp<=0){ ref.hp=0; spectate=true; }
+        bullets.splice(i,1);
+        continue;
+      }
+
+      if (dist(b.x,b.y,b.tx,b.ty) < 20 || b.life<=0){
         bullets.splice(i,1);
       }
     }
@@ -439,16 +616,40 @@
     else if (unitCanWalk(ref.x,ref.y+dy)) ref.y+=dy;
     const camX = clamp(ref.x-W/2,0,WORLD_W-W), camY = clamp(ref.y-H/2,0,WORLD_H-H);
     ref.angle = Math.atan2(mouseY+camY-ref.y, mouseX+camX-ref.x);
+    if (ref.swing > 0) ref.swing--;
     if (firing){
-      fireTimer -= dt;
-      if (fireTimer<=0){
-        fireTimer = 0.06;
-        const a = ref.angle + rand(-0.03,0.03);
-        bullets.push({ x:ref.x, y:ref.y, tx:ref.x+Math.cos(a)*400, ty:ref.y+Math.sin(a)*400,
-          spd:14*3, dmg:Math.round(ref.atk*0.6), owner:'ref', side:'ref',
-          color:'#ffd166', life:40, btype:'bullet', angle:a });
+      if (ref.mode === 'gun'){
+        fireTimer -= dt;
+        if (fireTimer<=0){
+          fireTimer = 0.12;
+          const a = ref.angle + rand(-0.03,0.03);
+          const tx = ref.x+Math.cos(a)*400, ty = ref.y+Math.sin(a)*400;
+          if (!lineHitsWall(ref.x,ref.y,tx,ty)){
+            bullets.push({ x:ref.x, y:ref.y, tx, ty,
+              spd:14*4, dmg:Math.round(ref.atk*0.6), owner:'ref', side:'ref',
+              color:'#ffd166', life:50, btype:'bullet', angle:a });
+          }
+        }
+      } else {
+        if (ref.cool <= 0){
+          ref.cool = 0.25;
+          ref.swing = 10;
+          for (const u of units){
+            if (!u.alive) continue;
+            const d = dist(ref.x,ref.y,u.x,u.y);
+            if (d < SWORD_RANGE){
+              const ang = Math.atan2(u.y-ref.y,u.x-ref.x);
+              const diff = Math.abs(((ang - ref.angle + Math.PI*3) % (Math.PI*2)) - Math.PI);
+              if (diff < Math.PI/2){
+                u.hp -= Math.round(ref.atk*1.2);
+                if (u.hp<=0) u.alive=false;
+              }
+            }
+          }
+        }
       }
     }
+    if (ref.cool > 0) ref.cool -= dt;
   }
 
   function checkMatchEnd(dt){
@@ -484,10 +685,7 @@
   }
 
   function advanceMatch(){
-    if (tournament.stage==='done'){
-      showResult(tournament.finalWinner);
-      return;
-    }
+    if (tournament.stage==='done'){ showResult(tournament.finalWinner); return; }
     let next = -1;
     for (let i=0;i<tournament.matches.length;i++){
       if (!tournament.matches[i].winner && (i!==tournament.current || finished)){ next=i; break; }
@@ -506,6 +704,7 @@
     armyADisplay.textContent = CLANS[m.a.clan].name;
     armyBDisplay.textContent = CLANS[m.b.clan].name;
     ref.hp = ref.maxHp;
+    updateModeDisplay();
   }
 
   function showResult(winnerTeam){
@@ -515,17 +714,40 @@
     resultImg.src = c.img;
   }
 
-  // ===== 描画 =====
+  function updateModeDisplay(){
+    modeDisplay.textContent = ref.mode === 'gun' ? '銃' : '刀';
+    weaponBtn.textContent = ref.mode === 'gun' ? '刀モード切替' : '銃モード切替';
+  }
+
   function drawTerrain(){
-    ctx.fillStyle = '#0e3a5a';
-    ctx.fillRect(RIVER_X0, 0, RIVER_X1-RIVER_X0, WORLD_H);
-    ctx.fillStyle = '#6a4a20';
-    for (const b of BRIDGES) ctx.fillRect(RIVER_X0-10, b.y-b.h/2, (RIVER_X1-RIVER_X0)+20, b.h);
-    for (const m of MOUNTAINS){
+    const r = mapPattern.river;
+    if (r && r.x1 > r.x0){
+      ctx.fillStyle = '#0e3a5a';
+      ctx.fillRect(r.x0, 0, r.x1-r.x0, WORLD_H);
+      ctx.fillStyle = '#6a4a20';
+      for (const b of mapPattern.bridges) ctx.fillRect(r.x0-10, b.y-b.h/2, (r.x1-r.x0)+20, b.h);
+    }
+    for (const m of mapPattern.mountains){
       ctx.fillStyle = '#3a4a2a';
       ctx.beginPath(); ctx.arc(m.x,m.y,m.r,0,Math.PI*2); ctx.fill();
       ctx.fillStyle = '#5a6a3a';
       ctx.beginPath(); ctx.arc(m.x,m.y,m.r*0.6,0,Math.PI*2); ctx.fill();
+    }
+    for (const t of mapPattern.forestTrees){
+      ctx.fillStyle = '#5a3a1a';
+      ctx.fillRect(t.x-4, t.y-4, 8, 14);
+      ctx.fillStyle = '#1e6a1e';
+      ctx.beginPath(); ctx.arc(t.x, t.y-8, t.r, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#2a8a2a';
+      ctx.beginPath(); ctx.arc(t.x-4, t.y-12, t.r*0.65, 0, Math.PI*2); ctx.fill();
+    }
+    for (const w of castleWalls){
+      ctx.fillStyle = '#6a5a4a';
+      ctx.fillRect(w.x0, w.y0-w.h/2, w.x1-w.x0, w.h);
+      ctx.fillStyle = '#8a7a6a';
+      ctx.fillRect(w.x0, w.y0-w.h/2, w.x1-w.x0, 6);
+      ctx.fillStyle = '#3a2a1a';
+      for (let x=w.x0+10;x<w.x1-10;x+=30) ctx.fillRect(x, w.y0-w.h/2+8, 10, 8);
     }
   }
 
@@ -533,35 +755,29 @@
     const col = u.side==='A'?'#7ad7ff':'#ff8ad8';
     ctx.save(); ctx.translate(u.x,u.y); ctx.rotate(u.angle);
     if (u.type==='general'){
-      // 大将：円＋采配
       ctx.fillStyle = u.clan==='oda'?'#8a3a10':u.clan==='tokugawa'?'#0a5a30':u.clan==='toyotomi'?'#a06a10':'#7a2a5a';
       ctx.beginPath(); ctx.arc(0,0,u.radius,0,Math.PI*2); ctx.fill();
       ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.stroke();
-      // 采配
       ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(u.radius*0.5,0); ctx.lineTo(u.radius*1.6,0); ctx.stroke();
       if (u.flash>0){ ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(u.radius*1.7,0,4,0,Math.PI*2); ctx.fill(); }
     } else if (u.type==='cavalry'){
-      // 騎馬：馬体＋騎手
       ctx.fillStyle = '#5a3a1a'; ctx.fillRect(-u.radius,-u.radius*0.7,u.radius*2,u.radius*1.4);
       ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.strokeRect(-u.radius,-u.radius*0.7,u.radius*2,u.radius*1.4);
       ctx.fillStyle = '#3a2010'; ctx.fillRect(-u.radius*0.8,-u.radius*1.2,u.radius*0.6,u.radius*0.6);
       if (u.flash>0){ ctx.strokeStyle='#ffd166'; ctx.lineWidth=2;
         ctx.beginPath(); ctx.moveTo(u.radius,0); ctx.lineTo(u.radius*2,0); ctx.stroke(); }
     } else if (u.type==='gun'){
-      // 鉄砲：筒＋発光
       ctx.fillStyle = '#2a2a2a'; ctx.fillRect(-u.radius,-u.radius*0.5,u.radius*2,u.radius);
       ctx.fillStyle = '#111'; ctx.fillRect(u.radius*0.5,-2,u.radius*1.4,4);
       if (u.flash>0){ ctx.fillStyle='#ffd166'; ctx.shadowColor='#ffd166'; ctx.shadowBlur=12;
         ctx.beginPath(); ctx.arc(u.radius*1.9,0,4,0,Math.PI*2); ctx.fill(); ctx.shadowBlur=0; }
     } else if (u.type==='bow'){
-      // 弓：弧＋矢
       ctx.strokeStyle = col; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(u.radius*0.2,0,u.radius*0.9,-Math.PI*0.7,Math.PI*0.7); ctx.stroke();
       if (u.flash>0){ ctx.strokeStyle='#ffd166'; ctx.lineWidth=2;
         ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(u.radius*2,0); ctx.stroke(); }
     } else {
-      // 槍：縦長＋穂先
       ctx.fillStyle = '#7a5a3a'; ctx.fillRect(-u.radius,-u.radius*0.5,u.radius*2,u.radius);
       ctx.strokeStyle = '#c0c0c0'; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(u.radius*0.6,0); ctx.lineTo(u.radius*1.8,0); ctx.stroke();
@@ -569,11 +785,9 @@
         ctx.moveTo(u.radius*1.8,0); ctx.lineTo(u.radius*1.4,-4); ctx.lineTo(u.radius*1.4,4); ctx.closePath(); ctx.fill(); }
     }
     ctx.restore();
-    // HPバー
     const hr = clamp(u.hp/u.maxHp,0,1);
     ctx.fillStyle = '#1a1208'; ctx.fillRect(u.x-18,u.y-u.radius-14,36,4);
     ctx.fillStyle = u.side==='A'?'#7ad7ff':'#ff8ad8'; ctx.fillRect(u.x-18,u.y-u.radius-14,36*hr,4);
-    // 名前/ID
     let label = '';
     if (showName && showId) label = u.name + ' #' + u.id;
     else if (showName) label = u.name;
@@ -607,15 +821,58 @@
     }
   }
 
+  function drawRef(){
+    if (spectate) return;
+    if (gravityOn && gravityPower > 0){
+      const pulse = 20 + Math.sin(performance.now()/200) * 6 + (gravityPower/1000)*30;
+      const g = ctx.createRadialGradient(ref.x,ref.y,10,ref.x,ref.y,pulse);
+      g.addColorStop(0,'rgba(199,125,255,0.45)');
+      g.addColorStop(1,'rgba(199,125,255,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(ref.x,ref.y,pulse,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle = 'rgba(199,125,255,0.12)';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(ref.x,ref.y,GRAVITY_INFLUENCE,0,Math.PI*2); ctx.stroke();
+    }
+    ctx.save(); ctx.translate(ref.x,ref.y); ctx.rotate(ref.angle);
+    ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(0,0,10,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#1a1208'; ctx.lineWidth = 2; ctx.stroke();
+    if (ref.mode === 'gun'){
+      ctx.fillStyle = '#1a1208'; ctx.fillRect(6,-2,14,4);
+    } else {
+      const swing = ref.swing > 0 ? Math.sin((10-ref.swing)/10*Math.PI) * 1.2 : 0;
+      ctx.rotate(-0.3 + swing);
+      ctx.strokeStyle = '#e0e0e0'; ctx.lineWidth = 3;
+      ctx.shadowColor = '#ff8a00'; ctx.shadowBlur = 10;
+      ctx.beginPath(); ctx.moveTo(8,0); ctx.lineTo(30,0); ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = '#8a4a10'; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(8,0); ctx.stroke();
+    }
+    ctx.restore();
+    const hr = clamp(ref.hp/ref.maxHp,0,1);
+    ctx.strokeStyle = '#1a1208'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(ref.x,ref.y,16,0,Math.PI*2); ctx.stroke();
+    ctx.strokeStyle = hr>0.5?'#00e6b0':'#ff8a5c'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(ref.x,ref.y,16,-Math.PI/2,-Math.PI/2+Math.PI*2*hr); ctx.stroke();
+    ctx.fillStyle = gravityOn?'#c77dff':'#ffd166'; ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('審判', ref.x, ref.y-22);
+  }
+
   function draw(){
     const camX = clamp(ref.x-W/2,0,WORLD_W-W);
     const camY = clamp(ref.y-H/2,0,WORLD_H-H);
     ctx.fillStyle = '#050505'; ctx.fillRect(0,0,W,H);
-    if (bgOn){
-      if (bgMode==='fill') ctx.drawImage(bgImg,0,0,bgImg.width,bgImg.height,camX,camY,W,H);
-      else if (bgMode==='cover'){
-        const s = Math.max(W/WORLD_W, H/WORLD_H);
-        ctx.drawImage(bgImg,0,0,bgImg.width,bgImg.height,camX/s,camY/s,W/s,H/s);
+    if (bgOn && bgImg.complete && bgImg.naturalWidth > 0){
+      if (bgMode==='fill'){
+        ctx.drawImage(bgImg, 0, 0, W, H);
+      } else if (bgMode==='cover'){
+        const ir = bgImg.naturalWidth / bgImg.naturalHeight;
+        const cr = W / H;
+        let sw, sh, sx, sy;
+        if (ir > cr){ sh = bgImg.naturalHeight; sw = sh * cr; sx = (bgImg.naturalWidth - sw)/2; sy = 0; }
+        else { sw = bgImg.naturalWidth; sh = sw / cr; sx = 0; sy = (bgImg.naturalHeight - sh)/2; }
+        ctx.drawImage(bgImg, sx, sy, sw, sh, 0, 0, W, H);
       } else {
         ctx.save(); ctx.translate(-camX,-camY);
         for(let x=0;x<WORLD_W;x+=256)for(let y=0;y<WORLD_H;y+=256)ctx.drawImage(bgImg,x,y,256,256);
@@ -624,30 +881,27 @@
     }
     ctx.save(); ctx.translate(-camX,-camY);
     drawTerrain();
-    // 家紋（陣営中央に表示）
     if (units.length){
       const uA = units.find(u=>u.side==='A'); const uB = units.find(u=>u.side==='B');
-      if (uA) drawEmblem(ctx, uA.clan, WORLD_W/2-300, WORLD_H*0.15, 40);
-      if (uB) drawEmblem(ctx, uB.clan, WORLD_W/2+300, WORLD_H*0.85, 40);
+      if (uA) drawEmblem(ctx, uA.clan, WORLD_W/2-300, WORLD_H*0.08, 40);
+      if (uB) drawEmblem(ctx, uB.clan, WORLD_W/2+300, WORLD_H*0.92, 40);
     }
     for (const u of units) if (u.alive) drawUnit(u);
     for (const b of bullets) drawBullet(b);
-    if (!spectate){
-      ctx.save(); ctx.translate(ref.x,ref.y); ctx.rotate(ref.angle);
-      ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(0,0,10,0,Math.PI*2); ctx.fill();
-      ctx.strokeStyle = '#1a1208'; ctx.lineWidth = 2; ctx.stroke();
-      ctx.fillStyle = '#1a1208'; ctx.fillRect(6,-2,14,4);
-      ctx.restore();
-    }
+    drawRef();
     ctx.restore();
     if (spectate){
       ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(0,0,W,30);
       ctx.fillStyle = '#ffd166'; ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center';
       ctx.fillText('観戦モード', W/2, 22);
     }
+    if (gravityOn){
+      ctx.fillStyle = 'rgba(199,125,255,0.15)'; ctx.fillRect(0,0,W,H);
+      ctx.fillStyle = '#c77dff'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'left';
+      ctx.fillText('重力モード ON / 強さ '+gravityPower, 10, H-14);
+    }
   }
 
-  // ===== カード =====
   function findUnitById(id){ return units.find(u=>u.id===id && u.alive); }
   function needsDisplay(){ return showName || showId; }
   yellowBtn.addEventListener('click',()=>{
@@ -665,17 +919,32 @@
   idBtn.addEventListener('click',()=>{ showId=!showId; idBtn.classList.toggle('active',showId); });
   nameIdBtn.addEventListener('click',()=>{ showName=!showName; showId=showName; nameBtn.classList.toggle('active',showName); idBtn.classList.toggle('active',showId); nameIdBtn.classList.toggle('active',showName); });
 
+  weaponBtn.addEventListener('click',()=>{ ref.mode = ref.mode==='gun'?'sword':'gun'; updateModeDisplay(); });
+
+  gravityBtn.addEventListener('click',()=>{
+    gravityOn = !gravityOn;
+    gravityBtn.textContent = '重力: ' + (gravityOn?'ON':'OFF');
+    gravityBtn.classList.toggle('on', gravityOn);
+  });
+  gravityInput.addEventListener('input',()=>{
+    let v = parseFloat(gravityInput.value);
+    if (isNaN(v)) v = 0;
+    v = clamp(v, 0, 1000);
+    gravityPower = v;
+  });
+
   bgToggleBtn.addEventListener('click',()=>{ bgOn=!bgOn; bgToggleBtn.textContent='背景: '+(bgOn?'ON':'OFF'); });
   bgModeBtn.addEventListener('click',()=>{ bgMode = bgMode==='fill'?'cover':bgMode==='cover'?'tile':'fill'; bgModeBtn.textContent=bgMode; });
 
-  // ===== 入力 =====
-  window.addEventListener('keydown',e=>{ if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();keys[e.key]=true;} });
+  window.addEventListener('keydown',e=>{
+    if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();keys[e.key]=true;}
+    if(e.key==='q'||e.key==='Q'){ ref.mode = ref.mode==='gun'?'sword':'gun'; updateModeDisplay(); }
+  });
   window.addEventListener('keyup',e=>{ if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();keys[e.key]=false;} });
   canvas.addEventListener('mousemove',e=>{ const r=canvas.getBoundingClientRect(); mouseX=(e.clientX-r.left)*(W/r.width); mouseY=(e.clientY-r.top)*(H/r.height); });
   canvas.addEventListener('mousedown',e=>{ if(e.button===0){e.preventDefault();firing=true;fireTimer=0;} });
   window.addEventListener('mouseup',e=>{ if(e.button===0) firing=false; });
 
-  // ===== オープニング =====
   const opening = document.getElementById('opening');
   const startBtn = document.getElementById('startBtn');
   const viewBgBtn = document.getElementById('viewBgBtn');
@@ -688,7 +957,6 @@
   viewBgBtn.addEventListener('click',()=>{ bgModalImg.src=chosenBg; bgModal.classList.remove('hidden'); });
   bgModalClose.addEventListener('click',()=>bgModal.classList.add('hidden'));
 
-  // ===== メインループ =====
   function loop(t){
     const dt = Math.min(0.05,(t-lastTime)/1000); lastTime=t;
     if (running){ updateRef(dt); updateUnits(dt); updateBullets(dt); checkMatchEnd(dt); }
@@ -701,6 +969,7 @@
   buildTournament();
   advanceMatch();
   stateDisplay.textContent = '試合中';
+  updateModeDisplay();
   requestAnimationFrame(loop);
 })();
 </script>
