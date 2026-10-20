@@ -55,9 +55,16 @@
   .ui-btn.bg:hover { background:#7ad7ff; color:#1a1208; }
   .ui-btn.sword { color:#ff8a00; border-color:#ff8a00; }
   .ui-btn.sword:hover { background:#ff8a00; color:#1a1208; }
+  .ui-btn.gravity { color:#c77dff; border-color:#c77dff; }
+  .ui-btn.gravity:hover { background:#c77dff; color:#1a1208; }
+  .ui-btn.gravity.on { background:#c77dff; color:#1a1208; box-shadow:0 0 20px #c77dffaa; }
   .card-input {
     width:64px; padding:5px 6px; border-radius:8px; border:1px solid #4a3520;
     background:#0f0a05; color:#ffd166; font-size:12px; text-align:center; font-family:inherit;
+  }
+  .gravity-input {
+    width:72px; padding:5px 6px; border-radius:8px; border:1px solid #c77dff;
+    background:#0f0a05; color:#c77dff; font-size:12px; text-align:center; font-family:inherit;
   }
   .hint { font-size:11px; color:#6a5038; text-align:center; width:100%; }
   .opening {
@@ -146,12 +153,17 @@
       <button class="ui-btn red" id="redBtn">レッドカード</button>
     </div>
     <div class="row">
+      <button class="ui-btn gravity" id="gravityBtn">重力: OFF</button>
+      <input type="number" class="gravity-input" id="gravityInput" min="0" max="1000" step="10" value="250">
+      <span style="font-size:11px;color:#8a6b4a;">重力度 0〜1000</span>
+    </div>
+    <div class="row">
       <button class="ui-btn bg" id="bgToggleBtn">背景: OFF</button>
       <button class="ui-btn bg" id="bgModeBtn">fill</button>
       <span class="stat" style="margin-left:auto;"><span class="label">地形</span><span class="value state" id="mapNameDisplay">-</span></span>
     </div>
   </div>
-  <div class="hint" id="hint">移動: 矢印キー / エイム: マウス / 射撃・刀: クリック / 武器切替: Q or ボタン / カード: ID入力してボタン</div>
+  <div class="hint" id="hint">移動: 矢印キー / エイム: マウス / 射撃・刀: クリック / 武器切替: Q or ボタン / カード: ID入力してボタン / 重力: ボタン＋数値</div>
 </div>
 
 <script>
@@ -176,6 +188,8 @@
   const yellowBtn = document.getElementById('yellowBtn');
   const redIdInput = document.getElementById('redIdInput');
   const redBtn = document.getElementById('redBtn');
+  const gravityBtn = document.getElementById('gravityBtn');
+  const gravityInput = document.getElementById('gravityInput');
   const bgToggleBtn = document.getElementById('bgToggleBtn');
   const bgModeBtn = document.getElementById('bgModeBtn');
   const resultScreen = document.getElementById('resultScreen');
@@ -353,13 +367,6 @@
     }
     return false;
   }
-  function nearWall(x,y){
-    const R = 30;
-    for (const w of castleWalls){
-      if (x >= w.x0 - R && x <= w.x1 + R && y >= w.y0 - w.h/2 - R && y <= w.y0 + w.h/2 + R) return true;
-    }
-    return false;
-  }
 
   let ref = { x: WORLD_W/2, y: WORLD_H/2, hp:100, maxHp:100, angle:0, mode:'gun', atk:20, swing:0, cool:0 };
   let units = [];
@@ -374,6 +381,10 @@
   let matchTime = 40.0;
   let running = false, finished = false, spectate = false;
   let lastTime = 0;
+
+  // 重力モード
+  let gravityOn = false;
+  let gravityPower = 250;
 
   const REF_SPEED = 100;
   const ARMY_SPEED_MULT = 16.0;
@@ -447,7 +458,6 @@
           cool: rand(0,5), alive:true, angle: side==='A'?Math.PI/2:-Math.PI/2,
           yellows:0, red:false, radius: u.type==='general'?18:(u.type==='cavalry'?16:12),
           flash:0,
-          wallSlide:false, slideDir: Math.random()<0.5?1:-1,
         });
       });
     }
@@ -487,35 +497,35 @@
       const onMt = isMountain(u.x,u.y);
       let terrSpd = onMt ? 0.55 : 1.0;
       if (mapPattern.id==='forest' && onMt) terrSpd = 0.7;
+
+      // 重力モード：審判へ引き寄せ
+      if (gravityOn && gravityPower > 0 && !spectate){
+        const gd = dist(u.x,u.y,ref.x,ref.y);
+        if (gd > 20){
+          const ga = Math.atan2(ref.y-u.y, ref.x-u.x);
+          // 重力度250で控えめ、1000で強烈（0.0016〜0.0064 px/ms相当）
+          const pull = (gravityPower / 250) * 0.8 * dt * 60 * 0.1;
+          const gmx = Math.cos(ga)*pull;
+          const gmy = Math.sin(ga)*pull;
+          if (unitCanWalk(u.x+gmx,u.y+gmy)){ u.x+=gmx; u.y+=gmy; }
+          else if (unitCanWalk(u.x+gmx,u.y)){ u.x+=gmx; }
+          else if (unitCanWalk(u.x,u.y+gmy)){ u.y+=gmy; }
+        }
+      }
+
       if (d > u.rng*0.9){
-        if (u.wallSlide){
-          // 壁沿いモード：ターゲットをオフにし、壁と平行（横）方向へ
-          const perp = u.angle + Math.PI/2 * u.slideDir;
-          const mx = Math.cos(perp)*u.spd*terrSpd*dt;
-          const my = Math.sin(perp)*u.spd*terrSpd*dt;
-          let moved = false;
-          if (unitCanWalk(u.x+mx,u.y+my)){ u.x+=mx; u.y+=my; moved=true; }
-          else if (unitCanWalk(u.x+mx,u.y)){ u.x+=mx; moved=true; }
-          else if (unitCanWalk(u.x,u.y+my)){ u.y+=my; moved=true; }
-          if (moved && !nearWall(u.x,u.y)){
-            u.wallSlide = false;
-          }
-          if (!moved){
-            u.slideDir *= -1;
-            u.wallSlide = false;
-          }
-        } else {
-          const goal = pickWaypoint(u, target);
-          const ga = Math.atan2(goal.y-u.y, goal.x-u.x);
-          const mx = Math.cos(ga)*u.spd*terrSpd*dt;
-          const my = Math.sin(ga)*u.spd*terrSpd*dt;
-          if (unitCanWalk(u.x+mx,u.y+my)){ u.x+=mx; u.y+=my; }
-          else if (unitCanWalk(u.x+mx,u.y)){ u.x+=mx; }
-          else if (unitCanWalk(u.x,u.y+my)){ u.y+=my; }
-          else {
-            u.wallSlide = true;
-            u.slideDir = Math.random()<0.5?1:-1;
-          }
+        const goal = pickWaypoint(u, target);
+        const ga = Math.atan2(goal.y-u.y, goal.x-u.x);
+        const mx = Math.cos(ga)*u.spd*terrSpd*dt;
+        const my = Math.sin(ga)*u.spd*terrSpd*dt;
+        if (unitCanWalk(u.x+mx,u.y+my)){ u.x+=mx; u.y+=my; }
+        else if (unitCanWalk(u.x+mx,u.y)){ u.x+=mx; }
+        else if (unitCanWalk(u.x,u.y+my)){ u.y+=my; }
+        else {
+          const sideAng = ga + Math.PI/2;
+          const sx = Math.cos(sideAng)*u.spd*terrSpd*dt;
+          const sy = Math.sin(sideAng)*u.spd*terrSpd*dt;
+          if (unitCanWalk(u.x+sx,u.y+sy)){ u.x+=sx; u.y+=sy; }
         }
       }
       u.cool -= dt*60;
@@ -557,7 +567,6 @@
       b.x = nx; b.y = ny;
       b.life -= dt;
 
-      let removed = false;
       for (const u of units){
         if (!u.alive) continue;
         if (b.side === 'ref'){
@@ -565,7 +574,7 @@
             u.hp -= b.dmg;
             if (u.hp<=0) u.alive=false;
             bullets.splice(i,1);
-            removed = true;
+            b.x = -9999;
             break;
           }
         } else if (u.side !== b.side){
@@ -573,12 +582,12 @@
             u.hp -= b.dmg;
             if (u.hp<=0) u.alive=false;
             bullets.splice(i,1);
-            removed = true;
+            b.x = -9999;
             break;
           }
         }
       }
-      if (removed) continue;
+      if (!bullets[i] || bullets[i] !== b) continue;
 
       if (b.side !== 'ref' && !spectate && dist(b.x,b.y,ref.x,ref.y) < 18){
         ref.hp -= b.dmg*0.6;
@@ -811,6 +820,15 @@
 
   function drawRef(){
     if (spectate) return;
+    // 重力オーラ
+    if (gravityOn && gravityPower > 0){
+      const pulse = 20 + Math.sin(performance.now()/200) * 6 + (gravityPower/1000)*30;
+      const g = ctx.createRadialGradient(ref.x,ref.y,10,ref.x,ref.y,pulse);
+      g.addColorStop(0,'rgba(199,125,255,0.45)');
+      g.addColorStop(1,'rgba(199,125,255,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(ref.x,ref.y,pulse,0,Math.PI*2); ctx.fill();
+    }
     ctx.save(); ctx.translate(ref.x,ref.y); ctx.rotate(ref.angle);
     ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(0,0,10,0,Math.PI*2); ctx.fill();
     ctx.strokeStyle = '#1a1208'; ctx.lineWidth = 2; ctx.stroke();
@@ -832,7 +850,7 @@
     ctx.beginPath(); ctx.arc(ref.x,ref.y,16,0,Math.PI*2); ctx.stroke();
     ctx.strokeStyle = hr>0.5?'#00e6b0':'#ff8a5c'; ctx.lineWidth = 3;
     ctx.beginPath(); ctx.arc(ref.x,ref.y,16,-Math.PI/2,-Math.PI/2+Math.PI*2*hr); ctx.stroke();
-    ctx.fillStyle = '#ffd166'; ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillStyle = gravityOn?'#c77dff':'#ffd166'; ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center';
     ctx.fillText('審判', ref.x, ref.y-22);
   }
 
@@ -872,6 +890,11 @@
       ctx.fillStyle = '#ffd166'; ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center';
       ctx.fillText('観戦モード', W/2, 22);
     }
+    if (gravityOn){
+      ctx.fillStyle = 'rgba(199,125,255,0.15)'; ctx.fillRect(0,0,W,H);
+      ctx.fillStyle = '#c77dff'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'left';
+      ctx.fillText('重力モード ON / 強さ '+gravityPower, 10, H-14);
+    }
   }
 
   function findUnitById(id){ return units.find(u=>u.id===id && u.alive); }
@@ -892,6 +915,19 @@
   nameIdBtn.addEventListener('click',()=>{ showName=!showName; showId=showName; nameBtn.classList.toggle('active',showName); idBtn.classList.toggle('active',showId); nameIdBtn.classList.toggle('active',showName); });
 
   weaponBtn.addEventListener('click',()=>{ ref.mode = ref.mode==='gun'?'sword':'gun'; updateModeDisplay(); });
+
+  gravityBtn.addEventListener('click',()=>{
+    gravityOn = !gravityOn;
+    gravityBtn.textContent = '重力: ' + (gravityOn?'ON':'OFF');
+    gravityBtn.classList.toggle('on', gravityOn);
+  });
+  gravityInput.addEventListener('input',()=>{
+    let v = parseFloat(gravityInput.value);
+    if (isNaN(v)) v = 0;
+    v = clamp(v, 0, 1000);
+    gravityPower = v;
+  });
+
   bgToggleBtn.addEventListener('click',()=>{ bgOn=!bgOn; bgToggleBtn.textContent='背景: '+(bgOn?'ON':'OFF'); });
   bgModeBtn.addEventListener('click',()=>{ bgMode = bgMode==='fill'?'cover':bgMode==='cover'?'tile':'fill'; bgModeBtn.textContent=bgMode; });
 
