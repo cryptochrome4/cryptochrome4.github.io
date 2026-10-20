@@ -390,6 +390,7 @@
   const ARMY_SPEED_MULT = 16.0;
   const FIRE_COOL_BASE = 120;
   const SWORD_RANGE = 55;
+  const GRAVITY_INFLUENCE = 600; // 重力の影響半径
 
   function lineHitsWall(x0,y0,x1,y1){
     for (const w of castleWalls){
@@ -498,15 +499,15 @@
       let terrSpd = onMt ? 0.55 : 1.0;
       if (mapPattern.id==='forest' && onMt) terrSpd = 0.7;
 
-      // 重力モード：審判へ引き寄せ
+      // 重力モード：審判へ引き寄せ（SHOTの渦方式：dtを掛けず1フレーム固定量＋距離減衰）
       if (gravityOn && gravityPower > 0 && !spectate){
         const gd = dist(u.x,u.y,ref.x,ref.y);
         if (gd > 20){
           const ga = Math.atan2(ref.y-u.y, ref.x-u.x);
-          // 重力度250で控えめ、1000で強烈（0.0016〜0.0064 px/ms相当）
-          const pull = (gravityPower / 250) * 0.8 * dt * 60 * 0.1;
-          const gmx = Math.cos(ga)*pull;
-          const gmy = Math.sin(ga)*pull;
+          const falloff = Math.max(0, 1 - gd / GRAVITY_INFLUENCE);
+          const pull = (gravityPower / 1000) * 1.0 * (0.3 + 0.7 * falloff);
+          const gmx = Math.cos(ga) * pull;
+          const gmy = Math.sin(ga) * pull;
           if (unitCanWalk(u.x+gmx,u.y+gmy)){ u.x+=gmx; u.y+=gmy; }
           else if (unitCanWalk(u.x+gmx,u.y)){ u.x+=gmx; }
           else if (unitCanWalk(u.x,u.y+gmy)){ u.y+=gmy; }
@@ -567,6 +568,7 @@
       b.x = nx; b.y = ny;
       b.life -= dt;
 
+      let removed = false;
       for (const u of units){
         if (!u.alive) continue;
         if (b.side === 'ref'){
@@ -574,7 +576,7 @@
             u.hp -= b.dmg;
             if (u.hp<=0) u.alive=false;
             bullets.splice(i,1);
-            b.x = -9999;
+            removed = true;
             break;
           }
         } else if (u.side !== b.side){
@@ -582,12 +584,12 @@
             u.hp -= b.dmg;
             if (u.hp<=0) u.alive=false;
             bullets.splice(i,1);
-            b.x = -9999;
+            removed = true;
             break;
           }
         }
       }
-      if (!bullets[i] || bullets[i] !== b) continue;
+      if (removed) continue;
 
       if (b.side !== 'ref' && !spectate && dist(b.x,b.y,ref.x,ref.y) < 18){
         ref.hp -= b.dmg*0.6;
@@ -828,6 +830,10 @@
       g.addColorStop(1,'rgba(199,125,255,0)');
       ctx.fillStyle = g;
       ctx.beginPath(); ctx.arc(ref.x,ref.y,pulse,0,Math.PI*2); ctx.fill();
+      // 影響半径のリング
+      ctx.strokeStyle = 'rgba(199,125,255,0.12)';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(ref.x,ref.y,GRAVITY_INFLUENCE,0,Math.PI*2); ctx.stroke();
     }
     ctx.save(); ctx.translate(ref.x,ref.y); ctx.rotate(ref.angle);
     ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(0,0,10,0,Math.PI*2); ctx.fill();
