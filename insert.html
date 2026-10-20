@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>4番出口</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; background: #000; overflow: hidden;
+    font-family: "Hiragino Sans", "Yu Gothic", sans-serif; color: #eee; }
+
+  .screen { position: absolute; inset: 0; display: none; }
+  .screen.active { display: block; }
+
+  /* ===== オープニング ===== */
+  #titleScreen {
+    background: #111 url('img355war.jpg') center/cover no-repeat;
+  }
+  #titleScreen::after {
+    content: ""; position: absolute; inset: 0;
+    background: rgba(0,0,0,.55);
+  }
+  .title-box {
+    position: absolute; inset: 0; z-index: 2;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 18px; text-align: center; padding: 20px;
+  }
+  .title-box h1 {
+    font-size: clamp(32px, 8vw, 64px); letter-spacing: .15em;
+    text-shadow: 0 0 18px #000, 0 0 40px #000;
+  }
+  .title-box p.sub { font-size: 13px; opacity: .75; letter-spacing: .1em; }
+  .btn {
+    cursor: pointer; border: 1px solid #aaa; background: rgba(0,0,0,.6);
+    color: #eee; padding: 14px 36px; font-size: 16px; letter-spacing: .12em;
+    border-radius: 4px; transition: .18s; min-width: 220px;
+  }
+  .btn:hover { background: #eee; color: #111; }
+
+  /* ===== 背景画像ビューア ===== */
+  #bgViewer { background: #000; z-index: 50; }
+  #bgViewer img { width: 100%; height: 100%; object-fit: fill; display: block; }
+  #bgViewer .closeBtn {
+    position: absolute; top: 14px; right: 14px; z-index: 2;
+    background: rgba(0,0,0,.65); border: 1px solid #ccc; color: #fff;
+    padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px;
+  }
+
+  /* ===== ゲーム画面 ===== */
+  #gameScreen { background: #0a0a0a; }
+  #stage { position: absolute; inset: 0; display: flex; align-items: center;
+    justify-content: center; }
+  canvas { background: #15151a; image-rendering: pixelated; }
+
+  #hud {
+    position: absolute; top: 12px; left: 0; right: 0; z-index: 5;
+    text-align: center; font-size: 14px; letter-spacing: .1em;
+    text-shadow: 0 0 8px #000; pointer-events: none;
+  }
+  #hud .hint { display: block; font-size: 12px; opacity: .6; margin-top: 4px; }
+
+  #message {
+    position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%);
+    z-index: 5; background: rgba(0,0,0,.75); border: 1px solid #444;
+    padding: 8px 18px; border-radius: 4px; font-size: 13px;
+    opacity: 0; transition: opacity .3s; pointer-events: none; white-space: nowrap;
+  }
+  #message.show { opacity: 1; }
+
+  /* ===== クリア画面 ===== */
+  #clearScreen { background: #000; }
+  #clearScreen .wrap {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 20px; padding: 20px;
+    text-align: center;
+  }
+  #clearScreen img {
+    max-width: min(90vw, 620px); max-height: 55vh; object-fit: contain;
+    border-radius: 6px; box-shadow: 0 0 30px rgba(255,255,255,.15);
+  }
+  #clearScreen h2 { font-size: clamp(24px, 6vw, 40px); letter-spacing: .2em; }
+  footer.links { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
+  footer.links a {
+    color: #9fd; text-decoration: none; border: 1px solid #477;
+    padding: 12px 26px; border-radius: 4px; font-size: 15px; letter-spacing: .08em;
+    transition: .18s;
+  }
+  footer.links a:hover { background: #9fd; color: #000; }
+</style>
+</head>
+<body>
+
+<!-- ===== オープニング ===== -->
+<div id="titleScreen" class="screen active">
+  <div class="title-box">
+    <h1>4番出口</h1>
+    <p class="sub">〜 異常を見つけたら、引き返せ 〜</p>
+    <button class="btn" id="startBtn">はじめる</button>
+    <button class="btn" id="viewBgBtn">背景画像を見る</button>
+  </div>
+</div>
+
+<!-- ===== 背景画像ビューア ===== -->
+<div id="bgViewer" class="screen">
+  <img src="img355war.jpg" alt="背景画像">
+  <button class="closeBtn" id="closeBgBtn">閉じる</button>
+</div>
+
+<!-- ===== ゲーム ===== -->
+<div id="gameScreen" class="screen">
+  <div id="stage"><canvas id="cv" width="640" height="360"></canvas></div>
+  <div id="hud">
+    <span id="countLabel">出口 1 / 4</span>
+    <span class="hint">WASD / 矢印キーで移動　異常があれば引き返す</span>
+  </div>
+  <div id="message"></div>
+</div>
+
+<!-- ===== クリア画面 ===== -->
+<div id="clearScreen" class="screen">
+  <div class="wrap">
+    <h2>クリア！</h2>
+    <img src="img356war.jpg" alt="喜んでいる画像">
+    <footer class="links">
+      <a href="study.html">study.html</a>
+      <a href="nostalgic.html">nostalgic.html</a>
+    </footer>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ---------------- 画面管理 ---------------- */
+  const screens = {
+    title: document.getElementById('titleScreen'),
+    bg:    document.getElementById('bgViewer'),
+    game:  document.getElementById('gameScreen'),
+    clear: document.getElementById('clearScreen')
+  };
+  let current = 'title';
+  function show(name) {
+    Object.values(screens).forEach(s => s.classList.remove('active'));
+    screens[name].classList.add('active');
+    current = name;
+  }
+
+  document.getElementById('startBtn').onclick = () => { show('game'); startGame(); };
+  document.getElementById('viewBgBtn').onclick = () => show('bg');
+  document.getElementById('closeBgBtn').onclick = () => show('title');
+  screens.bg.addEventListener('click', e => {
+    if (e.target === screens.bg) show('title');
+  });
+
+  /* ---------------- ゲーム定義 ---------------- */
+  const cv = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height;
+
+  const GOAL = 4;            // 4番出口
+  const CORRIDOR_LEN = 420;  // 1本の通路の長さ(px)
+  const WALL_TOP = 60, WALL_BOTTOM = 300; // 通路の上下端
+
+  const countLabel = document.getElementById('countLabel');
+  const msgEl = document.getElementById('message');
+
+  let state = null;   // ゲーム状態
+  let keys = {};
+  let lastTime = 0;
+  let rafId = null;
+
+  // ---- 異変(オリジナル)の定義 ----
+  // 各異変は「描画をどう変えるか」を持つ。
+  const ANOMALIES = [
+    {
+      id: 'redLight',
+      name: '赤い照明',
+      apply(s) {
+        ctx.save();
+        ctx.fillStyle = 'rgba(255, 30, 30, 0.22)';
+        ctx.fillRect(0, 0, W, H);
+        ctx.restore();
+      }
+    },
+    {
+      id: 'floorText',
+      name: '床の不気味な文字',
+      apply(s, camX) {
+        ctx.save();
+        // 通路の床に文字を貼る
+        const textX = 120 - camX + 200;
+        if (textX > -200 && textX < W + 200) {
+          ctx.font = 'bold 34px monospace';
+          ctx.fillStyle = 'rgba(200, 20, 20, 0.85)';
+          ctx.textAlign = 'center';
+          ctx.fillText('オカエリ', textX, WALL_BOTTOM + 34);
+        }
+        ctx.restore();
+      }
+    },
+    {
+      id: 'extraDoor',
+      name: '余計な扉',
+      apply(s, camX) {
+        // 通常の扉の位置とは別の位置に扉を1つ追加
+        const dx = 200 - camX + 60;
+        if (dx > -80 && dx < W + 80) drawDoor(dx, WALL_TOP + 40, 64, 150, '#332a2a');
+      }
+    },
+    {
+      id: 'eyes',
+      name: '壁の目',
+      apply(s, camX) {
+        const ex = 260 - camX + 40;
+        if (ex > -60 && ex < W + 60) {
+          ctx.save();
+          ctx.fillStyle = '#ddd';
+          ctx.beginPath(); ctx.ellipse(ex, 130, 16, 9, 0, 0, Math.PI*2); ctx.fill();
+          ctx.beginPath(); ctx.ellipse(ex + 34, 130, 16, 9, 0, 0, Math.PI*2); ctx.fill();
+          ctx.fillStyle = '#000';
+          ctx.beginPath(); ctx.arc(ex + 4, 130, 5, 0, Math.PI*2); ctx.fill();
+          ctx.beginPath(); ctx.arc(ex + 38, 130, 5, 0, Math.PI*2); ctx.fill();
+          ctx.restore();
+        }
+      }
+    },
+    {
+      id: 'lowCeiling',
+      name: '天井が低い',
+      apply(s) {
+        ctx.save();
+        ctx.fillStyle = '#0c0c10';
+        ctx.fillRect(0, 0, W, 130);
+        ctx.restore();
+      }
+    },
+    {
+      id: 'flicker',
+      name: '照明の点滅',
+      apply(s) {
+        const t = performance.now();
+        if (Math.floor(t / 120) % 2 === 0) {
+          ctx.save();
+          ctx.fillStyle = 'rgba(0,0,0,0.55)';
+          ctx.fillRect(0, 0, W, H);
+          ctx.restore();
+        }
+      }
+    }
+  ];
+
+  /* ---------------- ゲーム開始 ---------------- */
+  function startGame() {
+    // 各通路に異変を割り振る。最初の通路(出口1)は必ず「異常なし」にする。
+    // 出口2〜4のうち、1本だけ異変を入れる(それ以外は異常なし)。
+    const halls = [];
+    halls.push({ anomaly: null }); // 出口1: 異常なし
+    const anomalyIndex = 1 + Math.floor(Math.random() * (GOAL - 1)); // 2〜4のどこか
+    for (let i = 1; i < GOAL; i++) {
+      if (i === anomalyIndex) {
+        halls.push({ anomaly: ANOMALIES[Math.floor(Math.random() * ANOMALIES.length)] });
+      } else {
+        halls.push({ anomaly: null });
+      }
+    }
+    // ※ 実際の「4番出口」は毎回ランダムで異常の有無が決まるが、
+    //   ここでは「4本中1本だけ異変」の分かりやすいルールにする。
+
+    state = {
+      hallIndex: 0,          // 現在の通路番号(0始まり)。出口番号 = hallIndex+1
+      camX: 0,               // 通路内のカメラ位置
+      playerX: 80,           // 画面上のプレイヤーX
+      facing: 1,
+      halls: halls,
+      cleared: false
+    };
+    updateHud();
+    showMsg('通路を進もう。異常があれば引き返せ。');
+    keys = {};
+    if (rafId) cancelAnimationFrame(rafId);
+    lastTime = performance.now();
+    loop(lastTime);
+  }
+
+  function updateHud() {
+    countLabel.textContent = '出口 ' + (state.hallIndex + 1) + ' / ' + GOAL;
+  }
+
+  let msgTimer = null;
+  function showMsg(text) {
+    msgEl.textContent = text;
+    msgEl.classList.add('show');
+    clearTimeout(msgTimer);
+    msgTimer = setTimeout(() => msgEl.classList.remove('show'), 2200);
+  }
+
+  /* ---------------- 入力 ---------------- */
+  window.addEventListener('keydown', e => {
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
+    keys[e.key.toLowerCase()] = true;
+    if (current === 'game' && e.key === 'Enter') tryPass();
+  });
+  window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+  /* ---------------- 描画ヘルパ ---------------- */
+  function drawDoor(x, y, w, h, color) {
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = '#111';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(x, y, w, h);
+    // ノブ
+    ctx.fillStyle = '#c9b37a';
+    ctx.beginPath();
+    ctx.arc(x + w - 12, y + h / 2, 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function drawCorridor(camX, anomaly, length) {
+    // 背景(壁・床・天井)
+    ctx.fillStyle = '#15151a';
+    ctx.fillRect(0, 0, W, H);
+
+    // 天井
+    ctx.fillStyle = '#0d0d12';
+    ctx.fillRect(0, 0, W, WALL_TOP);
+    // 床
+    ctx.fillStyle = '#1d1d24';
+    ctx.fillRect(0, WALL_BOTTOM, W, H - WALL_BOTTOM);
+
+    // 壁
+    ctx.fillStyle = '#2a2a33';
+    ctx.fillRect(0, WALL_TOP, W, WALL_BOTTOM - WALL_TOP);
+
+    // 遠近感のための横線(壁のパネル)
+    ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < W; x += 40) {
+      const sx = (x - (camX % 40));
+      ctx.beginPath();
+      ctx.moveTo(sx, WALL_TOP);
+      ctx.lineTo(sx, WALL_BOTTOM);
+      ctx.stroke();
+    }
+
+    // 通路の端(出口の壁) — 通路の終端が見えたら扉を描く
+    // 通路の長さ length の位置に「出口の扉」がある
+    const doorWorldX = length;
+    const doorScreenX = doorWorldX - camX;
+    if (doorScreenX > -120 && doorScreenX < W + 120) {
+      drawDoor(doorScreenX, WALL_TOP + 40, 80, 180, '#3a2f2f');
+      ctx.save();
+      ctx.fillStyle = '#eee';
+      ctx.font = 'bold 16px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('出口', doorScreenX + 40, WALL_TOP + 30);
+      ctx.restore();
+    }
+
+    // 天井の照明
+    for (let i = 0; i < 4; i++) {
+      const lx = 80 + i * 120 - (camX % 120);
+      ctx.fillStyle = 'rgba(255,240,200,0.18)';
+      ctx.fillRect(lx, 18, 60, 8);
+      ctx.fillStyle = 'rgba(255,240,200,0.5)';
+      ctx.fillRect(lx, 24, 60, 2);
+    }
+
+    // 異変の描画
+    if (anomaly && anomaly.apply) anomaly.apply(state, camX);
+
+    // プレイヤー(2Dのシルエット)
+    const px = state.playerX;
+    const py = WALL_BOTTOM - 26;
+    ctx.save();
+    ctx.fillStyle = '#e8e8e8';
+    // 頭
+    ctx.beginPath();
+    ctx.arc(px, py - 44, 10, 0, Math.PI * 2);
+    ctx.fill();
+    // 体
+    ctx.fillRect(px - 9, py - 34, 18, 34);
+    // 足
+    ctx.fillRect(px - 8, py, 6, 14);
+    ctx.fillRect(px + 2, py, 6, 14);
+    ctx.restore();
+  }
+
+  /* ---------------- メインループ ---------------- */
+  function loop(now) {
+    const dt = Math.min(50, now - lastTime) / 1000;
+    lastTime = now;
+
+    if (current === 'game' && state) {
+      const speed = 170;
+
+      let dx = 0;
+      if (keys['a'] || keys['arrowleft'])  dx -= 1;
+      if (keys['d'] || keys['arrowright']) dx += 1;
+
+      // 左右移動(ただし画面内でプレイヤーは固定気味に、カメラが動く)
+      // シンプルに: プレイヤーは画面上を少し動き、カメラが追従
+      if (dx !== 0) {
+        state.facing = dx;
+        state.playerX += dx * speed * dt;
+        // プレイヤーが画面中央付近を超えたらカメラ移動
+        if (state.playerX > W * 0.55) {
+          const over = state.playerX - W * 0.55;
+          state.playerX -= over;
+          state.camX += over;
+        } else if (state.playerX < W * 0.25) {
+          const under = W * 0.25 - state.playerX;
+          state.playerX += under;
+          state.camX = Math.max(0, state.camX - under);
+        }
+      }
+      // カメラの範囲制限
+      state.camX = Math.max(0, Math.min(CORRIDOR_LEN, state.camX));
+
+      // 描画
+      const hall = state.halls[state.hallIndex];
+      drawCorridor(state.camX, hall.anomaly, CORRIDOR_LEN);
+    }
+
+    rafId = requestAnimationFrame(loop);
+  }
+
+  /* ---------------- 通路の通過判定 ---------------- */
+  // 扉(通路の終端)に到達したら、その通路に異変があったかを判定する
+  function tryPass() {
+    if (current !== 'game' || !state) return;
+    const hall = state.halls[state.hallIndex];
+    const atEnd = state.camX >= CORRIDOR_LEN - 10;
+    if (!atEnd) { showMsg('まだ出口に着いていない。'); return; }
+
+    if (hall.anomaly) {
+      // 異変があった → 引き返すのが正解 → 進んだので失敗
+      showMsg('異変を見逃した…！ やり直し。');
+      resetCurrentHall();
+      return;
+    }
+
+    // 異常なし → 進んでOK
+    state.hallIndex++;
+    if (state.hallIndex >= GOAL) {
+      // クリア
+      state.cleared = true;
+      clearScreen();
+      return;
+    }
+    resetCurrentHall();
+    updateHud();
+    showMsg('次の通路へ。');
+  }
+
+  function resetCurrentHall() {
+    state.camX = 0;
+    state.playerX = 80;
+  }
+
+  /* ---------------- クリア ---------------- */
+  function clearScreen() {
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = null;
+    show('clear');
+  }
+
+  /* ---------------- クリア画面のリンク(同タブ遷移) ---------------- */
+  // href属性で同タブ遷移するのでJavaScript不要だが、
+  // 念のため明示的に同タブを保証する
+  document.querySelectorAll('#clearScreen footer.links a').forEach(a => {
+    a.addEventListener('click', e => {
+      // デフォルトの同タブ遷移をそのまま利用
+      // target属性は付けていないので同タブで開く
+    });
+  });
+
+  /* ---------------- エラー時のフォールバック(画像が無い場合) ---------------- */
+  // img355war.jpg / img356war.jpg が存在しない場合は alt 表示になるだけなので追加処理不要
+
+})();
+</script>
+</body>
+</html>
