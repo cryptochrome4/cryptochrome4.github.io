@@ -201,10 +201,10 @@
 
   // ===== チーム定義 =====
   const CLANS = {
-    oda:      { name:'織田信長軍', color:'#ffd166', img:'img35x.jpg' },
-    toyotomi: { name:'豊臣秀吉軍', color:'#ffb84d', img:'img36x.jpg' },
-    tokugawa: { name:'徳川家康軍', color:'#00c86a', img:'img37x.jpg' },
-    emperor:  { name:'天皇軍',     color:'#ff8ad8', img:'img38x.jpg' },
+    oda:      { name:'織田信長軍', color:'#ffd166', img:'img351war.jpg' },
+    toyotomi: { name:'豊臣秀吉軍', color:'#ffb84d', img:'img353war.jpg' },
+    tokugawa: { name:'徳川家康軍', color:'#00c86a', img:'img352war.jpg' },
+    emperor:  { name:'天皇軍',     color:'#ff8ad8', img:'img354war.jpg' },
   };
 
   // 史実編成ベース
@@ -260,8 +260,6 @@
   ];
 
   // ===== 地形（固定・公平） =====
-  // 川: x=1150〜1250 の縦帯。橋3箇所 y=300, 900, 1500
-  // 山: 左右対称 (600,450) と (1800,450) に山、 (600,1350) と (1800,1350)
   const RIVER_X0 = 1150, RIVER_X1 = 1250;
   const BRIDGES = [ {y:300,h:120}, {y:900,h:120}, {y:1500,h:120} ];
   const MOUNTAINS = [
@@ -280,28 +278,32 @@
   }
 
   // ===== 状態 =====
-  let ref = { x: WORLD_W/2, y: WORLD_H/2, hp:100, maxHp:100, angle:0, mode:'gun', swing:0, cool:0 };
+  let ref = { x: WORLD_W/2, y: WORLD_H/2, hp:100, maxHp:100, angle:0, mode:'gun', swing:0, cool:0, atk:20 };
   let units = [];
   let bullets = [];
-  let particles = [];
   let keys = {ArrowUp:false,ArrowDown:false,ArrowLeft:false,ArrowRight:false};
   let mouseX = W/2, mouseY = H/2, firing = false, fireTimer = 0;
   let showName = false, showId = false;
   let bgOn = false, bgMode = 'fill';
-  let bgImg = new Image(); bgImg.src = 'img44x.jpg';
+  // 背景は更新ごとに2枚からランダム
+  const MAP_BG = Math.random()<0.5 ? 'img355war.jpg' : 'img356war.jpg';
+  let bgImg = new Image(); bgImg.src = MAP_BG;
   let tournament = { round:'A', matches:[], current:-1, winner:null };
   let matchTime = 40.0;
   let running = false, finished = false, spectate = false;
   let lastTime = 0;
 
+  // 審判スピード（px/秒）
+  const REF_SPEED = 70;
+  // 軍スピード倍率（8倍）
+  const ARMY_SPEED_MULT = 8.0;
+
   // ===== トーナメント生成（更新ごとランダム） =====
   function buildTournament(){
     const pool = TEAM_POOL.slice();
-    // 8チーム: 4軍×2編成（プールを2周）
     const teams = [];
     for (let r=0;r<2;r++) for (const t of pool) teams.push(t);
     for (let i=teams.length-1;i>0;i--){ const j=randInt(0,i); [teams[i],teams[j]]=[teams[j],teams[i]]; }
-    // 8チーム → A:4, B:4 → 各2試合 → 勝者2 → C決勝
     const shuffled = teams.slice(0,8);
     tournament.matches = [];
     for (let i=0;i<8;i+=2) tournament.matches.push({a:shuffled[i], b:shuffled[i+1], winner:null, round:i<4?'A':'B'});
@@ -316,7 +318,7 @@
   // ===== ユニット生成 =====
   let unitIdCounter = 1;
   function spawnUnits(teamA, teamB){
-    units = []; bullets = []; particles = []; unitIdCounter = 1;
+    units = []; bullets = []; unitIdCounter = 1;
     const baseY_A = WORLD_H*0.3, baseY_B = WORLD_H*0.7;
     function place(team, side){
       const n = team.units.length;
@@ -327,17 +329,17 @@
         units.push({
           id: unitIdCounter++, side, clan: team.clan,
           name: u.name, type: u.type,
-          x, y, hp: u.hp, maxHp: u.hp, atk: u.atk, spd: u.spd*3.0, rng: u.rng,
-          cool: rand(0,30), alive:true, angle: side==='A'?Math.PI/2:-Math.PI/2,
+          x, y, hp: u.hp, maxHp: u.hp, atk: u.atk,
+          spd: u.spd * ARMY_SPEED_MULT, rng: u.rng,
+          cool: rand(0,5), alive:true, angle: side==='A'?Math.PI/2:-Math.PI/2,
           yellows:0, red:false, radius: u.type==='general'?18:(u.type==='cavalry'?16:12),
+          flash:0,
         });
       });
     }
     place(teamA,'A'); place(teamB,'B');
-    // 審判のHP/攻撃＝全ユニット平均
-    const alive = units;
-    const avgHp = alive.reduce((s,u)=>s+u.hp,0)/alive.length;
-    const avgAtk = alive.reduce((s,u)=>s+u.atk,0)/alive.length;
+    const avgHp = units.reduce((s,u)=>s+u.hp,0)/units.length;
+    const avgAtk = units.reduce((s,u)=>s+u.atk,0)/units.length;
     ref = { x: WORLD_W/2, y: WORLD_H/2, hp:Math.round(avgHp), maxHp:Math.round(avgHp),
             angle:0, mode:'gun', swing:0, cool:0, atk:Math.round(avgAtk) };
   }
@@ -362,32 +364,40 @@
   function updateUnits(dt){
     for (const u of units){
       if (!u.alive) continue;
+      if (u.flash>0) u.flash--;
       const target = findNearestEnemy(u);
       if (!target) continue;
       const d = dist(u.x,u.y,target.x,target.y);
       u.angle = Math.atan2(target.y-u.y, target.x-u.x);
       const onMt = isMountain(u.x,u.y);
       const terrSpd = onMt ? 0.55 : 1.0;
-      // 移動（射程外なら接近）
       if (d > u.rng*0.9){
-        const mx = Math.cos(u.angle)*u.spd*terrSpd*dt*0.6;
-        const my = Math.sin(u.angle)*u.spd*terrSpd*dt*0.6;
+        const mx = Math.cos(u.angle)*u.spd*terrSpd*dt;
+        const my = Math.sin(u.angle)*u.spd*terrSpd*dt;
         if (unitCanWalk(u.x+mx,u.y+my)){ u.x+=mx; u.y+=my; }
         else if (unitCanWalk(u.x+mx,u.y)) u.x+=mx;
         else if (unitCanWalk(u.x,u.y+my)) u.y+=my;
       }
-      // 攻撃
       u.cool -= dt*60;
       if (d <= u.rng && u.cool<=0){
-        u.cool = 40 + rand(-10,10);
+        // 8倍速に合わせクールダウン短縮
+        u.cool = (40 + rand(-10,10)) / ARMY_SPEED_MULT;
         let dmg = u.atk;
-        // 地形補正
         if (u.type==='bow' && onMt) dmg *= 1.35;
         if (u.type==='gun' && isRiver(target.x,target.y)) dmg *= 0.7;
         if (u.type==='cavalry' && (onMt||isRiver(u.x,u.y))) dmg *= 0.6;
         if (u.type==='general') dmg *= 1.2;
-        bullets.push({ x:u.x, y:u.y, tx:target.x, ty:target.y, spd:9*3,
-          dmg, owner:u.id, side:u.side, color: u.side==='A'?'#7ad7ff':'#ff8ad8', life:60 });
+        u.flash = 6;
+        // 兵種ごとに弾の見た目を変える
+        let btype = 'shot';
+        if (u.type==='bow') btype='arrow';
+        else if (u.type==='gun') btype='bullet';
+        else if (u.type==='spear') btype='thrust';
+        else if (u.type==='cavalry') btype='charge';
+        else if (u.type==='general') btype='command';
+        bullets.push({ x:u.x, y:u.y, tx:target.x, ty:target.y, spd:9*ARMY_SPEED_MULT,
+          dmg, owner:u.id, side:u.side, color: u.side==='A'?'#7ad7ff':'#ff8ad8',
+          life:60, btype, angle:u.angle });
       }
     }
   }
@@ -402,7 +412,6 @@
       let hit = false;
       if (dist(b.x,b.y,b.tx,b.ty) < 20){ hit = true; }
       if (hit || b.life<=0){
-        // 着弾判定：目標付近の敵
         for (const u of units){
           if (!u.alive || u.side===b.side) continue;
           if (dist(b.x,b.y,u.x,u.y) < u.radius+14){
@@ -410,7 +419,6 @@
             if (u.hp<=0){ u.alive=false; }
           }
         }
-        // 審判への流れ弾
         if (!spectate && dist(b.x,b.y,ref.x,ref.y) < 20){
           ref.hp -= b.dmg*0.6;
           if (ref.hp<=0){ ref.hp=0; spectate=true; }
@@ -422,7 +430,7 @@
 
   function updateRef(dt){
     if (spectate) return;
-    const sp = 7*dt;
+    const sp = REF_SPEED * dt;
     let dx=0,dy=0;
     if (keys.ArrowUp) dy-=sp; if (keys.ArrowDown) dy+=sp;
     if (keys.ArrowLeft) dx-=sp; if (keys.ArrowRight) dx+=sp;
@@ -434,10 +442,11 @@
     if (firing){
       fireTimer -= dt;
       if (fireTimer<=0){
-        fireTimer = 0.12;
+        fireTimer = 0.06;
         const a = ref.angle + rand(-0.03,0.03);
         bullets.push({ x:ref.x, y:ref.y, tx:ref.x+Math.cos(a)*400, ty:ref.y+Math.sin(a)*400,
-          spd:14*3, dmg:Math.round(ref.atk*0.6), owner:'ref', side:'ref', color:'#ffd166', life:40 });
+          spd:14*3, dmg:Math.round(ref.atk*0.6), owner:'ref', side:'ref',
+          color:'#ffd166', life:40, btype:'bullet', angle:a });
       }
     }
   }
@@ -459,7 +468,6 @@
     const m = tournament.matches[tournament.current];
     if (!m) return;
     m.winner = side==='A'?m.a:m.b;
-    // 次の試合へ
     setTimeout(()=>{
       if (tournament.stage==='semis'){
         tournament.finalists.push(m.winner);
@@ -485,14 +493,11 @@
       if (!tournament.matches[i].winner && (i!==tournament.current || finished)){ next=i; break; }
     }
     if (next===-1){
-      // 準決勝の全勝者が出た→決勝戦を追加して開始
       if (tournament.stage==='final' && tournament.matches.some(m=>m.round==='C'&&!m.winner)){
         next = tournament.matches.findIndex(m=>m.round==='C'&&!m.winner);
       }
     }
-    if (next===-1){ // 決勝が終わった
-      showResult(tournament.finalWinner); return;
-    }
+    if (next===-1){ showResult(tournament.finalWinner); return; }
     tournament.current = next;
     const m = tournament.matches[next];
     spawnUnits(m.a, m.b);
@@ -511,20 +516,16 @@
   }
 
   // ===== 描画 =====
-  function drawTerrain(camX,camY){
-    // 川
+  function drawTerrain(){
     ctx.fillStyle = '#0e3a5a';
     ctx.fillRect(RIVER_X0, 0, RIVER_X1-RIVER_X0, WORLD_H);
-    // 橋
     ctx.fillStyle = '#6a4a20';
     for (const b of BRIDGES) ctx.fillRect(RIVER_X0-10, b.y-b.h/2, (RIVER_X1-RIVER_X0)+20, b.h);
-    // 山
-    ctx.fillStyle = '#3a4a2a';
     for (const m of MOUNTAINS){
+      ctx.fillStyle = '#3a4a2a';
       ctx.beginPath(); ctx.arc(m.x,m.y,m.r,0,Math.PI*2); ctx.fill();
       ctx.fillStyle = '#5a6a3a';
       ctx.beginPath(); ctx.arc(m.x,m.y,m.r*0.6,0,Math.PI*2); ctx.fill();
-      ctx.fillStyle = '#3a4a2a';
     }
   }
 
@@ -532,21 +533,40 @@
     const col = u.side==='A'?'#7ad7ff':'#ff8ad8';
     ctx.save(); ctx.translate(u.x,u.y); ctx.rotate(u.angle);
     if (u.type==='general'){
+      // 大将：円＋采配
       ctx.fillStyle = u.clan==='oda'?'#8a3a10':u.clan==='tokugawa'?'#0a5a30':u.clan==='toyotomi'?'#a06a10':'#7a2a5a';
       ctx.beginPath(); ctx.arc(0,0,u.radius,0,Math.PI*2); ctx.fill();
       ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.stroke();
+      // 采配
+      ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(u.radius*0.5,0); ctx.lineTo(u.radius*1.6,0); ctx.stroke();
+      if (u.flash>0){ ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(u.radius*1.7,0,4,0,Math.PI*2); ctx.fill(); }
     } else if (u.type==='cavalry'){
+      // 騎馬：馬体＋騎手
       ctx.fillStyle = '#5a3a1a'; ctx.fillRect(-u.radius,-u.radius*0.7,u.radius*2,u.radius*1.4);
       ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.strokeRect(-u.radius,-u.radius*0.7,u.radius*2,u.radius*1.4);
+      ctx.fillStyle = '#3a2010'; ctx.fillRect(-u.radius*0.8,-u.radius*1.2,u.radius*0.6,u.radius*0.6);
+      if (u.flash>0){ ctx.strokeStyle='#ffd166'; ctx.lineWidth=2;
+        ctx.beginPath(); ctx.moveTo(u.radius,0); ctx.lineTo(u.radius*2,0); ctx.stroke(); }
     } else if (u.type==='gun'){
+      // 鉄砲：筒＋発光
       ctx.fillStyle = '#2a2a2a'; ctx.fillRect(-u.radius,-u.radius*0.5,u.radius*2,u.radius);
-      ctx.fillRect(u.radius*0.5,-2,u.radius*1.2,4);
+      ctx.fillStyle = '#111'; ctx.fillRect(u.radius*0.5,-2,u.radius*1.4,4);
+      if (u.flash>0){ ctx.fillStyle='#ffd166'; ctx.shadowColor='#ffd166'; ctx.shadowBlur=12;
+        ctx.beginPath(); ctx.arc(u.radius*1.9,0,4,0,Math.PI*2); ctx.fill(); ctx.shadowBlur=0; }
     } else if (u.type==='bow'){
+      // 弓：弧＋矢
       ctx.strokeStyle = col; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(-u.radius,0); ctx.lineTo(u.radius,0); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(0,-u.radius); ctx.lineTo(0,u.radius); ctx.stroke();
+      ctx.beginPath(); ctx.arc(u.radius*0.2,0,u.radius*0.9,-Math.PI*0.7,Math.PI*0.7); ctx.stroke();
+      if (u.flash>0){ ctx.strokeStyle='#ffd166'; ctx.lineWidth=2;
+        ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(u.radius*2,0); ctx.stroke(); }
     } else {
-      ctx.fillStyle = '#7a5a3a'; ctx.fillRect(-u.radius,-u.radius*0.6,u.radius*2,u.radius*1.2);
+      // 槍：縦長＋穂先
+      ctx.fillStyle = '#7a5a3a'; ctx.fillRect(-u.radius,-u.radius*0.5,u.radius*2,u.radius);
+      ctx.strokeStyle = '#c0c0c0'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(u.radius*0.6,0); ctx.lineTo(u.radius*1.8,0); ctx.stroke();
+      if (u.flash>0){ ctx.fillStyle='#ffd166'; ctx.beginPath();
+        ctx.moveTo(u.radius*1.8,0); ctx.lineTo(u.radius*1.4,-4); ctx.lineTo(u.radius*1.4,4); ctx.closePath(); ctx.fill(); }
     }
     ctx.restore();
     // HPバー
@@ -558,10 +578,9 @@
     if (showName && showId) label = u.name + ' #' + u.id;
     else if (showName) label = u.name;
     else if (showId) label = '#' + u.id;
-    if (label && (u.type==='general' || showName || showId)){
+    if (label){
       ctx.fillStyle = '#fff'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
       ctx.fillText(label, u.x, u.y-u.radius-20);
-      // カードアイコン（名前横）
       const lw = ctx.measureText(label).width;
       let cx = u.x + lw/2 + 4;
       for (let i=0;i<u.yellows;i++){
@@ -572,29 +591,60 @@
     }
   }
 
-  function draw(){
-    const camX = clamp((spectate?ref.x:ref.x)-W/2,0,WORLD_W-W);
-    const camY = clamp((spectate?ref.y:ref.y)-H/2,0,WORLD_H-H);
-    ctx.fillStyle = '#050505'; ctx.fillRect(0,0,W,H);
-    if (bgOn){
-      if (bgMode==='fill') ctx.drawImage(bgImg,camX,camY,W,H,0,0,W,H);
-      else if (bgMode==='cover'){ const s=Math.max(W/WORLD_W,H/WORLD_H); ctx.drawImage(bgImg,camX,camY,W/s,H/s,0,0,W/s,H/s); }
-      else { ctx.save(); ctx.translate(-camX,-camY); for(let x=0;x<WORLD_W;x+=256)for(let y=0;y<WORLD_H;y+=256)ctx.drawImage(bgImg,x,y,256,256); ctx.restore(); }
-    }
-    ctx.save(); ctx.translate(-camX,-camY);
-    drawTerrain(camX,camY);
-    for (const u of units) if (u.alive) drawUnit(u);
-    for (const b of bullets){
+  function drawBullet(b){
+    if (b.btype==='arrow'){
+      ctx.strokeStyle = b.color; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(b.x,b.y); ctx.lineTo(b.x-Math.cos(b.angle)*10, b.y-Math.sin(b.angle)*10); ctx.stroke();
+    } else if (b.btype==='thrust'){
+      ctx.strokeStyle = '#c0c0c0'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(b.x,b.y); ctx.lineTo(b.x+Math.cos(b.angle)*8, b.y+Math.sin(b.angle)*8); ctx.stroke();
+    } else if (b.btype==='charge'){
+      ctx.fillStyle = b.color; ctx.shadowColor = b.color; ctx.shadowBlur = 10;
+      ctx.beginPath(); ctx.arc(b.x,b.y,5,0,Math.PI*2); ctx.fill(); ctx.shadowBlur = 0;
+    } else {
       ctx.fillStyle = b.color; ctx.shadowColor = b.color; ctx.shadowBlur = 10;
       ctx.beginPath(); ctx.arc(b.x,b.y,4,0,Math.PI*2); ctx.fill(); ctx.shadowBlur = 0;
     }
+  }
+
+  function draw(){
+    const camX = clamp(ref.x-W/2,0,WORLD_W-W);
+    const camY = clamp(ref.y-H/2,0,WORLD_H-H);
+    ctx.fillStyle = '#050505'; ctx.fillRect(0,0,W,H);
+    if (bgOn){
+      if (bgMode==='fill') ctx.drawImage(bgImg,0,0,bgImg.width,bgImg.height,camX,camY,W,H);
+      else if (bgMode==='cover'){
+        const s = Math.max(W/WORLD_W, H/WORLD_H);
+        ctx.drawImage(bgImg,0,0,bgImg.width,bgImg.height,camX/s,camY/s,W/s,H/s);
+      } else {
+        ctx.save(); ctx.translate(-camX,-camY);
+        for(let x=0;x<WORLD_W;x+=256)for(let y=0;y<WORLD_H;y+=256)ctx.drawImage(bgImg,x,y,256,256);
+        ctx.restore();
+      }
+    }
+    ctx.save(); ctx.translate(-camX,-camY);
+    drawTerrain();
+    // 家紋（陣営中央に表示）
+    if (units.length){
+      const uA = units.find(u=>u.side==='A'); const uB = units.find(u=>u.side==='B');
+      if (uA) drawEmblem(ctx, uA.clan, WORLD_W/2-300, WORLD_H*0.15, 40);
+      if (uB) drawEmblem(ctx, uB.clan, WORLD_W/2+300, WORLD_H*0.85, 40);
+    }
+    for (const u of units) if (u.alive) drawUnit(u);
+    for (const b of bullets) drawBullet(b);
     if (!spectate){
       ctx.save(); ctx.translate(ref.x,ref.y); ctx.rotate(ref.angle);
       ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(0,0,10,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle = '#1a1208'; ctx.lineWidth = 2; ctx.stroke();
       ctx.fillStyle = '#1a1208'; ctx.fillRect(6,-2,14,4);
       ctx.restore();
     }
     ctx.restore();
+    if (spectate){
+      ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(0,0,W,30);
+      ctx.fillStyle = '#ffd166'; ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('観戦モード', W/2, 22);
+    }
   }
 
   // ===== カード =====
