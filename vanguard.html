@@ -55,9 +55,16 @@
   .ui-btn.bg:hover { background:#7ad7ff; color:#1a1208; }
   .ui-btn.sword { color:#ff8a00; border-color:#ff8a00; }
   .ui-btn.sword:hover { background:#ff8a00; color:#1a1208; }
+  .ui-btn.gravity { color:#c77dff; border-color:#c77dff; }
+  .ui-btn.gravity:hover { background:#c77dff; color:#1a1208; }
+  .ui-btn.gravity.on { background:#c77dff; color:#1a1208; box-shadow:0 0 20px #c77dffaa; }
   .card-input {
     width:64px; padding:5px 6px; border-radius:8px; border:1px solid #4a3520;
     background:#0f0a05; color:#ffd166; font-size:12px; text-align:center; font-family:inherit;
+  }
+  .gravity-input {
+    width:72px; padding:5px 6px; border-radius:8px; border:1px solid #c77dff;
+    background:#0f0a05; color:#c77dff; font-size:12px; text-align:center; font-family:inherit;
   }
   .hint { font-size:11px; color:#6a5038; text-align:center; width:100%; }
   .opening {
@@ -146,12 +153,17 @@
       <button class="ui-btn red" id="redBtn">レッドカード</button>
     </div>
     <div class="row">
+      <button class="ui-btn gravity" id="gravityBtn">重力: OFF</button>
+      <input type="number" class="gravity-input" id="gravityInput" min="0" max="1000" step="10" value="250">
+      <span style="font-size:11px;color:#8a6b4a;">重力度 0〜1000</span>
+    </div>
+    <div class="row">
       <button class="ui-btn bg" id="bgToggleBtn">背景: OFF</button>
       <button class="ui-btn bg" id="bgModeBtn">fill</button>
       <span class="stat" style="margin-left:auto;"><span class="label">地形</span><span class="value state" id="mapNameDisplay">-</span></span>
     </div>
   </div>
-  <div class="hint" id="hint">移動: 矢印キー / エイム: マウス / 射撃・刀: クリック / 武器切替: Q or ボタン / カード: ID入力してボタン</div>
+  <div class="hint" id="hint">移動: 矢印キー / エイム: マウス / 射撃・刀: クリック / 武器切替: Q or ボタン / カード: ID入力してボタン / 重力: ボタン＋数値</div>
 </div>
 
 <script>
@@ -176,6 +188,8 @@
   const yellowBtn = document.getElementById('yellowBtn');
   const redIdInput = document.getElementById('redIdInput');
   const redBtn = document.getElementById('redBtn');
+  const gravityBtn = document.getElementById('gravityBtn');
+  const gravityInput = document.getElementById('gravityInput');
   const bgToggleBtn = document.getElementById('bgToggleBtn');
   const bgModeBtn = document.getElementById('bgModeBtn');
   const resultScreen = document.getElementById('resultScreen');
@@ -214,7 +228,6 @@
     emperor:  { name:'天皇軍',     color:'#ff8ad8', img:'img354war.jpg' },
   };
 
-  // 攻撃力2倍済み
   const TEAM_POOL = [
     { clan:'oda', units:[
       {name:'織田信長',type:'general',hp:900,atk:120,spd:2.6,rng:300},
@@ -294,7 +307,6 @@
   let mapPattern = MAP_PATTERNS[0];
 
   function makeForestTrees(){
-    // 森パターン時のみ：木を生成（物理判定あり）
     if (mapPattern.id !== 'forest') return;
     const centers = [
       {x:1200,y:500},{x:900,y:900},{x:1500,y:900},{x:1200,y:1300},
@@ -370,10 +382,15 @@
   let running = false, finished = false, spectate = false;
   let lastTime = 0;
 
+  // 重力モード
+  let gravityOn = false;
+  let gravityPower = 250;
+
   const REF_SPEED = 100;
-  const ARMY_SPEED_MULT = 16.0;   // 旧8の2倍
-  const FIRE_COOL_BASE = 120;     // 旧40の3倍
+  const ARMY_SPEED_MULT = 16.0;
+  const FIRE_COOL_BASE = 120;
   const SWORD_RANGE = 55;
+  const GRAVITY_INFLUENCE = 600;
 
   function lineHitsWall(x0,y0,x1,y1){
     for (const w of castleWalls){
@@ -481,28 +498,43 @@
       const onMt = isMountain(u.x,u.y);
       let terrSpd = onMt ? 0.55 : 1.0;
       if (mapPattern.id==='forest' && onMt) terrSpd = 0.7;
+
+      // ===== 移動ベクトルを合算（通常移動＋重力を風と同じ外力として加算） =====
+      let moveX = 0, moveY = 0;
+
+      // 通常移動：敵へ向かう
       if (d > u.rng*0.9){
         const goal = pickWaypoint(u, target);
         const ga = Math.atan2(goal.y-u.y, goal.x-u.x);
-        const mx = Math.cos(ga)*u.spd*terrSpd*dt;
-        const my = Math.sin(ga)*u.spd*terrSpd*dt;
-        if (unitCanWalk(u.x+mx,u.y+my)){ u.x+=mx; u.y+=my; }
-        else if (unitCanWalk(u.x+mx,u.y)){ u.x+=mx; }
-        else if (unitCanWalk(u.x,u.y+my)){ u.y+=my; }
-        else {
-          const sideAng = ga + Math.PI/2;
-          const sx = Math.cos(sideAng)*u.spd*terrSpd*dt;
-          const sy = Math.sin(sideAng)*u.spd*terrSpd*dt;
-          if (unitCanWalk(u.x+sx,u.y+sy)){ u.x+=sx; u.y+=sy; }
+        moveX += Math.cos(ga)*u.spd*terrSpd*dt;
+        moveY += Math.sin(ga)*u.spd*terrSpd*dt;
+      }
+
+      // 重力：審判へ引き寄せ（外力として加算）
+      if (gravityOn && gravityPower > 0 && !spectate){
+        const gd = dist(u.x,u.y,ref.x,ref.y);
+        if (gd > 20){
+          const ga = Math.atan2(ref.y-u.y, ref.x-u.x);
+          const falloff = Math.max(0, 1 - gd / GRAVITY_INFLUENCE);
+          // 1フレームあたりの固定量。250で約2px（旧1000相当）、1000で約8px
+          const pull = (gravityPower / 1000) * 8.0 * (0.3 + 0.7 * falloff);
+          moveX += Math.cos(ga) * pull;
+          moveY += Math.sin(ga) * pull;
         }
       }
+
+      // 合算した移動を適用（1回だけ判定）
+      if (moveX !== 0 || moveY !== 0){
+        if (unitCanWalk(u.x+moveX,u.y+moveY)){ u.x+=moveX; u.y+=moveY; }
+        else if (unitCanWalk(u.x+moveX,u.y)){ u.x+=moveX; }
+        else if (unitCanWalk(u.x,u.y+moveY)){ u.y+=moveY; }
+      }
+
       u.cool -= dt*60;
       if (d <= u.rng && u.cool<=0){
-        // 射線が壁を横切るなら撃たない
         if (lineHitsWall(u.x,u.y,target.x,target.y)){
           u.cool = 20;
         } else {
-          // 連射速度1/3（基準120）
           u.cool = (FIRE_COOL_BASE + rand(-20,20)) / ARMY_SPEED_MULT;
           let dmg = u.atk;
           if (u.type==='bow' && onMt) dmg *= 1.35;
@@ -530,7 +562,6 @@
       const a = Math.atan2(b.ty-b.y, b.tx-b.x);
       const nx = b.x + Math.cos(a)*b.spd*dt;
       const ny = b.y + Math.sin(a)*b.spd*dt;
-      // 壁・木で遮断
       if (isWall(nx,ny) || isTree(nx,ny)){
         bullets.splice(i,1);
         continue;
@@ -538,16 +569,15 @@
       b.x = nx; b.y = ny;
       b.life -= dt;
 
-      // 敵ヒット判定
+      let removed = false;
       for (const u of units){
         if (!u.alive) continue;
         if (b.side === 'ref'){
-          // 審判の弾は敵軍すべてに当たる
           if (dist(b.x,b.y,u.x,u.y) < u.radius+12){
             u.hp -= b.dmg;
             if (u.hp<=0) u.alive=false;
             bullets.splice(i,1);
-            b.x = -9999;
+            removed = true;
             break;
           }
         } else if (u.side !== b.side){
@@ -555,14 +585,13 @@
             u.hp -= b.dmg;
             if (u.hp<=0) u.alive=false;
             bullets.splice(i,1);
-            b.x = -9999;
+            removed = true;
             break;
           }
         }
       }
-      if (!bullets[i] || bullets[i] !== b) continue;
+      if (removed) continue;
 
-      // 審判への被弾（敵の弾のみ。審判の弾は自分に当たらない）
       if (b.side !== 'ref' && !spectate && dist(b.x,b.y,ref.x,ref.y) < 18){
         ref.hp -= b.dmg*0.6;
         if (ref.hp<=0){ ref.hp=0; spectate=true; }
@@ -570,7 +599,6 @@
         continue;
       }
 
-      // 到達/life切れ
       if (dist(b.x,b.y,b.tx,b.ty) < 20 || b.life<=0){
         bullets.splice(i,1);
       }
@@ -595,7 +623,6 @@
         if (fireTimer<=0){
           fireTimer = 0.12;
           const a = ref.angle + rand(-0.03,0.03);
-          // 壁・木が射線上なら撃たない
           const tx = ref.x+Math.cos(a)*400, ty = ref.y+Math.sin(a)*400;
           if (!lineHitsWall(ref.x,ref.y,tx,ty)){
             bullets.push({ x:ref.x, y:ref.y, tx, ty,
@@ -706,12 +733,9 @@
       ctx.fillStyle = '#5a6a3a';
       ctx.beginPath(); ctx.arc(m.x,m.y,m.r*0.6,0,Math.PI*2); ctx.fill();
     }
-    // 森の木（物理判定あり）
     for (const t of mapPattern.forestTrees){
-      // 幹
       ctx.fillStyle = '#5a3a1a';
       ctx.fillRect(t.x-4, t.y-4, 8, 14);
-      // 葉（円）
       ctx.fillStyle = '#1e6a1e';
       ctx.beginPath(); ctx.arc(t.x, t.y-8, t.r, 0, Math.PI*2); ctx.fill();
       ctx.fillStyle = '#2a8a2a';
@@ -799,6 +823,17 @@
 
   function drawRef(){
     if (spectate) return;
+    if (gravityOn && gravityPower > 0){
+      const pulse = 20 + Math.sin(performance.now()/200) * 6 + (gravityPower/1000)*30;
+      const g = ctx.createRadialGradient(ref.x,ref.y,10,ref.x,ref.y,pulse);
+      g.addColorStop(0,'rgba(199,125,255,0.45)');
+      g.addColorStop(1,'rgba(199,125,255,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(ref.x,ref.y,pulse,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle = 'rgba(199,125,255,0.12)';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(ref.x,ref.y,GRAVITY_INFLUENCE,0,Math.PI*2); ctx.stroke();
+    }
     ctx.save(); ctx.translate(ref.x,ref.y); ctx.rotate(ref.angle);
     ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(0,0,10,0,Math.PI*2); ctx.fill();
     ctx.strokeStyle = '#1a1208'; ctx.lineWidth = 2; ctx.stroke();
@@ -820,7 +855,7 @@
     ctx.beginPath(); ctx.arc(ref.x,ref.y,16,0,Math.PI*2); ctx.stroke();
     ctx.strokeStyle = hr>0.5?'#00e6b0':'#ff8a5c'; ctx.lineWidth = 3;
     ctx.beginPath(); ctx.arc(ref.x,ref.y,16,-Math.PI/2,-Math.PI/2+Math.PI*2*hr); ctx.stroke();
-    ctx.fillStyle = '#ffd166'; ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillStyle = gravityOn?'#c77dff':'#ffd166'; ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center';
     ctx.fillText('審判', ref.x, ref.y-22);
   }
 
@@ -830,10 +865,8 @@
     ctx.fillStyle = '#050505'; ctx.fillRect(0,0,W,H);
     if (bgOn && bgImg.complete && bgImg.naturalWidth > 0){
       if (bgMode==='fill'){
-        // 画像全体をキャンバスにフィット（引き伸ばし）
         ctx.drawImage(bgImg, 0, 0, W, H);
       } else if (bgMode==='cover'){
-        // アスペクト比維持でキャンバスを覆う
         const ir = bgImg.naturalWidth / bgImg.naturalHeight;
         const cr = W / H;
         let sw, sh, sx, sy;
@@ -841,7 +874,6 @@
         else { sw = bgImg.naturalWidth; sh = sw / cr; sx = 0; sy = (bgImg.naturalHeight - sh)/2; }
         ctx.drawImage(bgImg, sx, sy, sw, sh, 0, 0, W, H);
       } else {
-        // タイル：ワールド座標に並べる（カメラ追従）
         ctx.save(); ctx.translate(-camX,-camY);
         for(let x=0;x<WORLD_W;x+=256)for(let y=0;y<WORLD_H;y+=256)ctx.drawImage(bgImg,x,y,256,256);
         ctx.restore();
@@ -863,6 +895,11 @@
       ctx.fillStyle = '#ffd166'; ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center';
       ctx.fillText('観戦モード', W/2, 22);
     }
+    if (gravityOn){
+      ctx.fillStyle = 'rgba(199,125,255,0.15)'; ctx.fillRect(0,0,W,H);
+      ctx.fillStyle = '#c77dff'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'left';
+      ctx.fillText('重力モード ON / 強さ '+gravityPower, 10, H-14);
+    }
   }
 
   function findUnitById(id){ return units.find(u=>u.id===id && u.alive); }
@@ -883,6 +920,19 @@
   nameIdBtn.addEventListener('click',()=>{ showName=!showName; showId=showName; nameBtn.classList.toggle('active',showName); idBtn.classList.toggle('active',showId); nameIdBtn.classList.toggle('active',showName); });
 
   weaponBtn.addEventListener('click',()=>{ ref.mode = ref.mode==='gun'?'sword':'gun'; updateModeDisplay(); });
+
+  gravityBtn.addEventListener('click',()=>{
+    gravityOn = !gravityOn;
+    gravityBtn.textContent = '重力: ' + (gravityOn?'ON':'OFF');
+    gravityBtn.classList.toggle('on', gravityOn);
+  });
+  gravityInput.addEventListener('input',()=>{
+    let v = parseFloat(gravityInput.value);
+    if (isNaN(v)) v = 0;
+    v = clamp(v, 0, 1000);
+    gravityPower = v;
+  });
+
   bgToggleBtn.addEventListener('click',()=>{ bgOn=!bgOn; bgToggleBtn.textContent='背景: '+(bgOn?'ON':'OFF'); });
   bgModeBtn.addEventListener('click',()=>{ bgMode = bgMode==='fill'?'cover':bgMode==='cover'?'tile':'fill'; bgModeBtn.textContent=bgMode; });
 
