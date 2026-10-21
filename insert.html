@@ -126,10 +126,10 @@
   const EDGE_ZONE = 60;
 
   // 判定位置（線の位置）
-  const LEFT_LINE  = EDGE_ZONE;                 // 赤い線
-  const RIGHT_LINE = CORRIDOR_LEN - EDGE_ZONE;  // 青い線
+  const LEFT_LINE  = EDGE_ZONE;
+  const RIGHT_LINE = CORRIDOR_LEN - EDGE_ZONE;
 
-  // ★ プレイヤーは画面中央固定
+  // プレイヤーは画面中央固定
   const PLAYER_SCREEN_X = W / 2;
 
   const countLabel = document.getElementById('countLabel');
@@ -143,12 +143,8 @@
 
   /* =========================================================
      異変 合計43種
-     第2引数 sx は「ワールド座標→画面座標」のオフセット。
-     描画は (wx + sx) で画面位置を求める。
      ========================================================= */
   const ANOMALIES = [
-
-    /* ================= 既存13種 ================= */
 
     { id:'redLight', easy:true, name:'赤い照明',
       apply(s, sx) {
@@ -297,8 +293,6 @@
           }
         }
       } },
-
-    /* ================= 新規30種 ================= */
 
     { id:'posterSmile', easy:false, name:'ポスターの顔が笑う',
       apply(s, sx) {
@@ -677,7 +671,6 @@
     return list[Math.floor(Math.random() * list.length)];
   }
 
-  /* ---------------- 状態管理 ---------------- */
   function pickHall() {
     const has = Math.random() < 0.5;
     return { anomaly: has ? pickAnomaly() : null };
@@ -711,14 +704,12 @@
     msgTimer = setTimeout(() => msgEl.classList.remove('show'), 2200);
   }
 
-  /* ---------------- 入力 ---------------- */
   window.addEventListener('keydown', e => {
     if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
     keys[e.key.toLowerCase()] = true;
   });
   window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 
-  /* ---------------- 描画 ---------------- */
   function drawDoor(x, y, w, h, color) {
     ctx.fillStyle = color; ctx.fillRect(x, y, w, h);
     ctx.strokeStyle = '#111'; ctx.lineWidth = 3; ctx.strokeRect(x, y, w, h);
@@ -783,7 +774,6 @@
     ctx.restore();
   }
 
-  // 線の位置（プレイヤー中央基準で描く → 判定と完全一致）
   function drawEdgeZones(sx) {
     const leftScreen = LEFT_LINE + sx;
     if (leftScreen > -80 && leftScreen < W + 80) {
@@ -825,7 +815,6 @@
   }
 
   function drawCorridor(camX, anomaly) {
-    // プレイヤー中央固定。ワールド座標 camX が画面中央に来るようオフセット
     const sx = PLAYER_SCREEN_X - camX;
 
     ctx.fillStyle = '#15151a'; ctx.fillRect(0,0,W,H);
@@ -833,10 +822,13 @@
     ctx.fillStyle = '#1d1d24'; ctx.fillRect(0,WALL_BOTTOM,W,H-WALL_BOTTOM);
     ctx.fillStyle = '#2a2a33'; ctx.fillRect(0,WALL_TOP,W,WALL_BOTTOM-WALL_TOP);
 
+    // ★ 壁の縦線をワールド座標基準で描く（ポスターと同じ基準）
     ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 1;
-    for (let x = 0; x < W; x += 40) {
-      const gx = x + ((camX + 20) % 40);
-      ctx.beginPath(); ctx.moveTo(gx, WALL_TOP); ctx.lineTo(gx, WALL_BOTTOM); ctx.stroke();
+    for (let wx = 0; wx < CORRIDOR_LEN; wx += 40) {
+      const x = wx + sx;
+      if (x > -20 && x < W + 20) {
+        ctx.beginPath(); ctx.moveTo(x, WALL_TOP); ctx.lineTo(x, WALL_BOTTOM); ctx.stroke();
+      }
     }
 
     drawWallPanels(sx);
@@ -856,7 +848,6 @@
 
     if (anomaly && anomaly.apply) anomaly.apply(state, sx, camX);
 
-    // プレイヤーは画面中央固定
     const px = PLAYER_SCREEN_X, py = WALL_BOTTOM - 26;
     ctx.save();
     ctx.fillStyle='#e8e8e8';
@@ -867,7 +858,6 @@
     ctx.restore();
   }
 
-  /* ---------------- メインループ ---------------- */
   function loop(now) {
     const dt = Math.min(50, now - lastTime) / 1000;
     lastTime = now;
@@ -884,7 +874,6 @@
         if (state.camX < LEFT_LINE)  state.camX = LEFT_LINE;
         if (state.camX > RIGHT_LINE) state.camX = RIGHT_LINE;
 
-        // 判定：線が画面中央（プレイヤー位置）に来たら発火
         if (state.camX <= LEFT_LINE) {
           judgeBack();
         }
@@ -899,7 +888,6 @@
     rafId = requestAnimationFrame(loop);
   }
 
-  /* ---------------- 判定 ---------------- */
   function judgeForward() {
     if (state.exitNum === 0) {
       showMsg('基礎廊下クリア。次から異常を見極めよう。');
