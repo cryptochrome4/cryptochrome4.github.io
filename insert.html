@@ -125,9 +125,12 @@
   const FADE_MS = 3000;
   const EDGE_ZONE = 60;
 
-  // ★ 判定位置（線の位置）
+  // 判定位置（線の位置）
   const LEFT_LINE  = EDGE_ZONE;                 // 赤い線
   const RIGHT_LINE = CORRIDOR_LEN - EDGE_ZONE;  // 青い線
+
+  // プレイヤーは常に画面中央固定
+  const PLAYER_SCREEN_X = W / 2;
 
   const countLabel = document.getElementById('countLabel');
   const msgEl = document.getElementById('message');
@@ -148,33 +151,33 @@
     /* ================= 既存13種 ================= */
 
     { id:'redLight', easy:true, name:'赤い照明',
-      apply(s, camX) {
+      apply(s, sx) {
         ctx.save(); ctx.fillStyle='rgba(255,20,20,0.35)'; ctx.fillRect(0,0,W,H); ctx.restore();
       } },
 
     { id:'floorText', easy:false, name:'床の不気味な文字',
-      apply(s, camX) {
+      apply(s, sx) {
         ctx.save(); ctx.font='bold 26px monospace';
         ctx.fillStyle='rgba(190,20,20,0.55)'; ctx.textAlign='center';
         for (let wx = 300; wx < CORRIDOR_LEN; wx += 600) {
-          const sx = wx - camX;
-          if (sx > -150 && sx < W + 150) ctx.fillText('オカエリ', sx, WALL_BOTTOM + 30);
+          const x = wx + sx;
+          if (x > -150 && x < W + 150) ctx.fillText('オカエリ', x, WALL_BOTTOM + 30);
         }
         ctx.restore();
       } },
 
     { id:'extraDoor', easy:false, name:'余計な扉',
-      apply(s, camX) {
+      apply(s, sx) {
         for (let wx = 400; wx < CORRIDOR_LEN; wx += 700) {
-          const sx = wx - camX;
-          if (sx > -80 && sx < W + 80) drawDoor(sx, WALL_TOP + 60, 48, 120, '#302828');
+          const x = wx + sx;
+          if (x > -80 && x < W + 80) drawDoor(x, WALL_TOP + 60, 48, 120, '#302828');
         }
       } },
 
     { id:'eyes', easy:false, name:'壁の目',
-      apply(s, camX) {
+      apply(s, sx) {
         for (let wx = 500; wx < CORRIDOR_LEN; wx += 650) {
-          const ex = wx - camX;
+          const ex = wx + sx;
           if (ex > -60 && ex < W + 60) {
             ctx.save();
             ctx.fillStyle='rgba(220,220,220,0.55)';
@@ -202,12 +205,12 @@
       } },
 
     { id:'posterFlip', easy:false, name:'ポスターが逆さま',
-      apply(s, camX) {
+      apply(s, sx) {
         for (let wx = 450; wx < CORRIDOR_LEN; wx += 720) {
-          const px = wx - camX;
-          if (px > -60 && px < W + 60) {
+          const x = wx + sx;
+          if (x > -60 && x < W + 60) {
             ctx.save();
-            ctx.translate(px, 120); ctx.rotate(Math.PI);
+            ctx.translate(x, 120); ctx.rotate(Math.PI);
             ctx.fillStyle='#4a5a6a'; ctx.fillRect(-18,-24,36,48);
             ctx.fillStyle='#9ab'; ctx.fillRect(-14,-20,28,6);
             ctx.restore();
@@ -216,38 +219,38 @@
       } },
 
     { id:'wallStain', easy:false, name:'壁の染み',
-      apply(s, camX) {
+      apply(s, sx) {
         for (let wx = 350; wx < CORRIDOR_LEN; wx += 640) {
-          const sx = wx - camX;
-          if (sx > -60 && sx < W + 60) {
+          const x = wx + sx;
+          if (x > -60 && x < W + 60) {
             ctx.save(); ctx.fillStyle='rgba(60,10,10,0.35)';
-            ctx.beginPath(); ctx.ellipse(sx, 210, 26, 14, 0.3, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(x, 210, 26, 14, 0.3, 0, Math.PI*2); ctx.fill();
             ctx.restore();
           }
         }
       } },
 
     { id:'lightOff', easy:false, name:'一部の照明が消えている',
-      apply(s, camX) {
+      apply(s, sx) {
         const skip = 2;
         for (let i = 0; i < 6; i++) {
           if (i === skip) continue;
-          const lx = 80 + i*120 - (camX % 120);
+          const lx = 80 + i*120 + (sx % 120);
           ctx.fillStyle='rgba(255,240,200,0.18)'; ctx.fillRect(lx,18,60,8);
           ctx.fillStyle='rgba(255,240,200,0.5)';  ctx.fillRect(lx,24,60,2);
         }
       } },
 
     { id:'floorCrack', easy:false, name:'床のひび割れ',
-      apply(s, camX) {
+      apply(s, sx) {
         ctx.save(); ctx.strokeStyle='rgba(0,0,0,0.6)'; ctx.lineWidth=2;
         for (let wx = 300; wx < CORRIDOR_LEN; wx += 580) {
-          const sx = wx - camX;
-          if (sx > -80 && sx < W + 80) {
+          const x = wx + sx;
+          if (x > -80 && x < W + 80) {
             ctx.beginPath();
-            ctx.moveTo(sx, WALL_BOTTOM+20);
-            ctx.lineTo(sx+16, WALL_BOTTOM+40);
-            ctx.lineTo(sx+6, WALL_BOTTOM+58);
+            ctx.moveTo(x, WALL_BOTTOM+20);
+            ctx.lineTo(x+16, WALL_BOTTOM+40);
+            ctx.lineTo(x+6, WALL_BOTTOM+58);
             ctx.stroke();
           }
         }
@@ -255,14 +258,14 @@
       } },
 
     { id:'shadowHand', easy:false, name:'壁に手の影',
-      apply(s, camX) {
+      apply(s, sx) {
         for (let wx = 420; wx < CORRIDOR_LEN; wx += 660) {
-          const sx = wx - camX;
-          if (sx > -60 && sx < W + 60) {
+          const x = wx + sx;
+          if (x > -60 && x < W + 60) {
             ctx.save(); ctx.fillStyle='rgba(0,0,0,0.35)';
-            ctx.beginPath(); ctx.ellipse(sx, 150, 10, 16, 0, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(x, 150, 10, 16, 0, 0, Math.PI*2); ctx.fill();
             for (let f=0; f<4; f++) {
-              ctx.beginPath(); ctx.ellipse(sx-8+f*5, 132, 2, 8, 0, 0, Math.PI*2); ctx.fill();
+              ctx.beginPath(); ctx.ellipse(x-8+f*5, 132, 2, 8, 0, 0, Math.PI*2); ctx.fill();
             }
             ctx.restore();
           }
@@ -270,26 +273,26 @@
       } },
 
     { id:'puddle', easy:false, name:'床の水たまり',
-      apply(s, camX) {
+      apply(s, sx) {
         for (let wx = 380; wx < CORRIDOR_LEN; wx += 620) {
-          const sx = wx - camX;
-          if (sx > -80 && sx < W + 80) {
+          const x = wx + sx;
+          if (x > -80 && x < W + 80) {
             ctx.save(); ctx.fillStyle='rgba(40,60,90,0.5)';
-            ctx.beginPath(); ctx.ellipse(sx, WALL_BOTTOM+34, 34, 10, 0, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(x, WALL_BOTTOM+34, 34, 10, 0, 0, Math.PI*2); ctx.fill();
             ctx.restore();
           }
         }
       } },
 
     { id:'signNum', easy:false, name:'案内板の数字が違う',
-      apply(s, camX) {
+      apply(s, sx) {
         for (let wx = 320; wx < CORRIDOR_LEN; wx += 640) {
-          const sx = wx - camX;
-          if (sx > -60 && sx < W + 60) {
+          const x = wx + sx;
+          if (x > -60 && x < W + 60) {
             ctx.save();
-            ctx.fillStyle='#1b3a2a'; ctx.fillRect(sx-22, 84, 44, 22);
+            ctx.fillStyle='#1b3a2a'; ctx.fillRect(x-22, 84, 44, 22);
             ctx.fillStyle='#cfe'; ctx.font='bold 14px sans-serif'; ctx.textAlign='center';
-            ctx.fillText('3', sx, 100);
+            ctx.fillText('3', x, 100);
             ctx.restore();
           }
         }
@@ -298,118 +301,117 @@
     /* ================= 新規30種 ================= */
 
     { id:'posterSmile', easy:false, name:'ポスターの顔が笑う',
-      apply(s, camX) {
+      apply(s, sx) {
         for (let wx = 500; wx < CORRIDOR_LEN; wx += 700) {
-          const px = wx - camX;
-          if (px > -60 && px < W + 60) {
+          const x = wx + sx;
+          if (x > -60 && x < W + 60) {
             ctx.save();
-            ctx.fillStyle='#3a3a4a'; ctx.fillRect(px-20, 90, 40, 56);
-            ctx.fillStyle='#e0c0a0'; ctx.beginPath(); ctx.arc(px, 112, 10, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle='#3a3a4a'; ctx.fillRect(x-20, 90, 40, 56);
+            ctx.fillStyle='#e0c0a0'; ctx.beginPath(); ctx.arc(x, 112, 10, 0, Math.PI*2); ctx.fill();
             ctx.strokeStyle='#a03030'; ctx.lineWidth=2;
-            ctx.beginPath(); ctx.arc(px, 116, 6, 0.2, Math.PI-0.2); ctx.stroke();
+            ctx.beginPath(); ctx.arc(x, 116, 6, 0.2, Math.PI-0.2); ctx.stroke();
             ctx.restore();
           }
         }
       } },
 
     { id:'ceilingDrip', easy:false, name:'天井から水滴',
-      apply(s, camX) {
+      apply(s, sx) {
         const t = performance.now();
         for (let wx = 450; wx < CORRIDOR_LEN; wx += 600) {
-          const sx = wx - camX;
-          if (sx > -20 && sx < W + 20) {
+          const x = wx + sx;
+          if (x > -20 && x < W + 20) {
             const dy = ((t/600 + wx) % 1) * 200;
             ctx.save(); ctx.fillStyle='rgba(160,200,255,0.7)';
-            ctx.beginPath(); ctx.ellipse(sx, 30 + dy, 3, 6, 0, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(x, 30 + dy, 3, 6, 0, 0, Math.PI*2); ctx.fill();
             ctx.restore();
           }
         }
       } },
 
     { id:'clockReverse', easy:false, name:'時計が逆回転',
-      apply(s, camX) {
+      apply(s, sx) {
         for (let wx = 600; wx < CORRIDOR_LEN; wx += 800) {
-          const cx2 = wx - camX;
-          if (cx2 > -40 && cx2 < W + 40) {
+          const x = wx + sx;
+          if (x > -40 && x < W + 40) {
             const t = performance.now() / 1000;
             ctx.save();
-            ctx.fillStyle='#ddd'; ctx.beginPath(); ctx.arc(cx2, 120, 18, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle='#ddd'; ctx.beginPath(); ctx.arc(x, 120, 18, 0, Math.PI*2); ctx.fill();
             ctx.strokeStyle='#222'; ctx.lineWidth=2;
-            ctx.beginPath(); ctx.moveTo(cx2,120);
-            ctx.lineTo(cx2 + Math.cos(-t)*12, 120 + Math.sin(-t)*12); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(x,120);
+            ctx.lineTo(x + Math.cos(-t)*12, 120 + Math.sin(-t)*12); ctx.stroke();
             ctx.restore();
           }
         }
       } },
 
     { id:'exitSignRed', easy:false, name:'非常口サインが赤',
-      apply(s, camX) {
+      apply(s, sx) {
         const on = Math.floor(performance.now()/400) % 2 === 0;
         for (let wx = 550; wx < CORRIDOR_LEN; wx += 700) {
-          const sx = wx - camX;
-          if (sx > -50 && sx < W + 50) {
+          const x = wx + sx;
+          if (x > -50 && x < W + 50) {
             ctx.save();
             ctx.fillStyle = on ? 'rgba(255,40,40,0.9)' : 'rgba(120,20,20,0.5)';
-            ctx.fillRect(sx-26, 78, 52, 20);
+            ctx.fillRect(x-26, 78, 52, 20);
             ctx.fillStyle='#fff'; ctx.font='bold 12px sans-serif'; ctx.textAlign='center';
-            ctx.fillText('非常口', sx, 92);
+            ctx.fillText('非常口', x, 92);
             ctx.restore();
           }
         }
       } },
 
     { id:'footprints', easy:false, name:'床に足跡',
-      apply(s, camX) {
+      apply(s, sx) {
         for (let wx = 340; wx < CORRIDOR_LEN; wx += 500) {
-          const sx = wx - camX;
-          if (sx > -60 && sx < W + 60) {
+          const x = wx + sx;
+          if (x > -60 && x < W + 60) {
             ctx.save(); ctx.fillStyle='rgba(20,20,20,0.5)';
-            ctx.beginPath(); ctx.ellipse(sx, WALL_BOTTOM+30, 6, 10, 0, 0, Math.PI*2); ctx.fill();
-            ctx.beginPath(); ctx.ellipse(sx+18, WALL_BOTTOM+42, 6, 10, 0, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(x, WALL_BOTTOM+30, 6, 10, 0, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(x+18, WALL_BOTTOM+42, 6, 10, 0, 0, Math.PI*2); ctx.fill();
             ctx.restore();
           }
         }
       } },
 
     { id:'mirror', easy:false, name:'壁の鏡',
-      apply(s, camX) {
+      apply(s, sx) {
         for (let wx = 700; wx < CORRIDOR_LEN; wx += 900) {
-          const sx = wx - camX;
-          if (sx > -50 && sx < W + 50) {
+          const x = wx + sx;
+          if (x > -50 && x < W + 50) {
             ctx.save();
-            ctx.fillStyle='#557'; ctx.fillRect(sx-22, 100, 44, 60);
-            ctx.fillStyle='rgba(200,220,240,0.3)'; ctx.fillRect(sx-18, 104, 36, 52);
+            ctx.fillStyle='#557'; ctx.fillRect(x-22, 100, 44, 60);
+            ctx.fillStyle='rgba(200,220,240,0.3)'; ctx.fillRect(x-18, 104, 36, 52);
             ctx.restore();
           }
         }
       } },
 
     { id:'tileDiff', easy:false, name:'色違いのタイル',
-      apply(s, camX) {
-        const wx = 900;
-        const sx = wx - camX;
-        if (sx > -40 && sx < W + 40) {
+      apply(s, sx) {
+        const x = 900 + sx;
+        if (x > -40 && x < W + 40) {
           ctx.save(); ctx.fillStyle='rgba(120,80,40,0.5)';
-          ctx.fillRect(sx, WALL_BOTTOM+10, 40, 40); ctx.restore();
+          ctx.fillRect(x, WALL_BOTTOM+10, 40, 40); ctx.restore();
         }
       } },
 
     { id:'beamExtra', easy:false, name:'梁が多い',
-      apply(s, camX) {
+      apply(s, sx) {
         ctx.save(); ctx.fillStyle='rgba(0,0,0,0.4)';
         for (let wx = 0; wx < CORRIDOR_LEN; wx += 150) {
-          const sx = wx - camX;
-          if (sx > -20 && sx < W + 20) ctx.fillRect(sx, 0, 12, 60);
+          const x = wx + sx;
+          if (x > -20 && x < W + 20) ctx.fillRect(x, 0, 12, 60);
         }
         ctx.restore();
       } },
 
     { id:'posterCrowd', easy:false, name:'ポスターが増えている',
-      apply(s, camX) {
+      apply(s, sx) {
         for (let wx = 400; wx < CORRIDOR_LEN; wx += 260) {
-          const sx = wx - camX;
-          if (sx > -40 && sx < W + 40) {
-            ctx.save(); ctx.fillStyle='#445'; ctx.fillRect(sx-16, 92, 32, 44);
+          const x = wx + sx;
+          if (x > -40 && x < W + 40) {
+            ctx.save(); ctx.fillStyle='#445'; ctx.fillRect(x-16, 92, 32, 44);
             ctx.restore();
           }
         }
@@ -421,37 +423,37 @@
       } },
 
     { id:'wallCrack', easy:false, name:'壁のひび',
-      apply(s, camX) {
+      apply(s, sx) {
         for (let wx = 480; wx < CORRIDOR_LEN; wx += 760) {
-          const sx = wx - camX;
-          if (sx > -40 && sx < W + 40) {
+          const x = wx + sx;
+          if (x > -40 && x < W + 40) {
             ctx.save(); ctx.strokeStyle='rgba(0,0,0,0.6)'; ctx.lineWidth=2;
-            ctx.beginPath(); ctx.moveTo(sx, 90); ctx.lineTo(sx+8, 140); ctx.lineTo(sx-4, 190); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(x, 90); ctx.lineTo(x+8, 140); ctx.lineTo(x-4, 190); ctx.stroke();
             ctx.restore();
           }
         }
       } },
 
     { id:'floorArrow', easy:false, name:'床の矢印',
-      apply(s, camX) {
+      apply(s, sx) {
         for (let wx = 520; wx < CORRIDOR_LEN; wx += 600) {
-          const sx = wx - camX;
-          if (sx > -40 && sx < W + 40) {
+          const x = wx + sx;
+          if (x > -40 && x < W + 40) {
             ctx.save(); ctx.fillStyle='rgba(200,200,80,0.5)';
             ctx.beginPath();
-            ctx.moveTo(sx, WALL_BOTTOM+20); ctx.lineTo(sx+16, WALL_BOTTOM+40);
-            ctx.lineTo(sx, WALL_BOTTOM+60); ctx.closePath(); ctx.fill();
+            ctx.moveTo(x, WALL_BOTTOM+20); ctx.lineTo(x+16, WALL_BOTTOM+40);
+            ctx.lineTo(x, WALL_BOTTOM+60); ctx.closePath(); ctx.fill();
             ctx.restore();
           }
         }
       } },
 
     { id:'paintingTilt', easy:false, name:'傾いた絵画',
-      apply(s, camX) {
+      apply(s, sx) {
         for (let wx = 640; wx < CORRIDOR_LEN; wx += 820) {
-          const sx = wx - camX;
-          if (sx > -50 && sx < W + 50) {
-            ctx.save(); ctx.translate(sx, 120); ctx.rotate(0.2);
+          const x = wx + sx;
+          if (x > -50 && x < W + 50) {
+            ctx.save(); ctx.translate(x, 120); ctx.rotate(0.2);
             ctx.fillStyle='#665'; ctx.fillRect(-20,-16,40,32);
             ctx.fillStyle='#aa8'; ctx.fillRect(-14,-10,28,20);
             ctx.restore();
@@ -460,48 +462,48 @@
       } },
 
     { id:'lightSwing', easy:false, name:'揺れる照明',
-      apply(s, camX) {
+      apply(s, sx) {
         const t = performance.now()/1000;
         const sway = Math.sin(t*2) * 6;
         for (let i = 0; i < 6; i++) {
-          const lx = 80 + i*120 - (camX % 120) + sway;
+          const lx = 80 + i*120 + (sx % 120) + sway;
           ctx.fillStyle='rgba(255,240,200,0.18)'; ctx.fillRect(lx,18,60,8);
           ctx.fillStyle='rgba(255,240,200,0.5)';  ctx.fillRect(lx,24,60,2);
         }
       } },
 
     { id:'graffiti', easy:false, name:'壁の落書き',
-      apply(s, camX) {
+      apply(s, sx) {
         for (let wx = 750; wx < CORRIDOR_LEN; wx += 900) {
-          const sx = wx - camX;
-          if (sx > -50 && sx < W + 50) {
+          const x = wx + sx;
+          if (x > -50 && x < W + 50) {
             ctx.save(); ctx.strokeStyle='rgba(200,60,60,0.7)'; ctx.lineWidth=2;
-            ctx.beginPath(); ctx.arc(sx, 140, 14, 0, Math.PI*1.5); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(sx-20, 170); ctx.lineTo(sx+20, 170); ctx.stroke();
+            ctx.beginPath(); ctx.arc(x, 140, 14, 0, Math.PI*1.5); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(x-20, 170); ctx.lineTo(x+20, 170); ctx.stroke();
             ctx.restore();
           }
         }
       } },
 
     { id:'litter', easy:false, name:'床の紙くず',
-      apply(s, camX) {
+      apply(s, sx) {
         for (let wx = 360; wx < CORRIDOR_LEN; wx += 520) {
-          const sx = wx - camX;
-          if (sx > -30 && sx < W + 30) {
+          const x = wx + sx;
+          if (x > -30 && x < W + 30) {
             ctx.save(); ctx.fillStyle='rgba(220,220,200,0.6)';
-            ctx.fillRect(sx, WALL_BOTTOM+24, 10, 8); ctx.restore();
+            ctx.fillRect(x, WALL_BOTTOM+24, 10, 8); ctx.restore();
           }
         }
       } },
 
     { id:'arrowReverse', easy:false, name:'矢印が逆',
-      apply(s, camX) {
+      apply(s, sx) {
         for (let wx = 560; wx < CORRIDOR_LEN; wx += 720) {
-          const sx = wx - camX;
-          if (sx > -50 && sx < W + 50) {
+          const x = wx + sx;
+          if (x > -50 && x < W + 50) {
             ctx.save(); ctx.fillStyle='rgba(220,220,100,0.7)';
             ctx.beginPath();
-            ctx.moveTo(sx+16, 100); ctx.lineTo(sx, 116); ctx.lineTo(sx+16, 132);
+            ctx.moveTo(x+16, 100); ctx.lineTo(x, 116); ctx.lineTo(x+16, 132);
             ctx.closePath(); ctx.fill();
             ctx.restore();
           }
@@ -509,127 +511,127 @@
       } },
 
     { id:'clockStopped', easy:false, name:'止まった時計',
-      apply(s, camX) {
+      apply(s, sx) {
         for (let wx = 820; wx < CORRIDOR_LEN; wx += 900) {
-          const cx2 = wx - camX;
-          if (cx2 > -40 && cx2 < W + 40) {
+          const x = wx + sx;
+          if (x > -40 && x < W + 40) {
             ctx.save();
-            ctx.fillStyle='#ddd'; ctx.beginPath(); ctx.arc(cx2, 120, 18, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle='#ddd'; ctx.beginPath(); ctx.arc(x, 120, 18, 0, Math.PI*2); ctx.fill();
             ctx.strokeStyle='#222'; ctx.lineWidth=2;
-            ctx.beginPath(); ctx.moveTo(cx2,120); ctx.lineTo(cx2,108); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(cx2,120); ctx.lineTo(cx2+8,120); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(x,120); ctx.lineTo(x,108); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(x,120); ctx.lineTo(x+8,120); ctx.stroke();
             ctx.restore();
           }
         }
       } },
 
     { id:'tileStripe', easy:false, name:'縦縞の床',
-      apply(s, camX) {
+      apply(s, sx) {
         ctx.save(); ctx.fillStyle='rgba(80,80,100,0.25)';
         for (let wx = 0; wx < CORRIDOR_LEN; wx += 40) {
-          const sx = wx - camX;
-          if (sx > -40 && sx < W + 40) ctx.fillRect(sx, WALL_BOTTOM, 20, H-WALL_BOTTOM);
+          const x = wx + sx;
+          if (x > -40 && x < W + 40) ctx.fillRect(x, WALL_BOTTOM, 20, H-WALL_BOTTOM);
         }
         ctx.restore();
       } },
 
     { id:'vent', easy:false, name:'天井の換気口',
-      apply(s, camX) {
+      apply(s, sx) {
         for (let wx = 480; wx < CORRIDOR_LEN; wx += 700) {
-          const sx = wx - camX;
-          if (sx > -40 && sx < W + 40) {
-            ctx.save(); ctx.fillStyle='#222'; ctx.fillRect(sx-18, 6, 36, 26);
+          const x = wx + sx;
+          if (x > -40 && x < W + 40) {
+            ctx.save(); ctx.fillStyle='#222'; ctx.fillRect(x-18, 6, 36, 26);
             ctx.strokeStyle='#555'; ctx.lineWidth=1;
-            for (let i=0;i<4;i++){ ctx.beginPath(); ctx.moveTo(sx-16, 10+i*5); ctx.lineTo(sx+16, 10+i*5); ctx.stroke(); }
+            for (let i=0;i<4;i++){ ctx.beginPath(); ctx.moveTo(x-16, 10+i*5); ctx.lineTo(x+16, 10+i*5); ctx.stroke(); }
             ctx.restore();
           }
         }
       } },
 
     { id:'stairSign', easy:false, name:'非常階段サイン',
-      apply(s, camX) {
+      apply(s, sx) {
         for (let wx = 620; wx < CORRIDOR_LEN; wx += 800) {
-          const sx = wx - camX;
-          if (sx > -50 && sx < W + 50) {
-            ctx.save(); ctx.fillStyle='#a33'; ctx.fillRect(sx-20, 80, 40, 18);
+          const x = wx + sx;
+          if (x > -50 && x < W + 50) {
+            ctx.save(); ctx.fillStyle='#a33'; ctx.fillRect(x-20, 80, 40, 18);
             ctx.fillStyle='#fff'; ctx.font='bold 10px sans-serif'; ctx.textAlign='center';
-            ctx.fillText('非常階段', sx, 93); ctx.restore();
+            ctx.fillText('非常階段', x, 93); ctx.restore();
           }
         }
       } },
 
     { id:'posterGlitch', easy:false, name:'化けたポスター',
-      apply(s, camX) {
+      apply(s, sx) {
         for (let wx = 900; wx < CORRIDOR_LEN; wx += 950) {
-          const sx = wx - camX;
-          if (sx > -50 && sx < W + 50) {
-            ctx.save(); ctx.fillStyle='#445'; ctx.fillRect(sx-20, 92, 40, 44);
+          const x = wx + sx;
+          if (x > -50 && x < W + 50) {
+            ctx.save(); ctx.fillStyle='#445'; ctx.fillRect(x-20, 92, 40, 44);
             ctx.fillStyle='rgba(220,80,80,0.8)';
-            ctx.fillRect(sx-14, 100, 10, 4); ctx.fillRect(sx+2, 108, 12, 4);
+            ctx.fillRect(x-14, 100, 10, 4); ctx.fillRect(x+2, 108, 12, 4);
             ctx.restore();
           }
         }
       } },
 
     { id:'drain', easy:false, name:'床の排水溝',
-      apply(s, camX) {
+      apply(s, sx) {
         for (let wx = 560; wx < CORRIDOR_LEN; wx += 700) {
-          const sx = wx - camX;
-          if (sx > -30 && sx < W + 30) {
-            ctx.save(); ctx.fillStyle='#333'; ctx.fillRect(sx-14, WALL_BOTTOM+20, 28, 10);
+          const x = wx + sx;
+          if (x > -30 && x < W + 30) {
+            ctx.save(); ctx.fillStyle='#333'; ctx.fillRect(x-14, WALL_BOTTOM+20, 28, 10);
             ctx.strokeStyle='#555'; ctx.lineWidth=1;
-            for (let i=0;i<4;i++){ ctx.beginPath(); ctx.moveTo(sx-12+i*8, WALL_BOTTOM+20); ctx.lineTo(sx-12+i*8, WALL_BOTTOM+30); ctx.stroke(); }
+            for (let i=0;i<4;i++){ ctx.beginPath(); ctx.moveTo(x-12+i*8, WALL_BOTTOM+20); ctx.lineTo(x-12+i*8, WALL_BOTTOM+30); ctx.stroke(); }
             ctx.restore();
           }
         }
       } },
 
     { id:'key', easy:false, name:'落ちている鍵',
-      apply(s, camX) {
-        const wx = 1100, sx = wx - camX;
-        if (sx > -40 && sx < W + 40) {
+      apply(s, sx) {
+        const x = 1100 + sx;
+        if (x > -40 && x < W + 40) {
           ctx.save(); ctx.strokeStyle='rgba(200,180,80,0.8)'; ctx.lineWidth=2;
-          ctx.beginPath(); ctx.arc(sx, WALL_BOTTOM+30, 5, 0, Math.PI*2); ctx.stroke();
-          ctx.beginPath(); ctx.moveTo(sx+5, WALL_BOTTOM+30); ctx.lineTo(sx+15, WALL_BOTTOM+30); ctx.stroke();
+          ctx.beginPath(); ctx.arc(x, WALL_BOTTOM+30, 5, 0, Math.PI*2); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(x+5, WALL_BOTTOM+30); ctx.lineTo(x+15, WALL_BOTTOM+30); ctx.stroke();
           ctx.restore();
         }
       } },
 
     { id:'hangingString', easy:false, name:'天井の紐',
-      apply(s, camX) {
+      apply(s, sx) {
         for (let wx = 700; wx < CORRIDOR_LEN; wx += 800) {
-          const sx = wx - camX;
-          if (sx > -20 && sx < W + 20) {
+          const x = wx + sx;
+          if (x > -20 && x < W + 20) {
             ctx.save(); ctx.strokeStyle='rgba(150,150,120,0.7)'; ctx.lineWidth=1;
-            ctx.beginPath(); ctx.moveTo(sx, 30); ctx.lineTo(sx, 90); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(x, 30); ctx.lineTo(x, 90); ctx.stroke();
             ctx.restore();
           }
         }
       } },
 
     { id:'brokenMirror', easy:false, name:'割れた鏡',
-      apply(s, camX) {
+      apply(s, sx) {
         for (let wx = 850; wx < CORRIDOR_LEN; wx += 900) {
-          const sx = wx - camX;
-          if (sx > -50 && sx < W + 50) {
+          const x = wx + sx;
+          if (x > -50 && x < W + 50) {
             ctx.save();
-            ctx.fillStyle='#557'; ctx.fillRect(sx-22, 100, 44, 60);
+            ctx.fillStyle='#557'; ctx.fillRect(x-22, 100, 44, 60);
             ctx.strokeStyle='rgba(220,220,255,0.7)'; ctx.lineWidth=1;
-            ctx.beginPath(); ctx.moveTo(sx-10,110); ctx.lineTo(sx,140); ctx.lineTo(sx+12,130); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(x-10,110); ctx.lineTo(x,140); ctx.lineTo(x+12,130); ctx.stroke();
             ctx.restore();
           }
         }
       } },
 
     { id:'ceilingHand', easy:false, name:'天井の手形',
-      apply(s, camX) {
+      apply(s, sx) {
         for (let wx = 760; wx < CORRIDOR_LEN; wx += 850) {
-          const sx = wx - camX;
-          if (sx > -30 && sx < W + 30) {
+          const x = wx + sx;
+          if (x > -30 && x < W + 30) {
             ctx.save(); ctx.fillStyle='rgba(0,0,0,0.4)';
-            ctx.beginPath(); ctx.ellipse(sx, 30, 10, 6, 0, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(x, 30, 10, 6, 0, 0, Math.PI*2); ctx.fill();
             for (let f=0; f<4; f++) {
-              ctx.beginPath(); ctx.ellipse(sx-7+f*5, 20, 2, 5, 0, 0, Math.PI*2); ctx.fill();
+              ctx.beginPath(); ctx.ellipse(x-7+f*5, 20, 2, 5, 0, 0, Math.PI*2); ctx.fill();
             }
             ctx.restore();
           }
@@ -637,18 +639,18 @@
       } },
 
     { id:'blueLine', easy:false, name:'床の青い線',
-      apply(s, camX) {
+      apply(s, sx) {
         ctx.save(); ctx.strokeStyle='rgba(80,160,255,0.6)'; ctx.lineWidth=3;
         ctx.beginPath(); ctx.moveTo(0, WALL_BOTTOM+50); ctx.lineTo(W, WALL_BOTTOM+50); ctx.stroke();
         ctx.restore();
       } },
 
     { id:'posterUp', easy:false, name:'上向きポスター',
-      apply(s, camX) {
+      apply(s, sx) {
         for (let wx = 1000; wx < CORRIDOR_LEN; wx += 950) {
-          const sx = wx - camX;
-          if (sx > -50 && sx < W + 50) {
-            ctx.save(); ctx.translate(sx, 120); ctx.rotate(-Math.PI/2);
+          const x = wx + sx;
+          if (x > -50 && x < W + 50) {
+            ctx.save(); ctx.translate(x, 120); ctx.rotate(-Math.PI/2);
             ctx.fillStyle='#445'; ctx.fillRect(-20,-16,40,32);
             ctx.restore();
           }
@@ -685,7 +687,6 @@
     state = {
       exitNum: 0,
       camX: START_CAM,
-      playerX: W / 2,
       hall: { anomaly: null },
       cleared: false,
       transitioning: false
@@ -725,45 +726,45 @@
     ctx.beginPath(); ctx.arc(x + w - 10, y + h/2, 3, 0, Math.PI*2); ctx.fill();
   }
 
-  function drawMoviePosters(camX) {
+  function drawMoviePosters(sx) {
     for (let wx = 200; wx < CORRIDOR_LEN; wx += 480) {
-      const sx = wx - camX;
-      if (sx > -80 && sx < W + 80) {
+      const x = wx + sx;
+      if (x > -80 && x < W + 80) {
         ctx.save();
-        ctx.fillStyle='#1a1a22'; ctx.fillRect(sx-26, 86, 52, 72);
-        ctx.fillStyle='#2e2e3a'; ctx.fillRect(sx-22, 90, 44, 64);
-        ctx.fillStyle='#4a6a8a'; ctx.fillRect(sx-18, 94, 36, 26);
-        ctx.fillStyle='#8a5a4a'; ctx.fillRect(sx-18, 124, 36, 8);
-        ctx.fillStyle='#c8c8b0'; ctx.fillRect(sx-18, 136, 36, 4);
-        ctx.fillRect(sx-18, 144, 24, 3);
+        ctx.fillStyle='#1a1a22'; ctx.fillRect(x-26, 86, 52, 72);
+        ctx.fillStyle='#2e2e3a'; ctx.fillRect(x-22, 90, 44, 64);
+        ctx.fillStyle='#4a6a8a'; ctx.fillRect(x-18, 94, 36, 26);
+        ctx.fillStyle='#8a5a4a'; ctx.fillRect(x-18, 124, 36, 8);
+        ctx.fillStyle='#c8c8b0'; ctx.fillRect(x-18, 136, 36, 4);
+        ctx.fillRect(x-18, 144, 24, 3);
         ctx.restore();
       }
     }
   }
 
-  function drawWallPanels(camX) {
+  function drawWallPanels(sx) {
     for (let wx = 60; wx < CORRIDOR_LEN; wx += 120) {
-      const sx = wx - camX;
-      if (sx > -60 && sx < W + 60) {
+      const x = wx + sx;
+      if (x > -60 && x < W + 60) {
         ctx.save();
         ctx.fillStyle='#252530';
-        ctx.fillRect(sx, WALL_TOP+10, 100, 30);
+        ctx.fillRect(x, WALL_TOP+10, 100, 30);
         ctx.strokeStyle='rgba(255,255,255,0.06)';
         ctx.lineWidth=1;
-        ctx.strokeRect(sx+2, WALL_TOP+12, 96, 26);
+        ctx.strokeRect(x+2, WALL_TOP+12, 96, 26);
         ctx.restore();
       }
     }
   }
 
-  function drawFloorTiles(camX) {
+  function drawFloorTiles(sx) {
     ctx.save();
     ctx.strokeStyle='rgba(255,255,255,0.04)';
     ctx.lineWidth=1;
     for (let wx = 0; wx < CORRIDOR_LEN; wx += 60) {
-      const sx = wx - camX;
-      if (sx > -60 && sx < W + 60) {
-        ctx.beginPath(); ctx.moveTo(sx, WALL_BOTTOM); ctx.lineTo(sx, H); ctx.stroke();
+      const x = wx + sx;
+      if (x > -60 && x < W + 60) {
+        ctx.beginPath(); ctx.moveTo(x, WALL_BOTTOM); ctx.lineTo(x, H); ctx.stroke();
       }
     }
     for (let y = WALL_BOTTOM; y < H; y += 20) {
@@ -772,20 +773,20 @@
     ctx.restore();
   }
 
-  function drawCeilingBeams(camX) {
+  function drawCeilingBeams(sx) {
     ctx.save();
     ctx.fillStyle='rgba(0,0,0,0.35)';
     for (let wx = 0; wx < CORRIDOR_LEN; wx += 150) {
-      const sx = wx - camX;
-      if (sx > -20 && sx < W + 20) ctx.fillRect(sx, 0, 10, 60);
+      const x = wx + sx;
+      if (x > -20 && x < W + 20) ctx.fillRect(x, 0, 10, 60);
     }
     ctx.restore();
   }
 
-  // 線の位置（判定と一致）
-  function drawEdgeZones(camX) {
-    // 左：赤い線（引き返す境界） = LEFT_LINE
-    const leftScreen = LEFT_LINE - camX;
+  // 線の位置はワールド座標を画面座標に変換するだけ（プレイヤーも同じ系）
+  function drawEdgeZones(sx) {
+    // 左：赤い線（引き返す境界）
+    const leftScreen = LEFT_LINE + sx;
     if (leftScreen > -80 && leftScreen < W + 80) {
       ctx.save();
       ctx.strokeStyle='rgba(255,80,80,0.7)'; ctx.lineWidth=3;
@@ -804,8 +805,8 @@
       ctx.restore();
     }
 
-    // 右：青い線（進む境界） = RIGHT_LINE
-    const rightScreen = RIGHT_LINE - camX;
+    // 右：青い線（進む境界）
+    const rightScreen = RIGHT_LINE + sx;
     if (rightScreen > -80 && rightScreen < W + 80) {
       ctx.save();
       ctx.strokeStyle='rgba(80,200,255,0.7)'; ctx.lineWidth=3;
@@ -826,6 +827,10 @@
   }
 
   function drawCorridor(camX, anomaly) {
+    // プレイヤーは画面中央固定。ワールド座標 → 画面座標のオフセット
+    // ワールド座標 camX の地点が画面中央に来るようにする
+    const sx = PLAYER_SCREEN_X - camX;
+
     ctx.fillStyle = '#15151a'; ctx.fillRect(0,0,W,H);
     ctx.fillStyle = '#0d0d12'; ctx.fillRect(0,0,W,WALL_TOP);
     ctx.fillStyle = '#1d1d24'; ctx.fillRect(0,WALL_BOTTOM,W,H-WALL_BOTTOM);
@@ -833,28 +838,29 @@
 
     ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 1;
     for (let x = 0; x < W; x += 40) {
-      const sx = (x - (camX % 40));
-      ctx.beginPath(); ctx.moveTo(sx, WALL_TOP); ctx.lineTo(sx, WALL_BOTTOM); ctx.stroke();
+      const gx = x + ((camX + 20) % 40);
+      ctx.beginPath(); ctx.moveTo(gx, WALL_TOP); ctx.lineTo(gx, WALL_BOTTOM); ctx.stroke();
     }
 
-    drawWallPanels(camX);
-    drawMoviePosters(camX);
-    drawFloorTiles(camX);
-    drawCeilingBeams(camX);
+    drawWallPanels(sx);
+    drawMoviePosters(sx);
+    drawFloorTiles(sx);
+    drawCeilingBeams(sx);
 
     if (!anomaly || anomaly.id !== 'lightOff') {
       for (let i = 0; i < 6; i++) {
-        const lx = 80 + i*120 - (camX % 120);
+        const lx = 80 + i*120 + (sx % 120);
         ctx.fillStyle='rgba(255,240,200,0.18)'; ctx.fillRect(lx,18,60,8);
         ctx.fillStyle='rgba(255,240,200,0.5)';  ctx.fillRect(lx,24,60,2);
       }
     }
 
-    drawEdgeZones(camX);
+    drawEdgeZones(sx);
 
-    if (anomaly && anomaly.apply) anomaly.apply(state, camX);
+    if (anomaly && anomaly.apply) anomaly.apply(state, sx, camX);
 
-    const px = state.playerX, py = WALL_BOTTOM - 26;
+    // プレイヤーは画面中央固定
+    const px = PLAYER_SCREEN_X, py = WALL_BOTTOM - 26;
     ctx.save();
     ctx.fillStyle='#e8e8e8';
     ctx.beginPath(); ctx.arc(px, py-44, 10, 0, Math.PI*2); ctx.fill();
@@ -878,15 +884,12 @@
 
         if (dx !== 0) state.camX += dx * speed * dt;
 
-        // ★ 可動範囲を線の位置にクランプ
+        // 可動範囲を線の位置にクランプ（プレイヤーは中央固定なので、
+        // camX が線に達した＝線がプレイヤー位置に来た）
         if (state.camX < LEFT_LINE)  state.camX = LEFT_LINE;
         if (state.camX > RIGHT_LINE) state.camX = RIGHT_LINE;
 
-        const rel = (state.camX - START_CAM) /
-                    Math.max(START_CAM - LEFT_LINE, RIGHT_LINE - START_CAM);
-        state.playerX = W / 2 + rel * (W / 2 - 100);
-
-        // ★ 判定を線の位置に合わせる
+        // 判定：線がプレイヤー位置（画面中央）に来たら発火
         if (state.camX <= LEFT_LINE) {
           judgeBack();
         }
@@ -948,7 +951,6 @@
       }
 
       state.camX = START_CAM;
-      state.playerX = W / 2;
 
       state.hall = (state.exitNum === 0)
         ? { anomaly: null }
