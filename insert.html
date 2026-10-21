@@ -11,7 +11,6 @@
   .screen { position: absolute; inset: 0; display: none; }
   .screen.active { display: block; }
 
-  /* オープニング */
   #titleScreen { background: #111 url('img357exit.jpg') center/cover no-repeat; }
   #titleScreen::after { content:""; position:absolute; inset:0; background: rgba(0,0,0,.55); }
   .title-box { position:absolute; inset:0; z-index:2; display:flex; flex-direction:column;
@@ -24,14 +23,12 @@
     transition:.18s; min-width:220px; }
   .btn:hover { background:#eee; color:#111; }
 
-  /* 背景画像ビューア */
   #bgViewer { background:#000; z-index:50; }
   #bgViewer img { width:100%; height:100%; object-fit:fill; display:block; }
   #bgViewer .closeBtn { position:absolute; top:14px; right:14px; z-index:2;
     background: rgba(0,0,0,.65); border:1px solid #ccc; color:#fff; padding:8px 16px;
     border-radius:4px; cursor:pointer; font-size:14px; }
 
-  /* ゲーム */
   #gameScreen { background:#0a0a0a; }
   #stage { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
   canvas { background:#15151a; image-rendering: pixelated; }
@@ -43,12 +40,10 @@
     font-size:13px; opacity:0; transition: opacity .3s; pointer-events:none; white-space:nowrap; }
   #message.show { opacity:1; }
 
-  /* 暗転オーバーレイ */
   #fade { position:absolute; inset:0; z-index:20; background:#000; opacity:0;
     pointer-events:none; transition: opacity .35s linear; }
   #fade.on { opacity:1; }
 
-  /* クリア */
   #clearScreen { background:#000; }
   #clearScreen .wrap { position:absolute; inset:0; display:flex; flex-direction:column;
     align-items:center; justify-content:center; gap:20px; padding:20px; text-align:center; }
@@ -126,7 +121,7 @@
   const GOAL = 4;
   const CORRIDOR_LEN = 420;
   const WALL_TOP = 60, WALL_BOTTOM = 300;
-  const FADE_MS = 3000;   // 暗転時間(3秒)
+  const FADE_MS = 3000;
 
   const countLabel = document.getElementById('countLabel');
   const msgEl = document.getElementById('message');
@@ -141,67 +136,73 @@
   const ANOMALIES = [
     { id:'redLight', name:'赤い照明',
       apply(s, camX) {
-        ctx.save(); ctx.fillStyle='rgba(255,30,30,0.22)'; ctx.fillRect(0,0,W,H); ctx.restore();
+        ctx.save(); ctx.fillStyle='rgba(255,30,30,0.25)'; ctx.fillRect(0,0,W,H); ctx.restore();
       } },
     { id:'floorText', name:'床の不気味な文字',
       apply(s, camX) {
-        const textX = 200 - camX + 120;
-        if (textX > -200 && textX < W + 200) {
-          ctx.save(); ctx.font='bold 34px monospace';
-          ctx.fillStyle='rgba(200,20,20,0.85)'; ctx.textAlign='center';
-          ctx.fillText('オカエリ', textX, WALL_BOTTOM + 34); ctx.restore();
+        ctx.save(); ctx.font='bold 30px monospace';
+        ctx.fillStyle='rgba(200,20,20,0.85)'; ctx.textAlign='center';
+        for (let wx = 120; wx < CORRIDOR_LEN; wx += 200) {
+          const sx = wx - camX;
+          if (sx > -150 && sx < W + 150) {
+            ctx.fillText('オカエリ', sx, WALL_BOTTOM + 34);
+          }
         }
+        ctx.restore();
       } },
     { id:'extraDoor', name:'余計な扉',
       apply(s, camX) {
-        const dx = 240 - camX + 40;
-        if (dx > -80 && dx < W + 80) drawDoor(dx, WALL_TOP + 40, 64, 150, '#332a2a');
+        for (let wx = 150; wx < CORRIDOR_LEN; wx += 220) {
+          const sx = wx - camX;
+          if (sx > -80 && sx < W + 80) drawDoor(sx, WALL_TOP + 40, 64, 150, '#332a2a');
+        }
       } },
     { id:'eyes', name:'壁の目',
       apply(s, camX) {
-        const ex = 260 - camX + 40;
-        if (ex > -60 && ex < W + 60) {
-          ctx.save();
-          ctx.fillStyle='#ddd';
-          ctx.beginPath(); ctx.ellipse(ex, 130, 16, 9, 0, 0, Math.PI*2); ctx.fill();
-          ctx.beginPath(); ctx.ellipse(ex+34, 130, 16, 9, 0, 0, Math.PI*2); ctx.fill();
-          ctx.fillStyle='#000';
-          ctx.beginPath(); ctx.arc(ex+4, 130, 5, 0, Math.PI*2); ctx.fill();
-          ctx.beginPath(); ctx.arc(ex+38, 130, 5, 0, Math.PI*2); ctx.fill();
-          ctx.restore();
+        for (let wx = 180; wx < CORRIDOR_LEN; wx += 200) {
+          const ex = wx - camX;
+          if (ex > -60 && ex < W + 60) {
+            ctx.save();
+            ctx.fillStyle='#ddd';
+            ctx.beginPath(); ctx.ellipse(ex, 130, 16, 9, 0, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(ex+34, 130, 16, 9, 0, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle='#000';
+            ctx.beginPath(); ctx.arc(ex+4, 130, 5, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(ex+38, 130, 5, 0, Math.PI*2); ctx.fill();
+            ctx.restore();
+          }
         }
       } },
     { id:'lowCeiling', name:'天井が低い',
       apply(s) {
-        ctx.save(); ctx.fillStyle='#0c0c10'; ctx.fillRect(0,0,W,130); ctx.restore();
+        ctx.save(); ctx.fillStyle='#0c0c10'; ctx.fillRect(0,0,W,140); ctx.restore();
       } },
     { id:'flicker', name:'照明の点滅',
       apply(s) {
         const t = performance.now();
-        if (Math.floor(t/120) % 2 === 0) {
-          ctx.save(); ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.fillRect(0,0,W,H); ctx.restore();
+        if (Math.floor(t/150) % 2 === 0) {
+          ctx.save(); ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fillRect(0,0,W,H); ctx.restore();
         }
       } }
   ];
 
   /* ---------------- 状態管理 ---------------- */
   function pickHall() {
-    // 1/2で異変、異変なら中からランダム。非異変なら null
     const has = Math.random() < 0.5;
     return { anomaly: has ? ANOMALIES[Math.floor(Math.random()*ANOMALIES.length)] : null };
   }
 
   function startGame() {
     state = {
-      exitNum: 0,               // 現在の出口番号(0=スタートの基礎廊下)
+      exitNum: 0,
       camX: 0,
-      playerX: 80,
-      hall: { anomaly: null },  // 出口0は必ず非異変
+      playerX: 100,
+      hall: { anomaly: null },
       cleared: false,
       transitioning: false
     };
     updateHud();
-    showMsg('出口0（基礎廊下）。A/D で進もう。');
+    showMsg('出口0（基礎廊下）。D で進もう。');
     keys = {};
     if (rafId) cancelAnimationFrame(rafId);
     lastTime = performance.now();
@@ -285,25 +286,22 @@
         if (keys['d'] || keys['arrowright']) dx += 1;
 
         if (dx !== 0) {
-          state.playerX += dx * speed * dt;
-          if (state.playerX > W * 0.55) {
-            const over = state.playerX - W * 0.55;
-            state.playerX -= over;
-            state.camX += over;
-          } else if (state.playerX < W * 0.25) {
-            const under = W * 0.25 - state.playerX;
-            state.playerX += under;
-            state.camX = Math.max(0, state.camX - under);
-          }
+          state.camX += dx * speed * dt;
         }
-        state.camX = Math.max(0, Math.min(CORRIDOR_LEN, state.camX));
+
+        if (state.camX < 0) state.camX = 0;
+        if (state.camX > CORRIDOR_LEN) state.camX = CORRIDOR_LEN;
+
+        // 見た目用: camX の進捗に応じてプレイヤーを画面内で移動
+        const t = CORRIDOR_LEN === 0 ? 0 : state.camX / CORRIDOR_LEN;
+        state.playerX = 100 + t * (W - 200);
 
         // 右端到達 → 前進判定
-        if (state.camX >= CORRIDOR_LEN - 6) {
+        if (state.camX >= CORRIDOR_LEN) {
           judgeForward();
         }
-        // 左端到達（戻り） → 引き返し判定
-        else if (state.camX <= 6 && state.exitNum > 0) {
+        // 左端到達(戻り) → 引き返し判定
+        else if (state.camX <= 0 && state.exitNum > 0) {
           judgeBack();
         }
       }
@@ -315,7 +313,7 @@
   }
 
   /* ---------------- 判定 ---------------- */
-  // 出口0は基礎廊下。前進のみで次へ。
+  // 右端=進む
   function judgeForward() {
     if (state.exitNum === 0) {
       showMsg('基礎廊下クリア。次から異常を見極めよう。');
@@ -331,6 +329,7 @@
     }
   }
 
+  // 左端=引き返す
   function judgeBack() {
     if (state.hall.anomaly) {
       showMsg('異常を回避。次の通路へ。');
@@ -341,38 +340,31 @@
     }
   }
 
-  // 暗転 → ワープ＆マップすり替え → 明転
   function transitionToNext(success) {
     state.transitioning = true;
     fadeEl.classList.add('on');
 
     setTimeout(() => {
-      // 暗転中処理
       if (success) {
         state.exitNum++;
         if (state.exitNum >= GOAL + 1) {
-          // 出口4を通過 → クリア
           fadeEl.classList.remove('on');
           finishClear();
           return;
         }
       } else {
-        // 失敗 → 出口0へ
         state.exitNum = 0;
       }
 
-      // 主人公をスタート位置へワープ
       state.camX = 0;
-      state.playerX = 80;
+      state.playerX = 100;
 
-      // マップすり替え(出口0は必ず非異変、それ以外は抽選)
       state.hall = (state.exitNum === 0)
         ? { anomaly: null }
         : pickHall();
 
       updateHud();
 
-      // 明転
       fadeEl.classList.remove('on');
       state.transitioning = false;
     }, FADE_MS);
