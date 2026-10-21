@@ -120,6 +120,7 @@
 
   const GOAL = 4;
   const CORRIDOR_LEN = 420;
+  const START_CAM = CORRIDOR_LEN / 2;  // 通路の中央からスタート
   const WALL_TOP = 60, WALL_BOTTOM = 300;
   const FADE_MS = 3000;
 
@@ -134,8 +135,8 @@
 
   /* =========================================================
      異変 13種
-     easy: true  … わかりやすい(全体の8%の重み)
-     easy: false … よく観察しないと気づけない難しいもの(92%の重み)
+     easy: true  … わかりやすい(8%)
+     easy: false … よく観察しないと気づけない難しいもの(92%)
      ========================================================= */
   const ANOMALIES = [
     /* ---- わかりやすい(8%) ---- */
@@ -215,7 +216,6 @@
       } },
     { id:'lightOff', easy:false, name:'一部の照明が消えている',
       apply(s, camX) {
-        // 通常は4本の照明。1本を描かない(消灯)
         const skip = 2;
         for (let i = 0; i < 4; i++) {
           if (i === skip) continue;
@@ -272,7 +272,7 @@
             ctx.save();
             ctx.fillStyle='#1b3a2a'; ctx.fillRect(sx-22, 84, 44, 22);
             ctx.fillStyle='#cfe'; ctx.font='bold 14px sans-serif'; ctx.textAlign='center';
-            ctx.fillText('3', sx, 100); // 本来は「4」だが「3」になっている
+            ctx.fillText('3', sx, 100);
             ctx.restore();
           }
         }
@@ -281,8 +281,8 @@
 
   // 重み付き抽選: わかりやすい8% / 難しい92%
   function pickAnomaly() {
-    const easyList   = ANOMALIES.filter(a => a.easy);
-    const hardList   = ANOMALIES.filter(a => !a.easy);
+    const easyList = ANOMALIES.filter(a => a.easy);
+    const hardList = ANOMALIES.filter(a => !a.easy);
     const useEasy = Math.random() < 0.08;
     const list = (useEasy && easyList.length) ? easyList : hardList;
     return list[Math.floor(Math.random() * list.length)];
@@ -297,8 +297,8 @@
   function startGame() {
     state = {
       exitNum: 0,
-      camX: 0,
-      playerX: 100,
+      camX: START_CAM,     // 通路の中央から
+      playerX: W / 2,      // 画面中央
       hall: { anomaly: null },
       cleared: false,
       transitioning: false
@@ -331,7 +331,6 @@
   window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 
   /* ---------------- 描画 ---------------- */
-  // 「余計な扉」異変でだけ使う
   function drawDoor(x, y, w, h, color) {
     ctx.fillStyle = color; ctx.fillRect(x, y, w, h);
     ctx.strokeStyle = '#111'; ctx.lineWidth = 3; ctx.strokeRect(x, y, w, h);
@@ -339,7 +338,7 @@
     ctx.beginPath(); ctx.arc(x + w - 10, y + h/2, 3, 0, Math.PI*2); ctx.fill();
   }
 
-  function drawCorridor(camX, anomaly, length) {
+  function drawCorridor(camX, anomaly) {
     ctx.fillStyle = '#15151a'; ctx.fillRect(0,0,W,H);
     ctx.fillStyle = '#0d0d12'; ctx.fillRect(0,0,W,WALL_TOP);
     ctx.fillStyle = '#1d1d24'; ctx.fillRect(0,WALL_BOTTOM,W,H-WALL_BOTTOM);
@@ -350,8 +349,6 @@
       const sx = (x - (camX % 40));
       ctx.beginPath(); ctx.moveTo(sx, WALL_TOP); ctx.lineTo(sx, WALL_BOTTOM); ctx.stroke();
     }
-
-    // 通常の出口扉は描かない（右端が出口）
 
     // 基本の照明4本（消灯異変のときは異変側で上書き）
     if (!anomaly || anomaly.id !== 'lightOff') {
@@ -391,8 +388,9 @@
         if (state.camX < 0) state.camX = 0;
         if (state.camX > CORRIDOR_LEN) state.camX = CORRIDOR_LEN;
 
-        const t = CORRIDOR_LEN === 0 ? 0 : state.camX / CORRIDOR_LEN;
-        state.playerX = 100 + t * (W - 200);
+        // 見た目用: 中央基準でプレイヤーを画面内で動かす
+        const rel = (state.camX - CORRIDOR_LEN / 2) / (CORRIDOR_LEN / 2); // -1..1
+        state.playerX = W / 2 + rel * (W / 2 - 100);
 
         // 右端到達 → 前進判定
         if (state.camX >= CORRIDOR_LEN) {
@@ -404,7 +402,7 @@
         }
       }
 
-      drawCorridor(state.camX, state.hall.anomaly, CORRIDOR_LEN);
+      drawCorridor(state.camX, state.hall.anomaly);
     }
 
     rafId = requestAnimationFrame(loop);
@@ -422,7 +420,7 @@
       showMsg('異常を見逃した… 出口0へ戻される。');
       transitionToNext(false);
     } else {
-      // ★ 非異変を右端(進む)で通過
+      // 非異変を右端(進む)で通過
       if (state.exitNum === GOAL) {
         // 出口4を非異変で通過 → クリア（暗転なし）
         finishClear();
@@ -460,8 +458,8 @@
         state.exitNum = 0;
       }
 
-      state.camX = 0;
-      state.playerX = 100;
+      state.camX = START_CAM;   // 中央へワープ
+      state.playerX = W / 2;
 
       state.hall = (state.exitNum === 0)
         ? { anomaly: null }
