@@ -132,64 +132,166 @@
   let lastTime = 0;
   let rafId = null;
 
-  /* ---------------- 異変(オリジナル) ---------------- */
+  /* =========================================================
+     異変 13種
+     easy: true  … わかりやすい(全体の8%の重み)
+     easy: false … よく観察しないと気づけない難しいもの(92%の重み)
+     ========================================================= */
   const ANOMALIES = [
-    { id:'redLight', name:'赤い照明',
+    /* ---- わかりやすい(8%) ---- */
+    { id:'redLight', easy:true, name:'赤い照明',
       apply(s, camX) {
-        ctx.save(); ctx.fillStyle='rgba(255,30,30,0.25)'; ctx.fillRect(0,0,W,H); ctx.restore();
+        ctx.save(); ctx.fillStyle='rgba(255,20,20,0.35)'; ctx.fillRect(0,0,W,H); ctx.restore();
       } },
-    { id:'floorText', name:'床の不気味な文字',
+
+    /* ---- 難しい(92%) ---- */
+    { id:'floorText', easy:false, name:'床の不気味な文字',
       apply(s, camX) {
-        ctx.save(); ctx.font='bold 30px monospace';
-        ctx.fillStyle='rgba(200,20,20,0.85)'; ctx.textAlign='center';
+        ctx.save(); ctx.font='bold 26px monospace';
+        ctx.fillStyle='rgba(190,20,20,0.55)'; ctx.textAlign='center';
         for (let wx = 120; wx < CORRIDOR_LEN; wx += 200) {
           const sx = wx - camX;
-          if (sx > -150 && sx < W + 150) {
-            ctx.fillText('オカエリ', sx, WALL_BOTTOM + 34);
-          }
+          if (sx > -150 && sx < W + 150) ctx.fillText('オカエリ', sx, WALL_BOTTOM + 30);
         }
         ctx.restore();
       } },
-    { id:'extraDoor', name:'余計な扉',
+    { id:'extraDoor', easy:false, name:'余計な扉',
       apply(s, camX) {
-        for (let wx = 150; wx < CORRIDOR_LEN; wx += 220) {
+        for (let wx = 170; wx < CORRIDOR_LEN; wx += 240) {
           const sx = wx - camX;
-          if (sx > -80 && sx < W + 80) drawDoor(sx, WALL_TOP + 40, 64, 150, '#332a2a');
+          if (sx > -80 && sx < W + 80) drawDoor(sx, WALL_TOP + 60, 48, 120, '#302828');
         }
       } },
-    { id:'eyes', name:'壁の目',
+    { id:'eyes', easy:false, name:'壁の目',
       apply(s, camX) {
-        for (let wx = 180; wx < CORRIDOR_LEN; wx += 200) {
+        for (let wx = 200; wx < CORRIDOR_LEN; wx += 200) {
           const ex = wx - camX;
           if (ex > -60 && ex < W + 60) {
             ctx.save();
-            ctx.fillStyle='#ddd';
-            ctx.beginPath(); ctx.ellipse(ex, 130, 16, 9, 0, 0, Math.PI*2); ctx.fill();
-            ctx.beginPath(); ctx.ellipse(ex+34, 130, 16, 9, 0, 0, Math.PI*2); ctx.fill();
-            ctx.fillStyle='#000';
-            ctx.beginPath(); ctx.arc(ex+4, 130, 5, 0, Math.PI*2); ctx.fill();
-            ctx.beginPath(); ctx.arc(ex+38, 130, 5, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle='rgba(220,220,220,0.55)';
+            ctx.beginPath(); ctx.ellipse(ex, 128, 10, 5, 0, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(ex+22, 128, 10, 5, 0, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle='rgba(0,0,0,0.6)';
+            ctx.beginPath(); ctx.arc(ex+2, 128, 3, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(ex+24, 128, 3, 0, Math.PI*2); ctx.fill();
             ctx.restore();
           }
         }
       } },
-    { id:'lowCeiling', name:'天井が低い',
+    { id:'lowCeiling', easy:false, name:'天井が低い',
       apply(s) {
-        ctx.save(); ctx.fillStyle='#0c0c10'; ctx.fillRect(0,0,W,140); ctx.restore();
+        ctx.save(); ctx.fillStyle='#0c0c10'; ctx.fillRect(0,0,W,120); ctx.restore();
       } },
-    { id:'flicker', name:'照明の点滅',
+    { id:'flicker', easy:false, name:'照明の点滅',
       apply(s) {
         const t = performance.now();
-        if (Math.floor(t/150) % 2 === 0) {
-          ctx.save(); ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fillRect(0,0,W,H); ctx.restore();
+        if (Math.floor(t/180) % 2 === 0) {
+          ctx.save(); ctx.fillStyle='rgba(0,0,0,0.35)'; ctx.fillRect(0,0,W,H); ctx.restore();
+        }
+      } },
+    { id:'posterFlip', easy:false, name:'ポスターが逆さま',
+      apply(s, camX) {
+        for (let wx = 150; wx < CORRIDOR_LEN; wx += 260) {
+          const px = wx - camX;
+          if (px > -60 && px < W + 60) {
+            ctx.save();
+            ctx.translate(px, 120); ctx.rotate(Math.PI);
+            ctx.fillStyle='#4a5a6a'; ctx.fillRect(-18,-24,36,48);
+            ctx.fillStyle='#9ab'; ctx.fillRect(-14,-20,28,6);
+            ctx.restore();
+          }
+        }
+      } },
+    { id:'wallStain', easy:false, name:'壁の染み',
+      apply(s, camX) {
+        for (let wx = 140; wx < CORRIDOR_LEN; wx += 230) {
+          const sx = wx - camX;
+          if (sx > -60 && sx < W + 60) {
+            ctx.save(); ctx.fillStyle='rgba(60,10,10,0.35)';
+            ctx.beginPath(); ctx.ellipse(sx, 210, 26, 14, 0.3, 0, Math.PI*2); ctx.fill();
+            ctx.restore();
+          }
+        }
+      } },
+    { id:'lightOff', easy:false, name:'一部の照明が消えている',
+      apply(s, camX) {
+        // 通常は4本の照明。1本を描かない(消灯)
+        const skip = 2;
+        for (let i = 0; i < 4; i++) {
+          if (i === skip) continue;
+          const lx = 80 + i*120 - (camX % 120);
+          ctx.fillStyle='rgba(255,240,200,0.18)'; ctx.fillRect(lx,18,60,8);
+          ctx.fillStyle='rgba(255,240,200,0.5)';  ctx.fillRect(lx,24,60,2);
+        }
+      } },
+    { id:'floorCrack', easy:false, name:'床のひび割れ',
+      apply(s, camX) {
+        ctx.save(); ctx.strokeStyle='rgba(0,0,0,0.6)'; ctx.lineWidth=2;
+        for (let wx = 130; wx < CORRIDOR_LEN; wx += 210) {
+          const sx = wx - camX;
+          if (sx > -80 && sx < W + 80) {
+            ctx.beginPath();
+            ctx.moveTo(sx, WALL_BOTTOM+20);
+            ctx.lineTo(sx+16, WALL_BOTTOM+40);
+            ctx.lineTo(sx+6, WALL_BOTTOM+58);
+            ctx.stroke();
+          }
+        }
+        ctx.restore();
+      } },
+    { id:'shadowHand', easy:false, name:'壁に手の影',
+      apply(s, camX) {
+        for (let wx = 180; wx < CORRIDOR_LEN; wx += 250) {
+          const sx = wx - camX;
+          if (sx > -60 && sx < W + 60) {
+            ctx.save(); ctx.fillStyle='rgba(0,0,0,0.35)';
+            ctx.beginPath(); ctx.ellipse(sx, 150, 10, 16, 0, 0, Math.PI*2); ctx.fill();
+            for (let f=0; f<4; f++) {
+              ctx.beginPath(); ctx.ellipse(sx-8+f*5, 132, 2, 8, 0, 0, Math.PI*2); ctx.fill();
+            }
+            ctx.restore();
+          }
+        }
+      } },
+    { id:'puddle', easy:false, name:'床の水たまり',
+      apply(s, camX) {
+        for (let wx = 160; wx < CORRIDOR_LEN; wx += 220) {
+          const sx = wx - camX;
+          if (sx > -80 && sx < W + 80) {
+            ctx.save(); ctx.fillStyle='rgba(40,60,90,0.5)';
+            ctx.beginPath(); ctx.ellipse(sx, WALL_BOTTOM+34, 34, 10, 0, 0, Math.PI*2); ctx.fill();
+            ctx.restore();
+          }
+        }
+      } },
+    { id:'signNum', easy:false, name:'案内板の数字が違う',
+      apply(s, camX) {
+        for (let wx = 120; wx < CORRIDOR_LEN; wx += 260) {
+          const sx = wx - camX;
+          if (sx > -60 && sx < W + 60) {
+            ctx.save();
+            ctx.fillStyle='#1b3a2a'; ctx.fillRect(sx-22, 84, 44, 22);
+            ctx.fillStyle='#cfe'; ctx.font='bold 14px sans-serif'; ctx.textAlign='center';
+            ctx.fillText('3', sx, 100); // 本来は「4」だが「3」になっている
+            ctx.restore();
+          }
         }
       } }
   ];
 
+  // 重み付き抽選: わかりやすい8% / 難しい92%
+  function pickAnomaly() {
+    const easyList   = ANOMALIES.filter(a => a.easy);
+    const hardList   = ANOMALIES.filter(a => !a.easy);
+    const useEasy = Math.random() < 0.08;
+    const list = (useEasy && easyList.length) ? easyList : hardList;
+    return list[Math.floor(Math.random() * list.length)];
+  }
+
   /* ---------------- 状態管理 ---------------- */
   function pickHall() {
-    const has = Math.random() < 0.5;
-    return { anomaly: has ? ANOMALIES[Math.floor(Math.random()*ANOMALIES.length)] : null };
+    const has = Math.random() < 0.5; // 1/2で異変
+    return { anomaly: has ? pickAnomaly() : null };
   }
 
   function startGame() {
@@ -202,7 +304,7 @@
       transitioning: false
     };
     updateHud();
-    showMsg('出口0（基礎廊下）。D で進もう。');
+    showMsg('出口0（基礎廊下）。D で進もう。A でも次へ進めます。');
     keys = {};
     if (rafId) cancelAnimationFrame(rafId);
     lastTime = performance.now();
@@ -229,11 +331,12 @@
   window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 
   /* ---------------- 描画 ---------------- */
+  // 「余計な扉」異変でだけ使う
   function drawDoor(x, y, w, h, color) {
     ctx.fillStyle = color; ctx.fillRect(x, y, w, h);
     ctx.strokeStyle = '#111'; ctx.lineWidth = 3; ctx.strokeRect(x, y, w, h);
     ctx.fillStyle = '#c9b37a';
-    ctx.beginPath(); ctx.arc(x + w - 12, y + h/2, 4, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x + w - 10, y + h/2, 3, 0, Math.PI*2); ctx.fill();
   }
 
   function drawCorridor(camX, anomaly, length) {
@@ -248,17 +351,15 @@
       ctx.beginPath(); ctx.moveTo(sx, WALL_TOP); ctx.lineTo(sx, WALL_BOTTOM); ctx.stroke();
     }
 
-    const doorScreenX = length - camX;
-    if (doorScreenX > -120 && doorScreenX < W + 120) {
-      drawDoor(doorScreenX, WALL_TOP + 40, 80, 180, '#3a2f2f');
-      ctx.save(); ctx.fillStyle='#eee'; ctx.font='bold 16px sans-serif'; ctx.textAlign='center';
-      ctx.fillText('出口', doorScreenX + 40, WALL_TOP + 30); ctx.restore();
-    }
+    // 通常の出口扉は描かない（右端が出口）
 
-    for (let i = 0; i < 4; i++) {
-      const lx = 80 + i*120 - (camX % 120);
-      ctx.fillStyle='rgba(255,240,200,0.18)'; ctx.fillRect(lx,18,60,8);
-      ctx.fillStyle='rgba(255,240,200,0.5)';  ctx.fillRect(lx,24,60,2);
+    // 基本の照明4本（消灯異変のときは異変側で上書き）
+    if (!anomaly || anomaly.id !== 'lightOff') {
+      for (let i = 0; i < 4; i++) {
+        const lx = 80 + i*120 - (camX % 120);
+        ctx.fillStyle='rgba(255,240,200,0.18)'; ctx.fillRect(lx,18,60,8);
+        ctx.fillStyle='rgba(255,240,200,0.5)';  ctx.fillRect(lx,24,60,2);
+      }
     }
 
     if (anomaly && anomaly.apply) anomaly.apply(state, camX);
@@ -285,14 +386,11 @@
         if (keys['a'] || keys['arrowleft'])  dx -= 1;
         if (keys['d'] || keys['arrowright']) dx += 1;
 
-        if (dx !== 0) {
-          state.camX += dx * speed * dt;
-        }
+        if (dx !== 0) state.camX += dx * speed * dt;
 
         if (state.camX < 0) state.camX = 0;
         if (state.camX > CORRIDOR_LEN) state.camX = CORRIDOR_LEN;
 
-        // 見た目用: camX の進捗に応じてプレイヤーを画面内で移動
         const t = CORRIDOR_LEN === 0 ? 0 : state.camX / CORRIDOR_LEN;
         state.playerX = 100 + t * (W - 200);
 
@@ -300,8 +398,8 @@
         if (state.camX >= CORRIDOR_LEN) {
           judgeForward();
         }
-        // 左端到達(戻り) → 引き返し判定
-        else if (state.camX <= 0 && state.exitNum > 0) {
+        // 左端到達 → 引き返し判定
+        else if (state.camX <= 0) {
           judgeBack();
         }
       }
@@ -324,6 +422,12 @@
       showMsg('異常を見逃した… 出口0へ戻される。');
       transitionToNext(false);
     } else {
+      // ★ 非異変を右端(進む)で通過
+      if (state.exitNum === GOAL) {
+        // 出口4を非異変で通過 → クリア（暗転なし）
+        finishClear();
+        return;
+      }
       showMsg('異常なし。次の通路へ。');
       transitionToNext(true);
     }
@@ -331,6 +435,11 @@
 
   // 左端=引き返す
   function judgeBack() {
+    if (state.exitNum === 0) {
+      showMsg('基礎廊下クリア。次から異常を見極めよう。');
+      transitionToNext(true);
+      return;
+    }
     if (state.hall.anomaly) {
       showMsg('異常を回避。次の通路へ。');
       transitionToNext(true);
@@ -347,11 +456,6 @@
     setTimeout(() => {
       if (success) {
         state.exitNum++;
-        if (state.exitNum >= GOAL + 1) {
-          fadeEl.classList.remove('on');
-          finishClear();
-          return;
-        }
       } else {
         state.exitNum = 0;
       }
