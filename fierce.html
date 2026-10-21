@@ -1,0 +1,2506 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>iPod touch 5 クイックメモ完全再現 - fierce</title>
+    <style>
+        body {
+            background-color: #1a1a1a;
+            font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* iPod touch 5 画面サイズと実物の完全な暗闇の背景 */
+        .ipod-screen {
+            width: 320px;
+            min-height: 568px;
+            background-color: #111111;
+            position: relative;
+            overflow: visible;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.8);
+            border: 4px solid #000;
+            border-radius: 24px;
+            box-sizing: border-box;
+        }
+
+        /* ーーー ① 最上部ステータスバー ーーー */
+        .status-bar {
+            height: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 6px 0 8px;
+            color: #fff;
+            font-size: 11px;
+            font-weight: 400;
+            box-sizing: border-box;
+            letter-spacing: 0.5px;
+        }
+        .status-left {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .wifi-icon {
+            width: 10px;
+            height: 8px;
+            border-top: 1px solid #fff;
+            border-radius: 50% 50% 0 0;
+            position: relative;
+        }
+        .wifi-icon::before {
+            content: "";
+            position: absolute;
+            top: 3px; left: 2px; width: 6px; height: 5px;
+            border-top: 1px solid #fff;
+            border-radius: 50% 50% 0 0;
+        }
+        .status-center {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            font-weight: 500;
+        }
+        .status-right {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .lock-icon {
+            width: 10px;
+            height: 10px;
+            border: 1px solid #fff;
+            border-radius: 50%;
+            position: relative;
+        }
+        .lock-icon::after {
+            content: "🔒";
+            font-size: 6px;
+            position: absolute;
+            top: -2px;
+            left: 1px;
+        }
+        .battery-icon {
+            width: 17px;
+            height: 8px;
+            border: 1px solid #fff;
+            border-radius: 2px;
+            padding: 1px;
+            display: flex;
+            align-items: center;
+            position: relative;
+        }
+        .battery-icon::after {
+            content: "";
+            position: absolute;
+            right: -2px; top: 2px; width: 1px; height: 4px;
+            background-color: #fff;
+        }
+        .battery-level {
+            width: 100%;
+            height: 100%;
+            background-color: #fff;
+        }
+
+        /* ーーー ② タブ ーーー */
+        .nc-tabs {
+            display: flex;
+            height: 38px;
+            border-bottom: 1px solid rgba(255,255,255,0.12);
+            background: rgba(255, 255, 255, 0.01);
+        }
+        .nc-tab {
+            flex: 1;
+            text-align: center;
+            line-height: 38px;
+            font-size: 13px;
+            color: #777777;
+        }
+        .nc-tab.active {
+            color: #000000;
+            background-color: rgba(255,255,255,0.06);
+            border-bottom: 1px solid rgba(255,255,255,0.4);
+        }
+        .nc-tab.inactive {
+            color: #838383;
+        }
+
+        /* ーーー ③ 日付表示 ーーー */
+        .date-header {
+            color: rgba(255, 255, 255, 0.85);
+            font-size: 28px;
+            font-weight: 300;
+            text-align: center;
+            margin: 22px 0 18px 0;
+            letter-spacing: 0.5px;
+        }
+
+        /* ーーー ④ ウィジェット ーーー */
+        .widget-container {
+            border-top: 1px solid rgba(255, 255, 255, 0.12);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+        }
+
+        .widget-header {
+            display: flex;
+            align-items: center;
+            padding: 8px 14px;
+            height: 24px;
+        }
+        .app-icon {
+            width: 18px;
+            height: 18px;
+            background: rgba(255,255,255,0.9);
+            border-radius: 4px;
+            margin-right: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 5px;
+            color: #555;
+            font-weight: bold;
+            line-height: 1;
+            text-align: center;
+        }
+        .widget-title {
+            color: rgba(255,255,255,0.9);
+            font-size: 15px;
+            font-weight: 400;
+        }
+
+        .memo-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .memo-item {
+            display: flex;
+            align-items: center;
+            padding: 10px 14px;
+            font-size: 15px;
+            color: #fff;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        /* ーーー ○ボタン ーーー */
+        .circle-btn {
+            width: 16px;
+            height: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            margin-right: 14px;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            box-sizing: border-box;
+            background: transparent;
+            flex-shrink: 0;
+        }
+        .circle-btn.selected {
+            border: 1px solid rgba(255, 255, 255, 0.7);
+        }
+        .circle-btn.selected::after {
+            content: "";
+            width: 8.8px;
+            height: 8.8px;
+            background-color: #ffffff;
+            border-radius: 50%;
+            border: none;
+        }
+
+        /* タイトル行 */
+        .memo-title {
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 15px;
+        }
+        /* 内容行（クリック不可・連動のみ） */
+        .memo-content {
+            padding-left: 22px;
+            font-size: 14px;
+            color: rgba(255,255,255,0.88);
+        }
+        .memo-content .circle-btn {
+            pointer-events: none;
+            width: 14px;
+            height: 14px;
+            margin-right: 12px;
+        }
+        .memo-content .circle-btn.selected::after {
+            width: 8.8px;
+            height: 8.8px;
+        }
+
+        /* 十字架レイアウト（長文のみ） */
+        .memo-item.cross {
+            align-items: flex-start;
+            padding-left: 0;
+        }
+        .memo-item.cross .circle-btn {
+            margin-left: 4px;
+        }
+        .memo-item.cross .memo-text {
+            white-space: nowrap;
+            overflow: visible;
+        }
+
+        .memo-text {
+            word-break: break-word;
+        }
+
+        /* ーーー ⑤ 追加・ペーストボタン ーーー */
+        .input-row {
+            display: flex;
+            gap: 8px;
+            padding: 10px 14px 12px 14px;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .input-btn {
+            flex: 1;
+            height: 28px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            border-radius: 5px;
+            color: rgba(255, 255, 255, 0.04);
+            font-size: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        /* ーーー ⑥ 編集ボタン ーーー */
+        .edit-btn-container {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            margin-top: 24px;
+            margin-bottom: 40px;
+        }
+        .edit-btn {
+            width: 220px;
+            height: 28px;
+            background: rgba(255, 255, 255, 0.16);
+            border-radius: 5px;
+            color: #151515;
+            font-size: 13px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        /* ーーー ⑦ 最下部の横線 ーーー */
+        .bottom-border-line {
+            position: absolute;
+            bottom: 25px;
+            width: 100%;
+            height: 1px;
+            background-color: rgba(255, 255, 255, 0.12);
+            pointer-events: none;
+        }
+
+        .bottom-handle {
+            position: absolute;
+            bottom: 3px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 35px;
+            height: 4px;
+            border-top: 2px solid rgba(255,255,255,0.25);
+            border-radius: 2px;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="ipod-screen">
+        <!-- ステータスバー -->
+        <div class="status-bar">
+            <div class="status-left">
+                <span>iPod</span>
+                <div class="wifi-icon"></div>
+            </div>
+            <div class="status-center">9:41</div>
+            <div class="status-right">
+                <div class="lock-icon"></div>
+                <div class="battery-icon">
+                    <div class="battery-level"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- タブ -->
+        <div class="nc-tabs">
+            <div class="nc-tab active">今日</div>
+            <div class="nc-tab inactive">通知</div>
+        </div>
+
+        <!-- 日付 -->
+        <div class="date-header">10月21日 水曜日</div>
+
+        <!-- クイックメモ ウィジェット本体 -->
+        <div class="widget-container">
+            <div class="widget-header">
+                <div class="app-icon">メモ<br>ウィジェット</div>
+                <div class="widget-title">クイックメモ</div>
+            </div>
+
+            <ul class="memo-list">
+
+                <!-- NVIDIA -->
+                <li class="memo-item memo-title" data-group="nvda" onclick="toggleGroup(this)">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">NVIDIA</span>
+                </li>
+                <li class="memo-item memo-content" data-group="nvda">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">創設：1993年</span>
+                </li>
+                <li class="memo-item memo-content" data-group="nvda">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">認知：2016年頃〜（AIブームで広がる）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="nvda">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">平均価格：上下動あり／約120〜180ドル帯</span>
+                </li>
+                <li class="memo-item memo-content" data-group="nvda">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">業種：半導体</span>
+                </li>
+                <li class="memo-item memo-content" data-group="nvda">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ビジネス：GPU設計・製造</span>
+                </li>
+                <li class="memo-item memo-content" data-group="nvda">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">株主優待：なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="nvda">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">NISA相性：良</span>
+                </li>
+                <li class="memo-item memo-content" data-group="nvda">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">今買う：割高だがAI需要強</span>
+                </li>
+                <li class="memo-item memo-content" data-group="nvda">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">もう遅い：意見割れる</span>
+                </li>
+                <li class="memo-item memo-content" data-group="nvda">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ガチホ度：高</span>
+                </li>
+                <li class="memo-item memo-content" data-group="nvda">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">未来：あり</span>
+                </li>
+                <li class="memo-item memo-content" data-group="nvda">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">AI相性：最高</span>
+                </li>
+                <li class="memo-item memo-content" data-group="nvda">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">創業者：ジェンスン・フアン</span>
+                </li>
+                <li class="memo-item memo-content" data-group="nvda">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">国：米</span>
+                </li>
+                <li class="memo-item memo-content" data-group="nvda">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">客観視点：割高感あり</span>
+                </li>
+                <li class="memo-item memo-content" data-group="nvda">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">5ch/Twitter：賛否両論</span>
+                </li>
+                <li class="memo-item memo-content" data-group="nvda">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">競合：AMD</span>
+                </li>
+                <li class="memo-item memo-content" data-group="nvda">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">差別化：CUDAエコシステム</span>
+                </li>
+                <li class="memo-item memo-content" data-group="nvda">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">オワコン度：低</span>
+                </li>
+                <li class="memo-item memo-content" data-group="nvda">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">詐欺：なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="nvda">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">急ぎ度：急ぐ寄り（AI需要継続中）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="nvda">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">アイコン：緑の目玉ロゴ</span>
+                </li>
+
+                <!-- Tesla -->
+                <li class="memo-item memo-title" data-group="tsla" onclick="toggleGroup(this)">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">Tesla</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tsla">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">創設：2003年</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tsla">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">認知：2012年頃〜（Model S以降）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tsla">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">平均価格：上下動激しい／約200〜400ドル帯</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tsla">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">業種：自動車</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tsla">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ビジネス：EV製造・エネルギー</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tsla">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">株主優待：なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tsla">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">NISA相性：良</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tsla">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">今買う：判断分かれる</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tsla">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">もう遅い：意見割れる</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tsla">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ガチホ度：中〜高</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tsla">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">未来：あり（EV普及次第）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tsla">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">AI相性：中（自動運転）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tsla">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">創業者：マーティン・エバハルト／イーロン・マスク</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tsla">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">国：米</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tsla">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">客観視点：PER高く割高感</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tsla">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">5ch/Twitter：賛否激しい</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tsla">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">競合：BYD、VW、Ford</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tsla">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">差別化：ブランド・ソフト・充電網</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tsla">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">オワコン度：低〜中</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tsla">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">詐欺：なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tsla">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">急ぎ度：勉強後寄り（変動激しい）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tsla">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">アイコン：赤いT字ロゴ</span>
+                </li>
+
+                <!-- Microsoft -->
+                <li class="memo-item memo-title" data-group="msft" onclick="toggleGroup(this)">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">Microsoft</span>
+                </li>
+                <li class="memo-item memo-content" data-group="msft">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">創設：1975年</span>
+                </li>
+                <li class="memo-item memo-content" data-group="msft">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">認知：1990年代〜（Windows）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="msft">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">平均価格：約300〜450ドル帯</span>
+                </li>
+                <li class="memo-item memo-content" data-group="msft">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">業種：ソフトウェア</span>
+                </li>
+                <li class="memo-item memo-content" data-group="msft">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ビジネス：クラウド・OS・Office</span>
+                </li>
+                <li class="memo-item memo-content" data-group="msft">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">株主優待：なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="msft">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">NISA相性：良</span>
+                </li>
+                <li class="memo-item memo-content" data-group="msft">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">今買う：堅実</span>
+                </li>
+                <li class="memo-item memo-content" data-group="msft">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">もう遅い：遅くない</span>
+                </li>
+                <li class="memo-item memo-content" data-group="msft">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ガチホ度：高</span>
+                </li>
+                <li class="memo-item memo-content" data-group="msft">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">未来：あり</span>
+                </li>
+                <li class="memo-item memo-content" data-group="msft">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">AI相性：高（Azure OpenAI）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="msft">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">創業者：ビル・ゲイツ／ポール・アレン</span>
+                </li>
+                <li class="memo-item memo-content" data-group="msft">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">国：米</span>
+                </li>
+                <li class="memo-item memo-content" data-group="msft">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">客観視点：安定成長</span>
+                </li>
+                <li class="memo-item memo-content" data-group="msft">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">5ch/Twitter：好意的</span>
+                </li>
+                <li class="memo-item memo-content" data-group="msft">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">競合：Google、Amazon</span>
+                </li>
+                <li class="memo-item memo-content" data-group="msft">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">差別化：企業向け基盤</span>
+                </li>
+                <li class="memo-item memo-content" data-group="msft">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">オワコン度：低</span>
+                </li>
+                <li class="memo-item memo-content" data-group="msft">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">詐欺：なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="msft">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">急ぎ度：急ぐ寄り（堅実）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="msft">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">アイコン：4色の窓</span>
+                </li>
+
+                <!-- Apple -->
+                <li class="memo-item memo-title" data-group="aapl" onclick="toggleGroup(this)">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">Apple</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aapl">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">創設：1976年</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aapl">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">認知：1980年代〜（Mac）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aapl">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">平均価格：約150〜250ドル帯</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aapl">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">業種：ハードウェア</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aapl">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ビジネス：iPhone・サービス</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aapl">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">株主優待：なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aapl">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">NISA相性：良</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aapl">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">今買う：堅実</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aapl">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">もう遅い：遅くない</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aapl">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ガチホ度：高</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aapl">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">未来：あり</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aapl">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">AI相性：中（出遅れ感）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aapl">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">創業者：スティーブ・ジョブズ／ウォズニアック</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aapl">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">国：米</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aapl">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">客観視点：安定・高収益</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aapl">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">5ch/Twitter：好意的</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aapl">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">競合：Samsung、Google</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aapl">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">差別化：ブランド・エコシステム</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aapl">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">オワコン度：低</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aapl">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">詐欺：なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aapl">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">急ぎ度：急ぐ寄り（堅実）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aapl">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">アイコン：白いリンゴ</span>
+                </li>
+
+                <!-- Amazon -->
+                <li class="memo-item memo-title" data-group="amzn" onclick="toggleGroup(this)">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">Amazon</span>
+                </li>
+                <li class="memo-item memo-content" data-group="amzn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">創設：1994年</span>
+                </li>
+                <li class="memo-item memo-content" data-group="amzn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">認知：2000年代〜（EC）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="amzn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">平均価格：約130〜220ドル帯</span>
+                </li>
+                <li class="memo-item memo-content" data-group="amzn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">業種：EC・クラウド</span>
+                </li>
+                <li class="memo-item memo-content" data-group="amzn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ビジネス：通販・AWS</span>
+                </li>
+                <li class="memo-item memo-content" data-group="amzn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">株主優待：なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="amzn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">NISA相性：良</span>
+                </li>
+                <li class="memo-item memo-content" data-group="amzn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">今買う：堅実</span>
+                </li>
+                <li class="memo-item memo-content" data-group="amzn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">もう遅い：遅くない</span>
+                </li>
+                <li class="memo-item memo-content" data-group="amzn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ガチホ度：高</span>
+                </li>
+                <li class="memo-item memo-content" data-group="amzn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">未来：あり</span>
+                </li>
+                <li class="memo-item memo-content" data-group="amzn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">AI相性：高（AWS）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="amzn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">創業者：ジェフ・ベゾス</span>
+                </li>
+                <li class="memo-item memo-content" data-group="amzn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">国：米</span>
+                </li>
+                <li class="memo-item memo-content" data-group="amzn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">客観視点：成長・安定</span>
+                </li>
+                <li class="memo-item memo-content" data-group="amzn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">5ch/Twitter：好意的</span>
+                </li>
+                <li class="memo-item memo-content" data-group="amzn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">競合：Alibaba、Walmart</span>
+                </li>
+                <li class="memo-item memo-content" data-group="amzn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">差別化：物流・AWS</span>
+                </li>
+                <li class="memo-item memo-content" data-group="amzn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">オワコン度：低</span>
+                </li>
+                <li class="memo-item memo-content" data-group="amzn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">詐欺：なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="amzn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">急ぎ度：急ぐ寄り（堅実）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="amzn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">アイコン：黒字にオレンジの笑顔矢印</span>
+                </li>
+
+                <!-- イオン -->
+                <li class="memo-item memo-title" data-group="aeon" onclick="toggleGroup(this)">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">イオン</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aeon">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">創設：1926年（前身）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aeon">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">認知：1990年代〜（イオン改名）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aeon">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">平均価格：約3,000〜4,500円帯</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aeon">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">業種：小売</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aeon">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ビジネス：総合スーパー</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aeon">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">株主優待：あり（お買物券）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aeon">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">NISA相性：中</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aeon">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">今買う：判断分かれる</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aeon">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">もう遅い：遅くない</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aeon">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ガチホ度：中</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aeon">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">未来：あり（国内基盤）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aeon">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">AI相性：低</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aeon">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">創業者：岡田卓也</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aeon">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">国：日</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aeon">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">客観視点：ディフェンシブ</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aeon">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">5ch/Twitter：普通</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aeon">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">競合：セブン&アイ、ドンキ</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aeon">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">差別化：規模・PB</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aeon">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">オワコン度：中</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aeon">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">詐欺：なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aeon">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">急ぎ度：勉強後寄り</span>
+                </li>
+                <li class="memo-item memo-content" data-group="aeon">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">アイコン：赤いイオンの文字</span>
+                </li>
+
+                <!-- GTLB -->
+                <li class="memo-item memo-title" data-group="gtlb" onclick="toggleGroup(this)">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">GTLB（GitLab）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="gtlb">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">創設：2011年</span>
+                </li>
+                <li class="memo-item memo-content" data-group="gtlb">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">認知：2015年頃〜（DevOps）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="gtlb">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">平均価格：約40〜70ドル帯</span>
+                </li>
+                <li class="memo-item memo-content" data-group="gtlb">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">業種：ソフトウェア</span>
+                </li>
+                <li class="memo-item memo-content" data-group="gtlb">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ビジネス：DevOpsプラットフォーム</span>
+                </li>
+                <li class="memo-item memo-content" data-group="gtlb">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">株主優待：なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="gtlb">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">NISA相性：良</span>
+                </li>
+                <li class="memo-item memo-content" data-group="gtlb">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">今買う：判断分かれる</span>
+                </li>
+                <li class="memo-item memo-content" data-group="gtlb">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">もう遅い：遅くない</span>
+                </li>
+                <li class="memo-item memo-content" data-group="gtlb">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ガチホ度：中</span>
+                </li>
+                <li class="memo-item memo-content" data-group="gtlb">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">未来：あり（DevOps需要）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="gtlb">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">AI相性：中</span>
+                </li>
+                <li class="memo-item memo-content" data-group="gtlb">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">創業者：シッダールト・シジブランド／ドミトリー・ザポロズヘッツ</span>
+                </li>
+                <li class="memo-item memo-content" data-group="gtlb">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">国：米</span>
+                </li>
+                <li class="memo-item memo-content" data-group="gtlb">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">客観視点：成長途上</span>
+                </li>
+                <li class="memo-item memo-content" data-group="gtlb">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">5ch/Twitter：やや好意的</span>
+                </li>
+                <li class="memo-item memo-content" data-group="gtlb">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">競合：GitHub（Microsoft）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="gtlb">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">差別化：セルフホスト・CI/CD一体</span>
+                </li>
+                <li class="memo-item memo-content" data-group="gtlb">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">オワコン度：低</span>
+                </li>
+                <li class="memo-item memo-content" data-group="gtlb">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">詐欺：なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="gtlb">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">急ぎ度：勉強後寄り</span>
+                </li>
+                <li class="memo-item memo-content" data-group="gtlb">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">アイコン：オレンジの狐</span>
+                </li>
+
+                <!-- SHIFT -->
+                <li class="memo-item memo-title" data-group="shift" onclick="toggleGroup(this)">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">SHIFT</span>
+                </li>
+                <li class="memo-item memo-content" data-group="shift">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">創設：2005年</span>
+                </li>
+                <li class="memo-item memo-content" data-group="shift">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">認知：2010年代〜（ソフトウェアテスト）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="shift">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">平均価格：約10,000〜20,000円帯</span>
+                </li>
+                <li class="memo-item memo-content" data-group="shift">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">業種：ITサービス</span>
+                </li>
+                <li class="memo-item memo-content" data-group="shift">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ビジネス：ソフトウェアテスト・QA</span>
+                </li>
+                <li class="memo-item memo-content" data-group="shift">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">株主優待：なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="shift">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">NISA相性：良</span>
+                </li>
+                <li class="memo-item memo-content" data-group="shift">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">今買う：判断分かれる</span>
+                </li>
+                <li class="memo-item memo-content" data-group="shift">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">もう遅い：意見割れる</span>
+                </li>
+                <li class="memo-item memo-content" data-group="shift">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ガチホ度：中〜高</span>
+                </li>
+                <li class="memo-item memo-content" data-group="shift">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">未来：あり（QA需要）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="shift">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">AI相性：高（AIテスト）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="shift">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">創業者：丹下大</span>
+                </li>
+                <li class="memo-item memo-content" data-group="shift">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">国：日</span>
+                </li>
+                <li class="memo-item memo-content" data-group="shift">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">客観視点：成長・割高感</span>
+                </li>
+                <li class="memo-item memo-content" data-group="shift">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">5ch/Twitter：賛否両論</span>
+                </li>
+                <li class="memo-item memo-content" data-group="shift">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">競合：デジタルハーツ、バルテス</span>
+                </li>
+                <li class="memo-item memo-content" data-group="shift">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">差別化：テスト特化・品質</span>
+                </li>
+                <li class="memo-item memo-content" data-group="shift">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">オワコン度：低</span>
+                </li>
+                <li class="memo-item memo-content" data-group="shift">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">詐欺：なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="shift">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">急ぎ度：勉強後寄り（割高）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="shift">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">アイコン：青いSHIFT文字</span>
+                </li>
+
+                <!-- デジタルハーツ -->
+                <li class="memo-item memo-title" data-group="digh" onclick="toggleGroup(this)">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">デジタルハーツ</span>
+                </li>
+                <li class="memo-item memo-content" data-group="digh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">創設：2000年</span>
+                </li>
+                <li class="memo-item memo-content" data-group="digh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">認知：2010年代〜（デバッグ）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="digh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">平均価格：約1,000〜2,000円帯</span>
+                </li>
+                <li class="memo-item memo-content" data-group="digh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">業種：ITサービス</span>
+                </li>
+                <li class="memo-item memo-content" data-group="digh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ビジネス：デバッグ・QA</span>
+                </li>
+                <li class="memo-item memo-content" data-group="digh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">株主優待：なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="digh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">NISA相性：良</span>
+                </li>
+                <li class="memo-item memo-content" data-group="digh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">今買う：判断分かれる</span>
+                </li>
+                <li class="memo-item memo-content" data-group="digh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">もう遅い：意見割れる</span>
+                </li>
+                <li class="memo-item memo-content" data-group="digh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ガチホ度：中</span>
+                </li>
+                <li class="memo-item memo-content" data-group="digh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">未来：あり（QA需要）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="digh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">AI相性：中</span>
+                </li>
+                <li class="memo-item memo-content" data-group="digh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">創業者：宮澤一郎</span>
+                </li>
+                <li class="memo-item memo-content" data-group="digh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">国：日</span>
+                </li>
+                <li class="memo-item memo-content" data-group="digh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">客観視点：安定・成長</span>
+                </li>
+                <li class="memo-item memo-content" data-group="digh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">5ch/Twitter：普通</span>
+                </li>
+                <li class="memo-item memo-content" data-group="digh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">競合：SHIFT、バルテス</span>
+                </li>
+                <li class="memo-item memo-content" data-group="digh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">差別化：デバッグ特化</span>
+                </li>
+                <li class="memo-item memo-content" data-group="digh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">オワコン度：低〜中</span>
+                </li>
+                <li class="memo-item memo-content" data-group="digh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">詐欺：なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="digh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">急ぎ度：勉強後寄り</span>
+                </li>
+                <li class="memo-item memo-content" data-group="digh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">アイコン：青いDH文字</span>
+                </li>
+
+                <!-- ポールトゥウィン -->
+                <li class="memo-item memo-title" data-group="ptw" onclick="toggleGroup(this)">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ポールトゥウィン</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ptw">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">創設：2007年</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ptw">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">認知：2010年代〜（デバッグ）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ptw">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">平均価格：約800〜1,500円帯</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ptw">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">業種：ITサービス</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ptw">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ビジネス：デバッグ・QA</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ptw">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">株主優待：なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ptw">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">NISA相性：良</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ptw">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">今買う：判断分かれる</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ptw">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">もう遅い：意見割れる</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ptw">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ガチホ度：中</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ptw">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">未来：あり（QA需要）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ptw">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">AI相性：中</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ptw">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">創業者：不明</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ptw">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">国：日</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ptw">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">客観視点：安定</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ptw">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">5ch/Twitter：普通</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ptw">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">競合：SHIFT、デジタルハーツ</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ptw">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">差別化：デバッグ特化</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ptw">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">オワコン度：中</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ptw">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">詐欺：なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ptw">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">急ぎ度：勉強後寄り</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ptw">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">アイコン：赤いP文字</span>
+                </li>
+
+                <!-- バルテス -->
+                <li class="memo-item memo-title" data-group="vlt" onclick="toggleGroup(this)">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">バルテス</span>
+                </li>
+                <li class="memo-item memo-content" data-group="vlt">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">創設：2003年</span>
+                </li>
+                <li class="memo-item memo-content" data-group="vlt">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">認知：2010年代〜（テスト）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="vlt">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">平均価格：約500〜1,000円帯</span>
+                </li>
+                <li class="memo-item memo-content" data-group="vlt">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">業種：ITサービス</span>
+                </li>
+                <li class="memo-item memo-content" data-group="vlt">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ビジネス：ソフトウェアテスト</span>
+                </li>
+                <li class="memo-item memo-content" data-group="vlt">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">株主優待：なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="vlt">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">NISA相性：良</span>
+                </li>
+                <li class="memo-item memo-content" data-group="vlt">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">今買う：判断分かれる</span>
+                </li>
+                <li class="memo-item memo-content" data-group="vlt">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">もう遅い：意見割れる</span>
+                </li>
+                <li class="memo-item memo-content" data-group="vlt">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ガチホ度：中</span>
+                </li>
+                <li class="memo-item memo-content" data-group="vlt">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">未来：あり（QA需要）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="vlt">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">AI相性：中</span>
+                </li>
+                <li class="memo-item memo-content" data-group="vlt">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">創業者：田中真</span>
+                </li>
+                <li class="memo-item memo-content" data-group="vlt">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">国：日</span>
+                </li>
+                <li class="memo-item memo-content" data-group="vlt">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">客観視点：成長途上</span>
+                </li>
+                <li class="memo-item memo-content" data-group="vlt">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">5ch/Twitter：普通</span>
+                </li>
+                <li class="memo-item memo-content" data-group="vlt">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">競合：SHIFT、デジタルハーツ</span>
+                </li>
+                <li class="memo-item memo-content" data-group="vlt">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">差別化：テスト特化</span>
+                </li>
+                <li class="memo-item memo-content" data-group="vlt">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">オワコン度：中</span>
+                </li>
+                <li class="memo-item memo-content" data-group="vlt">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">詐欺：なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="vlt">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">急ぎ度：勉強後寄り</span>
+                </li>
+                <li class="memo-item memo-content" data-group="vlt">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">アイコン：青いV文字</span>
+                </li>
+
+                <!-- AGEST -->
+                <li class="memo-item memo-title" data-group="agest" onclick="toggleGroup(this)">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">AGEST（非上場）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="agest">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">創設：2007年</span>
+                </li>
+                <li class="memo-item memo-content" data-group="agest">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">認知：2010年代〜（テスト）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="agest">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">平均価格：非上場・なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="agest">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">業種：ITサービス</span>
+                </li>
+                <li class="memo-item memo-content" data-group="agest">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ビジネス：ソフトウェアテスト</span>
+                </li>
+                <li class="memo-item memo-content" data-group="agest">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">株主優待：なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="agest">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">NISA相性：対象外</span>
+                </li>
+                <li class="memo-item memo-content" data-group="agest">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">今買う：不可（非上場）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="agest">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">もう遅い：不可</span>
+                </li>
+                <li class="memo-item memo-content" data-group="agest">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ガチホ度：不可</span>
+                </li>
+                <li class="memo-item memo-content" data-group="agest">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">未来：あり（QA需要）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="agest">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">AI相性：中</span>
+                </li>
+                <li class="memo-item memo-content" data-group="agest">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">創業者：不明</span>
+                </li>
+                <li class="memo-item memo-content" data-group="agest">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">国：日</span>
+                </li>
+                <li class="memo-item memo-content" data-group="agest">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">客観視点：投資対象外</span>
+                </li>
+                <li class="memo-item memo-content" data-group="agest">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">5ch/Twitter：ほぼなし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="agest">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">競合：SHIFT、バルテス</span>
+                </li>
+                <li class="memo-item memo-content" data-group="agest">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">差別化：テスト特化</span>
+                </li>
+                <li class="memo-item memo-content" data-group="agest">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">オワコン度：不明</span>
+                </li>
+                <li class="memo-item memo-content" data-group="agest">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">詐欺：なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="agest">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">急ぎ度：対象外</span>
+                </li>
+                <li class="memo-item memo-content" data-group="agest">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">アイコン：青いAGEST文字</span>
+                </li>
+
+                <!-- ベリサーブ -->
+                <li class="memo-item memo-title" data-group="veriserve" onclick="toggleGroup(this)">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ベリサーブ（非上場）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="veriserve">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">創設：1994年</span>
+                </li>
+                <li class="memo-item memo-content" data-group="veriserve">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">認知：2000年代〜（テスト）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="veriserve">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">平均価格：非上場・なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="veriserve">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">業種：ITサービス</span>
+                </li>
+                <li class="memo-item memo-content" data-group="veriserve">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ビジネス：ソフトウェアテスト</span>
+                </li>
+                <li class="memo-item memo-content" data-group="veriserve">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">株主優待：なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="veriserve">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">NISA相性：対象外</span>
+                </li>
+                <li class="memo-item memo-content" data-group="veriserve">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">今買う：不可（非上場）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="veriserve">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">もう遅い：不可</span>
+                </li>
+                <li class="memo-item memo-content" data-group="veriserve">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ガチホ度：不可</span>
+                </li>
+                <li class="memo-item memo-content" data-group="veriserve">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">未来：あり（QA需要）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="veriserve">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">AI相性：中</span>
+                </li>
+                <li class="memo-item memo-content" data-group="veriserve">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">創業者：不明</span>
+                </li>
+                <li class="memo-item memo-content" data-group="veriserve">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">国：日</span>
+                </li>
+                <li class="memo-item memo-content" data-group="veriserve">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">客観視点：投資対象外</span>
+                </li>
+                <li class="memo-item memo-content" data-group="veriserve">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">5ch/Twitter：ほぼなし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="veriserve">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">競合：SHIFT、バルテス</span>
+                </li>
+                <li class="memo-item memo-content" data-group="veriserve">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">差別化：テスト特化</span>
+                </li>
+                <li class="memo-item memo-content" data-group="veriserve">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">オワコン度：不明</span>
+                </li>
+                <li class="memo-item memo-content" data-group="veriserve">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">詐欺：なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="veriserve">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">急ぎ度：対象外</span>
+                </li>
+                <li class="memo-item memo-content" data-group="veriserve">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">アイコン：青いV文字</span>
+                </li>
+
+                <!-- Cognizant -->
+                <li class="memo-item memo-title" data-group="ctsh" onclick="toggleGroup(this)">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">Cognizant</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ctsh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">創設：1994年</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ctsh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">認知：2000年代〜（ITサービス）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ctsh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">平均価格：約60〜90ドル帯</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ctsh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">業種：ITサービス</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ctsh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ビジネス：ITコンサル・QA</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ctsh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">株主優待：なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ctsh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">NISA相性：良</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ctsh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">今買う：判断分かれる</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ctsh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">もう遅い：遅くない</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ctsh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ガチホ度：中</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ctsh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">未来：あり（IT需要）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ctsh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">AI相性：中</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ctsh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">創業者：不明（元D&B子会社）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ctsh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">国：米</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ctsh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">客観視点：安定・割安感</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ctsh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">5ch/Twitter：普通</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ctsh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">競合：Accenture、IBM</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ctsh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">差別化：コスト競争力</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ctsh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">オワコン度：中</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ctsh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">詐欺：なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ctsh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">急ぎ度：勉強後寄り</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ctsh">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">アイコン：青いC文字</span>
+                </li>
+
+                <!-- IBM -->
+                <li class="memo-item memo-title" data-group="ibm" onclick="toggleGroup(this)">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">IBM</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ibm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">創設：1911年</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ibm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">認知：20世紀前半〜</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ibm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">平均価格：約120〜200ドル帯</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ibm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">業種：ITサービス</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ibm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ビジネス：ITコンサル・クラウド</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ibm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">株主優待：なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ibm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">NISA相性：良</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ibm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">今買う：判断分かれる</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ibm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">もう遅い：遅くない</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ibm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ガチホ度：中</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ibm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">未来：あり（企業IT）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ibm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">AI相性：中（Watson）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ibm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">創業者：チャールズ・フリント</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ibm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">国：米</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ibm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">客観視点：安定・低成長</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ibm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">5ch/Twitter：普通</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ibm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">競合：Accenture、Cognizant</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ibm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">差別化：企業基盤・研究力</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ibm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">オワコン度：中</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ibm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">詐欺：なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ibm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">急ぎ度：勉強後寄り</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ibm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">アイコン：青いIBM文字</span>
+                </li>
+
+                <!-- Accenture -->
+                <li class="memo-item memo-title" data-group="acn" onclick="toggleGroup(this)">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">Accenture</span>
+                </li>
+                <li class="memo-item memo-content" data-group="acn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">創設：1989年</span>
+                </li>
+                <li class="memo-item memo-content" data-group="acn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">認知：2000年代〜（コンサル）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="acn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">平均価格：約250〜350ドル帯</span>
+                </li>
+                <li class="memo-item memo-content" data-group="acn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">業種：ITサービス</span>
+                </li>
+                <li class="memo-item memo-content" data-group="acn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ビジネス：ITコンサル</span>
+                </li>
+                <li class="memo-item memo-content" data-group="acn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">株主優待：なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="acn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">NISA相性：良</span>
+                </li>
+                <li class="memo-item memo-content" data-group="acn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">今買う：堅実</span>
+                </li>
+                <li class="memo-item memo-content" data-group="acn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">もう遅い：遅くない</span>
+                </li>
+                <li class="memo-item memo-content" data-group="acn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ガチホ度：中〜高</span>
+                </li>
+                <li class="memo-item memo-content" data-group="acn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">未来：あり（IT需要）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="acn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">AI相性：中</span>
+                </li>
+                <li class="memo-item memo-content" data-group="acn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">創業者：元Arthur Andersen</span>
+                </li>
+                <li class="memo-item memo-content" data-group="acn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">国：米（アイルランド本社）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="acn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">客観視点：安定・高収益</span>
+                </li>
+                <li class="memo-item memo-content" data-group="acn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">5ch/Twitter：好意的</span>
+                </li>
+                <li class="memo-item memo-content" data-group="acn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">競合：IBM、Cognizant</span>
+                </li>
+                <li class="memo-item memo-content" data-group="acn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">差別化：コンサル力</span>
+                </li>
+                <li class="memo-item memo-content" data-group="acn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">オワコン度：低</span>
+                </li>
+                <li class="memo-item memo-content" data-group="acn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">詐欺：なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="acn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">急ぎ度：急ぐ寄り（堅実）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="acn">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">アイコン：紫の矢印ロゴ</span>
+                </li>
+
+                <!-- EPAM System -->
+                <li class="memo-item memo-title" data-group="epam" onclick="toggleGroup(this)">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">EPAM System</span>
+                </li>
+                <li class="memo-item memo-content" data-group="epam">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">創設：1993年</span>
+                </li>
+                <li class="memo-item memo-content" data-group="epam">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">認知：2010年代〜（ITサービス）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="epam">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">平均価格：約150〜300ドル帯</span>
+                </li>
+                <li class="memo-item memo-content" data-group="epam">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">業種：ITサービス</span>
+                </li>
+                <li class="memo-item memo-content" data-group="epam">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ビジネス：ITコンサル・開発</span>
+                </li>
+                <li class="memo-item memo-content" data-group="epam">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">株主優待：なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="epam">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">NISA相性：良</span>
+                </li>
+                <li class="memo-item memo-content" data-group="epam">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">今買う：判断分かれる</span>
+                </li>
+                <li class="memo-item memo-content" data-group="epam">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">もう遅い：遅くない</span>
+                </li>
+                <li class="memo-item memo-content" data-group="epam">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ガチホ度：中</span>
+                </li>
+                <li class="memo-item memo-content" data-group="epam">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">未来：あり（IT需要）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="epam">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">AI相性：中</span>
+                </li>
+                <li class="memo-item memo-content" data-group="epam">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">創業者：アルカディ・ドブキン</span>
+                </li>
+                <li class="memo-item memo-content" data-group="epam">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">国：米（ベラルーシ起源）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="epam">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">客観視点：成長・地政学リスク</span>
+                </li>
+                <li class="memo-item memo-content" data-group="epam">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">5ch/Twitter：普通</span>
+                </li>
+                <li class="memo-item memo-content" data-group="epam">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">競合：Accenture、Cognizant</span>
+                </li>
+                <li class="memo-item memo-content" data-group="epam">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">差別化：東欧エンジニア</span>
+                </li>
+                <li class="memo-item memo-content" data-group="epam">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">オワコン度：中</span>
+                </li>
+                <li class="memo-item memo-content" data-group="epam">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">詐欺：なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="epam">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">急ぎ度：勉強後寄り</span>
+                </li>
+                <li class="memo-item memo-content" data-group="epam">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">アイコン：緑のEPAM文字</span>
+                </li>
+
+                <!-- トレンドマイクロ -->
+                <li class="memo-item memo-title" data-group="tm" onclick="toggleGroup(this)">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">トレンドマイクロ</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">創設：1988年</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">認知：1990年代〜（ウイルスバスター）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">平均価格：約5,000〜8,000円帯</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">業種：セキュリティ</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ビジネス：セキュリティソフト</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">株主優待：なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">NISA相性：良</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">今買う：判断分かれる</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">もう遅い：意見割れる</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ガチホ度：中</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">未来：あり（セキュリティ需要）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">AI相性：中（AIセキュリティ）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">創業者：エバ・チェン／スティーブ・チャン</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">国：日（創業者は台湾系米国）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">客観視点：安定・成熟</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">5ch/Twitter：普通</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">競合：Symantec、McAfee</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">差別化：日本市場・法人向け</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">オワコン度：中</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">詐欺：なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">急ぎ度：勉強後寄り</span>
+                </li>
+                <li class="memo-item memo-content" data-group="tm">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">アイコン：赤いT文字</span>
+                </li>
+
+                <!-- メンバーズ -->
+                <li class="memo-item memo-title" data-group="members" onclick="toggleGroup(this)">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">メンバーズ</span>
+                </li>
+                <li class="memo-item memo-content" data-group="members">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">創設：1992年</span>
+                </li>
+                <li class="memo-item memo-content" data-group="members">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">認知：2010年代〜（デジタル支援）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="members">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">平均価格：約700〜1,500円帯</span>
+                </li>
+                <li class="memo-item memo-content" data-group="members">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">業種：ITサービス</span>
+                </li>
+                <li class="memo-item memo-content" data-group="members">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ビジネス：デジタルマーケ支援</span>
+                </li>
+                <li class="memo-item memo-content" data-group="members">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">株主優待：なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="members">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">NISA相性：良</span>
+                </li>
+                <li class="memo-item memo-content" data-group="members">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">今買う：判断分かれる</span>
+                </li>
+                <li class="memo-item memo-content" data-group="members">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">もう遅い：意見割れる</span>
+                </li>
+                <li class="memo-item memo-content" data-group="members">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ガチホ度：中</span>
+                </li>
+                <li class="memo-item memo-content" data-group="members">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">未来：あり（DX需要）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="members">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">AI相性：中</span>
+                </li>
+                <li class="memo-item memo-content" data-group="members">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">創業者：不明</span>
+                </li>
+                <li class="memo-item memo-content" data-group="members">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">国：日</span>
+                </li>
+                <li class="memo-item memo-content" data-group="members">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">客観視点：成長途上</span>
+                </li>
+                <li class="memo-item memo-content" data-group="members">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">5ch/Twitter：普通</span>
+                </li>
+                <li class="memo-item memo-content" data-group="members">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">競合：SHIFT、デジタルハーツ</span>
+                </li>
+                <li class="memo-item memo-content" data-group="members">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">差別化：デジタル支援特化</span>
+                </li>
+                <li class="memo-item memo-content" data-group="members">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">オワコン度：中</span>
+                </li>
+                <li class="memo-item memo-content" data-group="members">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">詐欺：なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="members">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">急ぎ度：勉強後寄り</span>
+                </li>
+                <li class="memo-item memo-content" data-group="members">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">アイコン：青いM文字</span>
+                </li>
+
+                <!-- ラック -->
+                <li class="memo-item memo-title" data-group="lac" onclick="toggleGroup(this)">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ラック（非上場）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="lac">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">創設：1984年</span>
+                </li>
+                <li class="memo-item memo-content" data-group="lac">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">認知：1990年代〜（セキュリティ）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="lac">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">平均価格：非上場・なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="lac">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">業種：セキュリティ</span>
+                </li>
+                <li class="memo-item memo-content" data-group="lac">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ビジネス：セキュリティ監査・診断</span>
+                </li>
+                <li class="memo-item memo-content" data-group="lac">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">株主優待：なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="lac">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">NISA相性：対象外</span>
+                </li>
+                <li class="memo-item memo-content" data-group="lac">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">今買う：不可（非上場）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="lac">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">もう遅い：不可</span>
+                </li>
+                <li class="memo-item memo-content" data-group="lac">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ガチホ度：不可</span>
+                </li>
+                <li class="memo-item memo-content" data-group="lac">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">未来：あり（セキュリティ需要）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="lac">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">AI相性：中</span>
+                </li>
+                <li class="memo-item memo-content" data-group="lac">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">創業者：不明</span>
+                </li>
+                <li class="memo-item memo-content" data-group="lac">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">国：日</span>
+                </li>
+                <li class="memo-item memo-content" data-group="lac">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">客観視点：投資対象外</span>
+                </li>
+                <li class="memo-item memo-content" data-group="lac">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">5ch/Twitter：ほぼなし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="lac">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">競合：トレンドマイクロ</span>
+                </li>
+                <li class="memo-item memo-content" data-group="lac">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">差別化：セキュリティ監査</span>
+                </li>
+                <li class="memo-item memo-content" data-group="lac">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">オワコン度：不明</span>
+                </li>
+                <li class="memo-item memo-content" data-group="lac">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">詐欺：なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="lac">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">急ぎ度：対象外</span>
+                </li>
+                <li class="memo-item memo-content" data-group="lac">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">アイコン：青いLAC文字</span>
+                </li>
+
+                <!-- Datadog -->
+                <li class="memo-item memo-title" data-group="ddog" onclick="toggleGroup(this)">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">Datadog</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ddog">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">創設：2010年</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ddog">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">認知：2010年代〜（監視）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ddog">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">平均価格：約100〜150ドル帯</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ddog">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">業種：ソフトウェア</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ddog">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ビジネス：監視・可観測性</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ddog">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">株主優待：なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ddog">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">NISA相性：良</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ddog">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">今買う：判断分かれる</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ddog">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">もう遅い：遅くない</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ddog">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ガチホ度：中</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ddog">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">未来：あり（可観測性需要）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ddog">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">AI相性：中</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ddog">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">創業者：オリビエ・ポメル／アレクシス・レコック</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ddog">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">国：米</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ddog">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">客観視点：成長・割高感</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ddog">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">5ch/Twitter：やや好意的</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ddog">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">競合：Splunk、New Relic</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ddog">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">差別化：統合監視</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ddog">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">オワコン度：低</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ddog">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">詐欺：なし</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ddog">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">急ぎ度：勉強後寄り</span>
+                </li>
+                <li class="memo-item memo-content" data-group="ddog">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">アイコン：紫の犬ロゴ</span>
+                </li>
+
+                <!-- 調査タイトル1：SHIFT系海外ライバル -->
+                <li class="memo-item memo-title" data-group="rival" onclick="toggleGroup(this)">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">SHIFT系 海外ライバル</span>
+                </li>
+                <li class="memo-item memo-content" data-group="rival">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">Cognizant（米）：ITコンサル・QA大手</span>
+                </li>
+                <li class="memo-item memo-content" data-group="rival">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">Accenture（米）：ITコンサル最大手</span>
+                </li>
+                <li class="memo-item memo-content" data-group="rival">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">EPAM（米）：東欧エンジニア強み</span>
+                </li>
+                <li class="memo-item memo-content" data-group="rival">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">IBM（米）：企業IT・QA</span>
+                </li>
+                <li class="memo-item memo-content" data-group="rival">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">Datadog（米）：監視・可観測性</span>
+                </li>
+                <li class="memo-item memo-content" data-group="rival">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">Capgemini（仏）：ITコンサル</span>
+                </li>
+                <li class="memo-item memo-content" data-group="rival">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">Infosys（印）：ITサービス大手</span>
+                </li>
+                <li class="memo-item memo-content" data-group="rival">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">TCS（印）：ITサービス最大手</span>
+                </li>
+                <li class="memo-item memo-content" data-group="rival">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">Wipro（印）：ITサービス</span>
+                </li>
+                <li class="memo-item memo-content" data-group="rival">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">Sopra Steria（仏）：ITコンサル</span>
+                </li>
+                <li class="memo-item memo-content" data-group="rival">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">結論：海外にも良質ライバル多数</span>
+                </li>
+
+                <!-- 調査タイトル2：玄人狙いか -->
+                <li class="memo-item memo-title" data-group="pro" onclick="toggleGroup(this)">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">SHIFT系は玄人狙いか</span>
+                </li>
+                <li class="memo-item memo-content" data-group="pro">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">結論：玄人向け寄り</span>
+                </li>
+                <li class="memo-item memo-content" data-group="pro">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">理由：QA市場は成長だが銘柄数少・割高</span>
+                </li>
+                <li class="memo-item memo-content" data-group="pro">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">美味しい投資：条件付きでYES</span>
+                </li>
+                <li class="memo-item memo-content" data-group="pro">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">条件：長期・分散・業績確認</span>
+                </li>
+                <li class="memo-item memo-content" data-group="pro">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">ガチホ：可能（現物・長期前提）</span>
+                </li>
+                <li class="memo-item memo-content" data-group="pro">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">注意：小型株は変動激しい</span>
+                </li>
+
+                <!-- 調査タイトル3：SBIおすすめランキング -->
+                <li class="memo-item memo-title" data-group="rank" onclick="toggleGroup(this)">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">SBIおすすめSHIFT系ランキング</span>
+                </li>
+                <li class="memo-item memo-content" data-group="rank">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">1位：SHIFT（3697）テスト特化・成長</span>
+                </li>
+                <li class="memo-item memo-content" data-group="rank">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">2位：バルテス（4442）テスト特化・小型</span>
+                </li>
+                <li class="memo-item memo-content" data-group="rank">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">3位：デジタルハーツ（3676）デバッグ大手</span>
+                </li>
+                <li class="memo-item memo-content" data-group="rank">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">4位：トレンドマイクロ（4704）セキュリティ</span>
+                </li>
+                <li class="memo-item memo-content" data-group="rank">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">5位：ポールトゥウィン（3657）デバッグ</span>
+                </li>
+                <li class="memo-item memo-content" data-group="rank">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">6位：メンバーズ（3155）デジタル支援</span>
+                </li>
+                <li class="memo-item memo-content" data-group="rank">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">参考：Cognizant（CTSH）米・割安</span>
+                </li>
+                <li class="memo-item memo-content" data-group="rank">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">参考：Accenture（ACN）米・堅実</span>
+                </li>
+                <li class="memo-item memo-content" data-group="rank">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">参考：EPAM（EPAM）米・成長</span>
+                </li>
+                <li class="memo-item memo-content" data-group="rank">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">非上場：AGEST・ベリサーブ・ラックは対象外</span>
+                </li>
+                <li class="memo-item memo-content" data-group="rank">
+                    <span class="circle-btn"></span>
+                    <span class="memo-text">前提：現物取引のみ・FX/信用なし</span>
+                </li>
+
+            </ul>
+
+            <!-- 追加とペーストボタン -->
+            <div class="input-row">
+                <div class="input-btn">追加</div>
+                <div class="input-btn">ペースト</div>
+            </div>
+        </div>
+
+        <!-- 編集ボタン -->
+        <div class="edit-btn-container">
+            <div class="edit-btn">編集</div>
+        </div>
+
+        <!-- 最下部の横線 -->
+        <div class="bottom-border-line"></div>
+
+        <!-- 最下部のハンドル -->
+        <div class="bottom-handle"></div>
+    </div>
+
+    <script>
+        function toggleGroup(titleEl) {
+            var group = titleEl.getAttribute('data-group');
+            var isSelected = titleEl.querySelector('.circle-btn').classList.contains('selected');
+
+            // タイトル自身の○
+            titleEl.querySelector('.circle-btn').classList.toggle('selected');
+
+            // 同じグループの内容○を連動
+            var contents = document.querySelectorAll('.memo-content[data-group="' + group + '"]');
+            contents.forEach(function(el) {
+                var btn = el.querySelector('.circle-btn');
+                if (isSelected) {
+                    btn.classList.remove('selected');
+                } else {
+                    btn.classList.add('selected');
+                }
+            });
+        }
+    </script>
+</body>
+</html>
