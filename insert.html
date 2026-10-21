@@ -119,13 +119,15 @@
   const W = cv.width, H = cv.height;
 
   const GOAL = 4;
-  const CORRIDOR_LEN = 2100;                 // 通路の長さ
-  const START_CAM = CORRIDOR_LEN * 0.25;     // ★ A側寄り(25%)からスタート
+  const CORRIDOR_LEN = 2100;
+  const START_CAM = CORRIDOR_LEN * 0.25;
   const WALL_TOP = 60, WALL_BOTTOM = 300;
   const FADE_MS = 3000;
-
-  // 端の「ループ境界」表示用マージン
   const EDGE_ZONE = 60;
+
+  // ★ 判定位置（線の位置）
+  const LEFT_LINE  = EDGE_ZONE;                 // 赤い線
+  const RIGHT_LINE = CORRIDOR_LEN - EDGE_ZONE;  // 青い線
 
   const countLabel = document.getElementById('countLabel');
   const msgEl = document.getElementById('message');
@@ -138,7 +140,6 @@
 
   /* =========================================================
      異変 合計43種
-     既存13種はそのまま。新規30種を追加。
      easy: true  … わかりやすい(8%の重み)
      easy: false … よく観察しないと気づけない難しいもの(92%の重み)
      ========================================================= */
@@ -656,7 +657,7 @@
 
     { id:'emergencyLight', easy:false, name:'端の非常灯',
       apply(s, camX) {
-        if (camX < 100 || camX > CORRIDOR_LEN - 100) {
+        if (camX < LEFT_LINE + 40 || camX > RIGHT_LINE - 40) {
           ctx.save();
           const a = 0.15 + 0.1*Math.sin(performance.now()/300);
           ctx.fillStyle='rgba(255,120,40,'+a+')';
@@ -666,7 +667,6 @@
       } }
   ];
 
-  // 重み付き抽選: わかりやすい8% / 難しい92%
   function pickAnomaly() {
     const easyList = ANOMALIES.filter(a => a.easy);
     const hardList = ANOMALIES.filter(a => !a.easy);
@@ -677,7 +677,7 @@
 
   /* ---------------- 状態管理 ---------------- */
   function pickHall() {
-    const has = Math.random() < 0.5; // 1/2で異変
+    const has = Math.random() < 0.5;
     return { anomaly: has ? pickAnomaly() : null };
   }
 
@@ -782,42 +782,43 @@
     ctx.restore();
   }
 
+  // 線の位置（判定と一致）
   function drawEdgeZones(camX) {
-    const leftWorldX = EDGE_ZONE;
-    const leftScreen = leftWorldX - camX;
+    // 左：赤い線（引き返す境界） = LEFT_LINE
+    const leftScreen = LEFT_LINE - camX;
     if (leftScreen > -80 && leftScreen < W + 80) {
       ctx.save();
-      ctx.strokeStyle='rgba(255,80,80,0.6)'; ctx.lineWidth=3;
+      ctx.strokeStyle='rgba(255,80,80,0.7)'; ctx.lineWidth=3;
       ctx.beginPath();
       ctx.moveTo(leftScreen, WALL_BOTTOM);
       ctx.lineTo(leftScreen, H);
       ctx.stroke();
-      ctx.strokeStyle='rgba(255,80,80,0.18)'; ctx.lineWidth=6;
+      ctx.strokeStyle='rgba(255,80,80,0.25)'; ctx.lineWidth=6;
       ctx.beginPath();
       ctx.moveTo(leftScreen, WALL_TOP);
       ctx.lineTo(leftScreen, WALL_BOTTOM);
       ctx.stroke();
-      ctx.fillStyle='rgba(255,120,120,0.85)';
+      ctx.fillStyle='rgba(255,120,120,0.9)';
       ctx.font='bold 12px sans-serif'; ctx.textAlign='center';
       ctx.fillText('引き返す境界', leftScreen, WALL_TOP+20);
       ctx.restore();
     }
 
-    const rightWorldX = CORRIDOR_LEN - EDGE_ZONE;
-    const rightScreen = rightWorldX - camX;
+    // 右：青い線（進む境界） = RIGHT_LINE
+    const rightScreen = RIGHT_LINE - camX;
     if (rightScreen > -80 && rightScreen < W + 80) {
       ctx.save();
-      ctx.strokeStyle='rgba(80,200,255,0.6)'; ctx.lineWidth=3;
+      ctx.strokeStyle='rgba(80,200,255,0.7)'; ctx.lineWidth=3;
       ctx.beginPath();
       ctx.moveTo(rightScreen, WALL_BOTTOM);
       ctx.lineTo(rightScreen, H);
       ctx.stroke();
-      ctx.strokeStyle='rgba(80,200,255,0.18)'; ctx.lineWidth=6;
+      ctx.strokeStyle='rgba(80,200,255,0.25)'; ctx.lineWidth=6;
       ctx.beginPath();
       ctx.moveTo(rightScreen, WALL_TOP);
       ctx.lineTo(rightScreen, WALL_BOTTOM);
       ctx.stroke();
-      ctx.fillStyle='rgba(120,200,255,0.85)';
+      ctx.fillStyle='rgba(120,200,255,0.9)';
       ctx.font='bold 12px sans-serif'; ctx.textAlign='center';
       ctx.fillText('進む境界', rightScreen, WALL_TOP+20);
       ctx.restore();
@@ -877,19 +878,20 @@
 
         if (dx !== 0) state.camX += dx * speed * dt;
 
-        if (state.camX < 0) state.camX = 0;
-        if (state.camX > CORRIDOR_LEN) state.camX = CORRIDOR_LEN;
+        // ★ 可動範囲を線の位置にクランプ
+        if (state.camX < LEFT_LINE)  state.camX = LEFT_LINE;
+        if (state.camX > RIGHT_LINE) state.camX = RIGHT_LINE;
 
-        // ★ START_CAM を画面中央に、端で画面端寄りに
         const rel = (state.camX - START_CAM) /
-                    Math.max(START_CAM, CORRIDOR_LEN - START_CAM);
+                    Math.max(START_CAM - LEFT_LINE, RIGHT_LINE - START_CAM);
         state.playerX = W / 2 + rel * (W / 2 - 100);
 
-        if (state.camX >= CORRIDOR_LEN) {
-          judgeForward();
-        }
-        else if (state.camX <= 0) {
+        // ★ 判定を線の位置に合わせる
+        if (state.camX <= LEFT_LINE) {
           judgeBack();
+        }
+        else if (state.camX >= RIGHT_LINE) {
+          judgeForward();
         }
       }
 
