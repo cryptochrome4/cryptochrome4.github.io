@@ -377,7 +377,7 @@
   let bgOn = false, bgMode = 'fill';
   const MAP_BG = Math.random()<0.5 ? 'img355war.jpg' : 'img356war.jpg';
   let bgImg = new Image(); bgImg.src = MAP_BG;
-  let tournament = { round:'A', matches:[], current:-1, winner:null };
+  let tournament = { round:'A', matches:[], current:-1, winner:null, stage:'ab' };
   let matchTime = 40.0;
   let running = false, finished = false, spectate = false;
   let lastTime = 0;
@@ -416,19 +416,20 @@
   }
 
   function buildTournament(){
+    // 4軍をランダムにA・Bへ2軍ずつ振り分け
     const pool = TEAM_POOL.slice();
-    const teams = [];
-    for (let r=0;r<2;r++) for (const t of pool) teams.push(t);
-    for (let i=teams.length-1;i>0;i--){ const j=randInt(0,i); [teams[i],teams[j]]=[teams[j],teams[i]]; }
-    const shuffled = teams.slice(0,8);
-    tournament.matches = [];
-    for (let i=0;i<8;i+=2) tournament.matches.push({a:shuffled[i], b:shuffled[i+1], winner:null, round:i<4?'A':'B'});
+    for (let i=pool.length-1;i>0;i--){ const j=randInt(0,i); [pool[i],pool[j]]=[pool[j],pool[i]]; }
+    const sideA = [pool[0], pool[1]];
+    const sideB = [pool[2], pool[3]];
+    tournament.matches = [
+      { a: sideA[0], b: sideA[1], winner:null, round:'A' },
+      { a: sideB[0], b: sideB[1], winner:null, round:'B' },
+    ];
     tournament.round = 'A';
-    tournament.current = -1;
+    tournament.current = 0;
     tournament.winner = null;
-    tournament.finalists = [];
     tournament.finalWinner = null;
-    tournament.stage = 'semis';
+    tournament.stage = 'ab';
   }
 
   let unitIdCounter = 1;
@@ -667,35 +668,61 @@
 
   function endMatch(side){
     const m = tournament.matches[tournament.current];
-    if (!m) return;
+    if (!m || m.winner) return;
     m.winner = side==='A'?m.a:m.b;
+    const finishedRound = m.round;
+    const finishedWinner = m.winner;
+
     setTimeout(()=>{
-      if (tournament.stage==='semis'){
-        tournament.finalists.push(m.winner);
-        if (tournament.finalists.length===2){
-          tournament.stage='final';
-          tournament.matches.push({a:tournament.finalists[0], b:tournament.finalists[1], winner:null, round:'C'});
+      if (finishedRound === 'C'){
+        // 決勝の勝者のみが優勝。1回だけ確定
+        if (tournament.stage !== 'done'){
+          tournament.finalWinner = finishedWinner;
+          tournament.stage = 'done';
         }
-      } else if (tournament.stage==='final'){
-        tournament.finalWinner = m.winner;
-        tournament.stage='done';
+      } else if (finishedRound === 'A'){
+        // A終了 → Bへ
+        tournament.stage = 'b';
+      } else if (finishedRound === 'B'){
+        // B終了 → C（決勝）を追加
+        const aWinner = tournament.matches.find(x=>x.round==='A').winner;
+        const bWinner = tournament.matches.find(x=>x.round==='B').winner;
+        tournament.matches.push({ a: aWinner, b: bWinner, winner:null, round:'C' });
+        tournament.stage = 'c';
       }
       advanceMatch();
     }, 800);
   }
 
   function advanceMatch(){
-    if (tournament.stage==='done'){ showResult(tournament.finalWinner); return; }
+    if (tournament.stage === 'done'){
+      showResult(tournament.finalWinner);
+      return;
+    }
     let next = -1;
-    for (let i=0;i<tournament.matches.length;i++){
-      if (!tournament.matches[i].winner && (i!==tournament.current || finished)){ next=i; break; }
+    if (tournament.stage === 'ab' || tournament.stage === 'b'){
+      const aMatch = tournament.matches.find(x=>x.round==='A');
+      const bMatch = tournament.matches.find(x=>x.round==='B');
+      if (aMatch && !aMatch.winner) next = tournament.matches.indexOf(aMatch);
+      else if (bMatch && !bMatch.winner) next = tournament.matches.indexOf(bMatch);
     }
-    if (next===-1){
-      if (tournament.stage==='final' && tournament.matches.some(m=>m.round==='C'&&!m.winner)){
-        next = tournament.matches.findIndex(m=>m.round==='C'&&!m.winner);
+    if (tournament.stage === 'c'){
+      const cMatch = tournament.matches.find(x=>x.round==='C');
+      if (cMatch && !cMatch.winner) next = tournament.matches.indexOf(cMatch);
+    }
+    if (next === -1){
+      if (tournament.stage === 'c'){
+        const cMatch = tournament.matches.find(x=>x.round==='C');
+        if (cMatch && cMatch.winner){
+          tournament.finalWinner = cMatch.winner;
+          tournament.stage = 'done';
+          showResult(tournament.finalWinner);
+          return;
+        }
       }
+      showResult(tournament.finalWinner);
+      return;
     }
-    if (next===-1){ showResult(tournament.finalWinner); return; }
     tournament.current = next;
     const m = tournament.matches[next];
     spawnUnits(m.a, m.b);
