@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>4番出口</title>
+<title>5番出口</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { width: 100%; height: 100%; background: #000; overflow: hidden;
@@ -60,7 +60,7 @@
 
 <div id="titleScreen" class="screen active">
   <div class="title-box">
-    <h1>4番出口</h1>
+    <h1>5番出口</h1>
     <p class="sub">〜 異常を見つけたら、引き返せ 〜</p>
     <button class="btn" id="startBtn">はじめる</button>
     <button class="btn" id="viewBgBtn">背景画像を見る</button>
@@ -75,7 +75,7 @@
 <div id="gameScreen" class="screen">
   <div id="stage"><canvas id="cv" width="640" height="360"></canvas></div>
   <div id="hud">
-    <span id="countLabel">出口 0 / 4</span>
+    <span id="countLabel">出口 0 / 5</span>
     <span class="hint">A/D または ←/→ で移動。異常がなければ進む、あれば引き返す。</span>
   </div>
   <div id="message"></div>
@@ -118,18 +118,16 @@
   const ctx = cv.getContext('2d');
   const W = cv.width, H = cv.height;
 
-  const GOAL = 4;
+  const GOAL = 5;
   const CORRIDOR_LEN = 2100;
   const START_CAM = CORRIDOR_LEN * 0.25;
   const WALL_TOP = 60, WALL_BOTTOM = 300;
   const FADE_MS = 3000;
   const EDGE_ZONE = 60;
 
-  // 判定位置（線の位置）
   const LEFT_LINE  = EDGE_ZONE;
   const RIGHT_LINE = CORRIDOR_LEN - EDGE_ZONE;
 
-  // プレイヤーは画面中央固定
   const PLAYER_SCREEN_X = W / 2;
 
   const countLabel = document.getElementById('countLabel');
@@ -822,7 +820,6 @@
     ctx.fillStyle = '#1d1d24'; ctx.fillRect(0,WALL_BOTTOM,W,H-WALL_BOTTOM);
     ctx.fillStyle = '#2a2a33'; ctx.fillRect(0,WALL_TOP,W,WALL_BOTTOM-WALL_TOP);
 
-    // ★ 壁の縦線をワールド座標基準で描く（ポスターと同じ基準）
     ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 1;
     for (let wx = 0; wx < CORRIDOR_LEN; wx += 40) {
       const x = wx + sx;
@@ -888,40 +885,62 @@
     rafId = requestAnimationFrame(loop);
   }
 
+  /* =========================================================
+     判定
+     - 非異変でD（進む）→ カウント+1
+     - 異変でA（引き返す）→ カウント維持
+     - 異変なのにD → カウント0
+     - 非異変なのにA → カウント0
+     - 5/5でクリア
+     ========================================================= */
+
+  // 右端（D側＝進む）
   function judgeForward() {
-    if (state.exitNum === 0) {
-      showMsg('基礎廊下クリア。次から異常を見極めよう。');
+    // 出口0（基礎廊下）は必ず非異変。Dでカウント+1して次へ
+    if (state.exitNum === 0 && state.hall.anomaly === null) {
+      showMsg('基礎廊下クリア。（1/5）');
       transitionToNext(true);
       return;
     }
     if (state.hall.anomaly) {
-      showMsg('異常を見逃した… 出口0へ戻される。');
+      // 異変なのに進んだ → カウント0
+      showMsg('異常を見逃した… カウント0に戻される。');
       transitionToNext(false);
     } else {
-      if (state.exitNum === GOAL) {
+      // 非異変で進んだ → カウント+1
+      // 5/5到達ならクリア（暗転なし）
+      if (state.exitNum + 1 >= GOAL) {
+        showMsg('5/5 達成！ クリア！');
+        state.exitNum = GOAL;
+        updateHud();
         finishClear();
         return;
       }
-      showMsg('異常なし。次の通路へ。');
+      showMsg('異常なし。（' + (state.exitNum + 1) + '/5）');
       transitionToNext(true);
     }
   }
 
+  // 左端（A側＝引き返す）
   function judgeBack() {
-    if (state.exitNum === 0) {
-      showMsg('基礎廊下クリア。次から異常を見極めよう。');
+    // 出口0（基礎廊下）はAでも次へ（カウント+1）
+    if (state.exitNum === 0 && state.hall.anomaly === null) {
+      showMsg('基礎廊下クリア。（1/5）');
       transitionToNext(true);
       return;
     }
     if (state.hall.anomaly) {
-      showMsg('異常を回避。次の通路へ。');
-      transitionToNext(true);
+      // 異変で引き返した → 正解だがカウントは維持
+      showMsg('異常を回避。カウント維持。');
+      transitionToNextKeep();
     } else {
-      showMsg('異常はなかった… 出口0へ戻される。');
+      // 非異変なのに引き返した → カウント0
+      showMsg('異常はなかった… カウント0に戻される。');
       transitionToNext(false);
     }
   }
 
+  // カウント+1して次の通路へ
   function transitionToNext(success) {
     state.transitioning = true;
     fadeEl.classList.add('on');
@@ -933,6 +952,26 @@
         state.exitNum = 0;
       }
 
+      state.camX = START_CAM;
+
+      state.hall = (state.exitNum === 0)
+        ? { anomaly: null }
+        : pickHall();
+
+      updateHud();
+
+      fadeEl.classList.remove('on');
+      state.transitioning = false;
+    }, FADE_MS);
+  }
+
+  // カウント維持で次の通路へ（異変正解用）
+  function transitionToNextKeep() {
+    state.transitioning = true;
+    fadeEl.classList.add('on');
+
+    setTimeout(() => {
+      // exitNum は変更しない
       state.camX = START_CAM;
 
       state.hall = (state.exitNum === 0)
