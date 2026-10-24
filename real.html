@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AIまわり投資メモ - real</title>
+<style>
+  :root{
+    --bg:#111;
+    --text:#fff;
+    --orange:#ff9f1c;
+    --line:rgba(255,255,255,.15);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:#0b0b0b;
+    color:var(--text);
+    font-family:"Helvetica Neue",Arial,"Hiragino Kaku Gothic ProN",sans-serif;
+    -webkit-user-select:none;user-select:none;
+  }
+  .app{
+    max-width:720px;
+    margin:0 auto;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+  }
+
+  /* ---- ページ ---- */
+  .page{display:none;flex:1;padding:0 0 90px 0;}
+  .page.active{display:block;}
+
+  /* ---- 本タイトル ---- */
+  .main-title{
+    font-size:22px;
+    font-weight:700;
+    padding:16px 20px;
+    color:#000;
+    line-height:1.35;
+  }
+  .p1 .main-title{background:#1e6bd6;}
+  .p2 .main-title{background:#d9c9a3;}
+  .p3 .main-title{background:#d62828;}
+  .p4 .main-title{background:#d62828;}
+  .p5 .main-title{background:#2a9d8f;}
+  .p6 .main-title{background:#7b4fb5;}
+
+  /* ---- 本文 ---- */
+  .body-area{
+    background:#000;
+    color:#fff;
+    padding:16px 20px;
+    line-height:1.9;
+    font-size:15px;
+  }
+  .body-area p{margin:0 0 6px 0;}
+
+  /* 難しい単語 */
+  .term{
+    color:var(--orange);
+    font-weight:700;
+    cursor:pointer;
+    border-bottom:1px dashed rgba(255,159,28,.6);
+  }
+
+  /* ---- 解説 ---- */
+  .explain{
+    display:none;
+    margin:10px 0 14px 0;
+    padding:10px 14px;
+    font-size:13.5px;
+    line-height:1.7;
+    color:#000;
+    border-radius:6px;
+  }
+  .explain.open{display:block;}
+  .p1 .explain{background:#1e6bd6;}
+  .p2 .explain{background:#d9c9a3;}
+  .p3 .explain{background:#d62828;}
+  .p4 .explain{background:#d62828;}
+  .p5 .explain{background:#2a9d8f;}
+  .p6 .explain{background:#7b4fb5;}
+
+  /* ---- 画像 ---- */
+  .img-wrap{padding:14px 20px 0 20px;}
+  .img-wrap img{
+    width:100%;
+    height:180px;
+    display:block;
+    background:#222;
+    object-fit:cover; /* default */
+    border-radius:6px;
+  }
+  .fit-btns{
+    display:flex;gap:6px;margin-top:6px;
+  }
+  .fit-btn{
+    flex:1;font-size:11px;padding:4px 0;text-align:center;
+    background:rgba(255,255,255,.08);
+    color:#ccc;border:1px solid var(--line);border-radius:4px;
+    cursor:pointer;
+  }
+  .fit-btn.active{background:#fff;color:#000;font-weight:700;}
+
+  /* ---- ナビ ---- */
+  .nav{
+    position:fixed;bottom:0;left:0;right:0;
+    background:rgba(15,15,15,.96);
+    border-top:1px solid var(--line);
+    display:flex;gap:10px;padding:10px 14px;
+    max-width:720px;margin:0 auto;
+  }
+  .nav button{
+    flex:1;padding:10px 0;font-size:14px;font-weight:700;
+    background:rgba(255,255,255,.12);color:#fff;
+    border:1px solid var(--line);border-radius:6px;cursor:pointer;
+  }
+  .nav button:disabled{opacity:.35;cursor:default;}
+  .nav .pageno{flex:0 0 70px;display:flex;align-items:center;justify-content:center;font-size:13px;color:#aaa;}
+
+  /* ---- 十字グラフ ---- */
+  .cross-wrap{padding:20px;display:flex;justify-content:center;}
+  .cross{
+    position:relative;
+    width:100%;max-width:560px;aspect-ratio:1/1;
+    background:#0a0a0a;
+    border:1px solid var(--line);
+    border-radius:10px;
+    overflow:hidden;
+  }
+  /* 軸 */
+  .cross::before{
+    content:"";position:absolute;left:50%;top:0;bottom:0;width:1px;
+    background:rgba(255,255,255,.35);
+  }
+  .cross::after{
+    content:"";position:absolute;top:50%;left:0;right:0;height:1px;
+    background:rgba(255,255,255,.35);
+  }
+  .axis-label{
+    position:absolute;font-size:11px;color:#bbb;letter-spacing:.05em;
+  }
+  .axis-top{top:6px;left:50%;transform:translateX(-50%);}
+  .axis-bottom{bottom:6px;left:50%;transform:translateX(-50%);}
+  .axis-left{left:6px;top:50%;transform:translateY(-50%);}
+  .axis-right{right:6px;top:50%;transform:translateY(-50%);}
+
+  .center-ai{
+    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    background:#e63946;color:#fff;font-weight:700;font-size:12px;
+    padding:6px 10px;border-radius:20px;white-space:nowrap;
+    box-shadow:0 0 12px rgba(230,57,70,.6);z-index:3;
+  }
+
+  .node{
+    position:absolute;transform:translate(-50%,-50%);
+    background:#1f1f1f;border:1px solid var(--line);
+    color:#fff;font-size:11px;font-weight:600;
+    padding:5px 9px;border-radius:14px;white-space:nowrap;
+    z-index:2;
+  }
+  .node.cat{background:#16324a;border-color:#2a6ca0;}
+  .node.stock{background:#3a2a10;border-color:#a0792a;color:#ffcf7a;font-size:10.5px;}
+
+  /* 凡例 */
+  .legend{
+    padding:0 20px 10px 20px;font-size:11px;color:#999;line-height:1.7;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ============ PAGE 1 ============ -->
+  <section class="page p1 active" id="page1">
+    <div class="main-title">結論：AIそのものは買わない。AIまわりを買う</div>
+    <div class="body-area">
+      <p>1. 前提として、現物・普通投資のみ。FXや信用は使わない。</p>
+      <p>2. なぜAIそのものを買わないか。進化が速すぎて、数年で主役が入れ替わるから。</p>
+      <p>3. だから<span class="term" data-e="explain1">AIまわり</span>に投資する。AIを支える土台・裏方・インフラ。</p>
+      <p>4. 今回の対象は11銘柄。すべてAIの「周辺」に位置する。</p>
+      <p>5. 分類すると、テスト/QA系（SHIFT、デジタルハーツ、ポールトゥウィン、バルテス）。</p>
+      <p>6. ITコンサル/サービス系（Cognizant、IBM、Accenture、EPAM System、メンバーズ）。</p>
+      <p>7. セキュリティ系（トレンドマイクロ）。監視・可観測性系（Datadog）。</p>
+      <p>8. これらは「AIそのもの」ではなく「AIを使う企業を支える」立場。</p>
+      <p>9. AIブームが続くほど、テストもセキュリティも監視も需要が増える。</p>
+      <p>10. 逆にAIそのものが陳腐化しても、裏方は残りやすい。</p>
+      <p>11. これがAIまわり投資の最大のメリット。</p>
+      <p>12. ただしデメリットもある。成長はAI本体より緩やかで、地味。</p>
+      <p>13. 割高になりやすい銘柄も多く、小型株は変動が激しい。</p>
+      <p>14. 競合が多い分野もあり、差別化が効きにくいことがある。</p>
+      <p>15. 海外勢は強く、価格競争に巻き込まれるリスクもある。</p>
+      <p>16. それでも、長期・分散・現物なら許容できる範囲だと判断する。</p>
+      <p>17. 結論：良い寄り。ただし「AIそのもの」ではなく「AIまわり」。</p>
+      <p>18. 悪い理由もしっかり押さえた上で、現物で長期保有する。</p>
+      <p>19. 次のページから、良い理由と悪い理由を分けて整理する。</p>
+      <p>20. 良い理由は、需要の継続性・安定性・裏方性の3点。</p>
+      <p>21. 悪い理由は、割高・競合・地味さ・変動性の4点。</p>
+      <p>22. どちらも理解した上で、初めて「投資」と言える。</p>
+      <p>23. 一方的に持ち上げる記事は信用しない。</p>
+      <p>24. 一方的に貶す記事も同じく信用しない。</p>
+      <p>25. 両面を見て、自分の判断で現物を買う。</p>
+      <p>26. それが普通の投資の基本。</p>
+      <p>27. なお、AIそのものを買わない理由は「速すぎる」に尽きる。</p>
+      <p>28. 数年でモデルが変わり、数年でリーダーが変わる。</p>
+      <p>29. 個人がそれを追い続けるのは現実的でない。</p>
+      <p>30. だから土台側に投資する。土台は急に消えない。</p>
+      <p>31. テストも、セキュリティも、監視も、AIが増えるほど必要になる。</p>
+      <p>32. これはAIの流行に関係なく、IT全体の底上げ需要。</p>
+      <p>33. つまり「AIまわり」は、AIブームの恩恵を間接的に受ける。</p>
+      <p>34. 間接的だからこそ、ブームが冷めても致命傷になりにくい。</p>
+      <p>35. これが「AIまわり」を選ぶ最大の理由。</p>
+      <p>36. 5ページ目でカテゴリの位置、6ページ目で銘柄の位置を示す。</p>
+      <p>37. 十字グラフで、AIとの距離と成長/安定を見える化する。</p>
+      <p>38. 位置関係が分かれば、自分のポートフォリオの偏りも分かる。</p>
+      <p>39. 次ページ以降で、具体的な良い理由に入る。</p>
+      <p>40. まずはこの結論を頭に置いて読み進めてほしい。</p>
+      <div class="explain" id="explain1">
+        AIまわり＝AI本体（GPU・LLM・モデル開発）ではなく、AIを導入・運用する企業を支える分野。テスト/QA、ITコンサル、セキュリティ、監視など。AIブームが続くほど需要が増え、本体より陳腐化しにくいのが特徴。
+      </div>
+    </div>
+    <div class="img-wrap">
+      <img src="img35x.jpg" alt="img35x" id="img1">
+      <div class="fit-btns" data-target="img1">
+        <div class="fit-btn active" data-fit="cover">cover</div>
+        <div class="fit-btn" data-fit="fill">fill</div>
+        <div class="fit-btn" data-fit="contain">contain</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PAGE 2 ============ -->
+  <section class="page p2" id="page2">
+    <div class="main-title">良い理由：需要の継続性・安定性・裏方性</div>
+    <div class="body-area">
+      <p>1. 良い理由の1つ目は、需要の継続性。</p>
+      <p>2. AIが普及するほど、テストもセキュリティも監視も必要になる。</p>
+      <p>3. これは一時のブームではなく、IT全体の底上げ需要。</p>
+      <p>4. 2つ目は安定性。裏方は主役より入れ替わりが遅い。</p>
+      <p>5. 3つ目は裏方性。目立たないが、確実に仕事が来る。</p>
+      <p>6. <span class="term" data-e="explain2">テスト/QA</span>は、ソフト開発が増えるほど需要が増える。</p>
+      <p>7. SHIFTはテスト特化で、国内大手。成長性が高い。</p>
+      <p>8. デジタルハーツはデバッグ大手。安定と成長の中間。</p>
+      <p>9. ポールトゥウィンはデバッグ系。安定寄り。</p>
+      <p>10. バルテスはテスト特化の小型株。成長余地はあるが変動大。</p>
+      <p>11. ITコンサル系は、企業のDXを支える。<span class="term" data-e="explain3">DX</span>需要は続く。</p>
+      <p>12. Cognizantは米系で割安感。安定と成長のバランス。</p>
+      <p>13. IBMは歴史ある企業IT。低成長だが安定。</p>
+      <p>14. Accentureはコンサル最大手。堅実で高収益。</p>
+      <p>15. EPAM Systemは東欧エンジニア強み。成長性が高い。</p>
+      <p>16. メンバーズはデジタル支援。国内のDX需要を拾う。</p>
+      <p>17. トレンドマイクロはセキュリティ。AI時代ほど需要が増す。</p>
+      <p>18. Datadogは監視・可観測性。クラウド時代の必須インフラ。</p>
+      <p>19. これらは「AIそのもの」ではなく「AIを使う側」を支える。</p>
+      <p>20. AIが増えれば増えるほど、裏方の仕事も増える。</p>
+      <p>21. これが良い理由の核心。</p>
+      <p>22. もう1つ、裏方は景気に左右されにくい面もある。</p>
+      <p>23. テストもセキュリティも、止めたら事故になる。</p>
+      <p>24. だから予算が削られにくい。これも安定性の根拠。</p>
+      <p>25. ただし、これらの良い理由は「万能」ではない。</p>
+      <p>26. 次ページで悪い理由もしっかり扱う。</p>
+      <p>27. 良い理由だけ見て買うのは危険。</p>
+      <p>28. 悪い理由を知った上で買うのが普通の投資。</p>
+      <p>29. ここでは「良い寄り」の根拠を並べただけ。</p>
+      <p>30. 実際の判断は、悪い理由とセットで行う。</p>
+      <p>31. 需要の継続性は、AIブームが続く限り有効。</p>
+      <p>32. 安定性は、裏方であることの最大の強み。</p>
+      <p>33. 裏方性は、地味さと表裏一体。そこは次ページで。</p>
+      <p>34. まとめると、良い理由は「続く・残る・必要とされる」。</p>
+      <p>35. この3点が、AIまわり投資の土台。</p>
+      <p>36. 5ページ目のグラフでは、この位置関係を可視化する。</p>
+      <p>37. 6ページ目では、11銘柄をその位置に置く。</p>
+      <p>38. 位置が分かれば、自分の好みも分かる。</p>
+      <p>39. 成長重視か、安定重視か。それで選ぶ銘柄は変わる。</p>
+      <p>40. 次ページで、悪い理由に入る。</p>
+      <div class="explain" id="explain2">
+        テスト/QA＝ソフトウェアが正しく動くか確認する工程。バグを見つけ、品質を保証する。開発が増えるほど需要が増え、AI時代でも自動化と人の確認の両方が必要。
+      </div>
+      <div class="explain" id="explain3">
+        DX＝デジタルトランスフォーメーション。企業が業務や製品にデジタル技術を取り入れ、競争力を高める取り組み。AI導入もDXの一部として扱われる。
+      </div>
+    </div>
+    <div class="img-wrap">
+      <img src="img36x.jpg" alt="img36x" id="img2">
+      <div class="fit-btns" data-target="img2">
+        <div class="fit-btn active" data-fit="cover">cover</div>
+        <div class="fit-btn" data-fit="fill">fill</div>
+        <div class="fit-btn" data-fit="contain">contain</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PAGE 3 ============ -->
+  <section class="page p3" id="page3">
+    <div class="main-title">悪い理由：割高・競合・地味さ・変動性</div>
+    <div class="body-area">
+      <p>1. 悪い理由の1つ目は、割高になりやすいこと。</p>
+      <p>2. 特にSHIFTやDatadogなど、成長期待が高い銘柄はPERが高い。</p>
+      <p>3. <span class="term" data-e="explain4">PER</span>が高いと、業績が少しでも悪化したときに株価が大きく下がる。</p>
+      <p>4. 2つ目は競合が多いこと。テストもコンサルも参入者が多い。</p>
+      <p>5. 3つ目は地味さ。AI本体のような派手な話題性がない。</p>
+      <p>6. 4つ目は変動性。小型株は数日で大きく動く。</p>
+      <p>7. SHIFTは成長期待が高い分、失望時の下落も大きい。</p>
+      <p>8. バルテスは小型株で、流動性が低く値動きが荒い。</p>
+      <p>9. ポールトゥウィンは安定寄りだが、成長は緩やか。</p>
+      <p>10. デジタルハーツも競合が多く、差別化が難しい面がある。</p>
+      <p>11. 海外勢は価格競争力が強く、日本企業は押されやすい。</p>
+      <p>12. Cognizantは割安だが、成長率はそれほど高くない。</p>
+      <p>13. IBMは低成長で、株価の伸びは限定的になりやすい。</p>
+      <p>14. Accentureは堅実だが、割高感がある局面もある。</p>
+      <p>15. EPAMは地政学リスク（東欧起源）を抱える。</p>
+      <p>16. メンバーズは規模が小さく、成長はまだ途上。</p>
+      <p>17. トレンドマイクロは成熟市場で、成長は緩やか。</p>
+      <p>18. Datadogは成長期待が高い分、割高で変動が大きい。</p>
+      <p>19. これらは「悪い理由」であり、無視してはいけない。</p>
+      <p>20. ただし、悪い理由があるからといって即「買わない」ではない。</p>
+      <p>21. 良い理由と悪い理由を天秤にかけて判断する。</p>
+      <p>22. 悪い理由が許容範囲なら、買う判断もあり得る。</p>
+      <p>23. 逆に、悪い理由が大きすぎるなら、見送る。</p>
+      <p>24. ここが「普通の投資」と「ギャンブル」の分かれ目。</p>
+      <p>25. 今回の11銘柄は、悪い理由を抱えつつも許容範囲と判断。</p>
+      <p>26. ただし、それは「長期・分散・現物」が前提。</p>
+      <p>27. 短期売買や信用取引なら、話は別。</p>
+      <p>28. 現物で長期保有するからこそ、悪い理由を吸収できる。</p>
+      <p>29. 割高は、時間が解決する場合がある。</p>
+      <p>30. 競合は、差別化が効けば問題にならない。</p>
+      <p>31. 地味さは、長期ではむしろ美点になることもある。</p>
+      <p>32. 変動性は、分散でならすことができる。</p>
+      <p>33. つまり、悪い理由は「対策可能」なものが多い。</p>
+      <p>34. だから「悪い寄り」ではなく「良い寄り」と判断する。</p>
+      <p>35. ただし、それは万人に勧められるものではない。</p>
+      <p>36. 自分で理解し、自分で判断できる人向け。</p>
+      <p>37. 5ページ目・6ページ目で、位置関係を確認する。</p>
+      <p>38. 自分のリスク許容度と照らし合わせてほしい。</p>
+      <p>39. 次ページで、AIまわり投資の考え方をまとめる。</p>
+      <p>40. 悪い理由を知ることが、良い投資への第一歩。</p>
+      <div class="explain" id="explain4">
+        PER＝株価収益率。株価が1株あたり利益の何倍かを示す指標。高いほど成長期待が大きいが、業績悪化時の下落も大きい。低いほど割安だが、成長期待は小さい。
+      </div>
+    </div>
+    <div class="img-wrap">
+      <img src="img37x.jpg" alt="img37x" id="img3">
+      <div class="fit-btns" data-target="img3">
+        <div class="fit-btn active" data-fit="cover">cover</div>
+        <div class="fit-btn" data-fit="fill">fill</div>
+        <div class="fit-btn" data-fit="contain">contain</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PAGE 4 ============ -->
+  <section class="page p4" id="page4">
+    <div class="main-title">AIまわり投資の考え方とグラフへの導入</div>
+    <div class="body-area">
+      <p>1. ここまでで、良い理由と悪い理由を整理した。</p>
+      <p>2. 結論は「良い寄り」。ただし条件付き。</p>
+      <p>3. 条件は、現物・長期・分散。そして「AIそのもの」を買わないこと。</p>
+      <p>4. AIそのものは進化が速すぎて、個人が追うには危険。</p>
+      <p>5. 数年でモデルが変わり、数年で主役が入れ替わる。</p>
+      <p>6. だから<span class="term" data-e="explain5">AIまわり</span>に投資する。</p>
+      <p>7. AIを支える土台は、AI本体より長持ちする。</p>
+      <p>8. テスト、セキュリティ、監視、コンサル。どれも裏方。</p>
+      <p>9. 裏方は目立たないが、確実に需要がある。</p>
+      <p>10. これがAIまわり投資の本質。</p>
+      <p>11. では、11銘柄はAIに対してどの位置にあるのか。</p>
+      <p>12. それを可視化するのが、5ページ目と6ページ目の十字グラフ。</p>
+      <p>13. 十字グラフの軸は「AIとの距離」と「成長/安定」。</p>
+      <p>14. 横軸：AIに近い ←→ AIから遠い（間接）。</p>
+      <p>15. 縦軸：成長性が高い ←→ 安定・ディフェンシブ。</p>
+      <p>16. 中央には「AIそのもの」を置く。</p>
+      <p>17. その周囲に、AI関連のカテゴリを配置する。</p>
+      <p>18. 5ページ目はカテゴリのみ。銘柄名は出さない。</p>
+      <p>19. 6ページ目は、その位置に11銘柄を置く。</p>
+      <p>20. なぜカテゴリと銘柄を分けるか。全体像を見やすくするため。</p>
+      <p>21. まずカテゴリで地図を作り、次に銘柄で点を打つ。</p>
+      <p>22. これで「自分がどこに投資しているか」が一目で分かる。</p>
+      <p>23. 空きポジションも見える。そこが次の調査対象になる。</p>
+      <p>24. 例えば、AI関連の電力、AI関連のサーバー、データセンター。</p>
+      <p>25. これらは「AIに近い×安定」または「AIに近い×成長」に入る。</p>
+      <p>26. 噂レベルでも、そうした分野は存在する。</p>
+      <p>27. ただし、噂で飛びつくのは危険。まずは調査。</p>
+      <p>28. グラフは、調査の出発点として使う。</p>
+      <p>29. 投資判断そのものは、良い理由と悪い理由の両面で行う。</p>
+      <p>30. グラフはその補助ツール。主役はあくまで銘柄の中身。</p>
+      <p>31. 5ページ目でカテゴリの地図を確認する。</p>
+      <p>32. 6ページ目で、11銘柄の位置を確認する。</p>
+      <p>33. 自分のポートフォリオと照らし合わせる。</p>
+      <p>34. 偏りがあれば、分散のヒントになる。</p>
+      <p>35. 空きポジションがあれば、次の調査候補になる。</p>
+      <p>36. これが、グラフを作る理由。</p>
+      <p>37. AIそのものは買わない。AIまわりを買う。</p>
+      <p>38. その判断を、グラフで裏付ける。</p>
+      <p>39. 次ページから、実際のグラフを見ていく。</p>
+      <p>40. まずは5ページ目、カテゴリの地図から。</p>
+      <div class="explain" id="explain5">
+        AIまわり＝AI本体（GPU・LLM・モデル開発）ではなく、AIを導入・運用する企業を支える分野。テスト/QA、ITコンサル、セキュリティ、監視など。AIブームが続くほど需要が増え、本体より陳腐化しにくいのが特徴。
+      </div>
+    </div>
+    <div class="img-wrap">
+      <img src="img38x.jpg" alt="img38x" id="img4">
+      <div class="fit-btns" data-target="img4">
+        <div class="fit-btn active" data-fit="cover">cover</div>
+        <div class="fit-btn" data-fit="fill">fill</div>
+        <div class="fit-btn" data-fit="contain">contain</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PAGE 5 ============ -->
+  <section class="page p5" id="page5">
+    <div class="main-title">十字グラフ①：AIまわりカテゴリの地図</div>
+    <div class="body-area">
+      <p>1. 中央に「AIそのもの」を置く。</p>
+      <p>2. 横軸は「AIに近い ←→ AIから遠い（間接）」。</p>
+      <p>3. 縦軸は「成長性が高い ←→ 安定・ディフェンシブ」。</p>
+      <p>4. この4象限に、AI関連カテゴリを配置する。</p>
+      <p>5. 近×成長：AIサーバー、AI半導体、AIクラウド。</p>
+      <p>6. 近×安定：AI電力、データセンター、AIセキュリティ。</p>
+      <p>7. 遠×成長：テスト/QA、デバッグ、DevOps。</p>
+      <p>8. 遠×安定：ITコンサル、SIer、監視・可観測性。</p>
+      <p>9. 11銘柄は、主に「遠×成長」と「遠×安定」に集まる。</p>
+      <p>10. つまり、AIから見ると間接的だが、需要は確実。</p>
+      <p>11. 空きポジションは「近×成長」と「近×安定」。</p>
+      <p>12. ここが、AI関連の電力・サーバー・データセンターの領域。</p>
+      <p>13. 次ページで、11銘柄をこの地図に置く。</p>
+    </div>
+    <div class="cross-wrap">
+      <div class="cross">
+        <div class="axis-label axis-top">成長性が高い</div>
+        <div class="axis-label axis-bottom">安定・ディフェンシブ</div>
+        <div class="axis-label axis-left">AIに近い</div>
+        <div class="axis-label axis-right">AIから遠い（間接）</div>
+
+        <div class="center-ai">AIそのもの</div>
+
+        <!-- 近×成長（左上寄り） -->
+        <div class="node cat" style="left:26%;top:22%;">AIサーバー</div>
+        <div class="node cat" style="left:38%;top:14%;">AI半導体</div>
+        <div class="node cat" style="left:18%;top:34%;">AIクラウド</div>
+
+        <!-- 近×安定（左下寄り） -->
+        <div class="node cat" style="left:22%;top:66%;">AI電力</div>
+        <div class="node cat" style="left:36%;top:78%;">データセンター</div>
+        <div class="node cat" style="left:14%;top:82%;">AIセキュリティ</div>
+
+        <!-- 遠×成長（右上寄り） -->
+        <div class="node cat" style="left:70%;top:26%;">テスト/QA</div>
+        <div class="node cat" style="left:82%;top:36%;">デバッグ</div>
+        <div class="node cat" style="left:72%;top:16%;">DevOps</div>
+
+        <!-- 遠×安定（右下寄り） -->
+        <div class="node cat" style="left:74%;top:70%;">ITコンサル</div>
+        <div class="node cat" style="left:86%;top:82%;">SIer</div>
+        <div class="node cat" style="left:64%;top:86%;">監視・可観測性</div>
+      </div>
+    </div>
+    <div class="legend">※ 横軸：AIとの距離（近い＝AI本体に近い／遠い＝間接）　縦軸：成長性 vs 安定性</div>
+  </section>
+
+  <!-- ============ PAGE 6 ============ -->
+  <section class="page p6" id="page6">
+    <div class="main-title">十字グラフ②：11銘柄の位置</div>
+    <div class="body-area">
+      <p>1. 前ページのカテゴリ地図に、11銘柄を置く。</p>
+      <p>2. SHIFT（3697）：テスト特化。遠×成長のやや上。</p>
+      <p>3. バルテス（4442）：テスト特化・小型。遠×成長の上寄り。</p>
+      <p>4. デジタルハーツ（3676）：デバッグ大手。遠×成長の中ほど。</p>
+      <p>5. ポールトゥウィン（3657）：デバッグ系。遠×成長の下寄り。</p>
+      <p>6. メンバーズ（3155）：デジタル支援。遠×成長の下。</p>
+      <p>7. Datadog（DDOG）：監視・可観測性。遠×成長と遠×安定の中間。</p>
+      <p>8. トレンドマイクロ（4704）：セキュリティ。遠×安定の上寄り。</p>
+      <p>9. IBM（IBM）：企業IT。遠×安定の中央。</p>
+      <p>10. Cognizant（CTSH）：ITコンサル。遠×安定のやや上。</p>
+      <p>11. Accenture（ACN）：ITコンサル最大手。遠×安定の上。</p>
+      <p>12. EPAM（EPAM）：IT開発。遠×成長と安定の中間。</p>
+      <p>13. まとめると、11銘柄は「遠」側に集中している。</p>
+      <p>14. つまり、AIから見ると間接的。それが「AIまわり」の証拠。</p>
+      <p>15. 近側（AIサーバー・電力など）は、まだ空きポジション。</p>
+      <p>16. 空きポジションは、今後の調査候補になる。</p>
+      <p>17. ただし、噂で飛びつかず、まずは調査。</p>
+      <p>18. グラフは調査の出発点。投資判断は別で行う。</p>
+      <p>19. 自分のポートフォリオと照らし合わせてほしい。</p>
+      <p>20. 偏りがあれば分散のヒント。空きがあれば調査候補。</p>
+      <p>21. これが、このグラフを作った理由。</p>
+      <p>22. AIそのものは買わない。AIまわりを買う。</p>
+      <p>23. その判断を、位置関係で裏付ける。</p>
+      <p>24. 以上で、サイトの内容は終わり。</p>
+      <p>25. 結論：現物・長期・分散で、AIまわりを買う。</p>
+      <p>26. 良い理由と悪い理由の両面を理解した上で。</p>
+      <p>27. これが普通の投資。ギャンブルではない。</p>
+      <p>28. 最後まで読んでくれてありがとう。</p>
+    </div>
+    <div class="cross-wrap">
+      <div class="cross">
+        <div class="axis-label axis-top">成長性が高い</div>
+        <div class="axis-label axis-bottom">安定・ディフェンシブ</div>
+        <div class="axis-label axis-left">AIに近い</div>
+        <div class="axis-label axis-right">AIから遠い（間接）</div>
+
+        <div class="center-ai">AIそのもの</div>
+
+        <!-- 遠×成長 -->
+        <div class="node stock" style="left:68%;top:20%;">バルテス</div>
+        <div class="node stock" style="left:80%;top:28%;">SHIFT</div>
+        <div class="node stock" style="left:72%;top:34%;">デジタルハーツ</div>
+        <div class="node stock" style="left:84%;top:42%;">ポールトゥウィン</div>
+        <div class="node stock" style="left:76%;top:48%;">メンバーズ</div>
+        <div class="node stock" style="left:62%;top:40%;">Datadog</div>
+        <div class="node stock" style="left:58%;top:30%;">EPAM</div>
+
+        <!-- 遠×安定 -->
+        <div class="node stock" style="left:74%;top:62%;">トレンドマイクロ</div>
+        <div class="node stock" style="left:86%;top:70%;">IBM</div>
+        <div class="node stock" style="left:78%;top:78%;">Cognizant</div>
+        <div class="node stock" style="left:66%;top:74%;">Accenture</div>
+
+        <!-- 近側の空きポジション参考 -->
+        <div class="node cat" style="left:22%;top:26%;">AIサーバー</div>
+        <div class="node cat" style="left:30%;top:72%;">AI電力</div>
+      </div>
+    </div>
+    <div class="legend">※ 橙＝11銘柄　青＝参考カテゴリ（空きポジション）</div>
+  </section>
+
+  <!-- ---- NAV ---- -->
+  <div class="nav">
+    <button id="prevBtn" onclick="prevPage()">PREV</button>
+    <div class="pageno" id="pageno">1 / 6</div>
+    <button id="nextBtn" onclick="nextPage()">NEXT</button>
+  </div>
+</div>
+
+<script>
+  var current = 1;
+  var total = 6;
+
+  function showPage(n){
+    current = n;
+    for(var i=1;i<=total;i++){
+      document.getElementById('page'+i).classList.toggle('active', i===n);
+    }
+    document.getElementById('pageno').textContent = n + ' / ' + total;
+    document.getElementById('prevBtn').disabled = (n===1);
+    document.getElementById('nextBtn').disabled = (n===total);
+    window.scrollTo(0,0);
+  }
+  function prevPage(){ if(current>1) showPage(current-1); }
+  function nextPage(){ if(current<total) showPage(current+1); }
+
+  // 解説トグル
+  document.querySelectorAll('.term').forEach(function(t){
+    t.addEventListener('click', function(){
+      var id = this.getAttribute('data-e');
+      var el = document.getElementById(id);
+      if(el) el.classList.toggle('open');
+    });
+  });
+
+  // 画像 fit 切替
+  document.querySelectorAll('.fit-btns').forEach(function(group){
+    group.querySelectorAll('.fit-btn').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var targetId = group.getAttribute('data-target');
+        var img = document.getElementById(targetId);
+        var fit = this.getAttribute('data-fit');
+        img.style.objectFit = fit;
+        group.querySelectorAll('.fit-btn').forEach(function(b){ b.classList.remove('active'); });
+        this.classList.add('active');
+      });
+    });
+  });
+
+  showPage(1);
+</script>
+</body>
+</html>
