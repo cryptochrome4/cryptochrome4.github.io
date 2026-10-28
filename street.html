@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>仮面ライダー バトル</title>
+<title>仮面ライダー ストリートバトル</title>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  body {
+  html, body {
     margin: 0;
-    background: #0f0f1a;
+    background: #07070d;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -19,194 +19,504 @@
     user-select: none;
     padding: 8px;
     gap: 8px;
+    overflow-x: hidden;
   }
 
-  /* ===== ゲーム画面 ===== */
+  /* ============================================================
+     ゲーム画面
+     ============================================================ */
   #game-wrap { position: relative; width: min(96vw, 1000px); }
   #game {
     position: relative;
     width: 100%;
     aspect-ratio: 2 / 1;
-    background: linear-gradient(#1a0a2a 0%, #4a1a6a 60%, #2a0a1a 100%);
-    border: 4px solid #ff3333;
     overflow: hidden;
-    border-radius: 8px;
-    box-shadow: 0 0 30px rgba(255,50,50,0.4);
-  }
-  #ground {
-    position: absolute;
-    bottom: 0;
-    width: 100%;
-    height: 20%;
-    background: linear-gradient(#3a2a1a, #1a1008);
-    border-top: 3px solid #ff3333;
-    z-index: 1;
+    border-radius: 10px;
+    border: 3px solid #ff2244;
+    box-shadow: 0 0 40px rgba(255,30,70,0.5), 0 0 100px rgba(120,0,255,0.3);
+    background: #1a0a2a;
   }
 
-  /* ===== キャラ（当たり判定を内部で管理） ===== */
+  /* ===== 背景レイヤ ===== */
+  .bg-sky {
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg,
+      #0a0618 0%,
+      #1a0a3a 25%,
+      #3a1050 50%,
+      #6a1a4a 72%,
+      #2a0a1a 100%);
+    z-index: 0;
+  }
+  /* 月 */
+  .moon {
+    position: absolute;
+    top: 8%; right: 15%;
+    width: 9%; aspect-ratio: 1;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #fff8e0, #ffcc88 60%, #cc8844);
+    box-shadow: 0 0 40px rgba(255,220,150,0.8), 0 0 80px rgba(255,180,80,0.4);
+    z-index: 1;
+  }
+  /* 雲 */
+  .cloud {
+    position: absolute;
+    background: rgba(120,80,160,0.3);
+    border-radius: 50%;
+    filter: blur(8px);
+    z-index: 1;
+  }
+  .cloud.c1 { width: 20%; height: 8%; top: 15%; left: 10%; animation: drift 40s linear infinite; }
+  .cloud.c2 { width: 28%; height: 6%; top: 30%; left: 40%; animation: drift 55s linear infinite reverse; }
+  .cloud.c3 { width: 15%; height: 5%; top: 22%; left: 75%; animation: drift 48s linear infinite; }
+  @keyframes drift {
+    0% { transform: translateX(-30%); }
+    100% { transform: translateX(130%); }
+  }
+
+  /* ===== ビル群（奥） ===== */
+  .skyline {
+    position: absolute;
+    bottom: 22%; left: 0; right: 0;
+    height: 55%;
+    z-index: 2;
+  }
+  .building {
+    position: absolute;
+    bottom: 0;
+    background: linear-gradient(180deg, #1a1230 0%, #0a0818 100%);
+    border-top: 2px solid #2a1a4a;
+    box-shadow: inset 0 0 20px rgba(120,50,255,0.15);
+  }
+  .building .win {
+    position: absolute;
+    width: 6%; height: 3%;
+    background: #ffcc55;
+    box-shadow: 0 0 6px #ffcc55;
+    opacity: 0.9;
+  }
+  .building .win.off { background: #2a2040; box-shadow: none; }
+  .building .win.blue { background: #55ccff; box-shadow: 0 0 6px #55ccff; }
+
+  /* ===== ネオン看板 ===== */
+  .neon {
+    position: absolute;
+    font-family: 'Arial Black', sans-serif;
+    font-size: clamp(8px, 1.2vw, 14px);
+    font-weight: bold;
+    padding: 2px 8px;
+    border-radius: 3px;
+    background: rgba(0,0,0,0.6);
+    z-index: 3;
+    animation: neonFlicker 2s infinite alternate;
+  }
+  .neon.pink  { color: #ff44aa; text-shadow: 0 0 8px #ff44aa, 0 0 16px #ff44aa; border: 1px solid #ff44aa; }
+  .neon.cyan  { color: #44ffff; text-shadow: 0 0 8px #44ffff, 0 0 16px #44ffff; border: 1px solid #44ffff; }
+  .neon.yellow{ color: #ffee44; text-shadow: 0 0 8px #ffee44, 0 0 16px #ffee44; border: 1px solid #ffee44; }
+  @keyframes neonFlicker {
+    0%, 85%, 100% { opacity: 1; }
+    88% { opacity: 0.3; }
+    92% { opacity: 1; }
+    95% { opacity: 0.5; }
+  }
+
+  /* ===== 道路 ===== */
+  .street {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 22%;
+    background: linear-gradient(180deg, #2a2030 0%, #1a1020 40%, #0a0510 100%);
+    border-top: 3px solid #ff2244;
+    z-index: 4;
+  }
+  .street::before {
+    /* センターライン */
+    content: '';
+    position: absolute;
+    top: 40%; left: 0; right: 0;
+    height: 4%;
+    background: repeating-linear-gradient(90deg,
+      transparent 0, transparent 3%,
+      #ffee44 3%, #ffee44 7%);
+    opacity: 0.5;
+  }
+  .street::after {
+    /* 濡れた路面の反射 */
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 100%;
+    background: linear-gradient(180deg, rgba(255,50,100,0.15) 0%, transparent 60%);
+  }
+
+  /* 街灯 */
+  .streetlight {
+    position: absolute;
+    bottom: 22%;
+    width: 1%;
+    height: 30%;
+    background: linear-gradient(180deg, #333 0%, #555 100%);
+    z-index: 3;
+  }
+  .streetlight::before {
+    content: '';
+    position: absolute;
+    top: -8%; left: -300%;
+    width: 700%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,200,100,0.5) 0%, transparent 70%);
+  }
+  .streetlight::after {
+    content: '';
+    position: absolute;
+    top: 0; left: -150%;
+    width: 400%; height: 4%;
+    background: #ffee88;
+    border-radius: 2px;
+    box-shadow: 0 0 12px #ffee88;
+  }
+
+  /* 観客シルエット（手前） */
+  .crowd {
+    position: absolute;
+    bottom: 20%; left: 0; right: 0;
+    height: 6%;
+    z-index: 5;
+    opacity: 0.5;
+    background: repeating-linear-gradient(90deg,
+      transparent 0, transparent 1.5%,
+      #000 1.5%, #000 3%);
+    filter: blur(1px);
+  }
+
+  /* ============================================================
+     キャラクター
+     ============================================================ */
   .fighter {
     position: absolute;
     bottom: 20%;
     width: 8%;
     height: 30%;
-    z-index: 2;
-    transition: bottom 0.12s ease-out, height 0.12s ease-out;
+    z-index: 10;
+    transform: translateX(-50%);
+    transition: filter 0.08s;
   }
 
-  /* プレイヤー：仮面ライダー風 */
+  /* --- プレイヤー（赤ライダー） --- */
   #player {
-    background: linear-gradient(160deg, #ff2222 0%, #cc0000 40%, #1a1a1a 45%, #1a1a1a 100%);
-    border-radius: 40% 40% 20% 20% / 30% 30% 10% 10%;
-    box-shadow: inset -4px 0 8px rgba(0,0,0,0.5), 0 0 12px rgba(255,50,50,0.6);
+    --body-gradient: linear-gradient(160deg, #ff3333 0%, #cc0000 50%, #660000 100%);
+    --limb-color: #cc1111;
+    --accent: #ffdd00;
+    --eye-glow: #00ffff;
   }
-  #player::before {
-    content: '';
-    position: absolute;
-    top: 22%; left: 8%;
-    width: 85%; height: 22%;
-    background: radial-gradient(ellipse at center, #88ffff 0%, #00aacc 50%, #003355 100%);
-    border-radius: 50% 50% 30% 30%;
-    box-shadow: 0 0 8px #00ccff;
-    border: 1px solid #000;
-  }
-  #player::after {
-    content: '';
-    position: absolute;
-    bottom: 32%; left: 10%;
-    width: 80%; height: 8%;
-    background: linear-gradient(90deg, #ffcc00, #ffaa00);
-    border-radius: 2px;
-    box-shadow: 0 0 6px #ffcc00;
-  }
-
-  /* 敵：ダークライダー風 */
+  /* --- 敵（紫ダークライダー） --- */
   #enemy {
-    background: linear-gradient(200deg, #8822ff 0%, #4411aa 40%, #1a1a1a 45%, #1a1a1a 100%);
-    border-radius: 40% 40% 20% 20% / 30% 30% 10% 10%;
-    box-shadow: inset 4px 0 8px rgba(0,0,0,0.5), 0 0 12px rgba(150,50,255,0.6);
+    --body-gradient: linear-gradient(200deg, #aa33ff 0%, #6611cc 50%, #330088 100%);
+    --limb-color: #7711dd;
+    --accent: #ff00ff;
+    --eye-glow: #ff00ff;
   }
-  #enemy::before {
+
+  /* 胴体 */
+  .torso {
+    position: absolute;
+    left: 15%; top: 30%;
+    width: 70%; height: 45%;
+    background: var(--body-gradient);
+    border-radius: 30% 30% 20% 20% / 25% 25% 15% 15%;
+    box-shadow: inset -3px 0 8px rgba(0,0,0,0.6), 0 0 10px rgba(255,50,50,0.4);
+    z-index: 2;
+    transform-origin: center top;
+  }
+  /* ベルト */
+  .belt {
+    position: absolute;
+    left: 15%; top: 68%;
+    width: 70%; height: 9%;
+    background: var(--accent);
+    border-radius: 2px;
+    box-shadow: 0 0 8px var(--accent);
+    z-index: 3;
+  }
+
+  /* 頭（ヘルメット） */
+  .head {
+    position: absolute;
+    left: 15%; top: 2%;
+    width: 70%; height: 32%;
+    background: var(--body-gradient);
+    border-radius: 50% 50% 40% 40% / 60% 60% 40% 40%;
+    box-shadow: inset -2px 0 6px rgba(0,0,0,0.6);
+    z-index: 3;
+    transform-origin: center bottom;
+  }
+  /* 複眼 */
+  .head::before {
     content: '';
     position: absolute;
-    top: 22%; left: 8%;
-    width: 85%; height: 22%;
-    background: radial-gradient(ellipse at center, #ff88ff 0%, #cc00cc 50%, #550055 100%);
+    top: 35%; left: 8%;
+    width: 84%; height: 40%;
+    background: radial-gradient(ellipse at center,
+      #ffffff 0%, var(--eye-glow) 40%, #003355 100%);
     border-radius: 50% 50% 30% 30%;
-    box-shadow: 0 0 8px #ff00ff;
+    box-shadow: 0 0 12px var(--eye-glow), 0 0 20px var(--eye-glow);
     border: 1px solid #000;
   }
-  #enemy::after {
+  /* アンテナ */
+  .head::after {
     content: '';
     position: absolute;
-    bottom: 32%; left: 10%;
-    width: 80%; height: 8%;
-    background: linear-gradient(90deg, #cc00cc, #880088);
+    top: -18%; left: 45%;
+    width: 10%; height: 30%;
+    background: var(--accent);
     border-radius: 2px;
-    box-shadow: 0 0 6px #cc00cc;
+    transform: rotate(-5deg);
+    box-shadow: 0 0 6px var(--accent);
   }
 
-  /* ===== 攻撃エフェクト（腕・脚を表現） ===== */
-  /* パンチ：前へ突き出す拳 */
-  .punch-arm {
+  /* 腕 */
+  .arm {
     position: absolute;
-    top: 35%;
-    width: 0; height: 22%;
-    background: linear-gradient(90deg, #ff4444, #ffffff);
-    border-radius: 6px;
-    opacity: 0;
-    z-index: 5;
-    transition: width 0.08s, opacity 0.08s;
+    background: var(--limb-color);
+    border-radius: 40% 40% 30% 30%;
+    box-shadow: inset -2px 0 4px rgba(0,0,0,0.5), 0 0 4px rgba(255,50,50,0.3);
+    transform-origin: center top;
+    transition: transform 0.08s ease-out;
+    z-index: 1;
   }
-  #player .punch-arm { right: 0; transform-origin: right center; }
-  #enemy  .punch-arm { left: 0;  transform-origin: left center; }
-
-  /* キック：横へ振り上げる脚 */
-  .kick-leg {
+  .arm.left  { width: 18%; height: 38%; left: 2%;  top: 32%; transform: rotate(8deg); }
+  .arm.right { width: 18%; height: 38%; right: 2%; top: 32%; transform: rotate(-8deg); }
+  /* 拳 */
+  .arm::after {
+    content: '';
     position: absolute;
-    bottom: 25%;
-    width: 0; height: 20%;
-    background: linear-gradient(90deg, #ffaa44, #ffffff);
-    border-radius: 6px;
-    opacity: 0;
-    z-index: 5;
-    transition: width 0.08s, opacity 0.08s;
-  }
-  #player .kick-leg { right: 0; transform-origin: right bottom; }
-  #enemy  .kick-leg { left: 0;  transform-origin: left bottom; }
-
-  /* パンチ発動中 */
-  .fighter.punching .punch-arm {
-    width: 70%;
-    opacity: 1;
-    animation: punchStrike 0.2s ease-out;
-  }
-  @keyframes punchStrike {
-    0% { width: 0; opacity: 1; }
-    50% { width: 90%; }
-    100% { width: 70%; opacity: 0.9; }
+    bottom: -8%; left: 15%;
+    width: 70%; aspect-ratio: 1;
+    background: var(--limb-color);
+    border-radius: 50%;
+    box-shadow: inset -1px 0 3px rgba(0,0,0,0.5);
   }
 
-  /* キック発動中 */
-  .fighter.kicking .kick-leg {
-    width: 85%;
-    opacity: 1;
-    transform: rotate(-25deg);
-    animation: kickStrike 0.25s ease-out;
+  /* 脚 */
+  .leg {
+    position: absolute;
+    background: var(--limb-color);
+    border-radius: 30% 30% 40% 40%;
+    box-shadow: inset -2px 0 4px rgba(0,0,0,0.5);
+    transform-origin: center top;
+    transition: transform 0.08s ease-out;
+    z-index: 1;
   }
-  #enemy.kicking .kick-leg { transform: rotate(25deg); }
-  @keyframes kickStrike {
-    0% { width: 0; transform: rotate(0deg); }
-    50% { width: 100%; transform: rotate(-25deg); }
-    100% { width: 85%; transform: rotate(-25deg); }
+  .leg.left  { width: 22%; height: 30%; left: 18%; top: 72%; transform: rotate(3deg); }
+  .leg.right { width: 22%; height: 30%; right: 18%; top: 72%; transform: rotate(-3deg); }
+  /* ブーツ */
+  .leg::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: -10%;
+    width: 120%; height: 30%;
+    background: #111;
+    border-radius: 40% 40% 20% 20%;
   }
-  @keyframes kickStrikeEnemy {
-    0% { width: 0; transform: rotate(0deg); }
-    50% { width: 100%; transform: rotate(25deg); }
-    100% { width: 85%; transform: rotate(25deg); }
-  }
-  #enemy.kicking .kick-leg { animation: kickStrikeEnemy 0.25s ease-out; }
 
-  /* ジャンプ：浮き上がる */
-  .fighter.jumping { bottom: 40% !important; height: 26% !important; }
-  /* しゃがみ：縮む */
-  .fighter.crouching { height: 18% !important; }
+  /* ============================================================
+     アニメーション状態
+     ============================================================ */
+  /* 向き反転 */
+  #player.facing-left  .torso,
+  #player.facing-left  .head,
+  #player.facing-left  .belt { transform: scaleX(-1); }
+  #enemy.facing-right  .torso,
+  #enemy.facing-right  .head,
+  #enemy.facing-right  .belt { transform: scaleX(-1); }
+
+  /* 歩く：脚を交互に振る */
+  .fighter.walking .leg.left  { animation: walkL 0.4s infinite alternate ease-in-out; }
+  .fighter.walking .leg.right { animation: walkR 0.4s infinite alternate ease-in-out; }
+  .fighter.walking .arm.left  { animation: armL 0.4s infinite alternate ease-in-out; }
+  .fighter.walking .arm.right { animation: armR 0.4s infinite alternate ease-in-out; }
+  .fighter.walking .torso { animation: bob 0.2s infinite alternate ease-in-out; }
+  @keyframes walkL { from { transform: rotate(-15deg); } to { transform: rotate(20deg); } }
+  @keyframes walkR { from { transform: rotate(20deg); }  to { transform: rotate(-15deg); } }
+  @keyframes armL  { from { transform: rotate(15deg); }  to { transform: rotate(-10deg); } }
+  @keyframes armR  { from { transform: rotate(-10deg); } to { transform: rotate(15deg); } }
+  @keyframes bob   { from { transform: translateY(0); }  to { transform: translateY(-2%); } }
+
+  /* ジャンプ */
+  .fighter.jumping .leg.left  { transform: rotate(-25deg); }
+  .fighter.jumping .leg.right { transform: rotate(-25deg); }
+  .fighter.jumping .arm.left  { transform: rotate(-30deg); }
+  .fighter.jumping .arm.right { transform: rotate(30deg); }
+
+  /* しゃがみ */
+  .fighter.crouching { height: 20% !important; }
+  .fighter.crouching .head  { top: -5%; }
+  .fighter.crouching .torso { height: 40%; top: 35%; }
+  .fighter.crouching .leg.left  { height: 22%; top: 68%; transform: rotate(-30deg); }
+  .fighter.crouching .leg.right { height: 22%; top: 68%; transform: rotate(30deg); }
+  .fighter.crouching .arm.left  { top: 40%; height: 28%; transform: rotate(40deg); }
+  .fighter.crouching .arm.right { top: 40%; height: 28%; transform: rotate(-40deg); }
+
+  /* ============================================================
+     パンチ（腕を真っ直ぐ突き出す）
+     ============================================================ */
+  .fighter.punching .arm.right {
+    transform: rotate(-90deg) translateY(-30%);
+    width: 22%;
+    height: 55%;
+    transition: transform 0.08s ease-out, height 0.08s ease-out;
+  }
+  .fighter.punching .arm.right::after {
+    box-shadow: 0 0 10px #ffcc00, inset -1px 0 3px rgba(0,0,0,0.5);
+  }
+  /* 左向きのときは左腕でパンチ */
+  .fighter.facing-left.punching .arm.right { transform: rotate(-8deg); height: 38%; }
+  .fighter.facing-left.punching .arm.left {
+    transform: rotate(90deg) translateY(-30%);
+    width: 22%; height: 55%;
+    box-shadow: 0 0 10px #ffcc00;
+  }
+
+  /* パンチの踏み込み */
+  .fighter.punching { animation: punchLunge 0.2s ease-out; }
+  @keyframes punchLunge {
+    0% { transform: translateX(-50%) translateX(0); }
+    50% { transform: translateX(-50%) translateX(3%); }
+    100% { transform: translateX(-50%) translateX(0); }
+  }
+
+  /* ============================================================
+     キック（脚を弧を描いて振り上げる）
+     ============================================================ */
+  .fighter.kicking .leg.right {
+    transform: rotate(-100deg);
+    height: 45%;
+    transition: transform 0.1s ease-out, height 0.1s ease-out;
+    box-shadow: 0 0 15px #ffaa00;
+  }
+  .fighter.facing-left.kicking .leg.right { transform: rotate(-3deg); height: 30%; box-shadow: none; }
+  .fighter.facing-left.kicking .leg.left {
+    transform: rotate(100deg);
+    height: 45%;
+    box-shadow: 0 0 15px #ffaa00;
+  }
+  /* 上半身を反らせる */
+  .fighter.kicking .torso { transform: rotate(-10deg); }
+  .fighter.facing-left.kicking .torso { transform: rotate(10deg); }
+
+  .fighter.kicking { animation: kickLunge 0.25s ease-out; }
+  @keyframes kickLunge {
+    0% { transform: translateX(-50%) translateX(0); }
+    40% { transform: translateX(-50%) translateX(-2%); }
+    100% { transform: translateX(-50%) translateX(0); }
+  }
 
   /* 被弾フラッシュ */
-  .fighter.hit { filter: brightness(3) !important; }
-  .fighter.block { filter: brightness(1.5) sepia(1) hue-rotate(60deg); }
+  .fighter.hit { filter: brightness(3) saturate(0); }
+  .fighter.block { filter: brightness(1.3) sepia(1) hue-rotate(60deg); }
 
-  /* ===== HP ===== */
+  /* ============================================================
+     攻撃エフェクト（軌跡）
+     ============================================================ */
+  .fx-container {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 20;
+  }
+  .fx {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    animation: fxBurst 0.3s ease-out forwards;
+  }
+  @keyframes fxBurst {
+    0% { transform: translate(-50%, -50%) scale(0.2); opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(1.8); opacity: 0; }
+  }
+  .fx.hit {
+    background: radial-gradient(circle, #fff 0%, #ffcc00 30%, #ff4400 60%, transparent 100%);
+    box-shadow: 0 0 20px #ffcc00;
+  }
+  .fx.punch {
+    background: radial-gradient(circle, #fff 0%, #88ddff 40%, #0088ff 70%, transparent 100%);
+    box-shadow: 0 0 20px #00aaff;
+  }
+  .fx.kick {
+    background: radial-gradient(circle, #fff 0%, #ffdd88 40%, #ff8800 70%, transparent 100%);
+    box-shadow: 0 0 25px #ffaa00;
+  }
+
+  /* ダメージポップ */
+  .dmg-pop {
+    position: absolute;
+    font-family: 'Arial Black', sans-serif;
+    font-size: clamp(14px, 2.2vw, 24px);
+    font-weight: bold;
+    color: #fff;
+    text-shadow: 0 0 8px #ff0000, 2px 2px 0 #000;
+    pointer-events: none;
+    z-index: 21;
+    animation: dmgFloat 0.8s ease-out forwards;
+  }
+  @keyframes dmgFloat {
+    0% { transform: translate(-50%, 0) scale(0.5); opacity: 0; }
+    20% { transform: translate(-50%, -30%) scale(1.3); opacity: 1; }
+    100% { transform: translate(-50%, -150%) scale(1); opacity: 0; }
+  }
+
+  /* ============================================================
+     UI（HP/ラベル/メッセージ）
+     ============================================================ */
   .hp-bar {
     position: absolute;
     top: 4%;
     width: 38%;
-    height: 7%;
-    background: #222;
-    border: 2px solid #ff3333;
+    height: 6%;
+    background: #111;
+    border: 2px solid #ff2244;
     border-radius: 4px;
     overflow: hidden;
-    z-index: 3;
+    z-index: 30;
+    box-shadow: 0 0 10px rgba(255,30,70,0.5);
   }
   #player-hp { left: 2%; }
   #enemy-hp { right: 2%; }
   .hp-fill {
     height: 100%;
-    background: linear-gradient(#00ff00, #00aa00);
-    transition: width 0.2s;
+    background: linear-gradient(90deg, #ff2244, #ffcc00 40%, #44ff88 100%);
+    background-size: 200% 100%;
+    background-position: 100% 0;
+    transition: width 0.25s, background-position 0.25s;
   }
-  #enemy-hp .hp-fill { float: right; }
+  #enemy-hp .hp-fill {
+    float: right;
+    background: linear-gradient(-90deg, #ff2244, #ffcc00 40%, #44ff88 100%);
+    background-position: 0 0;
+  }
+  .hp-label {
+    position: absolute;
+    top: 11%;
+    font-size: 10px;
+    font-family: Arial, sans-serif;
+    color: #ffddaa;
+    text-shadow: 1px 1px 2px #000;
+    z-index: 30;
+  }
+  #player-hp-label { left: 3%; }
+  #enemy-hp-label { right: 3%; }
 
   .move-label {
     position: absolute;
-    top: 13%;
-    font-size: 13px;
-    color: #ffcc00;
+    top: 15%;
+    font-size: clamp(11px, 1.6vw, 16px);
+    color: #ffee00;
     font-weight: bold;
-    text-shadow: 2px 2px 0 #000;
+    text-shadow: 0 0 8px #ff6600, 2px 2px 0 #000;
     opacity: 0;
     transition: opacity 0.2s;
     font-family: Arial, sans-serif;
-    z-index: 3;
+    z-index: 30;
   }
   #player-move { left: 2%; }
   #enemy-move { right: 2%; }
@@ -214,28 +524,35 @@
 
   #message {
     position: absolute;
-    top: 45%;
-    left: 50%;
+    top: 45%; left: 50%;
     transform: translate(-50%, -50%);
-    font-size: clamp(24px, 5vw, 56px);
+    font-size: clamp(28px, 6vw, 72px);
     font-weight: bold;
-    text-shadow: 4px 4px 0 #000;
+    text-shadow: 0 0 20px currentColor, 4px 4px 0 #000;
     display: none;
-    z-index: 10;
+    z-index: 50;
     white-space: nowrap;
+    animation: msgPop 0.4s ease-out;
+  }
+  @keyframes msgPop {
+    0% { transform: translate(-50%, -50%) scale(0.3); opacity: 0; }
+    60% { transform: translate(-50%, -50%) scale(1.2); }
+    100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
   }
 
-  /* ===== 当たり判定の可視化（デバッグ用・半透明） ===== */
-  .hitbox {
-    position: absolute;
-    border: 2px dashed rgba(0,255,255,0.6);
-    background: rgba(0,255,255,0.1);
-    pointer-events: none;
-    z-index: 4;
+  /* 画面シェイク */
+  @keyframes shake {
+    0%, 100% { transform: translate(0, 0); }
+    20% { transform: translate(-6px, 3px); }
+    40% { transform: translate(6px, -3px); }
+    60% { transform: translate(-4px, 2px); }
+    80% { transform: translate(4px, -2px); }
   }
-  .hitbox.active { border-color: rgba(255,0,0,0.8); background: rgba(255,0,0,0.2); }
+  #game.shake { animation: shake 0.2s; }
 
-  /* ===== オープニング（PREV画面） ===== */
+  /* ============================================================
+     オープニング（PREV画面）
+     ============================================================ */
   #opening {
     position: absolute;
     inset: 0;
@@ -250,15 +567,22 @@
   #opening-bg {
     position: absolute;
     inset: 0;
-    width: 100%;
-    height: 100%;
+    width: 100%; height: 100%;
     object-fit: fill;
     z-index: 0;
-    opacity: 0.5;
+    opacity: 0.55;
+  }
+  #opening::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at center, transparent 30%, rgba(0,0,0,0.7) 100%);
+    z-index: 1;
+    pointer-events: none;
   }
   #opening .opening-inner {
     position: relative;
-    z-index: 1;
+    z-index: 2;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -270,33 +594,33 @@
   #opening h1 {
     margin: 0;
     font-size: clamp(24px, 5vw, 52px);
-    background: linear-gradient(180deg, #ffffff, #ff2222);
+    background: linear-gradient(180deg, #ffffff, #ffdd00 40%, #ff2244 100%);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
-    text-shadow: 0 4px 12px rgba(255,0,0,0.8);
+    filter: drop-shadow(0 4px 12px rgba(255,0,0,0.8));
     letter-spacing: 3px;
     animation: pulse 1.5s infinite alternate;
     text-align: center;
     line-height: 1.1;
   }
-  @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.05); } }
+  @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.04); } }
   #opening p.sub {
-    margin: 6px 0 0;
+    margin: 8px 0 0;
     color: #fff;
     font-size: clamp(10px, 1.6vw, 14px);
     font-family: Arial, sans-serif;
     text-shadow: 1px 1px 4px #000, 0 0 8px #000;
     text-align: center;
   }
-  .future-slot { display: flex; gap: 10px; margin-top: 10px; }
+  .future-slot { display: flex; gap: 10px; margin-top: 12px; justify-content: center; flex-wrap: wrap; }
   .future-btn {
     font-family: Arial, sans-serif;
     font-size: clamp(9px, 1.3vw, 12px);
     padding: 6px 14px;
     border: 1px dashed #666;
     border-radius: 20px;
-    background: rgba(0,0,0,0.4);
+    background: rgba(0,0,0,0.5);
     color: #888;
     cursor: not-allowed;
   }
@@ -311,9 +635,9 @@
     transition: transform 0.1s, box-shadow 0.1s, filter 0.1s;
   }
   #start-btn {
-    background: linear-gradient(180deg, #ff2222, #cc0000);
+    background: linear-gradient(180deg, #ff2244, #cc0022);
     color: #fff;
-    box-shadow: 0 6px 0 #660000, 0 8px 20px rgba(255,0,0,0.6);
+    box-shadow: 0 6px 0 #660011, 0 8px 20px rgba(255,30,70,0.6);
   }
   #view-bg-btn {
     background: linear-gradient(180deg, #666, #333);
@@ -348,23 +672,26 @@
     font-weight: bold;
   }
 
-  /* ===== 情報パネル（ゲーセンのみ・小型） ===== */
+  /* ============================================================
+     コントローラー（アーケード）
+     ============================================================ */
   #info-panel {
     width: min(96vw, 1000px);
-    background: #16162a;
-    border: 2px solid #3a3a5a;
-    border-radius: 10px;
-    padding: 8px 10px;
+    background: linear-gradient(180deg, #1a1230, #0a0618);
+    border: 2px solid #3a2a5a;
+    border-radius: 12px;
+    padding: 10px 12px;
+    box-shadow: 0 0 20px rgba(120,50,255,0.2);
   }
   #panel-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 4px;
+    margin-bottom: 6px;
   }
   #panel-header .title {
-    font-size: 11px; color: #8a8ab0;
-    font-family: Arial, sans-serif; letter-spacing: 1px;
+    font-size: 11px; color: #aaaacc;
+    font-family: Arial, sans-serif; letter-spacing: 2px;
   }
   #hint {
     font-size: 10px; color: #666688;
@@ -375,61 +702,70 @@
     align-items: center;
     justify-content: space-around;
     gap: 20px;
-    padding: 4px 0;
+    padding: 6px 0;
   }
   .lever-base {
     position: relative;
-    width: 120px; height: 120px;
+    width: 130px; height: 130px;
     display: flex; align-items: center; justify-content: center;
     flex-shrink: 0;
   }
-  .lever-dirs { position: relative; width: 110px; height: 110px; }
+  .lever-dirs { position: relative; width: 120px; height: 120px; }
   .lever-dir {
     position: absolute;
-    width: 36px; height: 36px;
+    width: 38px; height: 38px;
     background: linear-gradient(180deg, #2a2a44, #16162a);
-    border: 2px solid #5555aa;
+    border: 2px solid #6666cc;
     border-radius: 8px;
     color: #aaaaff;
-    font-size: 15px;
+    font-size: 16px;
     cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     touch-action: none;
     user-select: none;
-    transition: transform 0.08s, filter 0.08s;
+    transition: transform 0.08s, filter 0.08s, box-shadow 0.08s;
+    box-shadow: 0 3px 0 #0a0a18, inset 0 0 6px rgba(120,120,255,0.3);
   }
-  .lever-dir.pressed { transform: scale(0.9); filter: brightness(1.5); }
-  .lever-dir[data-dir="left"]  { left: 0; top: 37px; }
-  .lever-dir[data-dir="right"] { right: 0; top: 37px; }
-  .lever-dir[data-dir="up"]    { left: 37px; top: 0; }
-  .lever-dir[data-dir="down"]  { left: 37px; bottom: 0; }
+  .lever-dir.pressed {
+    transform: scale(0.9) translateY(2px);
+    filter: brightness(1.8);
+    box-shadow: 0 1px 0 #0a0a18, 0 0 12px #6666ff;
+  }
+  .lever-dir[data-dir="left"]  { left: 0; top: 41px; }
+  .lever-dir[data-dir="right"] { right: 0; top: 41px; }
+  .lever-dir[data-dir="up"]    { left: 41px; top: 0; }
+  .lever-dir[data-dir="down"]  { left: 41px; bottom: 0; }
 
-  .arcade-buttons { display: flex; gap: 18px; align-items: center; }
+  .arcade-buttons { display: flex; gap: 20px; align-items: center; }
   .arcade-btn {
-    width: 68px; height: 68px;
+    width: 74px; height: 74px;
     border-radius: 50%;
     color: #fff;
     font-size: 13px;
     font-weight: bold;
     cursor: pointer;
     border: 3px solid rgba(255,255,255,0.4);
-    box-shadow: 0 6px 0 rgba(0,0,0,0.5), inset 0 -6px 12px rgba(0,0,0,0.4);
+    box-shadow: 0 6px 0 rgba(0,0,0,0.6), inset 0 -6px 12px rgba(0,0,0,0.4);
     touch-action: none;
     user-select: none;
     transition: transform 0.08s, filter 0.08s;
+    font-family: 'Arial Black', sans-serif;
   }
-  .arcade-btn.pressed { transform: scale(0.92) translateY(2px); filter: brightness(1.4); }
-  .arcade-btn.punch { background: radial-gradient(circle at 35% 30%, #ff8888, #cc0000); }
-  .arcade-btn.kick  { background: radial-gradient(circle at 35% 30%, #88aaff, #0033cc); }
+  .arcade-btn.pressed {
+    transform: scale(0.92) translateY(2px);
+    filter: brightness(1.5);
+  }
+  .arcade-btn.punch { background: radial-gradient(circle at 35% 30%, #ff8888, #cc0000 80%); }
+  .arcade-btn.kick  { background: radial-gradient(circle at 35% 30%, #88aaff, #0033cc 80%); }
 
   @media (max-width: 640px) {
-    .lever-base { width: 100px; height: 100px; }
-    .lever-dirs { width: 92px; height: 92px; }
-    .lever-dir { width: 30px; height: 30px; font-size: 13px; }
-    .lever-dir[data-dir="left"], .lever-dir[data-dir="right"] { top: 31px; }
-    .lever-dir[data-dir="up"], .lever-dir[data-dir="down"] { left: 31px; }
-    .arcade-btn { width: 56px; height: 56px; font-size: 11px; }
-    .arcade-buttons { gap: 12px; }
+    .lever-base { width: 108px; height: 108px; }
+    .lever-dirs { width: 100px; height: 100px; }
+    .lever-dir { width: 32px; height: 32px; font-size: 14px; }
+    .lever-dir[data-dir="left"], .lever-dir[data-dir="right"] { top: 34px; }
+    .lever-dir[data-dir="up"], .lever-dir[data-dir="down"] { left: 34px; }
+    .arcade-btn { width: 60px; height: 60px; font-size: 11px; }
+    .arcade-buttons { gap: 14px; }
   }
 </style>
 </head>
@@ -437,31 +773,65 @@
 
 <div id="game-wrap">
   <div id="game">
+    <!-- 背景 -->
+    <div class="bg-sky"></div>
+    <div class="moon"></div>
+    <div class="cloud c1"></div>
+    <div class="cloud c2"></div>
+    <div class="cloud c3"></div>
+
+    <div class="skyline" id="skyline"></div>
+
+    <div class="neon pink"   style="top:22%; left:8%;  z-index:3;">BAR</div>
+    <div class="neon cyan"   style="top:35%; left:60%; z-index:3;">FIGHT</div>
+    <div class="neon yellow" style="top:28%; right:6%; z-index:3;">24H</div>
+
+    <div class="streetlight" style="left:15%;"></div>
+    <div class="streetlight" style="left:85%;"></div>
+
+    <div class="street"></div>
+    <div class="crowd"></div>
+
+    <!-- UI -->
     <div id="player-hp" class="hp-bar"><div class="hp-fill" style="width:100%"></div></div>
     <div id="enemy-hp" class="hp-bar"><div class="hp-fill" style="width:100%"></div></div>
+    <div id="player-hp-label" class="hp-label">RIDER</div>
+    <div id="enemy-hp-label" class="hp-label">DARK RIDER</div>
+
     <div id="player-move" class="move-label"></div>
     <div id="enemy-move" class="move-label"></div>
-    <div id="ground"></div>
 
-    <!-- 当たり判定表示エリア（デバッグ可視化） -->
-    <div id="hitbox-area"></div>
+    <!-- キャラ -->
+    <div id="player" class="fighter facing-right">
+      <div class="arm left"></div>
+      <div class="arm right"></div>
+      <div class="leg left"></div>
+      <div class="leg right"></div>
+      <div class="torso"></div>
+      <div class="belt"></div>
+      <div class="head"></div>
+    </div>
+    <div id="enemy" class="fighter facing-left">
+      <div class="arm left"></div>
+      <div class="arm right"></div>
+      <div class="leg left"></div>
+      <div class="leg right"></div>
+      <div class="torso"></div>
+      <div class="belt"></div>
+      <div class="head"></div>
+    </div>
 
-    <div id="player" class="fighter">
-      <div class="punch-arm"></div>
-      <div class="kick-leg"></div>
-    </div>
-    <div id="enemy" class="fighter">
-      <div class="punch-arm"></div>
-      <div class="kick-leg"></div>
-    </div>
+    <!-- エフェクト -->
+    <div class="fx-container" id="fxContainer"></div>
+
     <div id="message"></div>
 
-    <!-- PREV画面 -->
+    <!-- オープニング -->
     <div id="opening">
       <img id="opening-bg" src="img369rider.jpg" alt="背景">
       <div class="opening-inner">
         <div style="text-align:center; margin-top: 2%;">
-          <h1>仮面ライダー<br>バトル</h1>
+          <h1>仮面ライダー<br>ストリートバトル</h1>
           <p class="sub">— 上:ジャンプ / 下:しゃがみ / パンチ・キックで戦え —</p>
           <div class="future-slot">
             <span class="future-btn">⚙ 設定（準備中）</span>
@@ -481,7 +851,7 @@
   </div>
 </div>
 
-<!-- 情報パネル（アーケードのみ） -->
+<!-- コントローラー -->
 <div id="info-panel">
   <div id="panel-header">
     <span class="title">▼ CONTROLLER（アーケード）</span>
@@ -505,11 +875,52 @@
 
 <script>
 /* ============================================================
-   座標系：ゲーム画面内を 0-100 の % で管理
-   - x: 左端0, 右端100
-   - y: 地面=0(足元), 上に行くほど+
+   ビル群を生成
    ============================================================ */
-const G = document.getElementById('game');
+(function generateSkyline() {
+  const skyline = document.getElementById('skyline');
+  const buildings = [
+    { left: 0,   width: 8,  height: 60 },
+    { left: 8,   width: 6,  height: 75 },
+    { left: 14,  width: 10, height: 50 },
+    { left: 25,  width: 7,  height: 85 },
+    { left: 33,  width: 9,  height: 65 },
+    { left: 43,  width: 6,  height: 90 },
+    { left: 50,  width: 11, height: 55 },
+    { left: 62,  width: 8,  height: 70 },
+    { left: 71,  width: 7,  height: 80 },
+    { left: 79,  width: 10, height: 60 },
+    { left: 90,  width: 10, height: 72 },
+  ];
+  buildings.forEach(b => {
+    const el = document.createElement('div');
+    el.className = 'building';
+    el.style.left = b.left + '%';
+    el.style.width = b.width + '%';
+    el.style.height = b.height + '%';
+    // 窓を配置
+    const rows = Math.floor(b.height / 10);
+    const cols = Math.floor(b.width / 2);
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const w = document.createElement('div');
+        w.className = 'win';
+        const rnd = Math.random();
+        if (rnd < 0.3) w.classList.add('off');
+        else if (rnd < 0.4) w.classList.add('blue');
+        w.style.left = (10 + c * (80 / cols)) + '%';
+        w.style.top = (5 + r * (90 / rows)) + '%';
+        el.appendChild(w);
+      }
+    }
+    skyline.appendChild(el);
+  });
+})();
+
+/* ============================================================
+   座標系・定数
+   ============================================================ */
+const GAME = document.getElementById('game');
 const player = document.getElementById('player');
 const enemy = document.getElementById('enemy');
 const playerHpFill = document.querySelector('#player-hp .hp-fill');
@@ -522,60 +933,109 @@ const bgViewer = document.getElementById('bg-viewer');
 const closeBg = document.getElementById('close-bg');
 const playerMoveLbl = document.getElementById('player-move');
 const enemyMoveLbl  = document.getElementById('enemy-move');
-const hitboxArea = document.getElementById('hitbox-area');
+const fxContainer = document.getElementById('fxContainer');
 
-/* ===== キャラ定義 ===== */
-const CHAR = {
-  player: {
-    x: 20,          // 中心X(%)
-    hp: 100,
-    facing: 1,      // 1=右向き, -1=左向き
-    state: 'idle',  // idle / walking / punching / kicking / jumping / crouching / hit
-    stateTimer: 0,
-    jumpY: 0,       // ジャンプ中の高さ(%)
-    jumpVel: 0,
-    isCrouching: false,
-  },
-  enemy: {
-    x: 80,
-    hp: 100,
-    facing: -1,
-    state: 'idle',
-    stateTimer: 0,
-    jumpY: 0,
-    jumpVel: 0,
-    isCrouching: false,
-  }
-};
-
-/* ===== 物理定数 ===== */
-const GROUND_Y = 0;        // 地面の高さ(%)
-const GRAVITY = 0.6;
-const JUMP_POWER = 7;
-const MOVE_SPEED = 0.5;    // %/frame
-const MIN_DIST = 10;       // キャラ同士の最小間隔(%)
-const PUNCH_RANGE = 12;    // パンチのリーチ(%)
-const KICK_RANGE = 14;     // キックのリーチ(%)
+const GROUND = 20;        // 地面の高さ(%)
+const GRAVITY = 0.55;
+const JUMP_POWER = 6.5;
+const MOVE_SPEED = 0.55;
+const MIN_DIST = 11;
+const PUNCH_RANGE = 13;
+const KICK_RANGE = 15;
 const PUNCH_DAMAGE = 8;
 const KICK_DAMAGE = 12;
-const PUNCH_DURATION = 12; // フレーム
-const KICK_DURATION = 16;
+const PUNCH_DURATION = 14;
+const KICK_DURATION = 18;
 const HIT_DURATION = 10;
-const ATTACK_COOLDOWN = 20;
+const ATTACK_COOLDOWN = 18;
 
-/* ===== 入力状態 ===== */
-const input = {
-  left: false, right: false,
-  up: false, down: false,     // up=ジャンプ, down=しゃがみ
+/* ============================================================
+   状態
+   ============================================================ */
+const P = {
+  x: 22, hp: 100, facing: 1,
+  state: 'idle',  // idle / walking / punching / kicking / jumping / crouching / hit
+  stateTimer: 0,
+  jumpY: 0, jumpVel: 0,
+  isCrouching: false,
+  attackHitDone: false,
+};
+const E = {
+  x: 78, hp: 100, facing: -1,
+  state: 'idle',
+  stateTimer: 0,
+  jumpY: 0, jumpVel: 0,
+  isCrouching: false,
+  attackHitDone: false,
 };
 
 let gameStarted = false;
 let gameOver = false;
-let canAttack = true;
+let playerCanAttack = true;
 let enemyAttackCooldown = 0;
 let enemyNextAttackTimer = 60;
+let hitStopTimer = 0;
 
-/* ===== オープニング ===== */
+const input = { left: false, right: false };
+
+/* ============================================================
+   入力処理（確実に左右が効くように）
+   ============================================================ */
+function bindDirButton(btn) {
+  const dir = btn.dataset.dir;
+
+  const press = (e) => {
+    e.preventDefault();
+    btn.classList.add('pressed');
+    if (dir === 'left')  input.left = true;
+    if (dir === 'right') input.right = true;
+    if (dir === 'up')    { tryJump(P); }
+    if (dir === 'down')  { tryCrouch(P, true); }
+  };
+  const release = (e) => {
+    if (e) e.preventDefault();
+    btn.classList.remove('pressed');
+    if (dir === 'left')  input.left = false;
+    if (dir === 'right') input.right = false;
+    if (dir === 'down')  tryCrouch(P, false);
+  };
+
+  // pointer: マウス/タッチ両対応
+  btn.addEventListener('pointerdown', press);
+  btn.addEventListener('pointerup', release);
+  btn.addEventListener('pointerleave', release);
+  btn.addEventListener('pointercancel', release);
+  // 念のための mouse/touch フォールバック
+  btn.addEventListener('mousedown', (e) => { if (e.pointerType === undefined) press(e); });
+  btn.addEventListener('mouseup',   (e) => { if (e.pointerType === undefined) release(e); });
+  btn.addEventListener('touchstart',(e) => { if (e.pointerType === undefined) { e.preventDefault(); press(e); } }, { passive: false });
+  btn.addEventListener('touchend',  (e) => { if (e.pointerType === undefined) { e.preventDefault(); release(e); } }, { passive: false });
+}
+document.querySelectorAll('[data-dir]').forEach(bindDirButton);
+
+document.querySelectorAll('[data-btn]').forEach(btn => {
+  const press = (e) => {
+    e.preventDefault();
+    btn.classList.add('pressed');
+    tryAttack(P, btn.dataset.btn);
+  };
+  const release = (e) => {
+    if (e) e.preventDefault();
+    btn.classList.remove('pressed');
+  };
+  btn.addEventListener('pointerdown', press);
+  btn.addEventListener('pointerup', release);
+  btn.addEventListener('pointerleave', release);
+  btn.addEventListener('pointercancel', release);
+  btn.addEventListener('mousedown', (e) => { if (e.pointerType === undefined) press(e); });
+  btn.addEventListener('mouseup',   (e) => { if (e.pointerType === undefined) release(e); });
+  btn.addEventListener('touchstart',(e) => { if (e.pointerType === undefined) { e.preventDefault(); press(e); } }, { passive: false });
+  btn.addEventListener('touchend',  (e) => { if (e.pointerType === undefined) { e.preventDefault(); release(e); } }, { passive: false });
+});
+
+/* ============================================================
+   オープニング
+   ============================================================ */
 startBtn.addEventListener('click', () => {
   opening.style.display = 'none';
   gameStarted = true;
@@ -583,74 +1043,41 @@ startBtn.addEventListener('click', () => {
 viewBgBtn.addEventListener('click', () => bgViewer.classList.add('active'));
 closeBg.addEventListener('click', () => bgViewer.classList.remove('active'));
 
-/* ===== コントローラー入力 ===== */
-function bindDir(btn) {
-  const dir = btn.dataset.dir;
-  const on = (e) => {
-    e.preventDefault();
-    btn.classList.add('pressed');
-    if (dir === 'left')  input.left = true;
-    if (dir === 'right') input.right = true;
-    if (dir === 'up')    { input.up = true; tryJump(CHAR.player); }
-    if (dir === 'down')  { input.down = true; tryCrouch(CHAR.player, true); }
-  };
-  const off = (e) => {
-    e.preventDefault();
-    btn.classList.remove('pressed');
-    if (dir === 'left')  input.left = false;
-    if (dir === 'right') input.right = false;
-    if (dir === 'up')    input.up = false;
-    if (dir === 'down')  { input.down = false; tryCrouch(CHAR.player, false); }
-  };
-  btn.addEventListener('pointerdown', on);
-  btn.addEventListener('pointerup', off);
-  btn.addEventListener('pointerleave', off);
-  btn.addEventListener('pointercancel', off);
-}
-document.querySelectorAll('[data-dir]').forEach(bindDir);
-
-document.querySelectorAll('[data-btn]').forEach(btn => {
-  btn.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    btn.classList.add('pressed');
-    tryAttack(CHAR.player, btn.dataset.btn);
-  });
-  const release = () => btn.classList.remove('pressed');
-  btn.addEventListener('pointerup', release);
-  btn.addEventListener('pointerleave', release);
-  btn.addEventListener('pointercancel', release);
-});
-
-/* ===== アクション ===== */
+/* ============================================================
+   アクション
+   ============================================================ */
 function tryJump(c) {
   if (!gameStarted || gameOver) return;
-  if (c.jumpY > 0) return;      // 空中
+  if (c.jumpY > 0) return;
   if (c.state === 'hit') return;
   c.isCrouching = false;
   c.jumpVel = JUMP_POWER;
   c.state = 'jumping';
-  showLabel(c === CHAR.player ? playerMoveLbl : enemyMoveLbl, 'JUMP');
+  if (c === P) showLabel(playerMoveLbl, 'JUMP');
 }
 
 function tryCrouch(c, flag) {
   if (!gameStarted || gameOver) return;
   if (c.jumpY > 0) return;
+  if (c.state === 'hit') return;
   c.isCrouching = flag;
-  if (flag && c.state === 'idle') {
+  if (flag) {
     c.state = 'crouching';
-    showLabel(c === CHAR.player ? playerMoveLbl : enemyMoveLbl, 'GUARD');
-  } else if (!flag && c.state === 'crouching') {
+    if (c === P) showLabel(playerMoveLbl, 'GUARD');
+  } else if (c.state === 'crouching') {
     c.state = 'idle';
   }
 }
 
 function tryAttack(c, type) {
-  if (!gameStarted || gameOver || !canAttack) return;
-  if (c !== CHAR.player) return;
+  if (!gameStarted || gameOver) return;
+  if (!playerCanAttack) return;
+  if (c !== P) return;
   if (c.state === 'punching' || c.state === 'kicking') return;
   if (c.jumpY > 0) return;
 
-  canAttack = false;
+  playerCanAttack = false;
+  c.attackHitDone = false;
   if (type === 'punch') {
     c.state = 'punching';
     c.stateTimer = PUNCH_DURATION;
@@ -664,53 +1091,47 @@ function tryAttack(c, type) {
   }
 }
 
-/* ===== 当たり判定 ===== */
-/* キャラの当たり判定ボックス（中心X, 足元Y, 幅, 高さ）を返す */
-function getHitbox(c) {
-  const baseW = 6;    // 幅(%)
-  const baseH = 30;   // 通常時の高さ(%)
-  let h = baseH;
-  if (c.isCrouching) h = 18;
+/* ============================================================
+   当たり判定
+   ============================================================ */
+function getBodyBox(c) {
+  const w = 6;
+  let h = 28;
+  if (c.isCrouching) h = 16;
   if (c.jumpY > 0) h = 26;
-  const footY = c.jumpY;
   return {
-    cx: c.x,
-    bottom: footY,           // 足元の高さ
-    top: footY + h,          // 頭の高さ
-    left: c.x - baseW / 2,
-    right: c.x + baseW / 2,
-    w: baseW,
+    left: c.x - w/2,
+    right: c.x + w/2,
+    bottom: GROUND + c.jumpY,
+    top: GROUND + c.jumpY + h,
     h: h,
   };
 }
 
-/* 攻撃の当たり判定ボックスを返す（発動中のみ有効） */
-function getAttackBox(attacker, defender) {
-  if (attacker.state !== 'punching' && attacker.state !== 'kicking') return null;
-  const hb = getHitbox(attacker);
-  const facing = attacker.x < defender.x ? 1 : -1;
+function getAttackBox(c, target) {
+  if (c.state !== 'punching' && c.state !== 'kicking') return null;
+  const body = getBodyBox(c);
+  const facingRight = target.x > c.x;
 
-  if (attacker.state === 'punching') {
-    // パンチ：胸の高さ(下半身)に横方向のリーチ
-    const y = hb.bottom + hb.h * 0.45; // 胸あたり
+  if (c.state === 'punching') {
+    const y = body.bottom + body.h * 0.55;
     const range = PUNCH_RANGE;
-    const boxLeft  = facing === 1 ? hb.right : hb.left - range;
-    const boxRight = facing === 1 ? hb.right + range : hb.left;
     return {
-      left: boxLeft, right: boxRight,
-      bottom: y - 3, top: y + 8,
+      left:  facingRight ? body.right : body.left - range,
+      right: facingRight ? body.right + range : body.left,
+      bottom: y - 4,
+      top: y + 8,
       type: 'punch',
       damage: PUNCH_DAMAGE,
     };
   } else {
-    // キック：腰〜頭の高さに横方向のリーチ
-    const y = hb.bottom + hb.h * 0.55;
+    const y = body.bottom + body.h * 0.65;
     const range = KICK_RANGE;
-    const boxLeft  = facing === 1 ? hb.right : hb.left - range;
-    const boxRight = facing === 1 ? hb.right + range : hb.left;
     return {
-      left: boxLeft, right: boxRight,
-      bottom: y - 5, top: y + 12,
+      left:  facingRight ? body.right : body.left - range,
+      right: facingRight ? body.right + range : body.left,
+      bottom: y - 6,
+      top: y + 12,
       type: 'kick',
       damage: KICK_DAMAGE,
     };
@@ -721,176 +1142,196 @@ function boxesOverlap(a, b) {
   return !(a.right < b.left || a.left > b.right || a.top < b.bottom || a.bottom > b.top);
 }
 
-/* ===== ダメージ処理 ===== */
-function damage(target, amount, source) {
-  if (target === CHAR.player) {
-    CHAR.player.hp = Math.max(0, CHAR.player.hp - amount);
-    playerHpFill.style.width = CHAR.player.hp + '%';
+/* ============================================================
+   ダメージ & エフェクト
+   ============================================================ */
+function applyDamage(target, amount, atkType) {
+  const isPlayer = target === P;
+  target.hp = Math.max(0, target.hp - amount);
+
+  if (isPlayer) {
+    playerHpFill.style.width = target.hp + '%';
     player.classList.add('hit');
     setTimeout(() => player.classList.remove('hit'), 120);
   } else {
-    CHAR.enemy.hp = Math.max(0, CHAR.enemy.hp - amount);
-    enemyHpFill.style.width = CHAR.enemy.hp + '%';
+    enemyHpFill.style.width = target.hp + '%';
     enemy.classList.add('hit');
     setTimeout(() => enemy.classList.remove('hit'), 120);
   }
-  if (target.state !== 'crouching' || source.type === 'kick') {
+
+  // ダメージポップ
+  spawnDamagePop(target.x, GROUND + (target.isCrouching ? 22 : 32), amount);
+
+  // ヒットエフェクト
+  const yPct = 100 - (GROUND + (target.isCrouching ? 10 : 18));
+  const hitY = (GROUND + (target.isCrouching ? 20 : 30));
+  spawnFx(target.x, hitY, atkType);
+
+  // 画面シェイク
+  GAME.classList.remove('shake');
+  void GAME.offsetWidth;
+  GAME.classList.add('shake');
+
+  // ヒットストップ
+  hitStopTimer = 4;
+
+  // 被弾モーション
+  if (!(target.isCrouching && atkType === 'punch')) {
     target.state = 'hit';
     target.stateTimer = HIT_DURATION;
   }
+
   checkGameOver();
 }
 
-/* ===== 攻撃ヒット判定 ===== */
+function spawnFx(xPct, yPct, type) {
+  const el = document.createElement('div');
+  el.className = 'fx ' + (type === 'punch' ? 'punch' : type === 'kick' ? 'kick' : 'hit');
+  el.style.left = xPct + '%';
+  el.style.top = (100 - yPct - 4) + '%';
+  el.style.width = '10%';
+  el.style.aspectRatio = '1';
+  fxContainer.appendChild(el);
+  setTimeout(() => el.remove(), 320);
+}
+
+function spawnDamagePop(xPct, yPct, amount) {
+  const el = document.createElement('div');
+  el.className = 'dmg-pop';
+  el.textContent = '-' + amount;
+  el.style.left = xPct + '%';
+  el.style.top = (100 - yPct) + '%';
+  fxContainer.appendChild(el);
+  setTimeout(() => el.remove(), 850);
+}
+
+/* ============================================================
+   ヒット判定解決
+   ============================================================ */
 function resolveAttack(attacker, defender) {
+  if (attacker.attackHitDone) return;
   const atkBox = getAttackBox(attacker, defender);
   if (!atkBox) return;
 
-  // デバッグ可視化
-  drawHitbox(atkBox, true);
+  const defBox = getBodyBox(defender);
 
-  const defBox = getHitbox(defender);
-
-  // しゃがみ中：パンチは当たらない
+  // しゃがみ回避：パンチは当たらない
   if (atkBox.type === 'punch' && defender.isCrouching) {
-    showLabel(defender === CHAR.player ? playerMoveLbl : enemyMoveLbl, 'GUARD (しゃがみ)');
+    attacker.attackHitDone = true;
+    showLabel(defender === P ? playerMoveLbl : enemyMoveLbl, 'GUARD');
     return;
   }
-  // ジャンプ中：キックは当たらない（相手が空中にいる＝高さが合わない）
-  if (atkBox.type === 'kick' && defender.jumpY > 0) {
-    showLabel(defender === CHAR.player ? playerMoveLbl : enemyMoveLbl, 'MISS (ジャンプ)');
+  // ジャンプ回避：キックは当たらない
+  if (atkBox.type === 'kick' && defender.jumpY > 3) {
+    attacker.attackHitDone = true;
+    showLabel(defender === P ? playerMoveLbl : enemyMoveLbl, 'MISS');
+    return;
+  }
+  // 空中の相手には地上攻撃が当たらない
+  if (defender.jumpY > 3) {
+    attacker.attackHitDone = true;
     return;
   }
 
   if (boxesOverlap(atkBox, defBox)) {
-    damage(defender, atkBox.damage, atkBox);
-    showLabel(attacker === CHAR.player ? enemyMoveLbl : playerMoveLbl, 'HIT!');
+    attacker.attackHitDone = true;
+    applyDamage(defender, atkBox.damage, atkBox.type);
+    showLabel(attacker === P ? enemyMoveLbl : playerMoveLbl, 'HIT!');
   }
 }
 
-/* 当たり判定を一時表示 */
-let hitboxTimers = [];
-function drawHitbox(box, active) {
-  const el = document.createElement('div');
-  el.className = 'hitbox active';
-  el.style.left = box.left + '%';
-  el.style.width = (box.right - box.left) + '%';
-  el.style.bottom = box.bottom + '%';
-  el.style.height = (box.top - box.bottom) + '%';
-  hitboxArea.appendChild(el);
-  const t = setTimeout(() => el.remove(), 100);
-  hitboxTimers.push(t);
-}
-
-/* ===== ラベル表示 ===== */
-function showLabel(el, text) {
-  el.textContent = text;
-  el.classList.add('show');
-  clearTimeout(el._t);
-  el._t = setTimeout(() => el.classList.remove('show'), 600);
-}
-
-/* ===== 敵AI ===== */
+/* ============================================================
+   敵AI
+   ============================================================ */
 function updateEnemyAI() {
   if (gameOver) return;
-  const p = CHAR.player;
-  const e = CHAR.enemy;
-  const dist = Math.abs(p.x - e.x);
+  const dist = Math.abs(P.x - E.x);
+  E.facing = P.x > E.x ? 1 : -1;
 
-  // 向き
-  e.facing = p.x > e.x ? 1 : -1;
+  if (E.state === 'hit') return;
+  if (E.jumpY > 0) return;
+  if (E.state === 'punching' || E.state === 'kicking') return;
+  if (E.state === 'crouching') return;
 
-  // 状態異常中は行動しない
-  if (e.state === 'hit') return;
-  if (e.jumpY > 0) return;
-  if (e.state === 'punching' || e.state === 'kicking') return;
-  if (e.state === 'crouching') return;
+  if (enemyAttackCooldown > 0) { enemyAttackCooldown--; return; }
 
-  if (enemyAttackCooldown > 0) {
-    enemyAttackCooldown--;
-    return;
-  }
-
-  // プレイヤーの攻撃に反応して回避（技術力）
-  if (p.state === 'punching' && dist < PUNCH_RANGE + 4 && Math.random() < 0.4) {
-    e.isCrouching = true;
-    e.state = 'crouching';
-    e.stateTimer = 20;
+  // 回避行動
+  if (P.state === 'punching' && dist < PUNCH_RANGE + 3 && Math.random() < 0.35) {
+    tryCrouch(E, true);
+    setTimeout(() => tryCrouch(E, false), 400);
     showLabel(enemyMoveLbl, 'しゃがみ回避');
     enemyAttackCooldown = ATTACK_COOLDOWN;
     return;
   }
-  if (p.state === 'kicking' && dist < KICK_RANGE + 4 && Math.random() < 0.4) {
-    tryJump(e);
+  if (P.state === 'kicking' && dist < KICK_RANGE + 3 && Math.random() < 0.35) {
+    tryJump(E);
     showLabel(enemyMoveLbl, 'ジャンプ回避');
     enemyAttackCooldown = ATTACK_COOLDOWN;
     return;
   }
 
-  // 距離による行動
   if (dist > 18) {
-    // 近づく
-    e.x += e.facing * MOVE_SPEED;
-    e.state = 'walking';
+    E.x += E.facing * MOVE_SPEED * 0.9;
+    if (E.state !== 'walking') E.state = 'walking';
   } else if (enemyNextAttackTimer <= 0) {
-    // 攻撃
     const useKick = Math.random() < 0.45;
-    e.state = useKick ? 'kicking' : 'punching';
-    e.stateTimer = useKick ? KICK_DURATION : PUNCH_DURATION;
+    E.attackHitDone = false;
+    E.state = useKick ? 'kicking' : 'punching';
+    E.stateTimer = useKick ? KICK_DURATION : PUNCH_DURATION;
     showLabel(enemyMoveLbl, useKick ? 'KICK' : 'PUNCH');
     enemyAttackCooldown = ATTACK_COOLDOWN;
-    enemyNextAttackTimer = 40 + Math.floor(Math.random() * 40);
+    enemyNextAttackTimer = 50 + Math.floor(Math.random() * 40);
   } else {
     enemyNextAttackTimer--;
-    if (Math.random() < 0.3) {
-      e.x += e.facing * MOVE_SPEED * 0.5;
-    }
+    if (Math.random() < 0.3) E.x += E.facing * MOVE_SPEED * 0.4;
+    if (E.state !== 'walking') E.state = 'walking';
   }
 }
 
-/* ===== 更新処理 ===== */
+/* ============================================================
+   更新
+   ============================================================ */
 function updatePlayer() {
-  const p = CHAR.player;
-  p.facing = enemy.x > p.x ? 1 : -1;
-
-  if (p.state === 'hit') {
-    p.stateTimer--;
-    if (p.stateTimer <= 0) p.state = 'idle';
+  if (P.state === 'hit') {
+    P.stateTimer--;
+    if (P.stateTimer <= 0) P.state = 'idle';
     return;
   }
-  if (p.state === 'punching' || p.state === 'kicking') {
-    p.stateTimer--;
-    if (p.stateTimer <= 0) {
-      p.state = 'idle';
-      canAttack = true;
+  if (P.state === 'punching' || P.state === 'kicking') {
+    P.stateTimer--;
+    if (P.stateTimer <= 0) {
+      P.state = 'idle';
+      playerCanAttack = true;
     }
     return;
   }
-
-  // 移動
-  if (p.jumpY > 0) {
-    // 空中移動も可能
-    if (input.left)  p.x -= MOVE_SPEED * 0.7;
-    if (input.right) p.x += MOVE_SPEED * 0.7;
-  } else {
-    if (input.left && !input.down)  p.x -= MOVE_SPEED;
-    if (input.right && !input.down) p.x += MOVE_SPEED;
-    if (!input.left && !input.right && !p.isCrouching) p.state = 'idle';
-    if ((input.left || input.right) && !p.isCrouching) p.state = 'walking';
+  if (P.jumpY > 0) {
+    // 空中制御
+    if (input.left)  P.x -= MOVE_SPEED * 0.6;
+    if (input.right) P.x += MOVE_SPEED * 0.6;
+    return;
+  }
+  if (P.state === 'crouching') {
+    if (!P.isCrouching) P.state = 'idle';
+    return;
   }
 
-  // 位置制限
-  p.x = Math.max(4, Math.min(96, p.x));
-  // 敵との最小間隔
-  const dist = p.x - CHAR.enemy.x;
-  if (Math.abs(dist) < MIN_DIST) {
-    if (dist > 0) p.x = CHAR.enemy.x + MIN_DIST;
-    else p.x = CHAR.enemy.x - MIN_DIST;
+  // 地上移動
+  let moved = false;
+  if (input.left)  { P.x -= MOVE_SPEED; moved = true; }
+  if (input.right) { P.x += MOVE_SPEED; moved = true; }
+  if (moved) {
+    P.state = 'walking';
+  } else if (P.state !== 'crouching') {
+    P.state = 'idle';
   }
+
+  // 向き
+  P.facing = E.x > P.x ? 1 : -1;
 }
 
 function updatePhysics() {
-  [CHAR.player, CHAR.enemy].forEach(c => {
+  [P, E].forEach(c => {
     if (c.jumpY > 0 || c.jumpVel > 0) {
       c.jumpVel -= GRAVITY;
       c.jumpY += c.jumpVel;
@@ -903,74 +1344,56 @@ function updatePhysics() {
   });
 }
 
-function updateStates() {
-  [CHAR.player, CHAR.enemy].forEach(c => {
-    if (c.state === 'hit') {
-      c.stateTimer--;
-      if (c.stateTimer <= 0) c.state = 'idle';
-    }
-    if (c.state === 'punching' || c.state === 'kicking') {
-      c.stateTimer--;
-      if (c.stateTimer <= 0) {
-        c.state = 'idle';
-        if (c === CHAR.player) canAttack = true;
-      }
-    }
-    if (c.state === 'crouching') {
-      c.stateTimer--;
-      if (c.stateTimer <= 0 && !c.isCrouching) c.state = 'idle';
-    }
-  });
-}
-
-/* ===== 描画 ===== */
-function render() {
-  [CHAR.player, CHAR.enemy].forEach((c, i) => {
-    const el = i === 0 ? player : enemy;
-    // 位置
-    el.style.left = c.x + '%';
-    el.style.transform = `translateX(-50%)`;
-
-    // ジャンプ
-    if (c.jumpY > 0) {
-      el.classList.add('jumping');
-      el.style.bottom = (20 + c.jumpY) + '%';
-    } else {
-      el.classList.remove('jumping');
-      el.style.bottom = '20%';
-    }
-
-    // しゃがみ
-    if (c.isCrouching && c.jumpY === 0) el.classList.add('crouching');
-    else el.classList.remove('crouching');
-
-    // 状態クラス
-    el.classList.toggle('punching', c.state === 'punching');
-    el.classList.toggle('kicking', c.state === 'kicking');
-  });
-}
-
-/* ===== ゲームループ ===== */
-function loop() {
-  if (gameStarted && !gameOver) {
-    updatePlayer();
-    updateEnemyAI();
-    updatePhysics();
-    updateStates();
-
-    // 攻撃ヒット判定（両者）
-    resolveAttack(CHAR.player, CHAR.enemy);
-    resolveAttack(CHAR.enemy, CHAR.player);
-
-    render();
+function clampPositions() {
+  P.x = Math.max(5, Math.min(95, P.x));
+  E.x = Math.max(5, Math.min(95, E.x));
+  const dist = P.x - E.x;
+  if (Math.abs(dist) < MIN_DIST) {
+    if (dist > 0) P.x = E.x + MIN_DIST;
+    else P.x = E.x - MIN_DIST;
   }
-  requestAnimationFrame(loop);
 }
 
-/* ===== 勝敗 ===== */
+/* ============================================================
+   描画
+   ============================================================ */
+function render() {
+  // プレイヤー
+  player.style.left = P.x + '%';
+  player.style.bottom = (GROUND + P.jumpY) + '%';
+  player.classList.toggle('facing-right', P.facing === 1);
+  player.classList.toggle('facing-left',  P.facing === -1);
+  player.classList.toggle('walking',   P.state === 'walking');
+  player.classList.toggle('jumping',   P.jumpY > 0);
+  player.classList.toggle('crouching', P.isCrouching);
+  player.classList.toggle('punching',  P.state === 'punching');
+  player.classList.toggle('kicking',   P.state === 'kicking');
+
+  // 敵
+  enemy.style.left = E.x + '%';
+  enemy.style.bottom = (GROUND + E.jumpY) + '%';
+  enemy.classList.toggle('facing-right', E.facing === 1);
+  enemy.classList.toggle('facing-left',  E.facing === -1);
+  enemy.classList.toggle('walking',   E.state === 'walking');
+  enemy.classList.toggle('jumping',   E.jumpY > 0);
+  enemy.classList.toggle('crouching', E.isCrouching);
+  enemy.classList.toggle('punching',  E.state === 'punching');
+  enemy.classList.toggle('kicking',   E.state === 'kicking');
+}
+
+/* ============================================================
+   ラベル・勝敗
+   ============================================================ */
+function showLabel(el, text) {
+  el.textContent = text;
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 600);
+}
+
 function checkGameOver() {
-  if (CHAR.enemy.hp <= 0) endGame('YOU WIN!', '#00ff44');
-  else if (CHAR.player.hp <= 0) endGame('YOU LOSE...', '#ff3344');
+  if (E.hp <= 0) endGame('YOU WIN!', '#00ff88');
+  else if (P.hp <= 0) endGame('YOU LOSE...', '#ff2244');
 }
 function endGame(text, color) {
   if (gameOver) return;
@@ -985,7 +1408,46 @@ function endGame(text, color) {
   }
 }
 
-/* 初期描画 */
+/* ============================================================
+   メインループ
+   ============================================================ */
+function loop() {
+  if (gameStarted && !gameOver) {
+    if (hitStopTimer > 0) {
+      hitStopTimer--;
+    } else {
+      updatePlayer();
+      updateEnemyAI();
+      updatePhysics();
+      clampPositions();
+
+      // ヒット判定
+      resolveAttack(P, E);
+      resolveAttack(E, P);
+
+      // 状態タイマー（攻撃以外）
+      [P, E].forEach(c => {
+        if (c.state === 'hit') {
+          c.stateTimer--;
+          if (c.stateTimer <= 0) c.state = 'idle';
+        }
+        if (c.state === 'punching' || c.state === 'kicking') {
+          // 上の update で処理済みだが念のため
+        }
+      });
+
+      // 敵攻撃タイマー処理
+      if (E.state === 'punching' || E.state === 'kicking') {
+        E.stateTimer--;
+        if (E.stateTimer <= 0) E.state = 'idle';
+      }
+    }
+    render();
+  }
+  requestAnimationFrame(loop);
+}
+
+/* 初期化 */
 render();
 loop();
 </script>
