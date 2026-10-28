@@ -411,6 +411,77 @@
   }
   #game.shake { animation: shake 0.2s; }
 
+  /* ===== クリア画面 ===== */
+  #clear-screen {
+    position: absolute; inset: 0;
+    background: radial-gradient(circle at center, #2a1a4a 0%, #000 100%);
+    display: none;
+    flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 150; gap: 24px; padding: 5%;
+    animation: clearFadeIn 0.6s ease-out;
+  }
+  #clear-screen.active { display: flex; }
+  @keyframes clearFadeIn {
+    0% { opacity: 0; transform: scale(0.9); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+  #clear-screen h2 {
+    margin: 0;
+    font-size: clamp(32px, 8vw, 80px);
+    background: linear-gradient(180deg, #ffffff 0%, #ffdd00 50%, #ff8800 100%);
+    -webkit-background-clip: text; background-clip: text;
+    color: transparent;
+    filter: drop-shadow(0 0 20px rgba(255,200,0,0.8));
+    letter-spacing: 4px;
+    text-align: center;
+    animation: clearPulse 1.2s infinite alternate;
+  }
+  @keyframes clearPulse { from { transform: scale(1); } to { transform: scale(1.06); } }
+  #clear-screen .clear-sub {
+    font-family: Arial, sans-serif;
+    font-size: clamp(12px, 1.8vw, 16px);
+    color: #ccc;
+    text-align: center;
+    margin: 0;
+  }
+  #clear-screen .clear-badge {
+    padding: 12px 40px;
+    background: linear-gradient(180deg, #ff2244, #990000);
+    border-radius: 40px;
+    font-size: clamp(14px, 2vw, 18px);
+    font-weight: bold;
+    color: #fff;
+    box-shadow: 0 6px 0 #440000, 0 8px 20px rgba(255,0,0,0.5);
+    letter-spacing: 2px;
+  }
+  .clear-buttons {
+    display: flex; gap: 16px; flex-wrap: wrap; justify-content: center;
+  }
+  .clear-btn {
+    font-family: 'Arial Black', sans-serif;
+    font-size: clamp(14px, 2.2vw, 20px);
+    padding: 14px 36px;
+    border: none;
+    border-radius: 40px;
+    cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.1s, filter 0.1s;
+    text-decoration: none;
+    display: inline-block;
+  }
+  #clear-study-btn {
+    background: linear-gradient(180deg, #44ff88, #00aa44);
+    color: #001a0a;
+    box-shadow: 0 6px 0 #005522, 0 8px 20px rgba(0,255,130,0.5);
+  }
+  #clear-retry-btn {
+    background: linear-gradient(180deg, #6666ff, #3333cc);
+    color: #fff;
+    box-shadow: 0 6px 0 #111188, 0 8px 20px rgba(80,80,255,0.5);
+  }
+  .clear-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #333; }
+  .clear-btn:hover { filter: brightness(1.15); }
+
   #opening {
     position: absolute; inset: 0;
     background: #000;
@@ -634,6 +705,17 @@
 
     <div id="message"></div>
 
+    <!-- ===== クリア画面 ===== -->
+    <div id="clear-screen">
+      <h2>CLEAR!</h2>
+      <p class="clear-sub">見事、ダークライダーを撃破しました</p>
+      <div class="clear-badge">🏆 STAGE CLEAR 🏆</div>
+      <div class="clear-buttons">
+        <a href="study.html" class="clear-btn" id="clear-study-btn">📚 study.html へ進む</a>
+        <button class="clear-btn" id="clear-retry-btn">▶ もう一度</button>
+      </div>
+    </div>
+
     <div id="opening">
       <img id="opening-bg" src="img369rider.jpg" alt="背景">
       <div class="opening-inner">
@@ -689,7 +771,6 @@
 <script>
 /* ============================================================
    キーボード矢印キー → キャラを動かす（十字キー扱い）
-   ※ ブラウザのフォーカス移動より先に止めるためキャプチャ段階で処理
    ============================================================ */
 window.addEventListener('keydown', (e) => {
   if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) {
@@ -785,6 +866,8 @@ const closeBg = document.getElementById('close-bg');
 const playerMoveLbl = document.getElementById('player-move');
 const enemyMoveLbl  = document.getElementById('enemy-move');
 const fxContainer = document.getElementById('fxContainer');
+const clearScreen = document.getElementById('clear-screen');
+const clearRetryBtn = document.getElementById('clear-retry-btn');
 
 const GROUND = 20;
 const GRAVITY = 0.55;
@@ -822,6 +905,7 @@ let playerCanAttack = true;
 let enemyAttackCooldown = 0;
 let enemyNextAttackTimer = 60;
 let hitStopTimer = 0;
+let attackLockTimer = 0;   // ★ 攻撃ロックのタイマー方式（保険）
 
 const input = { left: false, right: false };
 
@@ -894,6 +978,13 @@ viewBgBtn.addEventListener('click', () => bgViewer.classList.add('active'));
 closeBg.addEventListener('click', () => bgViewer.classList.remove('active'));
 
 /* ============================================================
+   クリア画面：もう一度
+   ============================================================ */
+clearRetryBtn.addEventListener('click', () => {
+  location.reload();
+});
+
+/* ============================================================
    アクション
    ============================================================ */
 function tryJump(c) {
@@ -919,15 +1010,43 @@ function tryCrouch(c, flag) {
   }
 }
 
+/* ★ 修正：しゃがみ中・端・ヒット硬直後でも攻撃できるように */
 function tryAttack(c, type) {
   if (!gameStarted || gameOver) return;
-  if (!playerCanAttack) return;
   if (c !== P) return;
+
+  // 攻撃中なら弾く（ここだけは維持）
   if (c.state === 'punching' || c.state === 'kicking') return;
+
+  // 空中でも攻撃不可（維持）
   if (c.jumpY > 0) return;
 
+  // ★ playerCanAttack が false でも、タイマー方式で必ず復帰させる
+  if (!playerCanAttack) {
+    // 何らかの理由でロックが残っていたら強制解除
+    if (attackLockTimer <= 0) {
+      playerCanAttack = true;
+    } else {
+      return;
+    }
+  }
+
+  // ★ しゃがみ中なら攻撃前に解除
+  if (c.isCrouching) {
+    c.isCrouching = false;
+    if (c.state === 'crouching') c.state = 'idle';
+  }
+
+  // ★ hit 硬直中でも攻撃を受け付ける（硬直解除）
+  if (c.state === 'hit') {
+    c.state = 'idle';
+    c.stateTimer = 0;
+  }
+
   playerCanAttack = false;
+  attackLockTimer = (type === 'punch') ? PUNCH_DURATION : KICK_DURATION;
   c.attackHitDone = false;
+
   if (type === 'punch') {
     c.state = 'punching';
     c.stateTimer = PUNCH_DURATION;
@@ -1125,6 +1244,12 @@ function updateEnemyAI() {
    更新
    ============================================================ */
 function updatePlayer() {
+  // ★ 攻撃ロックのタイマーを毎フレーム減らす
+  if (attackLockTimer > 0) {
+    attackLockTimer--;
+    if (attackLockTimer <= 0) playerCanAttack = true;
+  }
+
   if (P.state === 'hit') {
     P.stateTimer--;
     if (P.stateTimer <= 0) P.state = 'idle';
@@ -1216,14 +1341,20 @@ function checkGameOver() {
   if (E.hp <= 0) endGame('YOU WIN!', '#00ff88');
   else if (P.hp <= 0) endGame('YOU LOSE...', '#ff2244');
 }
+
 function endGame(text, color) {
   if (gameOver) return;
   gameOver = true;
   message.textContent = text;
   message.style.color = color;
   message.style.display = 'block';
+
   if (text === 'YOU WIN!') {
-    setTimeout(() => { window.location.href = 'study.html'; }, 1500);
+    // ★ クリア画面を表示（同タブで study.html へ誘導可能）
+    setTimeout(() => {
+      message.style.display = 'none';
+      clearScreen.classList.add('active');
+    }, 1200);
   } else {
     setTimeout(() => location.reload(), 3000);
   }
