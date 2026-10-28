@@ -1063,72 +1063,102 @@ const input = { left: false, right: false };
    ============================================================ */
 function bindDirButton(btn) {
   const dir = btn.dataset.dir;
-  let activePointerId = null;
 
   const press = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    activePointerId = e.pointerId;
+    if (e) e.preventDefault();
     btn.classList.add('pressed');
-    // ポインタキャプチャで確実にイベントをこのボタンが受け取る
-    if (btn.setPointerCapture && e.pointerId !== undefined) {
-      try { btn.setPointerCapture(e.pointerId); } catch(_) {}
-    }
-
     if (dir === 'left')  input.left = true;
     if (dir === 'right') input.right = true;
-    if (dir === 'up')    { tryJump(P); }
-    if (dir === 'down')  { tryCrouch(P, true); }
+    if (dir === 'up')    tryJump(P);
+    if (dir === 'down')  tryCrouch(P, true);
   };
 
   const release = (e) => {
-    if (e) { e.preventDefault(); e.stopPropagation(); }
+    if (e) e.preventDefault();
     btn.classList.remove('pressed');
-    activePointerId = null;
-
     if (dir === 'left')  input.left = false;
     if (dir === 'right') input.right = false;
     if (dir === 'down')  tryCrouch(P, false);
   };
 
-  btn.addEventListener('pointerdown', press);
-  btn.addEventListener('pointerup', release);
-  btn.addEventListener('pointercancel', release);
-  // キャプチャ中は pointerleave を無視（誤発火防止）
-  btn.addEventListener('pointerleave', (e) => {
-    if (activePointerId === null) release(e);
-  });
+  // マウス
+  btn.addEventListener('mousedown', press);
+  btn.addEventListener('mouseup', release);
+  btn.addEventListener('mouseleave', release);
+
+  // タッチ（passive:false で preventDefault を効かせる）
+  btn.addEventListener('touchstart',  press,   { passive: false });
+  btn.addEventListener('touchend',    release, { passive: false });
+  btn.addEventListener('touchcancel', release, { passive: false });
+
   btn.addEventListener('contextmenu', (e) => e.preventDefault());
 }
 document.querySelectorAll('[data-dir]').forEach(bindDirButton);
 
 document.querySelectorAll('[data-btn]').forEach(btn => {
-  let activePointerId = null;
-
   const press = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    activePointerId = e.pointerId;
+    if (e) e.preventDefault();
     btn.classList.add('pressed');
-    if (btn.setPointerCapture && e.pointerId !== undefined) {
-      try { btn.setPointerCapture(e.pointerId); } catch(_) {}
-    }
     tryAttack(P, btn.dataset.btn);
   };
   const release = (e) => {
-    if (e) { e.preventDefault(); e.stopPropagation(); }
+    if (e) e.preventDefault();
     btn.classList.remove('pressed');
-    activePointerId = null;
   };
 
-  btn.addEventListener('pointerdown', press);
-  btn.addEventListener('pointerup', release);
-  btn.addEventListener('pointercancel', release);
-  btn.addEventListener('pointerleave', (e) => {
-    if (activePointerId === null) release(e);
-  });
+  btn.addEventListener('mousedown', press);
+  btn.addEventListener('mouseup', release);
+  btn.addEventListener('mouseleave', release);
+
+  btn.addEventListener('touchstart',  press,   { passive: false });
+  btn.addEventListener('touchend',    release, { passive: false });
+  btn.addEventListener('touchcancel', release, { passive: false });
+
   btn.addEventListener('contextmenu', (e) => e.preventDefault());
 });
+
+/* ============================================================
+   Gamepad API（実機コントローラーの十字キー）
+   ============================================================ */
+let gamepadPrev = { up: false, down: false };
+const DEADZONE = 0.4;
+
+function pollGamepad() {
+  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+  let pad = null;
+  for (let i = 0; i < pads.length; i++) {
+    if (pads[i] && pads[i].connected) { pad = pads[i]; break; }
+  }
+  if (!pad) {
+    gamepadPrev.up = false;
+    gamepadPrev.down = false;
+    return;
+  }
+
+  const btn = (i) => pad.buttons[i] && pad.buttons[i].pressed;
+  const axisX = pad.axes[0] || 0;
+  const axisY = pad.axes[1] || 0;
+
+  // 十字キー（標準: 12=上, 13=下, 14=左, 15=右）＋左スティック
+  const left  = btn(14) || axisX < -DEADZONE;
+  const right = btn(15) || axisX >  DEADZONE;
+  const up    = btn(12) || axisY < -DEADZONE;
+  const down  = btn(13) || axisY >  DEADZONE;
+
+  // 左右は押している間ずっと反映
+  input.left  = left;
+  input.right = right;
+
+  // 上は押した瞬間だけジャンプ
+  if (up && !gamepadPrev.up) tryJump(P);
+
+  // 下は押している間しゃがみ
+  if (down && !gamepadPrev.down) tryCrouch(P, true);
+  if (!down && gamepadPrev.down) tryCrouch(P, false);
+
+  gamepadPrev.up = up;
+  gamepadPrev.down = down;
+}
 
 /* ============================================================
    オープニング
@@ -1498,6 +1528,7 @@ function loop() {
     if (hitStopTimer > 0) {
       hitStopTimer--;
     } else {
+      pollGamepad();
       updatePlayer();
       updateEnemyAI();
       updatePhysics();
