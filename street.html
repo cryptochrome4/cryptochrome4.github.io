@@ -130,7 +130,6 @@
     z-index: 4;
   }
   .street::before {
-    /* センターライン */
     content: '';
     position: absolute;
     top: 40%; left: 0; right: 0;
@@ -141,7 +140,6 @@
     opacity: 0.5;
   }
   .street::after {
-    /* 濡れた路面の反射 */
     content: '';
     position: absolute;
     top: 0; left: 0; right: 0; height: 100%;
@@ -188,6 +186,23 @@
       #000 1.5%, #000 3%);
     filter: blur(1px);
   }
+
+  /* ===== 背景画像レイヤ（ON時に使用） ===== */
+  #bg-image {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    height: 78%; /* 道路(22%)を除いた上部分 */
+    background-image: url('img370street.jpg');
+    background-size: cover;
+    background-position: center bottom;
+    background-repeat: no-repeat;
+    z-index: 0;
+    display: none;
+  }
+  /* ON時：CSS背景を隠して画像に差し替え */
+  #game.bg-image-mode #bg-css { display: none; }
+  #game.bg-image-mode #bg-image { display: block; }
 
   /* ============================================================
      キャラクター
@@ -688,11 +703,52 @@
     align-items: center;
     justify-content: space-between;
     margin-bottom: 6px;
+    gap: 8px;
+    flex-wrap: wrap;
   }
   #panel-header .title {
     font-size: 11px; color: #aaaacc;
     font-family: Arial, sans-serif; letter-spacing: 2px;
   }
+  #panel-toggles {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  /* 背景画像トグル */
+  .toggle-wrap {
+    display: flex; align-items: center; gap: 6px;
+    font-family: Arial, sans-serif; font-size: 11px;
+    color: #aaaacc; cursor: pointer;
+  }
+  .toggle-switch {
+    position: relative;
+    width: 38px; height: 20px;
+    background: #2a2a44;
+    border: 1px solid #5555aa;
+    border-radius: 20px;
+    transition: background 0.2s;
+    flex-shrink: 0;
+  }
+  .toggle-switch::after {
+    content: '';
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 14px; height: 14px;
+    background: #8888cc;
+    border-radius: 50%;
+    transition: transform 0.2s, background 0.2s;
+  }
+  #bg-toggle:checked + .toggle-switch {
+    background: #44ff88;
+    border-color: #44ff88;
+  }
+  #bg-toggle:checked + .toggle-switch::after {
+    transform: translateX(18px);
+    background: #fff;
+  }
+  #bg-toggle { display: none; }
   #hint {
     font-size: 10px; color: #666688;
     font-family: Arial, sans-serif;
@@ -723,6 +779,8 @@
     display: flex; align-items: center; justify-content: center;
     touch-action: none;
     user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
     transition: transform 0.08s, filter 0.08s, box-shadow 0.08s;
     box-shadow: 0 3px 0 #0a0a18, inset 0 0 6px rgba(120,120,255,0.3);
   }
@@ -748,6 +806,8 @@
     box-shadow: 0 6px 0 rgba(0,0,0,0.6), inset 0 -6px 12px rgba(0,0,0,0.4);
     touch-action: none;
     user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
     transition: transform 0.08s, filter 0.08s;
     font-family: 'Arial Black', sans-serif;
   }
@@ -773,21 +833,26 @@
 
 <div id="game-wrap">
   <div id="game">
-    <!-- 背景 -->
-    <div class="bg-sky"></div>
-    <div class="moon"></div>
-    <div class="cloud c1"></div>
-    <div class="cloud c2"></div>
-    <div class="cloud c3"></div>
+    <!-- CSS背景（デフォ） -->
+    <div id="bg-css">
+      <div class="bg-sky"></div>
+      <div class="moon"></div>
+      <div class="cloud c1"></div>
+      <div class="cloud c2"></div>
+      <div class="cloud c3"></div>
 
-    <div class="skyline" id="skyline"></div>
+      <div class="skyline" id="skyline"></div>
 
-    <div class="neon pink"   style="top:22%; left:8%;  z-index:3;">BAR</div>
-    <div class="neon cyan"   style="top:35%; left:60%; z-index:3;">FIGHT</div>
-    <div class="neon yellow" style="top:28%; right:6%; z-index:3;">24H</div>
+      <div class="neon pink"   style="top:22%; left:8%;  z-index:3;">BAR</div>
+      <div class="neon cyan"   style="top:35%; left:60%; z-index:3;">FIGHT</div>
+      <div class="neon yellow" style="top:28%; right:6%; z-index:3;">24H</div>
 
-    <div class="streetlight" style="left:15%;"></div>
-    <div class="streetlight" style="left:85%;"></div>
+      <div class="streetlight" style="left:15%;"></div>
+      <div class="streetlight" style="left:85%;"></div>
+    </div>
+
+    <!-- 背景画像レイヤ（ON時に使用） -->
+    <div id="bg-image"></div>
 
     <div class="street"></div>
     <div class="crowd"></div>
@@ -855,7 +920,14 @@
 <div id="info-panel">
   <div id="panel-header">
     <span class="title">▼ CONTROLLER（アーケード）</span>
-    <span id="hint">クリック/長押しで操作</span>
+    <div id="panel-toggles">
+      <label class="toggle-wrap" title="ONにすると街の背景が軽量画像になります">
+        <input type="checkbox" id="bg-toggle">
+        <span class="toggle-switch"></span>
+        <span>背景画像 ON（軽量）</span>
+      </label>
+      <span id="hint">クリック/長押しで操作</span>
+    </div>
   </div>
   <div id="pad-area">
     <div class="lever-base">
@@ -898,7 +970,6 @@
     el.style.left = b.left + '%';
     el.style.width = b.width + '%';
     el.style.height = b.height + '%';
-    // 窓を配置
     const rows = Math.floor(b.height / 10);
     const cols = Math.floor(b.width / 2);
     for (let r = 0; r < rows; r++) {
@@ -918,6 +989,15 @@
 })();
 
 /* ============================================================
+   背景画像トグル
+   ============================================================ */
+const gameEl = document.getElementById('game');
+const bgToggle = document.getElementById('bg-toggle');
+bgToggle.addEventListener('change', () => {
+  gameEl.classList.toggle('bg-image-mode', bgToggle.checked);
+});
+
+/* ============================================================
    座標系・定数
    ============================================================ */
 const GAME = document.getElementById('game');
@@ -935,7 +1015,7 @@ const playerMoveLbl = document.getElementById('player-move');
 const enemyMoveLbl  = document.getElementById('enemy-move');
 const fxContainer = document.getElementById('fxContainer');
 
-const GROUND = 20;        // 地面の高さ(%)
+const GROUND = 20;
 const GRAVITY = 0.55;
 const JUMP_POWER = 6.5;
 const MOVE_SPEED = 0.55;
@@ -954,7 +1034,7 @@ const ATTACK_COOLDOWN = 18;
    ============================================================ */
 const P = {
   x: 22, hp: 100, facing: 1,
-  state: 'idle',  // idle / walking / punching / kicking / jumping / crouching / hit
+  state: 'idle',
   stateTimer: 0,
   jumpY: 0, jumpVel: 0,
   isCrouching: false,
@@ -979,19 +1059,20 @@ let hitStopTimer = 0;
 const input = { left: false, right: false };
 
 /* ============================================================
-   入力処理（確実に左右が効くように）
+   入力処理（十字キー・スマホ・コントローラー対応）
    ============================================================ */
 function bindDirButton(btn) {
   const dir = btn.dataset.dir;
 
   const press = (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     btn.classList.add('pressed');
     if (dir === 'left')  input.left = true;
     if (dir === 'right') input.right = true;
-    if (dir === 'up')    { tryJump(P); }
-    if (dir === 'down')  { tryCrouch(P, true); }
+    if (dir === 'up')    tryJump(P);
+    if (dir === 'down')  tryCrouch(P, true);
   };
+
   const release = (e) => {
     if (e) e.preventDefault();
     btn.classList.remove('pressed');
@@ -1000,22 +1081,23 @@ function bindDirButton(btn) {
     if (dir === 'down')  tryCrouch(P, false);
   };
 
-  // pointer: マウス/タッチ両対応
-  btn.addEventListener('pointerdown', press);
-  btn.addEventListener('pointerup', release);
-  btn.addEventListener('pointerleave', release);
-  btn.addEventListener('pointercancel', release);
-  // 念のための mouse/touch フォールバック
-  btn.addEventListener('mousedown', (e) => { if (e.pointerType === undefined) press(e); });
-  btn.addEventListener('mouseup',   (e) => { if (e.pointerType === undefined) release(e); });
-  btn.addEventListener('touchstart',(e) => { if (e.pointerType === undefined) { e.preventDefault(); press(e); } }, { passive: false });
-  btn.addEventListener('touchend',  (e) => { if (e.pointerType === undefined) { e.preventDefault(); release(e); } }, { passive: false });
+  // マウス
+  btn.addEventListener('mousedown', press);
+  btn.addEventListener('mouseup', release);
+  btn.addEventListener('mouseleave', release);
+
+  // タッチ（passive:false で preventDefault を効かせる）
+  btn.addEventListener('touchstart',  press,   { passive: false });
+  btn.addEventListener('touchend',    release, { passive: false });
+  btn.addEventListener('touchcancel', release, { passive: false });
+
+  btn.addEventListener('contextmenu', (e) => e.preventDefault());
 }
 document.querySelectorAll('[data-dir]').forEach(bindDirButton);
 
 document.querySelectorAll('[data-btn]').forEach(btn => {
   const press = (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     btn.classList.add('pressed');
     tryAttack(P, btn.dataset.btn);
   };
@@ -1023,14 +1105,16 @@ document.querySelectorAll('[data-btn]').forEach(btn => {
     if (e) e.preventDefault();
     btn.classList.remove('pressed');
   };
-  btn.addEventListener('pointerdown', press);
-  btn.addEventListener('pointerup', release);
-  btn.addEventListener('pointerleave', release);
-  btn.addEventListener('pointercancel', release);
-  btn.addEventListener('mousedown', (e) => { if (e.pointerType === undefined) press(e); });
-  btn.addEventListener('mouseup',   (e) => { if (e.pointerType === undefined) release(e); });
-  btn.addEventListener('touchstart',(e) => { if (e.pointerType === undefined) { e.preventDefault(); press(e); } }, { passive: false });
-  btn.addEventListener('touchend',  (e) => { if (e.pointerType === undefined) { e.preventDefault(); release(e); } }, { passive: false });
+
+  btn.addEventListener('mousedown', press);
+  btn.addEventListener('mouseup', release);
+  btn.addEventListener('mouseleave', release);
+
+  btn.addEventListener('touchstart',  press,   { passive: false });
+  btn.addEventListener('touchend',    release, { passive: false });
+  btn.addEventListener('touchcancel', release, { passive: false });
+
+  btn.addEventListener('contextmenu', (e) => e.preventDefault());
 });
 
 /* ============================================================
@@ -1159,23 +1243,17 @@ function applyDamage(target, amount, atkType) {
     setTimeout(() => enemy.classList.remove('hit'), 120);
   }
 
-  // ダメージポップ
   spawnDamagePop(target.x, GROUND + (target.isCrouching ? 22 : 32), amount);
 
-  // ヒットエフェクト
-  const yPct = 100 - (GROUND + (target.isCrouching ? 10 : 18));
   const hitY = (GROUND + (target.isCrouching ? 20 : 30));
   spawnFx(target.x, hitY, atkType);
 
-  // 画面シェイク
   GAME.classList.remove('shake');
   void GAME.offsetWidth;
   GAME.classList.add('shake');
 
-  // ヒットストップ
   hitStopTimer = 4;
 
-  // 被弾モーション
   if (!(target.isCrouching && atkType === 'punch')) {
     target.state = 'hit';
     target.stateTimer = HIT_DURATION;
@@ -1215,19 +1293,16 @@ function resolveAttack(attacker, defender) {
 
   const defBox = getBodyBox(defender);
 
-  // しゃがみ回避：パンチは当たらない
   if (atkBox.type === 'punch' && defender.isCrouching) {
     attacker.attackHitDone = true;
     showLabel(defender === P ? playerMoveLbl : enemyMoveLbl, 'GUARD');
     return;
   }
-  // ジャンプ回避：キックは当たらない
   if (atkBox.type === 'kick' && defender.jumpY > 3) {
     attacker.attackHitDone = true;
     showLabel(defender === P ? playerMoveLbl : enemyMoveLbl, 'MISS');
     return;
   }
-  // 空中の相手には地上攻撃が当たらない
   if (defender.jumpY > 3) {
     attacker.attackHitDone = true;
     return;
@@ -1255,7 +1330,6 @@ function updateEnemyAI() {
 
   if (enemyAttackCooldown > 0) { enemyAttackCooldown--; return; }
 
-  // 回避行動
   if (P.state === 'punching' && dist < PUNCH_RANGE + 3 && Math.random() < 0.35) {
     tryCrouch(E, true);
     setTimeout(() => tryCrouch(E, false), 400);
@@ -1306,7 +1380,6 @@ function updatePlayer() {
     return;
   }
   if (P.jumpY > 0) {
-    // 空中制御
     if (input.left)  P.x -= MOVE_SPEED * 0.6;
     if (input.right) P.x += MOVE_SPEED * 0.6;
     return;
@@ -1316,7 +1389,6 @@ function updatePlayer() {
     return;
   }
 
-  // 地上移動
   let moved = false;
   if (input.left)  { P.x -= MOVE_SPEED; moved = true; }
   if (input.right) { P.x += MOVE_SPEED; moved = true; }
@@ -1326,7 +1398,6 @@ function updatePlayer() {
     P.state = 'idle';
   }
 
-  // 向き
   P.facing = E.x > P.x ? 1 : -1;
 }
 
@@ -1358,7 +1429,6 @@ function clampPositions() {
    描画
    ============================================================ */
 function render() {
-  // プレイヤー
   player.style.left = P.x + '%';
   player.style.bottom = (GROUND + P.jumpY) + '%';
   player.classList.toggle('facing-right', P.facing === 1);
@@ -1369,7 +1439,6 @@ function render() {
   player.classList.toggle('punching',  P.state === 'punching');
   player.classList.toggle('kicking',   P.state === 'kicking');
 
-  // 敵
   enemy.style.left = E.x + '%';
   enemy.style.bottom = (GROUND + E.jumpY) + '%';
   enemy.classList.toggle('facing-right', E.facing === 1);
@@ -1420,23 +1489,14 @@ function loop() {
       updateEnemyAI();
       updatePhysics();
       clampPositions();
-
-      // ヒット判定
       resolveAttack(P, E);
       resolveAttack(E, P);
-
-      // 状態タイマー（攻撃以外）
       [P, E].forEach(c => {
         if (c.state === 'hit') {
           c.stateTimer--;
           if (c.stateTimer <= 0) c.state = 'idle';
         }
-        if (c.state === 'punching' || c.state === 'kicking') {
-          // 上の update で処理済みだが念のため
-        }
       });
-
-      // 敵攻撃タイマー処理
       if (E.state === 'punching' || E.state === 'kicking') {
         E.stateTimer--;
         if (E.stateTimer <= 0) E.state = 'idle';
@@ -1447,7 +1507,6 @@ function loop() {
   requestAnimationFrame(loop);
 }
 
-/* 初期化 */
 render();
 loop();
 </script>
