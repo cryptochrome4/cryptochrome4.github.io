@@ -2,373 +2,1999 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>部位破壊デモ</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MONSTER HUNT CARD GAME</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Shippori+Mincho:wght@400;700&family=Inter:wght@400;700&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap" rel="stylesheet">
 <style>
-  * { margin:0; padding:0; box-sizing:border-box; }
-  html,body { height:100%; overflow:hidden; background:#0a0e14; }
-  canvas { display:block; cursor:crosshair; }
-  #hint {
-    position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
-    color:#8ab; font:14px/1.5 "Segoe UI",sans-serif; letter-spacing:.1em;
-    text-shadow:0 0 8px #000; pointer-events:none; user-select:none;
-    opacity:.8; transition:opacity .4s;
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    background: #0a0705;
+    background-image: radial-gradient(circle at 20% 30%, #241a12 0%, #0a0705 90%);
+    font-family: 'Shippori Mincho', 'Yu Mincho', 'Hiragino Mincho ProN', serif;
+    color: #e8dcc8;
+  }
+
+  /* ===================== オープニング ===================== */
+  #opening {
+    position: fixed; inset: 0;
+    background-image: url("ing368monster.jpg");
+    background-size: 100% 100%; background-position: center; background-repeat: no-repeat;
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    z-index: 100;
+  }
+  #opening::before {
+    content: ""; position: absolute; inset: 0;
+    background: radial-gradient(circle at 50% 60%, rgba(10,7,5,0.4), rgba(10,7,5,0.85)); z-index: 0;
+  }
+  #opening .title {
+    position: relative; z-index: 1;
+    font-family: 'Cinzel', serif; color: #e8a53a;
+    font-size: clamp(28px, 6vw, 64px); letter-spacing: 0.15em; font-weight: 900;
+    text-shadow: 0 0 30px rgba(232,80,20,0.7), 0 2px 6px #000;
+    margin-bottom: 12px; text-align: center;
+  }
+  #opening .subtitle {
+    position: relative; z-index: 1; color: #c9a877;
+    font-family: 'Cinzel', serif; font-size: clamp(12px, 2vw, 18px);
+    letter-spacing: 0.35em; margin-bottom: 50px;
+  }
+  .btn-area { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 16px; align-items: center; }
+
+  /* 共通ボタン */
+  .btn {
+    min-width: 220px; padding: 12px 28px;
+    font-family: 'Cinzel', serif; font-size: clamp(13px, 1.8vw, 17px);
+    font-weight: 700; letter-spacing: 0.2em; color: #e8c99a;
+    background: linear-gradient(180deg, #2a1d12 0%, #140c06 100%);
+    border: 1.5px solid #b8822f; border-radius: 3px; cursor: pointer;
+    text-shadow: 0 1px 2px #000;
+    box-shadow: inset 0 0 12px rgba(232,150,50,0.1), 0 4px 0 #0a0603, 0 6px 12px rgba(0,0,0,0.6);
+    transition: all 0.12s ease; transform: translateY(-2px);
+  }
+  .btn:hover:not(:disabled) {
+    background: linear-gradient(180deg, #3a2818 0%, #1e140a 100%);
+    color: #ffdf9e; box-shadow: inset 0 0 16px rgba(255,180,60,0.25), 0 2px 0 #0a0603, 0 8px 16px rgba(0,0,0,0.7);
+    transform: translateY(0);
+  }
+  .btn:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 #0a0603, 0 4px 8px rgba(0,0,0,0.6); }
+  .btn:disabled { opacity: 0.3; cursor: not-allowed; box-shadow: 0 2px 0 #0a0603; transform: translateY(0); }
+
+  /* 背景ビューア */
+  #bgViewer { position: fixed; inset: 0; z-index: 200; background: #000; display: none; justify-content: center; align-items: center; }
+  #bgViewer.active { display: flex; }
+  #bgViewer img { width: 100%; height: 100%; object-fit: fill; display: block; }
+  #bgViewer .close-viewer {
+    position: absolute; top: 20px; right: 20px; z-index: 210; padding: 10px 24px;
+    font-family: 'Cinzel', serif; letter-spacing: 0.2em; color: #e8d5b8;
+    background: rgba(0,0,0,0.7); border: 1.5px solid #b8822f; cursor: pointer;
+  }
+  #bgViewer .close-viewer:hover { background: rgba(184,130,47,0.25); color: #ffeac2; }
+
+  /* ゲーム画面 */
+  #game {
+    position: fixed; inset: 0; display: none; flex-direction: column;
+    background: radial-gradient(circle at 50% 0%, #1e1408 0%, #0a0705 70%);
+    z-index: 50; overflow: hidden;
+  }
+  #game.active { display: flex; }
+
+  #topBar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 18px;
+    background: linear-gradient(180deg, rgba(26,18,12,0.98) 0%, rgba(10,7,5,0.98) 100%);
+    border-bottom: 1px solid rgba(232,165,58,0.4);
+    font-size: 14px; letter-spacing: 0.12em; flex-shrink: 0; gap: 12px;
+  }
+  #topBar .left-group { display: flex; align-items: center; gap: 10px; }
+  #topBar .clock {
+    font-family: 'Inter', sans-serif; font-variant-numeric: tabular-nums;
+    color: #e8a53a; text-shadow: 0 0 10px rgba(232,165,58,0.5);
+  }
+  #topBar .money {
+    font-family: 'Cinzel', serif; font-weight: 700; color: #ffeac2;
+    text-shadow: 0 0 8px rgba(232,165,58,0.4);
+  }
+  /* 背景画像トグル群 */
+  .bg-toggle-group {
+    display: flex; align-items: center; gap: 6px;
+    padding: 2px 8px; border-left: 1px solid rgba(232,165,58,0.25);
+  }
+  .mini-btn {
+    font-family: 'Inter', sans-serif; font-size: 10px; letter-spacing: 0.1em;
+    color: #e8c99a; background: rgba(20,14,8,0.9);
+    border: 1px solid #b8822f; border-radius: 3px; padding: 3px 8px; cursor: pointer;
+    transition: all 0.12s ease;
+  }
+  .mini-btn:hover { background: rgba(184,130,47,0.3); color: #ffeac2; }
+  .mini-btn.on { background: #b8822f; color: #10080a; }
+  #fitSelect {
+    background: #140c06; color: #e8c99a; border: 1px solid #b8822f;
+    border-radius: 3px; font-family: 'Inter', sans-serif; font-size: 10px; padding: 3px 4px;
+  }
+
+  #main { flex: 1; display: flex; overflow: hidden; }
+
+  #packArea {
+    flex: 1.4; display: flex; flex-direction: column;
+    justify-content: center; align-items: center; padding: 12px;
+    position: relative; overflow: hidden;
+  }
+  /* 左側背景レイヤー */
+  #leftBgLayer {
+    position: absolute; inset: 0; z-index: 0; display: none;
+    background-image: url("img367monster.jpg");
+    background-repeat: no-repeat; background-position: center;
+    background-size: cover;
+  }
+  #leftBgLayer.active { display: block; }
+  #leftBgLayer::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(90deg, rgba(10,7,5,0.55), rgba(10,7,5,0.75));
+  }
+  #packArea > *:not(#leftBgLayer) { position: relative; z-index: 1; }
+
+  #packCardWrap { display: none; flex-direction: column; align-items: center; gap: 10px; }
+  #packCardWrap.active { display: flex; }
+
+  /* =========================================================
+     モンスターカード骨格（モンハン風）
+  ========================================================= */
+  .ygo-card {
+    width: 260px; height: 380px; padding: 10px;
+    display: flex; flex-direction: column; position: relative; overflow: hidden;
+    transition: box-shadow 0.3s ease;
+    border-radius: 4px;
+  }
+
+  /* 恐竜系（国内→恐） */
+  .ygo-card.beast {
+    background:
+      repeating-linear-gradient(135deg, rgba(120,90,50,0.06) 0px, rgba(120,90,50,0.06) 3px, transparent 3px, transparent 9px),
+      radial-gradient(ellipse at 25% 15%, rgba(220,150,60,0.15) 0%, transparent 55%),
+      linear-gradient(160deg, #2a1d10 0%, #100a05 100%);
+    box-shadow:
+      inset 0 0 30px rgba(220,140,50,0.15),
+      inset 0 0 0 1px rgba(200,150,70,0.5),
+      0 15px 30px rgba(0,0,0,0.8);
+    border: 1px solid rgba(160,110,50,0.6);
+    color: #e8cf9a;
+  }
+  /* 悪霊系（外国→悪） */
+  .ygo-card.spirit {
+    background:
+      repeating-linear-gradient(45deg, rgba(80,20,120,0.12) 0px, rgba(80,20,120,0.12) 2px, transparent 2px, transparent 8px),
+      radial-gradient(ellipse at 30% 20%, rgba(140,40,200,0.18) 0%, transparent 55%),
+      linear-gradient(160deg, #1a0a28 0%, #060208 100%);
+    box-shadow:
+      inset 0 0 35px rgba(140,40,200,0.2),
+      inset 0 0 0 1px rgba(120,50,180,0.5),
+      0 18px 35px rgba(0,0,0,0.9);
+    border: 1px solid rgba(140,60,200,0.55);
+    color: #d8b8f0;
+  }
+  /* レア（銀） */
+  .ygo-card.silver {
+    background:
+      linear-gradient(115deg, transparent 30%, rgba(200,220,240,0.12) 48%, rgba(255,255,255,0.18) 50%, rgba(200,220,240,0.12) 52%, transparent 70%),
+      repeating-linear-gradient(45deg, rgba(0,0,0,0.15) 0px, rgba(0,0,0,0.15) 2px, transparent 2px, transparent 6px),
+      linear-gradient(160deg, #1a1a20 0%, #08080c 100%);
+    box-shadow:
+      inset 0 0 30px rgba(160,180,220,0.15),
+      inset 0 0 0 1px rgba(180,200,230,0.5),
+      0 20px 35px rgba(0,0,0,0.9);
+    border: 1px solid rgba(180,200,230,0.5);
+    color: #c8d4ec;
+  }
+  /* SR（紫大理） */
+  .ygo-card.marble {
+    background:
+      radial-gradient(ellipse at 20% 30%, rgba(180,80,255,0.18) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 70%, rgba(120,40,200,0.14) 0%, transparent 50%),
+      repeating-linear-gradient(45deg, rgba(0,0,0,0.12) 0px, rgba(0,0,0,0.12) 1px, transparent 1px, transparent 6px),
+      linear-gradient(160deg, #1a0a28 0%, #060208 100%);
+    box-shadow:
+      inset 0 0 40px rgba(160,70,240,0.2),
+      inset 0 0 0 1.5px rgba(180,90,240,0.6),
+      0 20px 35px rgba(0,0,0,0.9);
+    border: 1.5px solid rgba(180,90,240,0.7);
+    color: #dcb8f8;
+  }
+  /* UR（金） */
+  .ygo-card.gold {
+    background:
+      linear-gradient(115deg, transparent 30%, rgba(232,165,58,0.22) 48%, rgba(255,230,150,0.32) 50%, rgba(232,165,58,0.22) 52%, transparent 70%),
+      radial-gradient(ellipse at 30% 20%, rgba(232,165,58,0.15) 0%, transparent 50%),
+      repeating-linear-gradient(0deg, rgba(232,165,58,0.04) 0px, rgba(232,165,58,0.04) 1px, transparent 1px, transparent 3px),
+      linear-gradient(160deg, #221608 0%, #08050a 100%);
+    box-shadow:
+      inset 0 0 40px rgba(232,165,58,0.2),
+      inset 0 0 0 1.5px rgba(232,165,58,0.8),
+      0 0 30px rgba(232,165,58,0.4),
+      0 20px 40px rgba(0,0,0,0.9);
+    border: 1.5px solid rgba(232,165,58,0.85);
+    color: #f0cf78;
+  }
+
+  .ygo-name {
+    font-family: 'Cinzel', serif; font-size: 12px; font-weight: 700;
+    padding: 5px 8px; text-align: center; letter-spacing: 0.08em; min-height: 28px;
+    display: flex; justify-content: center; align-items: center; gap: 6px;
+    position: relative; z-index: 2;
+  }
+  .beast  .ygo-name { background: rgba(160,100,30,0.35); color: #ffe2a0; border: 1px solid rgba(200,140,60,0.4); }
+  .spirit .ygo-name { background: rgba(80,20,140,0.5);  color: #e0c0ff; border: 1px solid rgba(140,60,200,0.4); }
+  .silver .ygo-name { background: rgba(30,40,60,0.6);   color: #d0dcf0; border: 1px solid rgba(180,200,230,0.35); }
+  .marble .ygo-name { background: rgba(60,20,90,0.6);   color: #e0c0ff; border: 1px solid rgba(180,90,240,0.4); }
+  .gold   .ygo-name { background: rgba(40,25,8,0.7);    color: #ffdc8a; border: 1px solid rgba(232,165,58,0.55); }
+
+  .ygo-attr-mark {
+    display: inline-block; width: 20px; height: 20px; line-height: 18px;
+    text-align: center; border-radius: 50%; font-size: 11px; font-weight: 700;
+    font-family: 'Shippori Mincho', serif; flex-shrink: 0;
+  }
+  .ygo-attr-mark.beast  { background: #8a4a10; color: #ffe2a0; border: 1px solid rgba(255,200,100,0.5); }
+  .ygo-attr-mark.spirit { background: #5a1090; color: #e0c0ff; border: 1px solid rgba(200,120,255,0.6); }
+
+  .ygo-art {
+    flex: 1; margin: 6px 0; border-radius: 3px;
+    display: flex; justify-content: center; align-items: center;
+    overflow: hidden; position: relative; z-index: 2;
+  }
+  .beast  .ygo-art { background: #10080a; border: 1.5px solid rgba(200,140,60,0.45); }
+  .spirit .ygo-art { background: #0a0510; border: 1.5px solid rgba(140,60,200,0.5); }
+  .silver .ygo-art { background: #08080c; border: 1.5px solid rgba(180,200,230,0.4); }
+  .marble .ygo-art { background: #0a0510; border: 1.5px solid rgba(180,90,240,0.5); }
+  .gold   .ygo-art { background: #060504; border: 1.5px solid rgba(232,165,58,0.6); }
+  .ygo-art canvas { width: 100%; height: 100%; image-rendering: auto; }
+
+  .ygo-stats {
+    display: flex; justify-content: space-between;
+    font-family: 'Inter', sans-serif; font-variant-numeric: tabular-nums;
+    font-size: 12px; font-weight: 700; padding: 4px 8px; letter-spacing: 0.05em;
+    position: relative; z-index: 2;
+  }
+  .beast  .ygo-stats { background: rgba(160,100,30,0.25); color: #ffe2a0; border: 1px solid rgba(200,140,60,0.3); }
+  .spirit .ygo-stats { background: rgba(80,20,140,0.4);   color: #e0c0ff; border: 1px solid rgba(140,60,200,0.3); }
+  .silver .ygo-stats { background: rgba(20,30,50,0.6);    color: #d0dcf0; border: 1px solid rgba(180,200,230,0.25); }
+  .marble .ygo-stats { background: rgba(50,15,80,0.6);    color: #e0c0ff; border: 1px solid rgba(180,90,240,0.35); }
+  .gold   .ygo-stats { background: rgba(40,25,8,0.7);     color: #ffdc8a; border: 1px solid rgba(232,165,58,0.4); }
+
+  .ygo-effect {
+    font-family: 'Zen Kaku Gothic New', sans-serif; font-size: 10px;
+    padding: 5px 7px; margin-top: 5px; min-height: 36px; line-height: 1.35;
+    position: relative; z-index: 2;
+  }
+  .beast  .ygo-effect { background: rgba(20,10,5,0.6);  color: #e8cfa8; border: 1px solid rgba(200,140,60,0.3); }
+  .spirit .ygo-effect { background: rgba(15,5,25,0.7);  color: #d8b8f0; border: 1px solid rgba(140,60,200,0.35); }
+  .silver .ygo-effect { background: rgba(0,0,0,0.6);    color: #c8d4ec; border: 1px solid rgba(180,200,230,0.25); }
+  .marble .ygo-effect { background: rgba(15,5,25,0.7);  color: #d8b8f0; border: 1px solid rgba(180,90,240,0.35); }
+  .gold   .ygo-effect { background: rgba(20,12,3,0.75); color: #e8cf9a; border: 1px solid rgba(232,165,58,0.4); }
+
+  .type-tag { font-weight: 700; letter-spacing: 0.05em; }
+  .type-tag.fang  { color: #ffb86b; }  /* 牙竜型 */
+  .type-tag.curse { color: #c88aff; }  /* 呪詛型 */
+  .beast  .type-tag.fang  { color: #ffa040; }
+  .spirit .type-tag.curse { color: #d0a0ff; }
+
+  /* 外周リング */
+  .ygo-card.silver::before, .ygo-card.marble::before, .ygo-card.gold::before {
+    content: ""; position: absolute; inset: 4px; border-radius: 2px; pointer-events: none; z-index: 1;
+  }
+  .silver::before { border: 1px solid rgba(180,200,230,0.25); }
+  .marble::before { border: 1px solid rgba(180,90,240,0.3); box-shadow: inset 0 0 15px rgba(140,40,200,0.15); }
+  .gold::before   { border: 1px solid rgba(232,165,58,0.5); box-shadow: inset 0 0 18px rgba(232,165,58,0.2); }
+
+  .pack-controls { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
+  .pack-controls .btn { min-width: 88px; padding: 8px 12px; font-size: 10px; letter-spacing: 0.15em; }
+
+  #buyArea { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  #buyArea .buy-note { font-family: 'Inter', sans-serif; font-size: 11px; color: #a08868; letter-spacing: 0.15em; }
+
+  /* 情報パネル */
+  #infoPanel {
+    flex: 1; border-left: 1px solid rgba(232,165,58,0.35);
+    display: flex; flex-direction: column;
+    background: linear-gradient(180deg, rgba(20,12,6,0.97) 0%, rgba(10,7,5,0.97) 100%);
+    overflow: hidden;
+  }
+  #infoPanel h3 {
+    font-family: 'Cinzel', serif; font-size: 12px; padding: 10px 12px;
+    letter-spacing: 0.22em; color: #e8a53a;
+    border-bottom: 1px solid rgba(232,165,58,0.35);
+    background: linear-gradient(90deg, rgba(232,165,58,0.1), transparent);
+    text-shadow: 0 0 8px rgba(232,165,58,0.4);
+  }
+  #sortSelect {
+    margin: 8px 10px; padding: 5px 6px;
+    background: #1a1008; color: #e8c99a;
+    border: 1px solid rgba(184,130,47,0.6); border-radius: 3px;
+    font-family: 'Inter', sans-serif; font-size: 11px; letter-spacing: 0.08em;
+  }
+  #infoList { flex: 1; overflow-y: auto; padding: 4px 10px 10px; }
+  .info-item {
+    padding: 6px 8px; font-size: 12px;
+    border-bottom: 1px solid rgba(184,130,47,0.18);
+    cursor: pointer; display: flex; align-items: center; gap: 6px;
+    color: #e8dcc8; font-family: 'Shippori Mincho', serif; transition: background 0.15s ease;
+  }
+  .info-item:hover { background: rgba(232,165,58,0.1); }
+
+  #priceTable {
+    border-top: 1px solid rgba(232,165,58,0.35);
+    max-height: 38%; display: flex; flex-direction: column; overflow: hidden;
+  }
+  #priceTable h3 {
+    font-size: 11px; padding: 8px 12px; color: #e8a53a;
+    border-bottom: 1px solid rgba(232,165,58,0.35);
+    background: linear-gradient(90deg, rgba(232,165,58,0.1), transparent);
+    font-family: 'Cinzel', serif; letter-spacing: 0.2em;
+  }
+  #priceList { flex: 1; overflow-y: auto; padding: 4px 10px; font-size: 11px; font-family: 'Inter', sans-serif; font-variant-numeric: tabular-nums; }
+  .price-row {
+    display: flex; justify-content: space-between; padding: 3px 0;
+    border-bottom: 1px dashed rgba(232,165,58,0.18); color: #d8c8a8;
+  }
+  .price-row .up { color: #8ee7a8; }
+  .price-row .down { color: #ff8a8a; }
+
+  /* モーダル */
+  #modal {
+    position: fixed; inset: 0; background: rgba(5,3,2,0.92);
+    display: none; justify-content: center; align-items: center; z-index: 300; backdrop-filter: blur(4px);
+  }
+  #modal.active { display: flex; }
+  #modalInner { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+  #modalControls { display: flex; gap: 12px; }
+  #modalControls .btn { min-width: 120px; }
+
+  /* フッター */
+  #footer {
+    flex-shrink: 0; height: 24px; background: rgba(5,3,2,0.97);
+    display: flex; justify-content: flex-end; align-items: center;
+    padding: 0 14px; font-size: 11px; border-top: 1px solid rgba(232,165,58,0.18);
+  }
+  #studyLink {
+    display: none; color: #4a3e30; text-decoration: none;
+    letter-spacing: 0.15em; font-family: 'Inter', sans-serif; font-size: 10px;
+  }
+  #studyLink:hover { color: #e8a53a; text-shadow: 0 0 6px rgba(232,165,58,0.5); }
+  #studyLink.visible { display: inline; }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: rgba(0,0,0,0.3); }
+  ::-webkit-scrollbar-thumb { background: rgba(184,130,47,0.35); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(232,165,58,0.55); }
+
+  /* ===================== クリック演出用 Canvas ===================== */
+  #fxCanvas {
+    position: fixed; inset: 0; z-index: 250; pointer-events: none;
+    display: none;
+  }
+  #fxCanvas.active { display: block; }
+
+  /* フローティングログ（PART BROKEN等） */
+  #fxLog {
+    position: fixed; z-index: 260; pointer-events: none;
+    font-family: 'Cinzel', serif; font-weight: 900;
+    text-shadow: 0 0 20px currentColor, 0 2px 4px #000;
+    opacity: 0; transition: none;
+    letter-spacing: 0.1em;
   }
 </style>
 </head>
 <body>
-<canvas id="c"></canvas>
-<div id="hint">モンスターの部位（装甲）を連打して破壊せよ</div>
+
+<!-- オープニング -->
+<div id="opening">
+  <div class="title">MONSTER HUNT CARD</div>
+  <div class="subtitle">ANCIENT BEASTS &amp; WICKED SPIRITS</div>
+  <div class="btn-area">
+    <button class="btn" id="startBtn">はじめる</button>
+    <button class="btn" id="viewBgBtn">背景画像を見る</button>
+  </div>
+</div>
+
+<!-- 背景ビューア -->
+<div id="bgViewer">
+  <img src="ing368monster.jpg" alt="背景画像">
+  <button class="close-viewer" id="closeViewerBtn">CLOSE</button>
+</div>
+
+<!-- ゲーム -->
+<div id="game">
+  <div id="topBar">
+    <div class="left-group">
+      <div class="clock" id="clock">00:00:00</div>
+      <div class="bg-toggle-group">
+        <button class="mini-btn" id="bgToggleBtn" title="左側の背景画像を表示/非表示">背景</button>
+        <select id="fitSelect" title="背景画像のフィット方法">
+          <option value="cover">cover</option>
+          <option value="contain">contain</option>
+          <option value="fill">fill</option>
+          <option value="none">none</option>
+          <option value="100% 100%">100% 100%</option>
+        </select>
+      </div>
+    </div>
+    <div class="money" id="moneyDisplay">所持金：200G</div>
+  </div>
+
+  <div id="main">
+    <div id="packArea">
+      <div id="leftBgLayer"></div>
+
+      <div id="buyArea">
+        <button class="btn" id="buyPackBtn">パックを買う（200G）</button>
+        <div class="buy-note">1 PACK = 7 CARDS</div>
+      </div>
+
+      <div id="packCardWrap">
+        <div class="ygo-card beast" id="packCard">
+          <div class="ygo-name" id="packName"></div>
+          <div class="ygo-art"><canvas id="packCanvas" width="200" height="200"></canvas></div>
+          <div class="ygo-stats">
+            <span id="packAtk">ATK 0</span>
+            <span id="packDef">DEF 0</span>
+          </div>
+          <div class="ygo-effect" id="packEffect"></div>
+        </div>
+        <div class="pack-controls">
+          <button class="btn" id="prevBtn">PREV</button>
+          <button class="btn" id="nextBtn">NEXT</button>
+          <button class="btn" id="sellNowBtn">その場で売る</button>
+          <button class="btn" id="endPackBtn">売らずに開封終了</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="infoPanel">
+      <h3>捕獲モンスター</h3>
+      <select id="sortSelect">
+        <option value="obtained">入手順</option>
+        <option value="rarity">レア度順</option>
+        <option value="atk">攻撃力が高い順</option>
+        <option value="defLow">守備力が低い順</option>
+        <option value="beast">恐竜系順</option>
+        <option value="spirit">悪霊系順</option>
+        <option value="fang">牙竜型順</option>
+        <option value="curse">呪詛型順</option>
+      </select>
+      <div id="infoList"></div>
+
+      <div id="priceTable">
+        <h3>買取相場表</h3>
+        <div id="priceList"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="footer">
+    <a href="magazine.html" id="studyLink">magazine.html</a>
+  </div>
+</div>
+
+<!-- モーダル -->
+<div id="modal">
+  <div id="modalInner">
+    <div class="ygo-card beast" id="modalCard">
+      <div class="ygo-name" id="modalName"></div>
+      <div class="ygo-art"><canvas id="modalCanvas" width="200" height="200"></canvas></div>
+      <div class="ygo-stats">
+        <span id="modalAtk">ATK 0</span>
+        <span id="modalDef">DEF 0</span>
+      </div>
+      <div class="ygo-effect" id="modalEffect"></div>
+    </div>
+    <div id="modalControls">
+      <button class="btn" id="modalCloseBtn">CLOSE</button>
+      <button class="btn" id="modalSellBtn">売る</button>
+    </div>
+  </div>
+</div>
+
+<!-- クリック演出用 -->
+<canvas id="fxCanvas"></canvas>
+<div id="fxLog"></div>
+
 <script>
-const canvas = document.getElementById('c');
-const ctx = canvas.getContext('2d');
-let W, H;
-function resize(){
-  W = canvas.width = innerWidth;
-  H = canvas.height = innerHeight;
+/* =========================================================
+   モンスターマスター（50体）
+   attr: "恐" = 恐竜系（ノーマル〜レア）
+   attr: "悪" = 悪霊系（高レア）
+========================================================= */
+const CARD_MASTER = [
+  /* ===== 恐竜系（ノーマル）30体 ===== */
+  { name:"ラプトル・ヴェルデ",     code:"恐01", attr:"恐", rarity:"N", type:"fang", atk:15, def:25, effect:"攻撃力+5",           basePrice:8,  emblem:"raptor_verde" },
+  { name:"ヴェロキ・フレイム",     code:"恐02", attr:"恐", rarity:"N", type:"fang", atk:20, def:18, effect:"攻撃力+5",           basePrice:9,  emblem:"veloci_flame" },
+  { name:"ティラノ・レックス",     code:"恐03", attr:"恐", rarity:"N", type:"fang", atk:28, def:14, effect:"攻撃力+8",           basePrice:12, emblem:"trex" },
+  { name:"トリケラ・ガード",       code:"恐04", attr:"恐", rarity:"N", type:"fang", atk:10, def:30, effect:"守備力+8",           basePrice:7,  emblem:"tricera" },
+  { name:"プテラ・スカイ",         code:"恐05", attr:"恐", rarity:"N", type:"fang", atk:16, def:16, effect:"攻撃力+5",           basePrice:10, emblem:"ptera" },
+  { name:"ステゴ・スパイク",       code:"恐06", attr:"恐", rarity:"N", type:"fang", atk:12, def:32, effect:"守備力+9",           basePrice:11, emblem:"stego" },
+  { name:"アンキロ・シールド",     code:"恐07", attr:"恐", rarity:"N", type:"fang", atk:9,  def:35, effect:"守備力+10",          basePrice:10, emblem:"ankylo" },
+  { name:"ブラキオ・ロング",       code:"恐08", attr:"恐", rarity:"N", type:"fang", atk:14, def:28, effect:"守備力+7",           basePrice:9,  emblem:"brachio" },
+  { name:"スピノ・アクア",         code:"恐09", attr:"恐", rarity:"N", type:"fang", atk:26, def:16, effect:"攻撃力+7",           basePrice:12, emblem:"spino" },
+  { name:"ディロフォ・ツイン",     code:"恐10", attr:"恐", rarity:"N", type:"fang", atk:18, def:20, effect:"攻撃力+5",           basePrice:9,  emblem:"dilo" },
+  { name:"カルノ・ブレイド",       code:"恐11", attr:"恐", rarity:"N", type:"fang", atk:24, def:14, effect:"攻撃力+6",           basePrice:11, emblem:"carno" },
+  { name:"パキケファロ・ラム",     code:"恐12", attr:"恐", rarity:"N", type:"fang", atk:16, def:26, effect:"守備力+6",           basePrice:10, emblem:"pachy" },
+  { name:"ギガノト・キング",       code:"恐13", attr:"恐", rarity:"N", type:"fang", atk:30, def:12, effect:"攻撃力+9",           basePrice:13, emblem:"giga" },
+  { name:"アルゲンタ・ウィング",   code:"恐14", attr:"恐", rarity:"N", type:"fang", atk:14, def:22, effect:"攻撃力+5",           basePrice:8,  emblem:"argenta" },
+  { name:"イグアノ・ラッシュ",     code:"恐15", attr:"恐", rarity:"N", type:"fang", atk:15, def:24, effect:"守備力+5",           basePrice:9,  emblem:"iguan" },
+  { name:"ディメトロ・セイル",     code:"恐16", attr:"恐", rarity:"N", type:"fang", atk:17, def:21, effect:"攻撃力+5",           basePrice:10, emblem:"dimetro" },
+  { name:"アロサウルス・ハント",   code:"恐17", attr:"恐", rarity:"N", type:"fang", atk:25, def:15, effect:"攻撃力+7",           basePrice:11, emblem:"allo" },
+  { name:"ケラト・ホーン",         code:"恐18", attr:"恐", rarity:"N", type:"fang", atk:12, def:29, effect:"守備力+8",           basePrice:9,  emblem:"cerato" },
+  { name:"マジュンガ・ストライク", code:"恐19", attr:"恐", rarity:"N", type:"fang", atk:22, def:18, effect:"攻撃力+6",           basePrice:10, emblem:"majunga" },
+  { name:"オヴィラプトル・ダッシュ",code:"恐20",attr:"恐", rarity:"N", type:"fang", atk:14, def:20, effect:"守備力+5",           basePrice:8,  emblem:"ovi" },
+  { name:"プロトケラ・ランページ", code:"恐21", attr:"恐", rarity:"N", type:"fang", atk:18, def:26, effect:"守備力+6",           basePrice:10, emblem:"protocera" },
+  { name:"ガリミムス・スプリント", code:"恐22", attr:"恐", rarity:"N", type:"fang", atk:20, def:14, effect:"攻撃力+6",           basePrice:9,  emblem:"galli" },
+  { name:"テリジノ・サイズ",       code:"恐23", attr:"恐", rarity:"N", type:"fang", atk:16, def:24, effect:"攻撃力+5",           basePrice:10, emblem:"theri" },
+  { name:"サルタ・アーマー",       code:"恐24", attr:"恐", rarity:"N", type:"fang", atk:11, def:33, effect:"守備力+9",           basePrice:11, emblem:"sauropelta" },
+  { name:"ラプトル・シャドウ",     code:"恐25", attr:"恐", rarity:"N", type:"fang", atk:19, def:18, effect:"攻撃力+6",           basePrice:9,  emblem:"raptor_verde" },
+  { name:"ヴェロキ・ブレイズ",     code:"恐26", attr:"恐", rarity:"N", type:"fang", atk:23, def:15, effect:"攻撃力+7",           basePrice:11, emblem:"veloci_flame" },
+  { name:"ティラノ・ロア",         code:"恐27", attr:"恐", rarity:"N", type:"fang", atk:27, def:16, effect:"攻撃力+8",           basePrice:12, emblem:"trex" },
+  { name:"トリケラ・フォート",     code:"恐28", attr:"恐", rarity:"N", type:"fang", atk:12, def:31, effect:"守備力+9",           basePrice:10, emblem:"tricera" },
+  { name:"プテラ・ストーム",       code:"恐29", attr:"恐", rarity:"N", type:"fang", atk:17, def:19, effect:"攻撃力+5",           basePrice:9,  emblem:"ptera" },
+  { name:"ステゴ・テイル",         code:"恐30", attr:"恐", rarity:"N", type:"fang", atk:14, def:30, effect:"守備力+8",           basePrice:10, emblem:"stego" },
+
+  /* ===== 恐竜系レア（R）6体 ===== */
+  { name:"ギガノト・オーバーロード", code:"恐R1", attr:"恐", rarity:"R", type:"fang", atk:55, def:45, effect:"攻撃力+15", basePrice:60, emblem:"giga" },
+  { name:"スピノ・タイラント",       code:"恐R2", attr:"恐", rarity:"R", type:"fang", atk:45, def:60, effect:"守備力+15", basePrice:60, emblem:"spino" },
+  { name:"ティラノ・ジェノサイド",   code:"恐R3", attr:"恐", rarity:"R", type:"fang", atk:65, def:40, effect:"攻撃力+20", basePrice:70, emblem:"trex" },
+  { name:"アンキロ・フォートレス",   code:"恐R4", attr:"恐", rarity:"R", type:"fang", atk:40, def:70, effect:"守備力+20", basePrice:70, emblem:"ankylo" },
+  { name:"ブラキオ・コロッサス",     code:"恐R5", attr:"恐", rarity:"R", type:"fang", atk:50, def:55, effect:"守備力+15", basePrice:65, emblem:"brachio" },
+  { name:"アロサウルス・ハンター",   code:"恐R6", attr:"恐", rarity:"R", type:"fang", atk:58, def:52, effect:"攻撃力+18", basePrice:68, emblem:"allo" },
+
+  /* ===== 悪霊系（R）6体 ===== */
+  { name:"ファントム・リーパー",     code:"悪R1", attr:"悪", rarity:"R", type:"curse", atk:60, def:50, effect:"攻撃力+15", basePrice:66, emblem:"reaper" },
+  { name:"ヘル・ワイバーン",         code:"悪R2", attr:"悪", rarity:"R", type:"curse", atk:55, def:55, effect:"守備力+15", basePrice:64, emblem:"helwyvern" },
+  { name:"グール・マローダー",       code:"悪R3", attr:"悪", rarity:"R", type:"curse", atk:65, def:45, effect:"攻撃力+18", basePrice:70, emblem:"ghoul" },
+  { name:"バンシー・スクリーム",     code:"悪R4", attr:"悪", rarity:"R", type:"curse", atk:50, def:60, effect:"守備力+16", basePrice:68, emblem:"banshee" },
+  { name:"リッチ・ソーサラー",       code:"悪R5", attr:"悪", rarity:"R", type:"curse", atk:58, def:52, effect:"攻撃力+15", basePrice:72, emblem:"lich" },
+  { name:"ナイトメア・ホーン",       code:"悪R6", attr:"悪", rarity:"R", type:"curse", atk:62, def:48, effect:"攻撃力+16", basePrice:75, emblem:"nightmare" },
+
+  /* ===== 悪霊系SR 6体 ===== */
+  { name:"リッチ・オーバーロード",   code:"悪S1", attr:"悪", rarity:"SR", type:"curse", atk:100, def:95, effect:"守備力+30", basePrice:280, emblem:"lich" },
+  { name:"ドラゴン・ゾンビ",         code:"悪S2", attr:"悪", rarity:"SR", type:"curse", atk:115, def:85, effect:"攻撃力+40", basePrice:290, emblem:"helwyvern" },
+  { name:"デス・リーパー",           code:"悪S3", attr:"悪", rarity:"SR", type:"curse", atk:95,  def:110, effect:"守備力+40", basePrice:270, emblem:"reaper" },
+  { name:"アビス・バンシー",         code:"悪S4", attr:"悪", rarity:"SR", type:"curse", atk:120, def:80, effect:"攻撃力+45", basePrice:295, emblem:"banshee" },
+  { name:"シャドウ・ビースト",       code:"悪S5", attr:"悪", rarity:"SR", type:"curse", atk:90,  def:120, effect:"守備力+50", basePrice:285, emblem:"nightmare" },
+  { name:"グール・タイラント",       code:"悪S6", attr:"悪", rarity:"SR", type:"curse", atk:110, def:100, effect:"攻撃力+35", basePrice:300, emblem:"ghoul" },
+
+  /* ===== UR 2体（悪霊系）===== */
+  { name:"ダーク・ドラゴン・ロード", code:"悪U1", attr:"悪", rarity:"UR", type:"curse", atk:200, def:180, effect:"攻守を入れ替えて3倍", basePrice:1200, emblem:"darklord" },
+  { name:"リッチ・インペラトール",   code:"悪U2", attr:"悪", rarity:"UR", type:"curse", atk:180, def:200, effect:"相手の効果を全て無効", basePrice:1000, emblem:"lich" }
+];
+
+function rarityRank(r) { return { N:0, R:1, SR:2, UR:3 }[r]; }
+function typeLabel(t)  { return t === "curse" ? "【呪詛型】" : "【牙竜型】"; }
+function typeClass(t)  { return t === "curse" ? "curse" : "fang"; }
+function rarityClass(card) {
+  if (card.rarity === "UR") return "gold";
+  if (card.rarity === "SR") return "marble";
+  if (card.rarity === "R")  return "silver";
+  return card.attr === "悪" ? "spirit" : "beast";
 }
-resize();
-addEventListener('resize', resize);
 
-// ---------- 装甲（部位）の設定 ----------
-const part = {
-  x: W/2, y: H/2, r: Math.min(W,H)*0.28,
-  hp: 100, maxHp: 100,
-  broken: false, breakTime: 0,
-  shakeT: 0
-};
-function resetPart(){
-  part.x = W/2; part.y = H/2; part.r = Math.min(W,H)*0.28;
-  part.hp = part.maxHp = 100;
-  part.broken = false; part.breakTime = 0; part.shakeT = 0;
-  cracks = []; particles = []; hitstop = 0; popups = [];
-}
-let cracks = [];      // 蓄積するひび
-let particles = [];   // 破片・火花
-let popups = [];      // 「PART BROKEN」テキスト
-let hitstop = 0;      // ヒットストップ用カウンタ
-let flash = 0;        // 画面フラッシュ
-
-// ---------- クリック処理 ----------
-canvas.addEventListener('pointerdown', e => {
-  const mx = e.clientX, my = e.clientY;
-  const dx = mx - part.x, dy = my - part.y;
-  const dist = Math.hypot(dx, dy);
-
-  // 装甲の外をクリック → 空振り（小さな火花だけ）
-  if (part.broken || dist > part.r) {
-    for(let i=0;i<8;i++) spawnSpark(mx,my,'#7fd');
-    return;
-  }
-
-  // 命中！
-  const dmg = 22 + Math.random()*12;
-  part.hp -= dmg;
-  part.shakeT = 10;            // 部位シェイク
-  hitstop = 4;                 // ヒットストップ（数フレーム停止）
-  flash = 0.35;
-
-  // クリック地点にひびを追加
-  addCrack(mx, my);
-  // 火花・破片
-  for(let i=0;i<18;i++) spawnSpark(mx,my,'#ffd27f');
-
-  // 破壊判定
-  if(part.hp <= 0 && !part.broken){
-    part.broken = true;
-    part.breakTime = performance.now();
-    bigBreak();
-  }
+/* マーケット */
+const MARKET = {};
+CARD_MASTER.forEach(card => {
+  MARKET[card.name] = {
+    trend: Math.random() < 0.5 ? "up" : "down",
+    basePrice: card.basePrice,
+    maxPrice: card.basePrice * 2,
+    minPrice: 0,
+    currentPrice: card.basePrice
+  };
 });
 
-// ---------- ひび生成 ----------
-function addCrack(x, y){
-  // 中心から放射状にジグザグのひび
-  const branches = 4 + Math.floor(Math.random()*3);
-  for(let b=0;b<branches;b++){
-    const baseAng = Math.random()*Math.PI*2;
-    const segs = [];
-    let cx = x, cy = y, ang = baseAng, len = 12 + Math.random()*20;
-    for(let s=0;s<5;s++){
-      ang += (Math.random()-0.5)*1.2;
-      const nx = cx + Math.cos(ang)*len;
-      const ny = cy + Math.sin(ang)*len;
-      // 装甲の縁で止める
-      if(Math.hypot(nx-part.x, ny-part.y) > part.r) break;
-      segs.push([cx,cy,nx,ny]);
-      cx = nx; cy = ny;
-      len *= 0.85;
-    }
-    cracks.push({segs, life:1});
+/* =========================================================
+   エンブレム描画（モンハン風モンスターシルエット）
+========================================================= */
+function drawEmblem(canvas, emblem, rarity, attr) {
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // 背景（属性ごと）
+  const bg = ctx.createRadialGradient(W*0.3, H*0.2, W*0.1, W/2, H/2, W*0.8);
+  if (rarity === "UR") {
+    bg.addColorStop(0, "#2a1a05"); bg.addColorStop(1, "#050302");
+  } else if (rarity === "SR") {
+    bg.addColorStop(0, "#200a30"); bg.addColorStop(1, "#040208");
+  } else if (rarity === "R") {
+    bg.addColorStop(0, "#101828"); bg.addColorStop(1, "#04060c");
+  } else if (attr === "悪") {
+    bg.addColorStop(0, "#180828"); bg.addColorStop(1, "#030206");
+  } else {
+    bg.addColorStop(0, "#1c1005"); bg.addColorStop(1, "#050302");
   }
-  if(cracks.length > 60) cracks.splice(0, cracks.length-60);
-}
-
-// ---------- 破片パーティクル ----------
-function spawnSpark(x,y,color){
-  const a = Math.random()*Math.PI*2;
-  const sp = 2 + Math.random()*7;
-  particles.push({
-    x,y,
-    vx: Math.cos(a)*sp,
-    vy: Math.sin(a)*sp - 1,
-    life: 1,
-    decay: 0.02 + Math.random()*0.03,
-    size: 1 + Math.random()*3,
-    color
-  });
-}
-
-// ---------- 大破壊 ----------
-function bigBreak(){
-  hitstop = 12;
-  flash = 1.2;
-  part.shakeT = 30;
-  // 破片を大量放出
-  for(let i=0;i<120;i++){
-    const a = Math.random()*Math.PI*2;
-    const sp = 3 + Math.random()*12;
-    particles.push({
-      x: part.x + Math.cos(a)*part.r*Math.random(),
-      y: part.y + Math.sin(a)*part.r*Math.random(),
-      vx: Math.cos(a)*sp,
-      vy: Math.sin(a)*sp - 3,
-      life: 1,
-      decay: 0.012 + Math.random()*0.02,
-      size: 2 + Math.random()*5,
-      color: ['#ffce6b','#ff8a3d','#ffe9b0','#c94f2b'][Math.floor(Math.random()*4)],
-      gravity: 0.25
-    });
-  }
-  // ポップアップ
-  popups.push({
-    x: part.x, y: part.y - 40,
-    text: '部位破壊達成', sub: 'PART BROKEN',
-    life: 1, age: 0
-  });
-  // 3秒後にリセット
-  setTimeout(()=>{ if(part.broken) resetPart(); }, 3200);
-}
-
-// ---------- ループ ----------
-let last = performance.now();
-function loop(now){
-  requestAnimationFrame(loop);
-  let dt = Math.min(50, now - last)/16.67; // フレーム正規化
-  last = now;
-
-  // ヒットストップ中は時間を止める
-  if(hitstop > 0){
-    hitstop--;
-    render(0);
-    return;
-  }
-
-  update(dt);
-  render(dt);
-}
-
-function update(dt){
-  // 部位シェイク減衰
-  if(part.shakeT > 0) part.shakeT = Math.max(0, part.shakeT - dt);
-  flash = Math.max(0, flash - 0.04*dt);
-
-  // パーティクル
-  for(let i=particles.length-1;i>=0;i--){
-    const p = particles[i];
-    p.x += p.vx*dt; p.y += p.vy*dt;
-    p.vy += (p.gravity||0.18)*dt;
-    p.vx *= 0.99; p.vy *= 0.99;
-    p.life -= p.decay*dt;
-    if(p.life <= 0) particles.splice(i,1);
-  }
-  // ひびフェード
-  for(let i=cracks.length-1;i>=0;i--){
-    cracks[i].life -= 0.004*dt;
-    if(cracks[i].life <= 0) cracks.splice(i,1);
-  }
-  // ポップアップ
-  for(let i=popups.length-1;i>=0;i--){
-    const pu = popups[i];
-    pu.age += 0.016*dt;
-    pu.life = 1 - pu.age/2.2;
-    if(pu.life <= 0) popups.splice(i,1);
-  }
-}
-
-// ---------- 描画 ----------
-function render(dt){
-  // 背景（暗い洞窟風グラデ）
-  const bg = ctx.createRadialGradient(part.x, part.y, 50, W/2, H/2, Math.max(W,H));
-  bg.addColorStop(0, '#1a2430');
-  bg.addColorStop(1, '#05080c');
   ctx.fillStyle = bg;
-  ctx.fillRect(0,0,W,H);
+  ctx.fillRect(0, 0, W, H);
 
-  ctx.save();
-
-  // 部位シェイク
-  if(part.shakeT > 0){
-    const s = part.shakeT * 0.6;
-    ctx.translate((Math.random()-0.5)*s, (Math.random()-0.5)*s);
-  }
-
-  drawArmor();
-  drawCracks();
-  drawParticles();
-  drawPopups();
-
-  ctx.restore();
-
-  // フラッシュ
-  if(flash > 0){
-    ctx.fillStyle = `rgba(255,240,200,${flash*0.6})`;
-    ctx.fillRect(0,0,W,H);
-  }
-}
-
-function drawArmor(){
-  const {x,y,r,hp,maxHp,broken,breakTime} = part;
-
-  if(broken){
-    // 破壊後：崩れた輪郭
-    const t = (performance.now() - breakTime)/1000;
-    const alpha = Math.max(0, 1 - t/2.8);
-    if(alpha <= 0) return;
-    ctx.globalAlpha = alpha;
-    // 欠片の残骸
-    ctx.fillStyle = '#2a2018';
-    ctx.beginPath();
-    for(let i=0;i<24;i++){
-      const a = (i/24)*Math.PI*2;
-      const rr = r * (0.5 + Math.random()*0.5) * (1 - t*0.15);
-      const px = x + Math.cos(a)*rr;
-      const py = y + Math.sin(a)*rr;
-      if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
-    }
-    ctx.closePath();
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    return;
-  }
-
-  // 装甲本体（金属的なグラデ）
-  const g = ctx.createRadialGradient(x-r*0.3, y-r*0.3, r*0.1, x, y, r);
-  g.addColorStop(0, '#6b7a88');
-  g.addColorStop(0.5, '#3d4956');
-  g.addColorStop(1, '#1c232b');
-  ctx.fillStyle = g;
-  ctx.beginPath();
-  // ゴツゴツした多角形の装甲
-  const N = 18;
-  for(let i=0;i<N;i++){
-    const a = (i/N)*Math.PI*2 - Math.PI/2;
-    const jag = 0.88 + 0.12*Math.sin(i*7.3);
-    const px = x + Math.cos(a)*r*jag;
-    const py = y + Math.sin(a)*r*jag;
-    if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
-  }
-  ctx.closePath();
-  ctx.fill();
-
-  // 装甲の縁取り
-  ctx.strokeStyle = 'rgba(150,180,210,0.5)';
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  // 中央の核（目っぽい発光）
-  const coreG = ctx.createRadialGradient(x, y, 2, x, y, r*0.35);
-  coreG.addColorStop(0, `rgba(255,${100+hp*1.2},60,0.9)`);
-  coreG.addColorStop(1, 'rgba(255,80,30,0)');
-  ctx.fillStyle = coreG;
-  ctx.beginPath();
-  ctx.arc(x, y, r*0.35, 0, Math.PI*2);
-  ctx.fill();
-
-  // HPバー（円弧）
-  const hpRatio = hp/maxHp;
-  ctx.strokeStyle = 'rgba(0,0,0,0.6)';
-  ctx.lineWidth = 8;
-  ctx.beginPath();
-  ctx.arc(x, y, r+18, -Math.PI/2, Math.PI*1.5);
-  ctx.stroke();
-
-  ctx.strokeStyle = hpRatio > 0.5 ? '#5ad06a' : hpRatio > 0.25 ? '#ffcf3d' : '#ff4433';
-  ctx.lineWidth = 6;
-  ctx.beginPath();
-  ctx.arc(x, y, r+18, -Math.PI/2, -Math.PI/2 + Math.PI*2*hpRatio);
-  ctx.stroke();
-
-  // 発光
-  ctx.shadowBlur = 20;
-  ctx.shadowColor = 'rgba(120,180,255,0.6)';
-  ctx.strokeStyle = 'rgba(160,200,255,0.3)';
+  // スケールパターン（竜鱗）
+  ctx.strokeStyle = (attr === "悪")
+    ? "rgba(140,60,200,0.08)" : "rgba(232,165,58,0.07)";
   ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.arc(x, y, r+18, 0, Math.PI*2);
-  ctx.stroke();
-  ctx.shadowBlur = 0;
-}
-
-function drawCracks(){
-  for(const c of cracks){
-    ctx.strokeStyle = `rgba(20,10,5,${c.life})`;
-    ctx.lineWidth = 2.5;
-    ctx.shadowBlur = 8;
-    ctx.shadowColor = `rgba(255,180,80,${c.life*0.8})`;
-    for(const [x1,y1,x2,y2] of c.segs){
+  const sc = 22;
+  for (let y = -sc; y < H + sc; y += sc*0.75) {
+    for (let x = -sc; x < W + sc; x += sc) {
+      const ox = (Math.round(y/(sc*0.75)) % 2) * (sc/2);
       ctx.beginPath();
-      ctx.moveTo(x1,y1);
-      ctx.lineTo(x2,y2);
+      ctx.arc(x + ox, y, sc*0.45, 0.2, Math.PI - 0.2);
       ctx.stroke();
     }
   }
-  ctx.shadowBlur = 0;
-}
 
-function drawParticles(){
-  for(const p of particles){
-    ctx.globalAlpha = Math.max(0, p.life);
-    ctx.fillStyle = p.color;
-    ctx.shadowBlur = 10;
-    ctx.shadowColor = p.color;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, p.size*p.life, 0, Math.PI*2);
-    ctx.fill();
+  const cx = W/2, cy = H/2 - 4;
+  const s = W / 200;
+
+  // モンスターシルエット描画
+  ctx.save();
+  ctx.translate(cx, cy);
+
+  // 発光バッジ
+  const badgeR = 68 * s;
+  const badgeGrad = ctx.createRadialGradient(-12*s, -12*s, 4*s, 0, 0, badgeR);
+  if (rarity === "UR") {
+    badgeGrad.addColorStop(0, "#3a2408"); badgeGrad.addColorStop(1, "#0a0502");
+  } else if (rarity === "SR") {
+    badgeGrad.addColorStop(0, "#30105a"); badgeGrad.addColorStop(1, "#06020c");
+  } else if (rarity === "R") {
+    badgeGrad.addColorStop(0, "#14203a"); badgeGrad.addColorStop(1, "#040608");
+  } else if (attr === "悪") {
+    badgeGrad.addColorStop(0, "#220a3a"); badgeGrad.addColorStop(1, "#040208");
+  } else {
+    badgeGrad.addColorStop(0, "#2a1808"); badgeGrad.addColorStop(1, "#0a0503");
   }
-  ctx.globalAlpha = 1;
-  ctx.shadowBlur = 0;
+  ctx.fillStyle = badgeGrad;
+  ctx.beginPath(); ctx.arc(0, 0, badgeR, 0, Math.PI*2); ctx.fill();
+
+  // リング
+  ctx.lineWidth = 2*s;
+  if (rarity === "UR") ctx.strokeStyle = "rgba(232,165,58,0.95)";
+  else if (rarity === "SR") ctx.strokeStyle = "rgba(180,90,240,0.8)";
+  else if (rarity === "R") ctx.strokeStyle = "rgba(180,200,230,0.7)";
+  else if (attr === "悪") ctx.strokeStyle = "rgba(140,60,200,0.6)";
+  else ctx.strokeStyle = "rgba(200,140,60,0.6)";
+  ctx.beginPath(); ctx.arc(0, 0, badgeR, 0, Math.PI*2); ctx.stroke();
+
+  ctx.strokeStyle = "rgba(255,255,255,0.15)"; ctx.lineWidth = 1*s;
+  ctx.beginPath(); ctx.arc(0, 0, badgeR - 6*s, 0, Math.PI*2); ctx.stroke();
+
+  // モンスターシルエット
+  ctx.save();
+  ctx.beginPath(); ctx.arc(0, 0, badgeR - 8*s, 0, Math.PI*2); ctx.clip();
+  drawMonsterMotif(ctx, emblem, s, rarity, attr);
+  ctx.restore();
+  ctx.restore();
+
+  // 外枠
+  if (rarity === "UR") { ctx.strokeStyle = "rgba(232,165,58,0.9)"; ctx.lineWidth = 3; ctx.strokeRect(2,2,W-4,H-4); }
+  else if (rarity === "SR") { ctx.strokeStyle = "rgba(180,90,240,0.7)"; ctx.lineWidth = 2; ctx.strokeRect(2,2,W-4,H-4); }
+  else if (rarity === "R") { ctx.strokeStyle = "rgba(180,200,230,0.5)"; ctx.lineWidth = 1; ctx.strokeRect(2,2,W-4,H-4); }
+  else if (attr === "悪") { ctx.strokeStyle = "rgba(140,60,200,0.4)"; ctx.lineWidth = 1; ctx.strokeRect(2,2,W-4,H-4); }
+  else { ctx.strokeStyle = "rgba(200,140,60,0.35)"; ctx.lineWidth = 1; ctx.strokeRect(2,2,W-4,H-4); }
 }
 
-function drawPopups(){
-  for(const pu of popups){
-    const t = pu.age;
-    const scale = Math.min(1, t*4);            // ポンと出る
-    const alpha = Math.min(1, pu.life*2);
-    ctx.save();
-    ctx.translate(pu.x, pu.y - t*30);
-    ctx.scale(scale, scale);
-    ctx.globalAlpha = alpha;
-    ctx.textAlign = 'center';
+function drawLabel(ctx, text, s, color) {
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.font = `700 ${13*s}px 'Cinzel', 'Shippori Mincho', sans-serif`;
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.shadowBlur = 6*s; ctx.shadowColor = color;
+  ctx.fillText(text, 0, 46*s);
+  ctx.restore();
+}
 
-    // サブ（英語）
-    ctx.font = 'bold 18px "Segoe UI",sans-serif';
-    ctx.fillStyle = '#ffcf3d';
-    ctx.shadowBlur = 20;
-    ctx.shadowColor = '#ff8a00';
-    ctx.fillText(pu.sub, 0, -30);
+/* =========================================================
+   モンスターシルエット描画（モンハン風）
+========================================================= */
+function drawMonsterMotif(ctx, emblem, s, rarity, attr) {
+  const reset = () => { ctx.shadowBlur = 0; };
+  const glow = (c, b) => { ctx.shadowColor = c; ctx.shadowBlur = (b||8)*s; };
+  const beastCol = rarity==="UR" ? "#ffcf5a" : rarity==="SR" ? "#c890ff" : rarity==="R" ? "#a8c0e0" : "#e8a040";
+  const spiritCol = rarity==="UR" ? "#ffcf5a" : rarity==="SR" ? "#c890ff" : rarity==="R" ? "#a890e0" : "#a060e0";
 
-    // メイン（日本語）
-    ctx.font = 'bold 48px "Yu Gothic","Hiragino Sans",sans-serif';
-    ctx.fillStyle = '#fff';
-    ctx.shadowBlur = 30;
-    ctx.shadowColor = '#ff8a00';
-    ctx.fillText(pu.text, 0, 20);
+  switch (emblem) {
+    /* ===== 恐竜系 ===== */
+    case "trex": {
+      // T-レックスの頭部シルエット
+      ctx.fillStyle = beastCol; glow(beastCol);
+      ctx.beginPath();
+      ctx.moveTo(-30*s,-8*s);
+      ctx.quadraticCurveTo(-30*s,-28*s, 0,-28*s);
+      ctx.quadraticCurveTo(28*s,-28*s, 32*s,-4*s);
+      ctx.lineTo(22*s, 6*s);
+      ctx.lineTo(10*s, 8*s);
+      ctx.lineTo(6*s, 18*s);
+      ctx.lineTo(-2*s, 18*s);
+      ctx.lineTo(-6*s, 6*s);
+      ctx.lineTo(-22*s, 8*s);
+      ctx.closePath(); ctx.fill();
+      reset();
+      // 目
+      ctx.fillStyle = "#ffcc00"; glow("#ffcc00", 10);
+      ctx.beginPath(); ctx.arc(10*s, -12*s, 3.5*s, 0, Math.PI*2); ctx.fill();
+      reset();
+      // 歯
+      ctx.fillStyle = "#1a0a02";
+      for (let i=0;i<5;i++){
+        ctx.beginPath();
+        ctx.moveTo(6*s + i*5*s, 8*s);
+        ctx.lineTo(8*s + i*5*s, 14*s);
+        ctx.lineTo(10*s + i*5*s, 8*s);
+        ctx.closePath(); ctx.fill();
+      }
+      drawLabel(ctx, "T-REX", s, beastCol);
+      break;
+    }
+    case "tricera": {
+      ctx.fillStyle = beastCol; glow(beastCol);
+      ctx.beginPath();
+      ctx.moveTo(-28*s, 6*s);
+      ctx.quadraticCurveTo(-28*s, -18*s, 0, -20*s);
+      ctx.quadraticCurveTo(26*s, -20*s, 28*s, 0);
+      ctx.lineTo(18*s, 10*s);
+      ctx.lineTo(-18*s, 10*s);
+      ctx.closePath(); ctx.fill();
+      // フリル
+      ctx.beginPath();
+      ctx.moveTo(-18*s,-16*s); ctx.lineTo(-32*s,-28*s);
+      ctx.lineTo(-22*s,-14*s); ctx.lineTo(-32*s,-8*s);
+      ctx.lineTo(-20*s,-4*s);
+      ctx.closePath(); ctx.fill();
+      reset();
+      // 角
+      ctx.strokeStyle = "#ffe0a0"; ctx.lineWidth = 3*s; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(18*s,-6*s); ctx.lineTo(34*s,-16*s); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(20*s,-2*s); ctx.lineTo(36*s,-4*s); ctx.stroke();
+      reset();
+      // 目
+      ctx.fillStyle = "#ffcc00"; glow("#ffcc00", 10);
+      ctx.beginPath(); ctx.arc(10*s,-8*s,3*s,0,Math.PI*2); ctx.fill();
+      reset();
+      drawLabel(ctx, "TRICERA", s, beastCol);
+      break;
+    }
+    case "raptor_verde": {
+      // ラプトル頭部
+      ctx.fillStyle = beastCol; glow(beastCol);
+      ctx.beginPath();
+      ctx.moveTo(-24*s,-4*s);
+      ctx.quadraticCurveTo(-24*s,-18*s, 0,-18*s);
+      ctx.lineTo(28*s,-8*s);
+      ctx.lineTo(20*s, 2*s);
+      ctx.lineTo(4*s, 4*s);
+      ctx.lineTo(0*s, 14*s);
+      ctx.lineTo(-8*s, 6*s);
+      ctx.lineTo(-22*s, 8*s);
+      ctx.closePath(); ctx.fill();
+      reset();
+      ctx.fillStyle = "#ffcc00"; glow("#ffcc00", 8);
+      ctx.beginPath(); ctx.arc(8*s,-8*s,2.8*s,0,Math.PI*2); ctx.fill();
+      reset();
+      // 爪
+      ctx.strokeStyle = "#ffe0a0"; ctx.lineWidth = 2*s;
+      ctx.beginPath(); ctx.moveTo(28*s,-8*s); ctx.lineTo(36*s,-12*s); ctx.stroke();
+      drawLabel(ctx, "RAPTOR", s, beastCol);
+      break;
+    }
+    case "veloci_flame": {
+      // 走るヴェロキ（横シルエット）
+      ctx.fillStyle = beastCol; glow(beastCol);
+      // 頭
+      ctx.beginPath();
+      ctx.moveTo(-16*s,-18*s);
+      ctx.lineTo(4*s,-14*s);
+      ctx.lineTo(8*s,-8*s);
+      ctx.lineTo(-2*s,-6*s);
+      ctx.lineTo(-8*s,0*s);
+      ctx.lineTo(-20*s,-4*s);
+      ctx.closePath(); ctx.fill();
+      // 胴
+      ctx.beginPath();
+      ctx.ellipse(-4*s, 4*s, 18*s, 8*s, -0.3, 0, Math.PI*2); ctx.fill();
+      // 脚
+      ctx.beginPath();
+      ctx.moveTo(-10*s, 8*s); ctx.lineTo(-16*s, 22*s); ctx.lineTo(-10*s, 22*s); ctx.lineTo(-6*s, 10*s); ctx.closePath(); ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(6*s, 8*s); ctx.lineTo(10*s, 22*s); ctx.lineTo(16*s, 22*s); ctx.lineTo(10*s, 8*s); ctx.closePath(); ctx.fill();
+      // 尾
+      ctx.beginPath();
+      ctx.moveTo(-20*s, 2*s); ctx.quadraticCurveTo(-36*s, 0, -40*s,-12*s); ctx.lineTo(-34*s,-10*s); ctx.quadraticCurveTo(-30*s, 2, -20*s, 8*s); ctx.closePath(); ctx.fill();
+      reset();
+      // 炎エフェクト
+      ctx.fillStyle = "#ff6a20"; glow("#ff6a20", 12);
+      ctx.beginPath(); ctx.arc(-30*s,-18*s,3*s,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(-38*s,-14*s,2*s,0,Math.PI*2); ctx.fill();
+      reset();
+      drawLabel(ctx, "VELOCIRA", s, beastCol);
+      break;
+    }
+    case "ptera": {
+      // 翼竜シルエット
+      ctx.fillStyle = beastCol; glow(beastCol);
+      // 体
+      ctx.beginPath();
+      ctx.ellipse(0, 4*s, 10*s, 16*s, 0, 0, Math.PI*2); ctx.fill();
+      // 翼
+      ctx.beginPath();
+      ctx.moveTo(0,-6*s); ctx.quadraticCurveTo(-30*s,-24*s,-42*s,-8*s);
+      ctx.quadraticCurveTo(-24*s,-10*s,-6*s,4*s); ctx.closePath(); ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(0,-6*s); ctx.quadraticCurveTo(30*s,-24*s,42*s,-8*s);
+      ctx.quadraticCurveTo(24*s,-10*s,6*s,4*s); ctx.closePath(); ctx.fill();
+      // 頭部とくちばし
+      ctx.beginPath();
+      ctx.moveTo(-6*s,-14*s); ctx.lineTo(0,-24*s); ctx.lineTo(6*s,-14*s);
+      ctx.lineTo(4*s,-6*s); ctx.lineTo(-4*s,-6*s); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(0,-24*s); ctx.lineTo(18*s,-28*s); ctx.lineTo(4*s,-22*s); ctx.closePath(); ctx.fill();
+      reset();
+      drawLabel(ctx, "PTERA", s, beastCol);
+      break;
+    }
+    case "stego": {
+      ctx.fillStyle = beastCol; glow(beastCol);
+      // 胴体
+      ctx.beginPath();
+      ctx.ellipse(0, 6*s, 26*s, 12*s, 0, 0, Math.PI*2); ctx.fill();
+      // 首と頭
+      ctx.beginPath();
+      ctx.moveTo(-24*s, 2*s); ctx.quadraticCurveTo(-32*s,-10*s,-26*s,-18*s);
+      ctx.lineTo(-18*s,-18*s); ctx.quadraticCurveTo(-20*s,-8*s,-16*s, 0*s); ctx.closePath(); ctx.fill();
+      // 尾
+      ctx.beginPath();
+      ctx.moveTo(22*s, 4*s); ctx.lineTo(42*s, -6*s); ctx.lineTo(40*s, 0); ctx.lineTo(24*s, 10*s); ctx.closePath(); ctx.fill();
+      // 背板
+      for (let i=-2;i<=2;i++){
+        ctx.beginPath();
+        ctx.moveTo(i*10*s, -4*s); ctx.lineTo(i*10*s - 4*s, -20*s); ctx.lineTo(i*10*s + 4*s, -20*s);
+        ctx.closePath(); ctx.fill();
+      }
+      reset();
+      drawLabel(ctx, "STEGO", s, beastCol);
+      break;
+    }
+    case "ankylo": {
+      ctx.fillStyle = beastCol; glow(beastCol);
+      ctx.beginPath();
+      ctx.ellipse(0, 6*s, 26*s, 14*s, 0, 0, Math.PI*2); ctx.fill();
+      // 甲羅のトゲ
+      for (let i=-2;i<=2;i++){
+        ctx.beginPath();
+        ctx.arc(i*9*s, -8*s, 4*s, 0, Math.PI*2); ctx.fill();
+      }
+      // 頭
+      ctx.beginPath(); ctx.ellipse(-24*s, 8*s, 8*s, 8*s, 0, 0, Math.PI*2); ctx.fill();
+      // 尾のハンマー
+      ctx.fillRect(20*s, 4*s, 16*s, 4*s);
+      ctx.beginPath(); ctx.arc(40*s, 6*s, 8*s, 0, Math.PI*2); ctx.fill();
+      reset();
+      drawLabel(ctx, "ANKYLO", s, beastCol);
+      break;
+    }
+    case "brachio": {
+      ctx.fillStyle = beastCol; glow(beastCol);
+      // 胴
+      ctx.beginPath(); ctx.ellipse(0, 12*s, 22*s, 12*s, 0, 0, Math.PI*2); ctx.fill();
+      // 首
+      ctx.beginPath();
+      ctx.moveTo(-16*s, 6*s); ctx.quadraticCurveTo(-28*s,-20*s,-20*s,-30*s);
+      ctx.lineTo(-14*s,-28*s); ctx.quadraticCurveTo(-18*s,-14*s,-8*s, 6*s); ctx.closePath(); ctx.fill();
+      // 頭
+      ctx.beginPath(); ctx.ellipse(-20*s,-30*s, 6*s, 4*s, 0, 0, Math.PI*2); ctx.fill();
+      // 脚
+      ctx.fillRect(-14*s, 20*s, 6*s, 16*s);
+      ctx.fillRect(4*s, 20*s, 6*s, 16*s);
+      reset();
+      drawLabel(ctx, "BRACHIO", s, beastCol);
+      break;
+    }
+    case "spino": {
+      ctx.fillStyle = beastCol; glow(beastCol);
+      // 頭部
+      ctx.beginPath();
+      ctx.moveTo(-24*s,-6*s); ctx.quadraticCurveTo(-24*s,-22*s, -2*s,-22*s);
+      ctx.lineTo(24*s,-12*s); ctx.lineTo(20*s,-2*s);
+      ctx.lineTo(0, 0); ctx.lineTo(-4*s, 8*s); ctx.lineTo(-14*s, 4*s);
+      ctx.lineTo(-22*s, 6*s); ctx.closePath(); ctx.fill();
+      // 帆
+      ctx.beginPath();
+      ctx.moveTo(-20*s, 6*s);
+      ctx.quadraticCurveTo(-4*s,-4*s, 22*s, 4*s);
+      for (let i=0;i<5;i++){
+        ctx.lineTo(22*s - i*8*s, -20*s + i*2*s);
+        ctx.lineTo(18*s - i*8*s, 4*s);
+      }
+      ctx.closePath(); ctx.fill();
+      reset();
+      // 目
+      ctx.fillStyle = "#ffcc00"; glow("#ffcc00", 10);
+      ctx.beginPath(); ctx.arc(8*s,-12*s,3*s,0,Math.PI*2); ctx.fill();
+      reset();
+      drawLabel(ctx, "SPINO", s, beastCol);
+      break;
+    }
+    case "dilo": {
+      ctx.fillStyle = beastCol; glow(beastCol);
+      ctx.beginPath();
+      ctx.moveTo(-22*s,-2*s); ctx.quadraticCurveTo(-22*s,-16*s, 0,-16*s);
+      ctx.lineTo(24*s,-8*s); ctx.lineTo(18*s, 2*s);
+      ctx.lineTo(4*s, 4*s); ctx.lineTo(0, 14*s); ctx.lineTo(-8*s, 6*s);
+      ctx.lineTo(-20*s, 8*s); ctx.closePath(); ctx.fill();
+      // 2つの頭頂クレスト
+      ctx.beginPath();
+      ctx.moveTo(-6*s,-16*s); ctx.lineTo(-14*s,-28*s); ctx.lineTo(0,-18*s); ctx.closePath(); ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(4*s,-16*s); ctx.lineTo(-2*s,-30*s); ctx.lineTo(10*s,-16*s); ctx.closePath(); ctx.fill();
+      reset();
+      drawLabel(ctx, "DILO", s, beastCol);
+      break;
+    }
+    case "carno": {
+      ctx.fillStyle = beastCol; glow(beastCol);
+      ctx.beginPath();
+      ctx.moveTo(-24*s,-2*s); ctx.quadraticCurveTo(-24*s,-18*s, 2*s,-18*s);
+      ctx.lineTo(30*s,-4*s); ctx.lineTo(22*s, 4*s);
+      ctx.lineTo(4*s, 6*s); ctx.lineTo(0, 16*s); ctx.lineTo(-8*s, 8*s);
+      ctx.lineTo(-20*s, 8*s); ctx.closePath(); ctx.fill();
+      // 角
+      ctx.beginPath();
+      ctx.moveTo(-4*s,-18*s); ctx.lineTo(-10*s,-30*s); ctx.lineTo(2*s,-18*s); ctx.closePath(); ctx.fill();
+      reset();
+      drawLabel(ctx, "CARNO", s, beastCol);
+      break;
+    }
+    case "pachy": {
+      ctx.fillStyle = beastCol; glow(beastCol);
+      ctx.beginPath();
+      ctx.moveTo(-22*s, 0); ctx.quadraticCurveTo(-22*s,-16*s, 2*s,-18*s);
+      ctx.lineTo(26*s,-4*s); ctx.lineTo(20*s, 4*s);
+      ctx.lineTo(2*s, 6*s); ctx.lineTo(-4*s, 14*s); ctx.lineTo(-12*s, 6*s);
+      ctx.lineTo(-22*s, 8*s); ctx.closePath(); ctx.fill();
+      // 頭頂ドーム
+      ctx.beginPath();
+      ctx.arc(-6*s, -18*s, 8*s, Math.PI, 0); ctx.fill();
+      reset();
+      drawLabel(ctx, "PACHY", s, beastCol);
+      break;
+    }
+    case "giga": {
+      ctx.fillStyle = beastCol; glow(beastCol);
+      ctx.beginPath();
+      ctx.moveTo(-30*s,-4*s); ctx.quadraticCurveTo(-30*s,-24*s, 4*s,-24*s);
+      ctx.lineTo(34*s,-6*s); ctx.lineTo(26*s, 4*s);
+      ctx.lineTo(6*s, 6*s); ctx.lineTo(0, 18*s); ctx.lineTo(-10*s, 8*s);
+      ctx.lineTo(-26*s, 10*s); ctx.closePath(); ctx.fill();
+      // 歯
+      ctx.fillStyle = "#1a0a02";
+      for (let i=0;i<6;i++){
+        ctx.beginPath();
+        ctx.moveTo(4*s + i*4*s, 6*s); ctx.lineTo(6*s + i*4*s, 12*s); ctx.lineTo(8*s + i*4*s, 6*s);
+        ctx.closePath(); ctx.fill();
+      }
+      reset();
+      ctx.fillStyle = "#ffcc00"; glow("#ffcc00", 12);
+      ctx.beginPath(); ctx.arc(12*s,-12*s,4*s,0,Math.PI*2); ctx.fill();
+      reset();
+      drawLabel(ctx, "GIGANO", s, beastCol);
+      break;
+    }
+    case "argenta": {
+      ctx.fillStyle = beastCol; glow(beastCol);
+      ctx.beginPath(); ctx.ellipse(0, 4*s, 8*s, 18*s, 0, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(0,-8*s); ctx.quadraticCurveTo(-40*s,-30*s,-52*s,-10*s);
+      ctx.quadraticCurveTo(-30*s,-12*s,-4*s, 6*s); ctx.closePath(); ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(0,-8*s); ctx.quadraticCurveTo(40*s,-30*s,52*s,-10*s);
+      ctx.quadraticCurveTo(30*s,-12*s,4*s, 6*s); ctx.closePath(); ctx.fill();
+      reset();
+      drawLabel(ctx, "ARGENTA", s, beastCol);
+      break;
+    }
+    case "iguan": {
+      ctx.fillStyle = beastCol; glow(beastCol);
+      ctx.beginPath(); ctx.ellipse(0, 6*s, 20*s, 10*s, 0, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(-18*s, 2*s); ctx.quadraticCurveTo(-26*s,-12*s,-22*s,-20*s);
+      ctx.lineTo(-14*s,-18*s); ctx.quadraticCurveTo(-16*s,-8*s,-10*s, 2*s); ctx.closePath(); ctx.fill();
+      // 背のトゲ
+      for (let i=-1;i<=1;i++){
+        ctx.beginPath();
+        ctx.moveTo(i*8*s, -2*s); ctx.lineTo(i*8*s - 2*s, -12*s); ctx.lineTo(i*8*s + 2*s, -12*s);
+        ctx.closePath(); ctx.fill();
+      }
+      // 親指スパイク
+      ctx.fillRect(-12*s, 4*s, 2*s, 8*s);
+      reset();
+      drawLabel(ctx, "IGUANO", s, beastCol);
+      break;
+    }
+    case "dimetro": {
+      ctx.fillStyle = beastCol; glow(beastCol);
+      ctx.beginPath(); ctx.ellipse(0, 8*s, 20*s, 10*s, 0, 0, Math.PI*2); ctx.fill();
+      // 帆
+      ctx.beginPath();
+      ctx.moveTo(-16*s, 2*s);
+      ctx.quadraticCurveTo(0,-32*s, 16*s, 2*s);
+      ctx.lineTo(0,-2*s); ctx.closePath(); ctx.fill();
+      // 頭
+      ctx.beginPath();
+      ctx.moveTo(-20*s, 4*s); ctx.lineTo(-30*s, 2*s); ctx.lineTo(-26*s, 12*s); ctx.lineTo(-16*s, 12*s); ctx.closePath(); ctx.fill();
+      reset();
+      drawLabel(ctx, "DIMETRO", s, beastCol);
+      break;
+    }
+    case "allo": {
+      ctx.fillStyle = beastCol; glow(beastCol);
+      ctx.beginPath();
+      ctx.moveTo(-24*s,-2*s); ctx.quadraticCurveTo(-24*s,-18*s, 2*s,-18*s);
+      ctx.lineTo(28*s,-6*s); ctx.lineTo(22*s, 4*s);
+      ctx.lineTo(4*s, 6*s); ctx.lineTo(0, 16*s); ctx.lineTo(-8*s, 8*s);
+      ctx.lineTo(-20*s, 8*s); ctx.closePath(); ctx.fill();
+      // 3本の爪
+      ctx.strokeStyle = "#ffe0a0"; ctx.lineWidth = 2*s;
+      for (let i=0;i<3;i++){
+        ctx.beginPath(); ctx.moveTo(28*s,-6*s); ctx.lineTo(34*s + i*2*s, -10*s + i*4*s); ctx.stroke();
+      }
+      reset();
+      drawLabel(ctx, "ALLO", s, beastCol);
+      break;
+    }
+    case "cerato": {
+      ctx.fillStyle = beastCol; glow(beastCol);
+      ctx.beginPath();
+      ctx.moveTo(-22*s, 2*s); ctx.quadraticCurveTo(-22*s,-12*s, 0,-14*s);
+      ctx.lineTo(24*s,-4*s); ctx.lineTo(18*s, 4*s);
+      ctx.lineTo(2*s, 6*s); ctx.lineTo(-4*s, 14*s); ctx.lineTo(-12*s, 6*s);
+      ctx.lineTo(-22*s, 8*s); ctx.closePath(); ctx.fill();
+      // 鼻角
+      ctx.beginPath();
+      ctx.moveTo(20*s,-4*s); ctx.lineTo(28*s,-14*s); ctx.lineTo(20*s, 0); ctx.closePath(); ctx.fill();
+      reset();
+      drawLabel(ctx, "CERATO", s, beastCol);
+      break;
+    }
+    case "majunga": {
+      ctx.fillStyle = beastCol; glow(beastCol);
+      ctx.beginPath();
+      ctx.moveTo(-22*s, 0); ctx.quadraticCurveTo(-22*s,-16*s, 0,-16*s);
+      ctx.lineTo(24*s,-6*s); ctx.lineTo(18*s, 2*s);
+      ctx.lineTo(4*s, 4*s); ctx.lineTo(0, 12*s); ctx.lineTo(-8*s, 4*s);
+      ctx.lineTo(-20*s, 6*s); ctx.closePath(); ctx.fill();
+      reset();
+      drawLabel(ctx, "MAJUNGA", s, beastCol);
+      break;
+    }
+    case "ovi": {
+      ctx.fillStyle = beastCol; glow(beastCol);
+      ctx.beginPath(); ctx.ellipse(0, 4*s, 20*s, 8*s, -0.2, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(-14*s,-2*s); ctx.lineTo(-26*s,-10*s); ctx.lineTo(-16*s, -14*s);
+      ctx.lineTo(-10*s,-6*s); ctx.closePath(); ctx.fill();
+      // 走る脚
+      ctx.fillRect(-12*s, 10*s, 3*s, 12*s);
+      ctx.fillRect(2*s, 10*s, 3*s, 12*s);
+      ctx.fillRect(10*s, 8*s, 3*s, 12*s);
+      reset();
+      drawLabel(ctx, "OVI", s, beastCol);
+      break;
+    }
+    case "protocera": {
+      ctx.fillStyle = beastCol; glow(beastCol);
+      ctx.beginPath();
+      ctx.moveTo(-22*s, 4*s); ctx.quadraticCurveTo(-22*s,-12*s, 0,-14*s);
+      ctx.lineTo(24*s,-4*s); ctx.lineTo(18*s, 4*s); ctx.lineTo(-18*s, 10*s); ctx.closePath(); ctx.fill();
+      // フリル
+      ctx.beginPath(); ctx.arc(-8*s,-12*s, 12*s, Math.PI, 0); ctx.fill();
+      reset();
+      drawLabel(ctx, "PROTOCERA", s, beastCol);
+      break;
+    }
+    case "galli": {
+      ctx.fillStyle = beastCol; glow(beastCol);
+      // ランニング
+      ctx.beginPath(); ctx.ellipse(0, 4*s, 18*s, 7*s, -0.1, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(-12*s,-2*s); ctx.lineTo(-22*s,-14*s); ctx.lineTo(-12*s,-10*s);
+      ctx.lineTo(-6*s,-4*s); ctx.closePath(); ctx.fill();
+      // 長い脚
+      ctx.fillRect(-10*s, 10*s, 3*s, 16*s);
+      ctx.fillRect(2*s, 10*s, 3*s, 16*s);
+      reset();
+      drawLabel(ctx, "GALLI", s, beastCol);
+      break;
+    }
+    case "theri": {
+      ctx.fillStyle = beastCol; glow(beastCol);
+      ctx.beginPath();
+      ctx.moveTo(-20*s, 2*s); ctx.quadraticCurveTo(-20*s,-14*s, 4*s,-14*s);
+      ctx.lineTo(20*s,-2*s); ctx.lineTo(14*s, 4*s); ctx.lineTo(-4*s, 4*s);
+      ctx.lineTo(-20*s, 8*s); ctx.closePath(); ctx.fill();
+      // 大鎌爪
+      ctx.strokeStyle = "#ffe0a0"; ctx.lineWidth = 3*s; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(-12*s, 0); ctx.quadraticCurveTo(-28*s,-4*s, -32*s, 8*s); ctx.stroke();
+      reset();
+      drawLabel(ctx, "THERI", s, beastCol);
+      break;
+    }
+    case "sauropelta": {
+      ctx.fillStyle = beastCol; glow(beastCol);
+      ctx.beginPath(); ctx.ellipse(0, 6*s, 24*s, 12*s, 0, 0, Math.PI*2); ctx.fill();
+      // 装甲プレート
+      for (let i=-2;i<=2;i++){
+        ctx.beginPath(); ctx.arc(i*8*s, -2*s, 4*s, 0, Math.PI*2); ctx.fill();
+      }
+      // 肩のスパイク
+      ctx.strokeStyle = "#ffe0a0"; ctx.lineWidth = 2.5*s;
+      ctx.beginPath(); ctx.moveTo(-18*s, 4*s); ctx.lineTo(-28*s,-8*s); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-18*s, 8*s); ctx.lineTo(-30*s, 2*s); ctx.stroke();
+      reset();
+      drawLabel(ctx, "SAUROPELTA", s, beastCol);
+      break;
+    }
 
-    ctx.restore();
+    /* ===== 悪霊系 ===== */
+    case "reaper": {
+      // 死神のシルエット
+      ctx.fillStyle = spiritCol; glow(spiritCol);
+      // フード
+      ctx.beginPath();
+      ctx.moveTo(-20*s,-20*s); ctx.quadraticCurveTo(0,-32*s, 20*s,-20*s);
+      ctx.quadraticCurveTo(24*s, 0, 20*s, 12*s);
+      ctx.lineTo(-20*s, 12*s); ctx.quadraticCurveTo(-24*s, 0, -20*s,-20*s);
+      ctx.closePath(); ctx.fill();
+      // 目
+      ctx.fillStyle = "#ff3030"; glow("#ff3030", 14);
+      ctx.beginPath(); ctx.arc(-8*s,-6*s, 3*s, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(8*s,-6*s, 3*s, 0, Math.PI*2); ctx.fill();
+      reset();
+      // 鎌
+      ctx.strokeStyle = "#d0c0e0"; ctx.lineWidth = 3*s; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(20*s, 22*s); ctx.lineTo(28*s,-24*s); ctx.stroke();
+      ctx.beginPath(); ctx.arc(28*s,-24*s, 12*s, Math.PI*0.6, Math.PI*1.7); ctx.stroke();
+      reset();
+      drawLabel(ctx, "REAPER", s, spiritCol);
+      break;
+    }
+    case "helwyvern": {
+      // ヘルワイバーン（翼悪竜）
+      ctx.fillStyle = spiritCol; glow(spiritCol);
+      // 体
+      ctx.beginPath(); ctx.ellipse(0, 4*s, 10*s, 18*s, 0, 0, Math.PI*2); ctx.fill();
+      // 翼
+      ctx.beginPath();
+      ctx.moveTo(0,-8*s); ctx.quadraticCurveTo(-36*s,-30*s,-46*s,-6*s);
+      ctx.lineTo(-30*s,-4*s); ctx.lineTo(-30*s,-14*s);
+      ctx.lineTo(-18*s, 4*s); ctx.lineTo(-6*s, 4*s); ctx.closePath(); ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(0,-8*s); ctx.quadraticCurveTo(36*s,-30*s,46*s,-6*s);
+      ctx.lineTo(30*s,-4*s); ctx.lineTo(30*s,-14*s);
+      ctx.lineTo(18*s, 4*s); ctx.lineTo(6*s, 4*s); ctx.closePath(); ctx.fill();
+      // 頭
+      ctx.beginPath();
+      ctx.moveTo(-6*s,-14*s); ctx.lineTo(0,-26*s); ctx.lineTo(8*s,-14*s);
+      ctx.lineTo(4*s,-8*s); ctx.lineTo(-4*s,-8*s); ctx.closePath(); ctx.fill();
+      reset();
+      // 目
+      ctx.fillStyle = "#ff3030"; glow("#ff3030", 12);
+      ctx.beginPath(); ctx.arc(0,-16*s, 2.5*s, 0, Math.PI*2); ctx.fill();
+      reset();
+      drawLabel(ctx, "HEL WYVERN", s, spiritCol);
+      break;
+    }
+    case "ghoul": {
+      ctx.fillStyle = spiritCol; glow(spiritCol);
+      // 頭部（グール）
+      ctx.beginPath(); ctx.arc(0,-4*s, 18*s, 0, Math.PI*2); ctx.fill();
+      // 牙
+      ctx.fillStyle = "#d0c0e0";
+      for (let i=-2;i<=2;i++){
+        ctx.beginPath();
+        ctx.moveTo(i*5*s, 8*s); ctx.lineTo(i*5*s + 2*s, 16*s); ctx.lineTo(i*5*s + 4*s, 8*s);
+        ctx.closePath(); ctx.fill();
+      }
+      // 目
+      ctx.fillStyle = "#ff3030"; glow("#ff3030", 12);
+      ctx.beginPath(); ctx.arc(-6*s,-6*s, 3*s, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(6*s,-6*s, 3*s, 0, Math.PI*2); ctx.fill();
+      reset();
+      // 手（爪）
+      ctx.strokeStyle = spiritCol; ctx.lineWidth = 3*s;
+      ctx.beginPath(); ctx.moveTo(-18*s, 8*s); ctx.lineTo(-28*s, 20*s); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(18*s, 8*s); ctx.lineTo(28*s, 20*s); ctx.stroke();
+      reset();
+      drawLabel(ctx, "GHOUL", s, spiritCol);
+      break;
+    }
+    case "banshee": {
+      ctx.fillStyle = spiritCol; glow(spiritCol);
+      // 叫ぶ口（バンシー）
+      ctx.beginPath();
+      ctx.moveTo(-16*s,-18*s); ctx.quadraticCurveTo(0,-30*s, 16*s,-18*s);
+      ctx.lineTo(20*s, 12*s); ctx.lineTo(-20*s, 12*s); ctx.closePath(); ctx.fill();
+      reset();
+      // 開いた口
+      ctx.fillStyle = "#050102";
+      ctx.beginPath(); ctx.ellipse(0, 2*s, 6*s, 10*s, 0, 0, Math.PI*2); ctx.fill();
+      // 目
+      ctx.fillStyle = "#ff3030"; glow("#ff3030", 14);
+      ctx.beginPath(); ctx.arc(-8*s,-10*s, 3*s, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(8*s,-10*s, 3*s, 0, Math.PI*2); ctx.fill();
+      reset();
+      drawLabel(ctx, "BANSHEE", s, spiritCol);
+      break;
+    }
+    case "lich": {
+      ctx.fillStyle = spiritCol; glow(spiritCol);
+      // フード付き頭骨
+      ctx.beginPath();
+      ctx.moveTo(-18*s,-20*s); ctx.quadraticCurveTo(0,-32*s, 18*s,-20*s);
+      ctx.lineTo(22*s, 6*s); ctx.lineTo(-22*s, 6*s); ctx.closePath(); ctx.fill();
+      reset();
+      // 頭骨
+      ctx.fillStyle = "#e8e0e8";
+      ctx.beginPath(); ctx.arc(0,-4*s, 14*s, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = "#1a0a22";
+      ctx.beginPath(); ctx.arc(-5*s,-4*s, 3.5*s, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(5*s,-4*s, 3.5*s, 0, Math.PI*2); ctx.fill();
+      // 歯
+      ctx.fillRect(-4*s, 4*s, 8*s, 6*s);
+      ctx.fillStyle = "#1a0a22";
+      for (let i=0;i<4;i++){ ctx.fillRect(-4*s + i*2*s, 4*s, 1*s, 6*s); }
+      // 発光目
+      ctx.fillStyle = "#c060ff"; glow("#c060ff", 14);
+      ctx.beginPath(); ctx.arc(-5*s,-4*s, 1.8*s, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(5*s,-4*s, 1.8*s, 0, Math.PI*2); ctx.fill();
+      reset();
+      drawLabel(ctx, "LICH", s, spiritCol);
+      break;
+    }
+    case "nightmare": {
+      ctx.fillStyle = spiritCol; glow(spiritCol);
+      // 馬の頭部＋炎
+      ctx.beginPath();
+      ctx.moveTo(-20*s, 8*s); ctx.quadraticCurveTo(-16*s,-20*s, 4*s,-24*s);
+      ctx.lineTo(14*s,-14*s); ctx.lineTo(20*s,-2*s); ctx.lineTo(12*s, 8*s); ctx.closePath(); ctx.fill();
+      reset();
+      // 目
+      ctx.fillStyle = "#ff3030"; glow("#ff3030", 14);
+      ctx.beginPath(); ctx.arc(2*s,-10*s, 3.5*s, 0, Math.PI*2); ctx.fill();
+      reset();
+      // 炎
+      ctx.fillStyle = "#c060ff"; glow("#c060ff", 14);
+      for (let i=0;i<4;i++){
+        ctx.beginPath();
+        ctx.arc(-16*s + i*4*s, -26*s + (i%2)*4*s, 3*s, 0, Math.PI*2); ctx.fill();
+      }
+      reset();
+      drawLabel(ctx, "NIGHTMARE", s, spiritCol);
+      break;
+    }
+    case "darklord": {
+      // ダークドラゴンの頭部＋翼
+      ctx.fillStyle = spiritCol; glow(spiritCol, 14);
+      // 頭部
+      ctx.beginPath();
+      ctx.moveTo(-26*s,-2*s); ctx.quadraticCurveTo(-26*s,-24*s, 4*s,-24*s);
+      ctx.lineTo(32*s,-6*s); ctx.lineTo(24*s, 4*s);
+      ctx.lineTo(4*s, 6*s); ctx.lineTo(0, 18*s); ctx.lineTo(-10*s, 8*s);
+      ctx.lineTo(-24*s, 10*s); ctx.closePath(); ctx.fill();
+      // 角
+      ctx.beginPath();
+      ctx.moveTo(-8*s,-24*s); ctx.lineTo(-18*s,-40*s); ctx.lineTo(0,-26*s); ctx.closePath(); ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(6*s,-24*s); ctx.lineTo(0,-38*s); ctx.lineTo(16*s,-24*s); ctx.closePath(); ctx.fill();
+      reset();
+      // 目
+      ctx.fillStyle = "#ff2020"; glow("#ff2020", 16);
+      ctx.beginPath(); ctx.arc(10*s,-12*s, 4*s, 0, Math.PI*2); ctx.fill();
+      reset();
+      drawLabel(ctx, "DARK LORD", s, spiritCol);
+      break;
+    }
+    default: {
+      ctx.strokeStyle = attr === "悪" ? "#a060e0" : "#e8a040";
+      ctx.lineWidth = 3*s; ctx.lineCap = "round";
+      glow(ctx.strokeStyle);
+      ctx.beginPath();
+      const pts = [0.2,0.5,0.35,0.7,0.55,0.85];
+      pts.forEach((v,i) => {
+        const x = -24*s + i*(48*s/(pts.length-1));
+        const y = 14*s - v*30*s;
+        i === 0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+      });
+      ctx.stroke();
+      reset();
+      break;
+    }
   }
 }
 
-requestAnimationFrame(loop);
+/* =========================================================
+   クリック演出（ランダム発動）
+========================================================= */
+const fxCanvas = document.getElementById("fxCanvas");
+const fxCtx = fxCanvas.getContext("2d");
+let fxParticles = [];
+let fxShake = 0;         // 画面シェイク
+let fxHitstop = 0;       // ヒットストップ
+let fxFlash = 0;         // 画面フラッシュ
+let fxFlashColor = "255,240,200";
+let fxSlash = [];        // 斬撃線
+let fxClaw = [];         // 爪痕
+let fxAmber = [];        // 琥珀
+let fxFootprints = [];   // 足跡
+let fxGuideBugs = [];    // 導蟲
+let fxLightning = [];    // 雷
+let fxFossilSites = [];  // 化石発掘
+let fxActive = false;
+
+function resizeFx() {
+  fxCanvas.width = innerWidth;
+  fxCanvas.height = innerHeight;
+}
+resizeFx();
+addEventListener("resize", resizeFx);
+
+const FX_EFFECTS = ["footprint", "fossil", "amber", "claw", "guidebugs", "greatsword", "element", "track", "partbreak"];
+
+function triggerRandomFx(x, y) {
+  fxActive = true;
+  fxCanvas.classList.add("active");
+  const kind = FX_EFFECTS[Math.floor(Math.random() * FX_EFFECTS.length)];
+  switch (kind) {
+    case "footprint":  fxFootprint(x, y);  break;
+    case "fossil":     fxFossil(x, y);     break;
+    case "amber":      fxAmberEffect(x, y); break;
+    case "claw":       fxClawMark(x, y);   break;
+    case "guidebugs":  fxGuideBugsSpawn(x, y); break;
+    case "greatsword": fxGreatSword(x, y); break;
+    case "element":    fxElement(x, y);    break;
+    case "track":      fxTrack(x, y);      break;
+    case "partbreak":  fxPartBreak(x, y);  break;
+  }
+}
+
+/* ---- 足跡 ---- */
+function fxFootprint(x, y) {
+  fxShake = Math.max(fxShake, 16);
+  spawnFxParticles(x, y, 25, "#d8c090", 3, 10, 0.4);
+  const toes = [];
+  for (let i = 0; i < 3; i++) {
+    const a = -Math.PI/2 + (i - 1) * 0.5;
+    toes.push({ x: x + Math.cos(a)*38, y: y + Math.sin(a)*38, r: 10 });
+  }
+  fxFootprints.push({ x, y, toes, life: 1 });
+  spawnFxParticles(x, y, 40, "#a08050", 4, 6, 0.02);
+  showFxLog(x, y - 60, "ズシン！", "STOMP", "#ffcf5a");
+}
+
+/* ---- 化石発掘 ---- */
+function fxFossil(x, y) {
+  fxHitstop = 8;
+  spawnFxParticles(x, y, 35, "#c0b090", 2, 12, 0.03);
+  fxFossilSites.push({ x, y, life: 1, rot: Math.random()*Math.PI });
+  showFxLog(x, y - 60, "発掘！", "FOSSIL FOUND", "#e0c080");
+}
+
+/* ---- 琥珀 ---- */
+function fxAmberEffect(x, y) {
+  spawnFxParticles(x, y, 30, "#ffcc40", 2, 8, 0.03);
+  fxAmber.push({ x, y, r: 5, maxR: 45 + Math.random()*25, life: 1 });
+  showFxLog(x, y - 60, "琥珀！", "AMBER", "#ffb040");
+}
+
+/* ---- 爪痕 ---- */
+function fxClawMark(x, y) {
+  fxHitstop = 6;
+  const lines = [];
+  for (let i = -1; i <= 1; i++) {
+    const offX = i * 18;
+    const a = -0.5 + Math.random()*0.3;
+    lines.push({
+      x1: x + offX - 60*Math.cos(a),
+      y1: y - 60*Math.sin(a),
+      x2: x + offX + 60*Math.cos(a),
+      y2: y + 60*Math.sin(a)
+    });
+  }
+  fxClaw.push({ lines, life: 1 });
+  spawnFxParticles(x, y, 20, "#ff6020", 3, 10, 0.04);
+  showFxLog(x, y - 60, "引き裂き！", "CLAW SLASH", "#ff8040");
+}
+
+/* ---- 導蟲 ---- */
+function fxGuideBugsSpawn(x, y) {
+  for (let i = 0; i < 18; i++) {
+    const a = Math.random()*Math.PI*2;
+    const d = 40 + Math.random()*100;
+    fxGuideBugs.push({
+      x: x + Math.cos(a)*d, y: y + Math.sin(a)*d,
+      tx: x, ty: y,
+      life: 1, seed: Math.random()*100
+    });
+  }
+  showFxLog(x, y - 60, "導蟲", "GUIDE BUGS", "#8affa0");
+}
+
+/* ---- 大剣溜め斬り ---- */
+function fxGreatSword(x, y) {
+  fxHitstop = 10;
+  fxShake = Math.max(fxShake, 22);
+  fxFlash = 1.2; fxFlashColor = "255,240,200";
+  fxSlash.push({ x, y, angle: -Math.PI/4 + Math.random()*0.6, len: 400, life: 1 });
+  spawnFxParticles(x, y, 60, "#ffe0a0", 4, 15, 0.04);
+  showFxLog(x, y - 60, "溜め斬り！", "GREAT SLASH", "#ffcf5a");
+}
+
+/* ---- 属性やられ ---- */
+function fxElement(x, y) {
+  const elements = [
+    { name: "火属性", sub: "FIRE", color: "#ff6020", rgb: "255,100,30" },
+    { name: "水属性", sub: "WATER", color: "#40a0ff", rgb: "60,160,255" },
+    { name: "雷属性", sub: "THUNDER", color: "#ffff60", rgb: "255,255,100" },
+    { name: "氷属性", sub: "ICE", color: "#a0e0ff", rgb: "160,220,255" },
+    { name: "龍属性", sub: "DRAGON", color: "#c060ff", rgb: "180,80,255" }
+  ];
+  const el = elements[Math.floor(Math.random()*elements.length)];
+  fxFlash = 0.8; fxFlashColor = el.rgb;
+  spawnFxParticles(x, y, 40, el.color, 4, 14, 0.04);
+  if (el.name === "雷属性") fxLightning.push({ x, y, life: 1, segments: makeLightning(x, y, 3) });
+  showFxLog(x, y - 60, el.name, el.sub, el.color);
+}
+
+function makeLightning(sx, sy, count) {
+  const segs = [];
+  for (let n = 0; n < count; n++) {
+    let cx = sx, cy = sy;
+    const a = Math.random()*Math.PI*2;
+    const pts = [[cx, cy]];
+    for (let i = 0; i < 8; i++) {
+      cx += Math.cos(a) * 25 + (Math.random()-0.5)*30;
+      cy += Math.sin(a) * 25 + (Math.random()-0.5)*30;
+      pts.push([cx, cy]);
+    }
+    segs.push(pts);
+  }
+  return segs;
+}
+
+/* ---- 痕跡採集 ---- */
+function fxTrack(x, y) {
+  spawnFxParticles(x, y, 18, "#88ffaa", 2, 8, 0.03);
+  for (let i = 0; i < 4; i++) {
+    fxParticles.push({
+      x: x + (Math.random()-0.5)*30, y: y + (Math.random()-0.5)*30,
+      vx: 0, vy: -0.3,
+      life: 1, decay: 0.008, size: 4 + Math.random()*3,
+      color: Math.random() < 0.5 ? "#88ffaa" : "#ffdd60",
+      glow: true
+    });
+  }
+  showFxLog(x, y - 60, "痕跡発見", "TRACK FOUND", "#88ffaa");
+}
+
+/* ---- 部位破壊 ---- */
+function fxPartBreak(x, y) {
+  fxHitstop = 14;
+  fxShake = Math.max(fxShake, 30);
+  fxFlash = 1.5; fxFlashColor = "255,240,200";
+  spawnFxParticles(x, y, 80, "#ffce6b", 4, 18, 0.03);
+  spawnFxParticles(x, y, 40, "#ff6020", 4, 12, 0.04);
+  // ひび
+  for (let b = 0; b < 6; b++) {
+    const a = Math.random()*Math.PI*2;
+    let cx = x, cy = y;
+    for (let s = 0; s < 5; s++) {
+      const nx = cx + Math.cos(a + (Math.random()-0.5)) * (20 + Math.random()*20);
+      const ny = cy + Math.sin(a + (Math.random()-0.5)) * (20 + Math.random()*20);
+      fxClaw.push({ lines: [{ x1: cx, y1: cy, x2: nx, y2: ny }], life: 1, crack: true });
+      cx = nx; cy = ny;
+    }
+  }
+  showFxLog(x, y - 60, "部位破壊達成", "PART BROKEN", "#ffcf5a");
+}
+
+/* ---- 共通パーティクル ---- */
+function spawnFxParticles(x, y, count, color, minS, maxS, decay) {
+  for (let i = 0; i < count; i++) {
+    const a = Math.random()*Math.PI*2;
+    const sp = minS + Math.random()*(maxS - minS);
+    fxParticles.push({
+      x, y,
+      vx: Math.cos(a)*sp, vy: Math.sin(a)*sp - 1,
+      life: 1, decay: decay, size: 2 + Math.random()*4,
+      color, glow: true, gravity: 0.25
+    });
+  }
+}
+
+/* ---- フローティングログ ---- */
+const fxLog = document.getElementById("fxLog");
+let fxLogTimeout = null;
+function showFxLog(x, y, mainText, subText, color) {
+  fxLog.style.left = x + "px";
+  fxLog.style.top = y + "px";
+  fxLog.innerHTML = `<div style="font-size:11px;letter-spacing:0.2em;opacity:0.85;text-align:center;">${subText}</div>
+                     <div style="font-size:26px;text-align:center;">${mainText}</div>`;
+  fxLog.style.color = color;
+  fxLog.style.opacity = "1";
+  fxLog.style.transform = "translate(-50%, -50%) scale(0.6)";
+  fxLog.style.transition = "none";
+  requestAnimationFrame(() => {
+    fxLog.style.transition = "transform 0.35s cubic-bezier(0.3,1.6,0.5,1), opacity 0.3s";
+    fxLog.style.transform = "translate(-50%, -50%) scale(1)";
+  });
+  clearTimeout(fxLogTimeout);
+  fxLogTimeout = setTimeout(() => {
+    fxLog.style.transition = "opacity 0.6s, transform 0.6s";
+    fxLog.style.opacity = "0";
+    fxLog.style.transform = "translate(-50%, -90%) scale(1)";
+  }, 700);
+}
+
+/* ---- FXアニメーションループ ---- */
+function fxLoop() {
+  requestAnimationFrame(fxLoop);
+  if (!fxActive) return;
+
+  // ヒットストップ
+  if (fxHitstop > 0) {
+    fxHitstop--;
+    renderFx(0);
+    return;
+  }
+
+  // シェイク減衰
+  if (fxShake > 0) fxShake = Math.max(0, fxShake - 1.2);
+
+  // フラッシュ減衰
+  if (fxFlash > 0) fxFlash = Math.max(0, fxFlash - 0.06);
+
+  // パーティクル
+  for (let i = fxParticles.length-1; i >= 0; i--) {
+    const p = fxParticles[i];
+    p.x += p.vx; p.y += p.vy;
+    p.vy += (p.gravity||0.2);
+    p.vx *= 0.98; p.vy *= 0.98;
+    p.life -= p.decay;
+    if (p.life <= 0) fxParticles.splice(i,1);
+  }
+
+  // 斬撃
+  for (let i = fxSlash.length-1; i >= 0; i--) {
+    fxSlash[i].life -= 0.04;
+    if (fxSlash[i].life <= 0) fxSlash.splice(i,1);
+  }
+  // 爪痕・ひび
+  for (let i = fxClaw.length-1; i >= 0; i--) {
+    fxClaw[i].life -= 0.015;
+    if (fxClaw[i].life <= 0) fxClaw.splice(i,1);
+  }
+  // 琥珀
+  for (let i = fxAmber.length-1; i >= 0; i--) {
+    const a = fxAmber[i];
+    a.r += (a.maxR - a.r) * 0.15;
+    a.life -= 0.012;
+    if (a.life <= 0) fxAmber.splice(i,1);
+  }
+  // 足跡
+  for (let i = fxFootprints.length-1; i >= 0; i--) {
+    fxFootprints[i].life -= 0.008;
+    if (fxFootprints[i].life <= 0) fxFootprints.splice(i,1);
+  }
+  // 導蟲
+  for (let i = fxGuideBugs.length-1; i >= 0; i--) {
+    const b = fxGuideBugs[i];
+    b.x += (b.tx - b.x) * 0.06 + Math.sin(Date.now()*0.003 + b.seed)*0.8;
+    b.y += (b.ty - b.y) * 0.06 + Math.cos(Date.now()*0.003 + b.seed)*0.8;
+    b.life -= 0.012;
+    if (b.life <= 0) fxGuideBugs.splice(i,1);
+  }
+  // 雷
+  for (let i = fxLightning.length-1; i >= 0; i--) {
+    fxLightning[i].life -= 0.06;
+    if (fxLightning[i].life <= 0) fxLightning.splice(i,1);
+  }
+  // 化石
+  for (let i = fxFossilSites.length-1; i >= 0; i--) {
+    fxFossilSites[i].life -= 0.01;
+    if (fxFossilSites[i].life <= 0) fxFossilSites.splice(i,1);
+  }
+
+  renderFx();
+
+  // 全部消えたらCanvas非表示
+  if (fxParticles.length === 0 && fxSlash.length === 0 && fxClaw.length === 0 &&
+      fxAmber.length === 0 && fxFootprints.length === 0 && fxGuideBugs.length === 0 &&
+      fxLightning.length === 0 && fxFossilSites.length === 0 && fxFlash === 0) {
+    fxActive = false;
+    fxCanvas.classList.remove("active");
+    fxCtx.clearRect(0, 0, fxCanvas.width, fxCanvas.height);
+  }
+}
+
+function renderFx() {
+  fxCtx.clearRect(0, 0, fxCanvas.width, fxCanvas.height);
+
+  fxCtx.save();
+  // シェイク
+  if (fxShake > 0) {
+    fxCtx.translate((Math.random()-0.5)*fxShake, (Math.random()-0.5)*fxShake);
+  }
+
+  // 化石
+  for (const f of fxFossilSites) {
+    fxCtx.save();
+    fxCtx.translate(f.x, f.y);
+    fxCtx.rotate(f.rot);
+    fxCtx.strokeStyle = `rgba(220,200,150,${f.life})`;
+    fxCtx.lineWidth = 3;
+    fxCtx.shadowBlur = 15; fxCtx.shadowColor = "#e0c080";
+    // 骨格
+    fxCtx.beginPath();
+    fxCtx.arc(0, -15, 12, 0, Math.PI*2); fxCtx.stroke();
+    fxCtx.beginPath();
+    fxCtx.moveTo(-8, -8); fxCtx.lineTo(-8, 15);
+    fxCtx.moveTo(8, -8); fxCtx.lineTo(8, 15);
+    fxCtx.moveTo(-8, 0); fxCtx.lineTo(8, 0);
+    fxCtx.moveTo(-8, 8); fxCtx.lineTo(8, 8);
+    fxCtx.stroke();
+    fxCtx.restore();
+  }
+
+  // 足跡
+  for (const fp of fxFootprints) {
+    fxCtx.fillStyle = `rgba(60,40,20,${fp.life*0.7})`;
+    fxCtx.shadowBlur = 20; fxCtx.shadowColor = `rgba(255,180,80,${fp.life})`;
+    fxCtx.beginPath();
+    fxCtx.ellipse(fp.x, fp.y + 10, 28, 40, 0, 0, Math.PI*2);
+    fxCtx.fill();
+    for (const t of fp.toes) {
+      fxCtx.beginPath();
+      fxCtx.arc(t.x, t.y, t.r, 0, Math.PI*2);
+      fxCtx.fill();
+    }
+  }
+
+  // 琥珀
+  for (const a of fxAmber) {
+    const g = fxCtx.createRadialGradient(a.x, a.y, 0, a.x, a.y, a.r);
+    g.addColorStop(0, `rgba(255,220,80,${a.life*0.9})`);
+    g.addColorStop(0.6, `rgba(255,160,40,${a.life*0.7})`);
+    g.addColorStop(1, `rgba(180,80,10,${a.life*0.3})`);
+    fxCtx.fillStyle = g;
+    fxCtx.shadowBlur = 20; fxCtx.shadowColor = `rgba(255,200,60,${a.life})`;
+    fxCtx.beginPath();
+    fxCtx.arc(a.x, a.y, a.r, 0, Math.PI*2);
+    fxCtx.fill();
+    // 中の虫
+    fxCtx.fillStyle = `rgba(40,20,0,${a.life*0.6})`;
+    fxCtx.beginPath();
+    fxCtx.ellipse(a.x, a.y, 4, 6, 0, 0, Math.PI*2);
+    fxCtx.fill();
+  }
+
+  // 爪痕・ひび
+  for (const c of fxClaw) {
+    fxCtx.strokeStyle = c.crack
+      ? `rgba(30,15,5,${c.life})`
+      : `rgba(180,30,10,${c.life})`;
+    fxCtx.lineWidth = c.crack ? 2 : 4;
+    fxCtx.lineCap = "round";
+    fxCtx.shadowBlur = c.crack ? 6 : 20;
+    fxCtx.shadowColor = c.crack ? `rgba(255,180,80,${c.life})` : `rgba(255,60,20,${c.life})`;
+    for (const l of c.lines) {
+      fxCtx.beginPath();
+      fxCtx.moveTo(l.x1, l.y1); fxCtx.lineTo(l.x2, l.y2);
+      fxCtx.stroke();
+    }
+  }
+
+  // 斬撃
+  for (const s of fxSlash) {
+    fxCtx.save();
+    fxCtx.translate(s.x, s.y);
+    fxCtx.rotate(s.angle);
+    const g = fxCtx.createLinearGradient(-s.len, 0, s.len, 0);
+    g.addColorStop(0, `rgba(255,255,200,0)`);
+    g.addColorStop(0.5, `rgba(255,255,220,${s.life})`);
+    g.addColorStop(1, `rgba(255,255,200,0)`);
+    fxCtx.fillStyle = g;
+    fxCtx.shadowBlur = 30; fxCtx.shadowColor = `rgba(255,220,140,${s.life})`;
+    fxCtx.fillRect(-s.len, -3, s.len*2, 6);
+    fxCtx.fillStyle = `rgba(255,255,255,${s.life*0.9})`;
+    fxCtx.fillRect(-s.len, -1, s.len*2, 2);
+    fxCtx.restore();
+  }
+
+  // 導蟲
+  for (const b of fxGuideBugs) {
+    fxCtx.fillStyle = `rgba(140,255,160,${b.life})`;
+    fxCtx.shadowBlur = 12; fxCtx.shadowColor = `rgba(140,255,160,${b.life})`;
+    fxCtx.beginPath();
+    fxCtx.arc(b.x, b.y, 2.5, 0, Math.PI*2);
+    fxCtx.fill();
+  }
+
+  // 雷
+  for (const l of fxLightning) {
+    fxCtx.strokeStyle = `rgba(180,220,255,${l.life})`;
+    fxCtx.lineWidth = 2;
+    fxCtx.shadowBlur = 15; fxCtx.shadowColor = `rgba(200,240,255,${l.life})`;
+    for (const seg of l.segments) {
+      fxCtx.beginPath();
+      fxCtx.moveTo(seg[0][0], seg[0][1]);
+      for (let i = 1; i < seg.length; i++) {
+        fxCtx.lineTo(seg[i][0], seg[i][1]);
+      }
+      fxCtx.stroke();
+    }
+  }
+
+  // パーティクル
+  for (const p of fxParticles) {
+    fxCtx.globalAlpha = Math.max(0, p.life);
+    fxCtx.fillStyle = p.color;
+    if (p.glow) {
+      fxCtx.shadowBlur = 12; fxCtx.shadowColor = p.color;
+    }
+    fxCtx.beginPath();
+    fxCtx.arc(p.x, p.y, p.size * p.life, 0, Math.PI*2);
+    fxCtx.fill();
+  }
+  fxCtx.globalAlpha = 1;
+  fxCtx.shadowBlur = 0;
+
+  fxCtx.restore();
+
+  // フラッシュ
+  if (fxFlash > 0) {
+    fxCtx.fillStyle = `rgba(${fxFlashColor},${fxFlash*0.5})`;
+    fxCtx.fillRect(0, 0, fxCanvas.width, fxCanvas.height);
+  }
+}
+fxLoop();
+
+/* =========================================================
+   カードプール＆ゲームロジック
+========================================================= */
+const NORMAL_POOL = CARD_MASTER.filter(c => c.rarity === "N");
+const RARE_POOL   = CARD_MASTER.filter(c => c.rarity !== "N");
+
+let money = 200;
+let currentPack = [];
+let currentIndex = 0;
+let obtainedCards = [];
+let sortMode = "obtained";
+let packsBought = 0;
+let startTime = Date.now();
+let gameStarted = false;
+
+const $ = (id) => document.getElementById(id);
+const opening = $("opening"), startBtn = $("startBtn"), viewBgBtn = $("viewBgBtn");
+const bgViewer = $("bgViewer"), closeViewerBtn = $("closeViewerBtn"), game = $("game");
+const clockEl = $("clock"), moneyDisplay = $("moneyDisplay");
+const buyPackBtn = $("buyPackBtn"), buyArea = $("buyArea"), packCardWrap = $("packCardWrap");
+const packCard = $("packCard"), packName = $("packName"), packCanvas = $("packCanvas");
+const packAtk = $("packAtk"), packDef = $("packDef"), packEffect = $("packEffect");
+const prevBtn = $("prevBtn"), nextBtn = $("nextBtn"), sellNowBtn = $("sellNowBtn"), endPackBtn = $("endPackBtn");
+const infoList = $("infoList"), sortSelect = $("sortSelect"), priceList = $("priceList"), studyLink = $("studyLink");
+const modal = $("modal"), modalCard = $("modalCard"), modalName = $("modalName"), modalCanvas = $("modalCanvas");
+const modalAtk = $("modalAtk"), modalDef = $("modalDef"), modalEffect = $("modalEffect");
+const modalCloseBtn = $("modalCloseBtn"), modalSellBtn = $("modalSellBtn");
+
+/* 背景画像制御 */
+const bgToggleBtn = $("bgToggleBtn"), fitSelect = $("fitSelect"), leftBgLayer = $("leftBgLayer");
+let bgVisible = false;
+bgToggleBtn.addEventListener("click", () => {
+  bgVisible = !bgVisible;
+  leftBgLayer.classList.toggle("active", bgVisible);
+  bgToggleBtn.classList.toggle("on", bgVisible);
+});
+fitSelect.addEventListener("change", () => {
+  leftBgLayer.style.backgroundSize = fitSelect.value;
+});
+
+/* 時計・相場 */
+function updateClock() {
+  const now = new Date();
+  clockEl.textContent = `${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}:${String(now.getSeconds()).padStart(2,"0")}`;
+}
+function updateAllPrices() {
+  const elapsed = Math.floor((Date.now() - startTime) / 1000);
+  Object.values(MARKET).forEach(m => {
+    if (m.trend === "up") m.currentPrice = Math.min(m.maxPrice, m.basePrice + elapsed);
+    else m.currentPrice = Math.max(m.minPrice, m.basePrice - elapsed);
+  });
+}
+function getPrice(name) { return MARKET[name] ? MARKET[name].currentPrice : 0; }
+function renderPriceTable() {
+  priceList.innerHTML = CARD_MASTER.map(card => {
+    const m = MARKET[card.name];
+    const cls = m.trend === "up" ? "up" : "down";
+    const arrow = m.trend === "up" ? "▲" : "▼";
+    return `<div class="price-row"><span>${card.name}</span><span class="${cls}">${arrow} ${m.currentPrice}G</span></div>`;
+  }).join("");
+}
+
+/* 情報パネル */
+function sortCards(mode) {
+  const cards = [...obtainedCards];
+  switch (mode) {
+    case "rarity": return cards.sort((a,b) => rarityRank(b.rarity) - rarityRank(a.rarity));
+    case "atk":    return cards.sort((a,b) => b.atk - a.atk);
+    case "defLow": return cards.sort((a,b) => a.def - b.def);
+    case "beast":  return cards.sort((a,b) => (a.attr === "恐" ? -1 : 1));
+    case "spirit": return cards.sort((a,b) => (a.attr === "悪" ? -1 : 1));
+    case "fang":   return cards.sort((a,b) => (a.type === "fang" ? -1 : 1));
+    case "curse":  return cards.sort((a,b) => (a.type === "curse" ? -1 : 1));
+    default:       return cards.sort((a,b) => a.obtainedAt - b.obtainedAt);
+  }
+}
+function renderInfoList() {
+  const cards = sortCards(sortMode);
+  infoList.innerHTML = cards.map((card, i) => {
+    const mark = card.attr === "恐"
+      ? `<span class="ygo-attr-mark beast">恐</span>`
+      : `<span class="ygo-attr-mark spirit">悪</span>`;
+    const tc = typeClass(card.type);
+    return `<div class="info-item" data-id="${card.uid}">
+      <span>${i+1}.</span>${mark}
+      <span class="type-tag ${tc}">${card.type === "curse" ? "呪" : "牙"}</span>
+      <span>${card.name}</span>
+    </div>`;
+  }).join("");
+  infoList.querySelectorAll(".info-item").forEach(el => {
+    el.addEventListener("click", () => {
+      const card = obtainedCards.find(c => c.uid === el.dataset.id);
+      if (card) openModal(card);
+    });
+  });
+}
+
+/* カード表示 */
+function renderCardToUI(card, cardEl, nameEl, canvasEl, atkEl, defEl, effectEl) {
+  cardEl.className = "ygo-card " + rarityClass(card);
+  const mark = card.attr === "恐"
+    ? `<span class="ygo-attr-mark beast">恐</span>`
+    : `<span class="ygo-attr-mark spirit">悪</span>`;
+  const tc = typeClass(card.type);
+  nameEl.innerHTML = `${mark}<span>${card.name}</span><span style="font-size:9px;opacity:0.55;">${card.code}</span>`;
+  drawEmblem(canvasEl, card.emblem, card.rarity, card.attr);
+  atkEl.textContent = `ATK ${card.atk}`;
+  defEl.textContent = `DEF ${card.def}`;
+  effectEl.innerHTML = `<span class="type-tag ${tc}">${typeLabel(card.type)}</span> ${card.effect}`;
+}
+function showPackCard() {
+  const card = currentPack[currentIndex];
+  if (!card) return;
+  renderCardToUI(card, packCard, packName, packCanvas, packAtk, packDef, packEffect);
+  prevBtn.disabled = currentIndex === 0;
+  nextBtn.disabled = currentIndex === currentPack.length - 1;
+}
+
+/* パック */
+function makeInstance(m) {
+  return {
+    uid: "U" + Math.random().toString(36).slice(2,10),
+    name: m.name, code: m.code, attr: m.attr, rarity: m.rarity,
+    type: m.type, atk: m.atk, def: m.def, effect: m.effect,
+    emblem: m.emblem, obtainedAt: 0
+  };
+}
+function buyPack() {
+  if (money < 200) return;
+  money -= 200; packsBought++; updateMoneyDisplay();
+  currentPack = []; currentIndex = 0;
+  for (let i = 0; i < 6; i++) {
+    currentPack.push(makeInstance(NORMAL_POOL[Math.floor(Math.random() * NORMAL_POOL.length)]));
+  }
+  currentPack.push(makeInstance(RARE_POOL[Math.floor(Math.random() * RARE_POOL.length)]));
+  buyArea.style.display = "none";
+  packCardWrap.classList.add("active");
+  showPackCard();
+}
+function nextCard() { if (currentIndex < currentPack.length - 1) { currentIndex++; showPackCard(); } }
+function prevCard() { if (currentIndex > 0) { currentIndex--; showPackCard(); } }
+
+/* 売却 */
+function sellCurrentCard() {
+  const card = currentPack[currentIndex];
+  if (!card) return;
+  updateAllPrices();
+  money += getPrice(card.name); updateMoneyDisplay();
+  currentPack.splice(currentIndex, 1);
+  if (currentPack.length === 0) endPack();
+  else { currentIndex = Math.min(currentIndex, currentPack.length - 1); showPackCard(); }
+}
+function endPack() {
+  currentPack.forEach(card => {
+    card.obtainedAt = obtainedCards.length;
+    obtainedCards.push(card);
+  });
+  currentPack = []; currentIndex = 0;
+  packCardWrap.classList.remove("active");
+  buyArea.style.display = "flex";
+  renderInfoList();
+}
+
+/* モーダル */
+let modalCardData = null;
+function openModal(card) {
+  modalCardData = card;
+  renderCardToUI(card, modalCard, modalName, modalCanvas, modalAtk, modalDef, modalEffect);
+  modal.classList.add("active");
+}
+function closeModal() { modal.classList.remove("active"); modalCardData = null; }
+function sellFromModal() {
+  if (!modalCardData) return;
+  updateAllPrices();
+  money += getPrice(modalCardData.name); updateMoneyDisplay();
+  obtainedCards = obtainedCards.filter(c => c.uid !== modalCardData.uid);
+  renderInfoList(); closeModal();
+}
+function updateMoneyDisplay() { moneyDisplay.textContent = `所持金：${money}G`; }
+function checkStudyLink() { if (packsBought >= 3) studyLink.classList.add("visible"); }
+
+/* カードクリックでFX発動（ランダム演出） */
+function attachFxTrigger(el) {
+  el.style.cursor = "pointer";
+  el.addEventListener("click", (e) => {
+    const rect = el.getBoundingClientRect();
+    let x, y;
+    if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
+      x = e.clientX; y = e.clientY;
+    } else {
+      x = rect.left + rect.width/2;
+      y = rect.top + rect.height/2;
+    }
+    triggerRandomFx(x, y);
+  });
+}
+attachFxTrigger(packCard);
+attachFxTrigger(modalCard);
+
+/* 情報パネルのアイテムクリックでもランダムFX */
+infoList.addEventListener("click", (e) => {
+  const item = e.target.closest(".info-item");
+  if (!item) return;
+  triggerRandomFx(e.clientX, e.clientY);
+});
+
+/* イベント */
+startBtn.addEventListener("click", () => {
+  opening.style.display = "none";
+  game.classList.add("active");
+  gameStarted = true; startTime = Date.now();
+  updateMoneyDisplay(); renderInfoList(); renderPriceTable();
+  fitSelect.value = "cover";
+  leftBgLayer.style.backgroundSize = "cover";
+});
+viewBgBtn.addEventListener("click", () => bgViewer.classList.add("active"));
+closeViewerBtn.addEventListener("click", () => bgViewer.classList.remove("active"));
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && bgViewer.classList.contains("active")) bgViewer.classList.remove("active");
+});
+buyPackBtn.addEventListener("click", () => { buyPack(); checkStudyLink(); });
+prevBtn.addEventListener("click", prevCard);
+nextBtn.addEventListener("click", nextCard);
+sellNowBtn.addEventListener("click", sellCurrentCard);
+endPackBtn.addEventListener("click", endPack);
+sortSelect.addEventListener("change", () => { sortMode = sortSelect.value; renderInfoList(); });
+modalCloseBtn.addEventListener("click", closeModal);
+modalSellBtn.addEventListener("click", sellFromModal);
+
+setInterval(() => {
+  updateClock();
+  if (gameStarted) { updateAllPrices(); renderPriceTable(); }
+}, 1000);
+updateClock();
 </script>
+
 </body>
 </html>
