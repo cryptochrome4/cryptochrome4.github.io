@@ -646,13 +646,13 @@
           </div>
         </div>
         <div class="opening-buttons" style="margin-bottom: 2%;">
-          <div id="start-btn" class="open-btn">はじめる</div>
-          <div id="view-bg-btn" class="open-btn">背景を見る</div>
+          <button id="start-btn" class="open-btn">はじめる</button>
+          <button id="view-bg-btn" class="open-btn">背景を見る</button>
         </div>
       </div>
       <div id="bg-viewer">
         <img src="img369rider.jpg" alt="背景拡大">
-        <div id="close-bg">✕</div>
+        <button id="close-bg">✕</button>
       </div>
     </div>
   </div>
@@ -673,35 +673,47 @@
   <div id="pad-area">
     <div class="lever-base">
       <div class="lever-dirs">
-        <div class="lever-dir" data-dir="up">▲</div>
-        <div class="lever-dir" data-dir="left">◀</div>
-        <div class="lever-dir" data-dir="right">▶</div>
-        <div class="lever-dir" data-dir="down">▼</div>
+        <button class="lever-dir" data-dir="up">▲</button>
+        <button class="lever-dir" data-dir="left">◀</button>
+        <button class="lever-dir" data-dir="right">▶</button>
+        <button class="lever-dir" data-dir="down">▼</button>
       </div>
     </div>
     <div class="arcade-buttons">
-      <div class="arcade-btn punch" data-btn="punch">PUNCH</div>
-      <div class="arcade-btn kick" data-btn="kick">KICK</div>
+      <button class="arcade-btn punch" data-btn="punch">PUNCH</button>
+      <button class="arcade-btn kick" data-btn="kick">KICK</button>
     </div>
   </div>
 </div>
 
 <script>
 /* ============================================================
-   フォーカス可能要素を完全排除
-   ・buttonタグをdivに置き換え済み
-   ・念のため残っているフォーカス可能要素も無効化
+   キーボード矢印キー → キャラを動かす（十字キー扱い）
+   ※ ブラウザのフォーカス移動より先に止めるためキャプチャ段階で処理
    ============================================================ */
-document.querySelectorAll('input, a, [tabindex]').forEach(el => {
-  el.setAttribute('tabindex', '-1');
-  el.addEventListener('focus', (e) => e.target.blur());
-});
-
-// 矢印キー・Enter・Space・Tab のデフォルト動作（フォーカス移動）をキャプチャで完全停止
 window.addEventListener('keydown', (e) => {
-  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ','Enter','Tab'].includes(e.key)) {
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) {
     e.preventDefault();
     e.stopPropagation();
+    if (e.repeat) return;
+    switch (e.key) {
+      case 'ArrowLeft':  input.left = true;  break;
+      case 'ArrowRight': input.right = true; break;
+      case 'ArrowUp':    tryJump(P);         break;
+      case 'ArrowDown':  tryCrouch(P, true); break;
+    }
+  }
+}, true);
+
+window.addEventListener('keyup', (e) => {
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) {
+    e.preventDefault();
+    e.stopPropagation();
+    switch (e.key) {
+      case 'ArrowLeft':  input.left = false;  break;
+      case 'ArrowRight': input.right = false; break;
+      case 'ArrowDown':  tryCrouch(P, false); break;
+    }
   }
 }, true);
 
@@ -869,52 +881,6 @@ document.querySelectorAll('[data-btn]').forEach(btn => {
 
   btn.addEventListener('contextmenu', (e) => e.preventDefault());
 });
-
-/* ============================================================
-   Gamepad API（実機コントローラー）
-   十字キーのみ使用（スティックは無視）
-   ============================================================ */
-let gamepadPrev = { up: false, down: false };
-let gamepadDebugLogged = false;
-
-function pollGamepad() {
-  if (document.activeElement && document.activeElement !== document.body) {
-    document.activeElement.blur();
-  }
-
-  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
-  let pad = null;
-  for (let i = 0; i < pads.length; i++) {
-    if (pads[i] && pads[i].connected) { pad = pads[i]; break; }
-  }
-  if (!pad) {
-    gamepadPrev.up = false;
-    gamepadPrev.down = false;
-    return;
-  }
-
-  if (!gamepadDebugLogged) {
-    console.log('[Gamepad] id:', pad.id, 'buttons:', pad.buttons.length, 'axes:', pad.axes.length);
-    gamepadDebugLogged = true;
-  }
-
-  const btn = (i) => pad.buttons[i] && pad.buttons[i].pressed;
-
-  const left  = btn(14);
-  const right = btn(15);
-  const up    = btn(12);
-  const down  = btn(13);
-
-  input.left  = left;
-  input.right = right;
-
-  if (up && !gamepadPrev.up) tryJump(P);
-  if (down && !gamepadPrev.down) tryCrouch(P, true);
-  if (!down && gamepadPrev.down) tryCrouch(P, false);
-
-  gamepadPrev.up = up;
-  gamepadPrev.down = down;
-}
 
 /* ============================================================
    オープニング
@@ -1271,7 +1237,6 @@ function loop() {
     if (hitStopTimer > 0) {
       hitStopTimer--;
     } else {
-      pollGamepad();
       updatePlayer();
       updateEnemyAI();
       updatePhysics();
