@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>ストリートファイター風ゲーム</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0;
+    background: #0f0f1a;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: 'Arial Black', Arial, sans-serif;
+    color: white;
+    user-select: none;
+    padding: 10px;
+  }
+
+  /* ===== ゲーム画面 ===== */
+  #game-wrap {
+    position: relative;
+    width: 800px;
+    max-width: 100%;
+  }
+  #game {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 2 / 1;
+    background: linear-gradient(#87ceeb, #4682b4);
+    border: 4px solid #fff;
+    overflow: hidden;
+    border-radius: 8px;
+  }
+  #ground {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    height: 20%;
+    background: linear-gradient(#a0522d, #6b3410);
+    border-top: 4px solid #654321;
+  }
+  .fighter {
+    position: absolute;
+    bottom: 20%;
+    width: 7.5%;
+    height: 30%;
+    transition: transform 0.1s;
+  }
+  #player {
+    background: linear-gradient(#ff6666, #cc0000);
+    border-radius: 12px 12px 6px 6px;
+    box-shadow: inset -6px 0 10px rgba(0,0,0,0.3);
+  }
+  #enemy {
+    background: linear-gradient(#6666ff, #0000cc);
+    border-radius: 12px 12px 6px 6px;
+    box-shadow: inset 6px 0 10px rgba(0,0,0,0.3);
+    transform: scaleX(-1);
+  }
+  .punching { transform: translateX(20px) !important; }
+  #enemy.punching { transform: scaleX(-1) translateX(20px) !important; }
+
+  .hp-bar {
+    position: absolute;
+    top: 4%;
+    width: 38%;
+    height: 7%;
+    background: #222;
+    border: 2px solid #fff;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  #player-hp { left: 2%; }
+  #enemy-hp { right: 2%; }
+  .hp-fill {
+    height: 100%;
+    background: linear-gradient(#00ff00, #00aa00);
+    transition: width 0.2s;
+  }
+  #enemy-hp .hp-fill { float: right; background: linear-gradient(#00ff00, #00aa00); }
+
+  #message {
+    position: absolute;
+    top: 45%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: clamp(24px, 5vw, 56px);
+    font-weight: bold;
+    text-shadow: 4px 4px 0 #000;
+    display: none;
+    z-index: 10;
+    white-space: nowrap;
+  }
+
+  /* ===== オープニング画面 ===== */
+  #opening {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at center, #2a1a3a 0%, #000 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    gap: 20px;
+  }
+  #opening h1 {
+    font-size: clamp(28px, 6vw, 60px);
+    margin: 0;
+    background: linear-gradient(180deg, #ffe600, #ff6600);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    text-shadow: 0 4px 0 rgba(0,0,0,0.6);
+    letter-spacing: 2px;
+    animation: pulse 1.5s infinite alternate;
+  }
+  @keyframes pulse {
+    from { transform: scale(1); }
+    to { transform: scale(1.05); }
+  }
+  #opening p.sub {
+    margin: 0;
+    color: #ccc;
+    font-size: clamp(12px, 2.2vw, 18px);
+    font-family: Arial, sans-serif;
+  }
+  #start-btn {
+    font-family: 'Arial Black', sans-serif;
+    font-size: clamp(18px, 3vw, 28px);
+    padding: 14px 50px;
+    border: none;
+    border-radius: 40px;
+    cursor: pointer;
+    background: linear-gradient(180deg, #ffd700, #ff8c00);
+    color: #4a1a00;
+    box-shadow: 0 6px 0 #8b4500, 0 8px 20px rgba(0,0,0,0.6);
+    transition: transform 0.1s, box-shadow 0.1s;
+  }
+  #start-btn:active {
+    transform: translateY(4px);
+    box-shadow: 0 2px 0 #8b4500, 0 4px 10px rgba(0,0,0,0.6);
+  }
+  #start-btn:hover { filter: brightness(1.1); }
+
+  /* ===== 情報パネル ===== */
+  #info-panel {
+    width: 800px;
+    max-width: 100%;
+    margin-top: 14px;
+    background: #16162a;
+    border: 2px solid #3a3a5a;
+    border-radius: 12px;
+    padding: 12px;
+  }
+  #panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+  #panel-header .title {
+    font-size: 14px;
+    color: #8a8ab0;
+    font-family: Arial, sans-serif;
+    letter-spacing: 1px;
+  }
+  #pad-selector {
+    display: flex;
+    gap: 6px;
+    background: #0c0c18;
+    padding: 4px;
+    border-radius: 20px;
+  }
+  .pad-tab {
+    font-family: Arial, sans-serif;
+    font-size: 12px;
+    padding: 6px 14px;
+    border: none;
+    border-radius: 16px;
+    cursor: pointer;
+    background: transparent;
+    color: #8888aa;
+    transition: all 0.15s;
+  }
+  .pad-tab.active {
+    background: linear-gradient(180deg, #6a6aff, #3838cc);
+    color: #fff;
+    font-weight: bold;
+  }
+
+  #pad-area {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-height: 170px;
+  }
+
+  /* ===== 共通ボタン(操作) ===== */
+  .ctrl-btn {
+    border: none;
+    cursor: pointer;
+    font-family: 'Arial Black', sans-serif;
+    user-select: none;
+    touch-action: none;
+    transition: transform 0.08s, filter 0.08s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .ctrl-btn.pressed {
+    transform: scale(0.92);
+    filter: brightness(1.4);
+  }
+
+  /* ===== ゲーセン風（レバー+ボタン）===== */
+  .arcade-layout {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-around;
+  }
+  #lever-base {
+    position: relative;
+    width: 150px;
+    height: 150px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #lever-dirs {
+    position: relative;
+    width: 130px;
+    height: 130px;
+  }
+  .lever-dir {
+    position: absolute;
+    width: 42px;
+    height: 42px;
+    background: #2a2a44;
+    border: 2px solid #5555aa;
+    border-radius: 8px;
+    color: #aaaaff;
+    font-size: 18px;
+  }
+  .lever-dir[data-dir="left"]  { left: 0;    top: 44px; }
+  .lever-dir[data-dir="right"] { right: 0;   top: 44px; }
+  .lever-dir[data-dir="up"]    { left: 44px; top: 0; }
+  .lever-dir[data-dir="down"]  { left: 44px; bottom: 0; }
+  .arcade-buttons {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+  }
+  .arcade-btn {
+    width: 74px;
+    height: 74px;
+    border-radius: 50%;
+    color: #fff;
+    font-size: 16px;
+    border: 3px solid rgba(255,255,255,0.4);
+    box-shadow: 0 6px 0 rgba(0,0,0,0.5), inset 0 -6px 12px rgba(0,0,0,0.4);
+  }
+  .arcade-btn.punch { background: radial-gradient(circle at 35% 30%, #ff8888, #cc0000); }
+  .arcade-btn.kick  { background: radial-gradient(circle at 35% 30%, #88aaff, #0033cc); }
+
+  /* ===== プレステ風 ===== */
+  .ps-layout {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-around;
+    gap: 10px;
+  }
+  #dpad {
+    position: relative;
+    width: 130px;
+    height: 130px;
+  }
+  .dpad-btn {
+    position: absolute;
+    width: 44px;
+    height: 44px;
+    background: linear-gradient(180deg, #3a3a55, #1a1a2a);
+    border: 2px solid #5555aa;
+    border-radius: 8px;
+    color: #bbb;
+    font-size: 16px;
+  }
+  .dpad-btn[data-dir="up"]    { left: 43px; top: 0; }
+  .dpad-btn[data-dir="down"]  { left: 43px; bottom: 0; }
+  .dpad-btn[data-dir="left"]  { left: 0; top: 43px; }
+  .dpad-btn[data-dir="right"] { right: 0; top: 43px; }
+  .dpad-center {
+    position: absolute;
+    left: 43px; top: 43px;
+    width: 44px; height: 44px;
+    background: #22223a;
+    border-radius: 50%;
+  }
+  .ps-face-buttons {
+    position: relative;
+    width: 140px;
+    height: 140px;
+  }
+  .ps-btn {
+    position: absolute;
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    color: #fff;
+    font-size: 18px;
+    font-weight: bold;
+    border: 2px solid rgba(255,255,255,0.3);
+    box-shadow: 0 4px 0 rgba(0,0,0,0.5);
+  }
+  .ps-btn[data-btn="punch"] { left: 0; top: 43px; background: radial-gradient(circle at 35% 30%, #ffaaaa, #cc0000); }
+  .ps-btn[data-btn="kick"]  { right: 0; top: 43px; background: radial-gradient(circle at 35% 30%, #aaccff, #0044dd); }
+
+  /* ===== キーボード風 ===== */
+  .kbd-layout {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-around;
+    gap: 10px;
+    font-family: monospace;
+  }
+  .kbd-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
+  }
+  .kbd-row { display: flex; gap: 8px; }
+  .kbd-key {
+    width: 52px;
+    height: 52px;
+    background: linear-gradient(180deg, #3a3a4a, #22222e);
+    border: 2px solid #555;
+    border-bottom-width: 5px;
+    border-radius: 8px;
+    color: #ddd;
+    font-size: 15px;
+    font-weight: bold;
+  }
+  .kbd-key.wide { width: 70px; }
+  .kbd-key.punch { color: #ff8888; }
+  .kbd-key.kick  { color: #88aaff; }
+
+  /* ===== 反応ボタン(隠し: キーボード風の下に配置するスペーサー) ===== */
+  #hint {
+    margin-top: 10px;
+    font-size: 12px;
+    color: #666688;
+    text-align: center;
+    font-family: Arial, sans-serif;
+  }
+
+  @media (max-width: 640px) {
+    .lever-dir, .dpad-btn { width: 38px; height: 38px; }
+    .lever-dir[data-dir="left"], .lever-dir[data-dir="right"] { top: 38px; }
+    .lever-dir[data-dir="up"], .lever-dir[data-dir="down"] { left: 38px; }
+    .dpad-btn[data-dir="up"], .dpad-btn[data-dir="down"] { left: 38px; }
+    .dpad-btn[data-dir="left"], .dpad-btn[data-dir="right"] { top: 38px; }
+    .arcade-btn { width: 58px; height: 58px; font-size: 13px; }
+    .ps-btn { width: 46px; height: 46px; }
+    #dpad, #lever-dirs { width: 114px; height: 114px; }
+    .kbd-key { width: 40px; height: 40px; font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="game-wrap">
+  <div id="game">
+    <div id="player-hp" class="hp-bar"><div class="hp-fill" style="width:100%"></div></div>
+    <div id="enemy-hp" class="hp-bar"><div class="hp-fill" style="width:100%"></div></div>
+    <div id="ground"></div>
+    <div id="player" class="fighter"></div>
+    <div id="enemy" class="fighter"></div>
+    <div id="message"></div>
+
+    <!-- オープニング画面 -->
+    <div id="opening">
+      <h1>STREET FIGHTER</h1>
+      <p class="sub">— 情報パネルのコントローラーで操作 —</p>
+      <button id="start-btn">はじめる</button>
+    </div>
+  </div>
+</div>
+
+<!-- 情報パネル（コントローラー） -->
+<div id="info-panel">
+  <div id="panel-header">
+    <span class="title">▼ CONTROLLER</span>
+    <div id="pad-selector">
+      <button class="pad-tab active" data-pad="ps">プレステ</button>
+      <button class="pad-tab" data-pad="arcade">ゲーセン</button>
+      <button class="pad-tab" data-pad="kbd">キーボード</button>
+    </div>
+  </div>
+
+  <div id="pad-area">
+    <!-- プレステ風 -->
+    <div class="ps-layout" id="pad-ps">
+      <div id="dpad">
+        <button class="ctrl-btn dpad-btn" data-dir="up">▲</button>
+        <button class="ctrl-btn dpad-btn" data-dir="left">◀</button>
+        <div class="dpad-center"></div>
+        <button class="ctrl-btn dpad-btn" data-dir="right">▶</button>
+        <button class="ctrl-btn dpad-btn" data-dir="down">▼</button>
+      </div>
+      <div class="ps-face-buttons">
+        <button class="ctrl-btn ps-btn" data-btn="punch">✕</button>
+        <button class="ctrl-btn ps-btn" data-btn="kick">□</button>
+      </div>
+    </div>
+
+    <!-- ゲーセン風 -->
+    <div class="arcade-layout" id="pad-arcade" style="display:none;">
+      <div id="lever-base">
+        <div id="lever-dirs">
+          <button class="ctrl-btn lever-dir" data-dir="up">▲</button>
+          <button class="ctrl-btn lever-dir" data-dir="left">◀</button>
+          <button class="ctrl-btn lever-dir" data-dir="right">▶</button>
+          <button class="ctrl-btn lever-dir" data-dir="down">▼</button>
+        </div>
+      </div>
+      <div class="arcade-buttons">
+        <button class="ctrl-btn arcade-btn punch" data-btn="punch">PUNCH</button>
+        <button class="ctrl-btn arcade-btn kick" data-btn="kick">KICK</button>
+      </div>
+    </div>
+
+    <!-- キーボード風 -->
+    <div class="kbd-layout" id="pad-kbd" style="display:none;">
+      <div class="kbd-group">
+        <div class="kbd-row">
+          <button class="ctrl-btn kbd-key" data-dir="up">W</button>
+        </div>
+        <div class="kbd-row">
+          <button class="ctrl-btn kbd-key" data-dir="left">A</button>
+          <button class="ctrl-btn kbd-key" data-dir="down">S</button>
+          <button class="ctrl-btn kbd-key" data-dir="right">D</button>
+        </div>
+      </div>
+      <div class="kbd-group">
+        <div class="kbd-row">
+          <button class="ctrl-btn kbd-key punch" data-btn="punch">J</button>
+          <button class="ctrl-btn kbd-key kick" data-btn="kick">K</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="hint">クリック / タップ / 長押しで操作できます</div>
+</div>
+
+<script>
+/* ========== 要素参照 ========== */
+const player = document.getElementById('player');
+const enemy = document.getElementById('enemy');
+const playerHpFill = document.querySelector('#player-hp .hp-fill');
+const enemyHpFill = document.querySelector('#enemy-hp .hp-fill');
+const message = document.getElementById('message');
+const opening = document.getElementById('opening');
+const startBtn = document.getElementById('start-btn');
+const game = document.getElementById('game');
+
+/* ========== ゲーム状態 ========== */
+let playerHp = 100;
+let enemyHp = 100;
+let playerX = 150;   // ゲーム座標(0-800)
+let enemyX = 590;
+let gameOver = false;
+let gameStarted = false;
+let canAttack = true;
+
+const GAME_W = 800;
+const GAME_H = 400;
+const MIN_DIST = 80;
+
+const keys = { left: false, right: false };
+let enemyAttackCooldown = 0;
+
+/* ========== オープニング ========== */
+startBtn.addEventListener('click', () => {
+  opening.style.display = 'none';
+  gameStarted = true;
+});
+
+/* ========== コントローラー切替 ========== */
+document.querySelectorAll('.pad-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.pad-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    const pad = tab.dataset.pad;
+    document.getElementById('pad-ps').style.display     = pad === 'ps'     ? 'flex' : 'none';
+    document.getElementById('pad-arcade').style.display = pad === 'arcade' ? 'flex' : 'none';
+    document.getElementById('pad-kbd').style.display    = pad === 'kbd'    ? 'flex' : 'none';
+  });
+});
+
+/* ========== コントローラー入力（クリック/長押し両対応） ========== */
+// 方向ボタン: 押している間だけ移動フラグをON（長押しで連続移動）
+document.querySelectorAll('[data-dir]').forEach(btn => {
+  const dir = btn.dataset.dir;
+  const on  = (e) => {
+    e.preventDefault();
+    btn.classList.add('pressed');
+    if (dir === 'left')  keys.left = true;
+    if (dir === 'right') keys.right = true;
+    // up/downはジャンプ等未実装のためフラグのみ（拡張用）
+  };
+  const off = (e) => {
+    e.preventDefault();
+    btn.classList.remove('pressed');
+    if (dir === 'left')  keys.left = false;
+    if (dir === 'right') keys.right = false;
+  };
+  btn.addEventListener('pointerdown', on);
+  btn.addEventListener('pointerup', off);
+  btn.addEventListener('pointerleave', off);
+  btn.addEventListener('pointercancel', off);
+});
+
+// 攻撃ボタン: 押した瞬間に1回攻撃
+document.querySelectorAll('[data-btn]').forEach(btn => {
+  btn.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    btn.classList.add('pressed');
+    attack(btn.dataset.btn);
+  });
+  const release = () => btn.classList.remove('pressed');
+  btn.addEventListener('pointerup', release);
+  btn.addEventListener('pointerleave', release);
+  btn.addEventListener('pointercancel', release);
+});
+
+/* ========== 攻撃処理 ========== */
+function attack(type) {
+  if (!gameStarted || gameOver || !canAttack) return;
+  canAttack = false;
+  player.classList.add('punching');
+
+  const damage = type === 'punch' ? 8 : 12;
+  const range  = type === 'punch' ? 100 : 110;
+
+  if (Math.abs(playerX - enemyX) < range) {
+    enemyHp = Math.max(0, enemyHp - damage);
+    enemyHpFill.style.width = enemyHp + '%';
+    enemy.style.filter = 'brightness(2.2)';
+    setTimeout(() => enemy.style.filter = '', 140);
+    checkGameOver();
+  }
+
+  setTimeout(() => {
+    player.classList.remove('punching');
+    canAttack = true;
+  }, 200);
+}
+
+/* ========== 敵AI ========== */
+function enemyAI() {
+  if (gameOver) return;
+  const dist = Math.abs(playerX - enemyX);
+
+  if (dist > 100) {
+    enemyX -= 2.5;
+  } else if (enemyAttackCooldown <= 0) {
+    enemy.classList.add('punching');
+    playerHp = Math.max(0, playerHp - 7);
+    playerHpFill.style.width = playerHp + '%';
+    player.style.filter = 'brightness(2.2)';
+    setTimeout(() => player.style.filter = '', 140);
+    enemyAttackCooldown = 60;
+    checkGameOver();
+    setTimeout(() => enemy.classList.remove('punching'), 200);
+  }
+  if (enemyAttackCooldown > 0) enemyAttackCooldown--;
+
+  enemy.style.right = (GAME_W - enemyX - 60) + 'px';
+}
+
+/* ========== 勝敗判定 ========== */
+function checkGameOver() {
+  if (enemyHp <= 0) endGame('YOU WIN!', '#00ff44');
+  else if (playerHp <= 0) endGame('YOU LOSE...', '#ff3344');
+}
+
+function endGame(text, color) {
+  gameOver = true;
+  message.textContent = text;
+  message.style.color = color;
+  message.style.display = 'block';
+  setTimeout(() => location.reload(), 3000);
+}
+
+/* ========== メインループ ========== */
+function loop() {
+  if (gameStarted && !gameOver) {
+    // プレイヤー移動（押している間だけ）
+    if (keys.left && playerX > 20) playerX -= 4;
+    if (keys.right && playerX < enemyX - MIN_DIST) playerX += 4;
+    player.style.left = playerX + 'px';
+
+    // 敵の移動制限
+    if (enemyX < playerX + MIN_DIST) enemyX = playerX + MIN_DIST;
+    if (enemyX > GAME_W - 80) enemyX = GAME_W - 80;
+
+    enemyAI();
+  }
+  requestAnimationFrame(loop);
+}
+
+loop();
+</script>
+</body>
+</html>
