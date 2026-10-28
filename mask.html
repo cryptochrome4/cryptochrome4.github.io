@@ -313,6 +313,22 @@
     100% { transform: translateX(-50%) translateX(0); }
   }
 
+  /* ★ ライダーキック用の見た目 */
+  .fighter.rider-kicking .leg.right {
+    transform: rotate(-90deg);
+    height: 55%;
+    box-shadow: 0 0 25px #ffcc00, 0 0 50px #ff6600;
+  }
+  .fighter.facing-left.rider-kicking .leg.right {
+    transform: rotate(-3deg); height: 30%; box-shadow: none;
+  }
+  .fighter.facing-left.rider-kicking .leg.left {
+    transform: rotate(90deg); height: 55%;
+    box-shadow: 0 0 25px #ffcc00, 0 0 50px #ff6600;
+  }
+  .fighter.rider-kicking .arm.left  { transform: rotate(-60deg); }
+  .fighter.rider-kicking .arm.right { transform: rotate(60deg); }
+
   .fighter.hit { filter: brightness(3) saturate(0); }
   .fighter.block { filter: brightness(1.3) sepia(1) hue-rotate(60deg); }
 
@@ -332,6 +348,7 @@
   .fx.hit   { background: radial-gradient(circle, #fff 0%, #ffcc00 30%, #ff4400 60%, transparent 100%); box-shadow: 0 0 20px #ffcc00; }
   .fx.punch { background: radial-gradient(circle, #fff 0%, #88ddff 40%, #0088ff 70%, transparent 100%); box-shadow: 0 0 20px #00aaff; }
   .fx.kick  { background: radial-gradient(circle, #fff 0%, #ffdd88 40%, #ff8800 70%, transparent 100%); box-shadow: 0 0 25px #ffaa00; }
+  .fx.rider { background: radial-gradient(circle, #fff 0%, #ffee44 30%, #ff4400 70%, transparent 100%); box-shadow: 0 0 30px #ffcc00, 0 0 60px #ff6600; }
 
   .dmg-pop {
     position: absolute;
@@ -411,7 +428,6 @@
   }
   #game.shake { animation: shake 0.2s; }
 
-  /* ===== クリア画面 ===== */
   #clear-screen {
     position: absolute; inset: 0;
     background: radial-gradient(circle at center, #2a1a4a 0%, #000 100%);
@@ -705,7 +721,6 @@
 
     <div id="message"></div>
 
-    <!-- ===== クリア画面 ===== -->
     <div id="clear-screen">
       <h2>CLEAR!</h2>
       <p class="clear-sub">見事、ダークライダーを撃破しました</p>
@@ -872,12 +887,16 @@ const clearRetryBtn = document.getElementById('clear-retry-btn');
 const GROUND = 20;
 const GRAVITY = 0.55;
 const JUMP_POWER = 6.5;
+const JUMP_POWER_2 = 5.5;
+const MAX_JUMP = 2;
 const MOVE_SPEED = 0.55;
 const MIN_DIST = 11;
 const PUNCH_RANGE = 13;
 const KICK_RANGE = 15;
 const PUNCH_DAMAGE = 8;
 const KICK_DAMAGE = 12;
+const RIDER_KICK_DAMAGE = 15;       // ★ ライダーキックのダメージ
+const RIDER_KICK_FORWARD = 1.6;     // ★ ライダーキック中の前進量（%/frame）
 const PUNCH_DURATION = 14;
 const KICK_DURATION = 18;
 const HIT_DURATION = 10;
@@ -890,7 +909,9 @@ const P = {
   x: 22, hp: 100, facing: 1,
   state: 'idle', stateTimer: 0,
   jumpY: 0, jumpVel: 0,
+  jumpCount: 0,
   isCrouching: false, attackHitDone: false,
+  isRiderKicking: false,           // ★ ライダーキック中フラグ
 };
 const E = {
   x: 78, hp: 100, facing: -1,
@@ -905,7 +926,7 @@ let playerCanAttack = true;
 let enemyAttackCooldown = 0;
 let enemyNextAttackTimer = 60;
 let hitStopTimer = 0;
-let attackLockTimer = 0;   // ★ 攻撃ロックのタイマー方式（保険）
+let attackLockTimer = 0;
 
 const input = { left: false, right: false };
 
@@ -989,12 +1010,26 @@ clearRetryBtn.addEventListener('click', () => {
    ============================================================ */
 function tryJump(c) {
   if (!gameStarted || gameOver) return;
-  if (c.jumpY > 0) return;
   if (c.state === 'hit') return;
-  c.isCrouching = false;
-  c.jumpVel = JUMP_POWER;
-  c.state = 'jumping';
-  if (c === P) showLabel(playerMoveLbl, 'JUMP');
+
+  if (c === P) {
+    if (c.jumpCount >= MAX_JUMP) return;
+    c.isCrouching = false;
+
+    if (c.jumpCount === 0) {
+      c.jumpVel = JUMP_POWER;
+    } else {
+      c.jumpVel = JUMP_POWER_2;
+    }
+    c.jumpCount++;
+    c.state = 'jumping';
+    showLabel(playerMoveLbl, c.jumpCount === 1 ? 'JUMP' : 'JUMP×2');
+  } else {
+    if (c.jumpY > 0) return;
+    c.isCrouching = false;
+    c.jumpVel = JUMP_POWER;
+    c.state = 'jumping';
+  }
 }
 
 function tryCrouch(c, flag) {
@@ -1010,20 +1045,35 @@ function tryCrouch(c, flag) {
   }
 }
 
-/* ★ 修正：しゃがみ中・端・ヒット硬直後でも攻撃できるように */
+/* ★ 修正：ジャンプ中に KICK → ライダーキック発動 */
 function tryAttack(c, type) {
   if (!gameStarted || gameOver) return;
   if (c !== P) return;
 
-  // 攻撃中なら弾く（ここだけは維持）
+  // ライダーキック中は他の行動不可
+  if (c.isRiderKicking) return;
+
+  // 通常攻撃（地上）
   if (c.state === 'punching' || c.state === 'kicking') return;
 
-  // 空中でも攻撃不可（維持）
-  if (c.jumpY > 0) return;
+  if (c.jumpY > 0) {
+    // ★ ジャンプ中
+    if (type === 'kick') {
+      // ライダーキック発動
+      c.isRiderKicking = true;
+      c.state = 'kicking';
+      c.stateTimer = 9999;   // 着地まで継続（着地で解除）
+      c.attackHitDone = false;
+      c.isCrouching = false;
+      showLabel(playerMoveLbl, 'RIDER KICK!');
+      return;
+    }
+    // ジャンプ中のパンチは何もしない（既存のまま）
+    return;
+  }
 
-  // ★ playerCanAttack が false でも、タイマー方式で必ず復帰させる
+  // 地上攻撃（既存のまま）
   if (!playerCanAttack) {
-    // 何らかの理由でロックが残っていたら強制解除
     if (attackLockTimer <= 0) {
       playerCanAttack = true;
     } else {
@@ -1031,13 +1081,11 @@ function tryAttack(c, type) {
     }
   }
 
-  // ★ しゃがみ中なら攻撃前に解除
   if (c.isCrouching) {
     c.isCrouching = false;
     if (c.state === 'crouching') c.state = 'idle';
   }
 
-  // ★ hit 硬直中でも攻撃を受け付ける（硬直解除）
   if (c.state === 'hit') {
     c.state = 'idle';
     c.stateTimer = 0;
@@ -1090,13 +1138,16 @@ function getAttackBox(c, target) {
       type: 'punch', damage: PUNCH_DAMAGE,
     };
   } else {
-    const y = body.bottom + body.h * 0.65;
-    const range = KICK_RANGE;
+    // ★ ライダーキック中はリーチを少し伸ばす
+    const isRider = c.isRiderKicking;
+    const y = body.bottom + body.h * (isRider ? 0.5 : 0.65);
+    const range = isRider ? KICK_RANGE + 4 : KICK_RANGE;
     return {
       left:  facingRight ? body.right : body.left - range,
       right: facingRight ? body.right + range : body.left,
       bottom: y - 6, top: y + 12,
-      type: 'kick', damage: KICK_DAMAGE,
+      type: isRider ? 'rider' : 'kick',
+      damage: isRider ? RIDER_KICK_DAMAGE : KICK_DAMAGE,
     };
   }
 }
@@ -1142,10 +1193,14 @@ function applyDamage(target, amount, atkType) {
 
 function spawnFx(xPct, yPct, type) {
   const el = document.createElement('div');
-  el.className = 'fx ' + (type === 'punch' ? 'punch' : type === 'kick' ? 'kick' : 'hit');
+  let cls = 'hit';
+  if (type === 'punch') cls = 'punch';
+  else if (type === 'kick') cls = 'kick';
+  else if (type === 'rider') cls = 'rider';
+  el.className = 'fx ' + cls;
   el.style.left = xPct + '%';
   el.style.top = (100 - yPct - 4) + '%';
-  el.style.width = '10%';
+  el.style.width = (type === 'rider' ? '14%' : '10%');
   el.style.aspectRatio = '1';
   fxContainer.appendChild(el);
   setTimeout(() => el.remove(), 320);
@@ -1176,13 +1231,10 @@ function resolveAttack(attacker, defender) {
     showLabel(defender === P ? playerMoveLbl : enemyMoveLbl, 'GUARD');
     return;
   }
-  if (atkBox.type === 'kick' && defender.jumpY > 3) {
+  // キック・ライダーキックはジャンプ中の相手に当たらない
+  if ((atkBox.type === 'kick' || atkBox.type === 'rider') && defender.jumpY > 3) {
     attacker.attackHitDone = true;
     showLabel(defender === P ? playerMoveLbl : enemyMoveLbl, 'MISS');
-    return;
-  }
-  if (defender.jumpY > 3) {
-    attacker.attackHitDone = true;
     return;
   }
 
@@ -1244,7 +1296,6 @@ function updateEnemyAI() {
    更新
    ============================================================ */
 function updatePlayer() {
-  // ★ 攻撃ロックのタイマーを毎フレーム減らす
   if (attackLockTimer > 0) {
     attackLockTimer--;
     if (attackLockTimer <= 0) playerCanAttack = true;
@@ -1255,6 +1306,22 @@ function updatePlayer() {
     if (P.stateTimer <= 0) P.state = 'idle';
     return;
   }
+
+  // ★ ライダーキック中：前進しながら着地まで継続
+  if (P.isRiderKicking) {
+    // 向いている方向に前進
+    P.x += P.facing * RIDER_KICK_FORWARD;
+    // 向きは常に敵方向を維持
+    P.facing = E.x > P.x ? 1 : -1;
+    // 着地したら解除
+    if (P.jumpY <= 0) {
+      P.isRiderKicking = false;
+      P.state = 'idle';
+      P.stateTimer = 0;
+    }
+    return;
+  }
+
   if (P.state === 'punching' || P.state === 'kicking') {
     P.stateTimer--;
     if (P.stateTimer <= 0) { P.state = 'idle'; playerCanAttack = true; }
@@ -1286,6 +1353,15 @@ function updatePhysics() {
       c.jumpY += c.jumpVel;
       if (c.jumpY <= 0) {
         c.jumpY = 0; c.jumpVel = 0;
+        if (c === P) {
+          c.jumpCount = 0;
+          // ★ ライダーキック中に着地したら解除
+          if (c.isRiderKicking) {
+            c.isRiderKicking = false;
+            c.state = 'idle';
+            c.stateTimer = 0;
+          }
+        }
         if (c.state === 'jumping') c.state = 'idle';
       }
     }
@@ -1295,6 +1371,11 @@ function updatePhysics() {
 function clampPositions() {
   P.x = Math.max(5, Math.min(95, P.x));
   E.x = Math.max(5, Math.min(95, E.x));
+
+  // プレイヤーがジャンプ中 or ライダーキック中はクランプしない
+  if (P.jumpY > 3) return;
+  if (P.isRiderKicking) return;
+
   const dist = P.x - E.x;
   if (Math.abs(dist) < MIN_DIST) {
     if (dist > 0) P.x = E.x + MIN_DIST;
@@ -1314,7 +1395,8 @@ function render() {
   player.classList.toggle('jumping',   P.jumpY > 0);
   player.classList.toggle('crouching', P.isCrouching);
   player.classList.toggle('punching',  P.state === 'punching');
-  player.classList.toggle('kicking',   P.state === 'kicking');
+  player.classList.toggle('kicking',   P.state === 'kicking' && !P.isRiderKicking);
+  player.classList.toggle('rider-kicking', P.isRiderKicking);
 
   enemy.style.left = E.x + '%';
   enemy.style.bottom = (GROUND + E.jumpY) + '%';
@@ -1350,7 +1432,6 @@ function endGame(text, color) {
   message.style.display = 'block';
 
   if (text === 'YOU WIN!') {
-    // ★ クリア画面を表示（同タブで study.html へ誘導可能）
     setTimeout(() => {
       message.style.display = 'none';
       clearScreen.classList.add('active');
