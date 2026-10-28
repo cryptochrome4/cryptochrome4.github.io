@@ -688,17 +688,22 @@
 
 <script>
 /* ============================================================
-   全ボタンをフォーカス不能にする（十字キーがフォーカス移動に吸われないように）
+   全フォーカス可能要素を無効化（十字キーがフォーカス移動に吸われないように）
+   button だけでなく input / a / tabindex 付き要素も対象
    ============================================================ */
-document.querySelectorAll('button').forEach(el => {
+document.querySelectorAll('button, input, a, [tabindex]').forEach(el => {
   el.setAttribute('tabindex', '-1');
   el.addEventListener('focus', (e) => e.target.blur());
 });
-document.addEventListener('keydown', (e) => {
-  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ','Enter'].includes(e.key)) {
-    if (document.activeElement && document.activeElement !== document.body) {
-      document.activeElement.blur();
-    }
+
+/* ============================================================
+   矢印キー・Enter・Space・Tab のデフォルト動作（フォーカス移動）を
+   キャプチャ段階で完全に停止
+   ============================================================ */
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ','Enter','Tab'].includes(e.key)) {
+    e.preventDefault();
+    e.stopPropagation();
   }
 }, true);
 
@@ -869,15 +874,14 @@ document.querySelectorAll('[data-btn]').forEach(btn => {
 
 /* ============================================================
    Gamepad API（実機コントローラー）
-   - スティック（axes）と十字キー（buttons）を完全分離
-   - 十字キーのボタン番号は標準12/13/14/15のみ使用（スティックは使わない）
+   - 十字キー（buttons 12-15）のみ使用。スティック（axes）は使わない
+   - スティック＝カーソル、十字キー＝キャラ を実現
    ============================================================ */
 let gamepadPrev = { up: false, down: false };
 let gamepadDebugLogged = false;
 
 function pollGamepad() {
-  // フォーカスがボタンに残っていると十字キーがブラウザのフォーカス移動に吸われる。
-  // 毎フレーム body 以外のフォーカスを剥がす。
+  // フォーカスがどこかに残っていたら即剥がす
   if (document.activeElement && document.activeElement !== document.body) {
     document.activeElement.blur();
   }
@@ -893,7 +897,6 @@ function pollGamepad() {
     return;
   }
 
-  // デバッグ用：初回だけボタン数をログ
   if (!gamepadDebugLogged) {
     console.log('[Gamepad] id:', pad.id, 'buttons:', pad.buttons.length, 'axes:', pad.axes.length);
     gamepadDebugLogged = true;
@@ -901,8 +904,7 @@ function pollGamepad() {
 
   const btn = (i) => pad.buttons[i] && pad.buttons[i].pressed;
 
-  // ★ 十字キーのみ使用（スティック=axes は使わない）
-  // 標準マッピング: 12=上, 13=下, 14=左, 15=右
+  // 十字キーのみ使用（標準マッピング: 12=上, 13=下, 14=左, 15=右）
   const left  = btn(14);
   const right = btn(15);
   const up    = btn(12);
