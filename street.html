@@ -21,11 +21,8 @@
     gap: 8px;
   }
 
-  /* ===== ゲーム画面（拡大） ===== */
-  #game-wrap {
-    position: relative;
-    width: min(96vw, 1000px);
-  }
+  /* ===== ゲーム画面 ===== */
+  #game-wrap { position: relative; width: min(96vw, 1000px); }
   #game {
     position: relative;
     width: 100%;
@@ -46,17 +43,18 @@
     z-index: 1;
   }
 
-  /* ===== キャラ（%指定で確実に表示） ===== */
+  /* ===== キャラ（当たり判定を内部で管理） ===== */
   .fighter {
     position: absolute;
     bottom: 20%;
     width: 8%;
     height: 30%;
-    transition: bottom 0.15s, height 0.15s, filter 0.1s;
     z-index: 2;
+    transition: bottom 0.12s ease-out, height 0.12s ease-out;
   }
+
+  /* プレイヤー：仮面ライダー風 */
   #player {
-    left: 18%;
     background: linear-gradient(160deg, #ff2222 0%, #cc0000 40%, #1a1a1a 45%, #1a1a1a 100%);
     border-radius: 40% 40% 20% 20% / 30% 30% 10% 10%;
     box-shadow: inset -4px 0 8px rgba(0,0,0,0.5), 0 0 12px rgba(255,50,50,0.6);
@@ -80,12 +78,12 @@
     border-radius: 2px;
     box-shadow: 0 0 6px #ffcc00;
   }
+
+  /* 敵：ダークライダー風 */
   #enemy {
-    right: 18%;
     background: linear-gradient(200deg, #8822ff 0%, #4411aa 40%, #1a1a1a 45%, #1a1a1a 100%);
     border-radius: 40% 40% 20% 20% / 30% 30% 10% 10%;
     box-shadow: inset 4px 0 8px rgba(0,0,0,0.5), 0 0 12px rgba(150,50,255,0.6);
-    transform: scaleX(-1);
   }
   #enemy::before {
     content: '';
@@ -107,16 +105,77 @@
     box-shadow: 0 0 6px #cc00cc;
   }
 
-  .punching { transform: translateX(22px) !important; }
-  #enemy.punching { transform: scaleX(-1) translateX(22px) !important; }
-  .kicking { transform: translateX(30px) !important; filter: brightness(1.3); }
-  #enemy.kicking { transform: scaleX(-1) translateX(-30px) !important; filter: brightness(1.3); }
+  /* ===== 攻撃エフェクト（腕・脚を表現） ===== */
+  /* パンチ：前へ突き出す拳 */
+  .punch-arm {
+    position: absolute;
+    top: 35%;
+    width: 0; height: 22%;
+    background: linear-gradient(90deg, #ff4444, #ffffff);
+    border-radius: 6px;
+    opacity: 0;
+    z-index: 5;
+    transition: width 0.08s, opacity 0.08s;
+  }
+  #player .punch-arm { right: 0; transform-origin: right center; }
+  #enemy  .punch-arm { left: 0;  transform-origin: left center; }
 
-  #player.jumping { bottom: 40%; height: 26%; }
-  #player.crouching { height: 20%; }
-  #enemy.jumping { bottom: 40%; height: 26%; }
-  #enemy.crouching { height: 20%; }
+  /* キック：横へ振り上げる脚 */
+  .kick-leg {
+    position: absolute;
+    bottom: 25%;
+    width: 0; height: 20%;
+    background: linear-gradient(90deg, #ffaa44, #ffffff);
+    border-radius: 6px;
+    opacity: 0;
+    z-index: 5;
+    transition: width 0.08s, opacity 0.08s;
+  }
+  #player .kick-leg { right: 0; transform-origin: right bottom; }
+  #enemy  .kick-leg { left: 0;  transform-origin: left bottom; }
 
+  /* パンチ発動中 */
+  .fighter.punching .punch-arm {
+    width: 70%;
+    opacity: 1;
+    animation: punchStrike 0.2s ease-out;
+  }
+  @keyframes punchStrike {
+    0% { width: 0; opacity: 1; }
+    50% { width: 90%; }
+    100% { width: 70%; opacity: 0.9; }
+  }
+
+  /* キック発動中 */
+  .fighter.kicking .kick-leg {
+    width: 85%;
+    opacity: 1;
+    transform: rotate(-25deg);
+    animation: kickStrike 0.25s ease-out;
+  }
+  #enemy.kicking .kick-leg { transform: rotate(25deg); }
+  @keyframes kickStrike {
+    0% { width: 0; transform: rotate(0deg); }
+    50% { width: 100%; transform: rotate(-25deg); }
+    100% { width: 85%; transform: rotate(-25deg); }
+  }
+  @keyframes kickStrikeEnemy {
+    0% { width: 0; transform: rotate(0deg); }
+    50% { width: 100%; transform: rotate(25deg); }
+    100% { width: 85%; transform: rotate(25deg); }
+  }
+  #enemy.kicking .kick-leg { animation: kickStrikeEnemy 0.25s ease-out; }
+
+  /* ジャンプ：浮き上がる */
+  .fighter.jumping { bottom: 40% !important; height: 26% !important; }
+  /* しゃがみ：縮む */
+  .fighter.crouching { height: 18% !important; }
+
+  /* 被弾フラッシュ */
+  .fighter.hit { filter: brightness(3) !important; }
+  .fighter.block { filter: brightness(1.5) sepia(1) hue-rotate(60deg); }
+
+  /* ===== HP ===== */
   .hp-bar {
     position: absolute;
     top: 4%;
@@ -166,7 +225,17 @@
     white-space: nowrap;
   }
 
-  /* ===== オープニング（PREV画面：将来の設定/キャラ選択枠） ===== */
+  /* ===== 当たり判定の可視化（デバッグ用・半透明） ===== */
+  .hitbox {
+    position: absolute;
+    border: 2px dashed rgba(0,255,255,0.6);
+    background: rgba(0,255,255,0.1);
+    pointer-events: none;
+    z-index: 4;
+  }
+  .hitbox.active { border-color: rgba(255,0,0,0.8); background: rgba(255,0,0,0.2); }
+
+  /* ===== オープニング（PREV画面） ===== */
   #opening {
     position: absolute;
     inset: 0;
@@ -220,12 +289,7 @@
     text-shadow: 1px 1px 4px #000, 0 0 8px #000;
     text-align: center;
   }
-  /* 将来の「設定」「キャラ選択」枠（今は無効表示） */
-  .future-slot {
-    display: flex;
-    gap: 10px;
-    margin-top: 10px;
-  }
+  .future-slot { display: flex; gap: 10px; margin-top: 10px; }
   .future-btn {
     font-family: Arial, sans-serif;
     font-size: clamp(9px, 1.3vw, 12px);
@@ -236,12 +300,7 @@
     color: #888;
     cursor: not-allowed;
   }
-  .opening-buttons {
-    display: flex;
-    gap: 14px;
-    flex-wrap: wrap;
-    justify-content: center;
-  }
+  .opening-buttons { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
   .open-btn {
     font-family: 'Arial Black', sans-serif;
     font-size: clamp(14px, 2.4vw, 22px);
@@ -274,11 +333,7 @@
     z-index: 200;
   }
   #bg-viewer.active { display: flex; }
-  #bg-viewer img {
-    width: 100%;
-    height: 100%;
-    object-fit: fill;
-  }
+  #bg-viewer img { width: 100%; height: 100%; object-fit: fill; }
   #close-bg {
     position: absolute;
     top: 10px; right: 10px;
@@ -293,7 +348,7 @@
     font-weight: bold;
   }
 
-  /* ===== 情報パネル（小型・ゲーセンのみ） ===== */
+  /* ===== 情報パネル（ゲーセンのみ・小型） ===== */
   #info-panel {
     width: min(96vw, 1000px);
     background: #16162a;
@@ -308,18 +363,13 @@
     margin-bottom: 4px;
   }
   #panel-header .title {
-    font-size: 11px;
-    color: #8a8ab0;
-    font-family: Arial, sans-serif;
-    letter-spacing: 1px;
+    font-size: 11px; color: #8a8ab0;
+    font-family: Arial, sans-serif; letter-spacing: 1px;
   }
   #hint {
-    font-size: 10px;
-    color: #666688;
+    font-size: 10px; color: #666688;
     font-family: Arial, sans-serif;
   }
-
-  /* ゲーセン風コントローラー（コンパクト） */
   #pad-area {
     display: flex;
     align-items: center;
@@ -329,31 +379,21 @@
   }
   .lever-base {
     position: relative;
-    width: 120px;
-    height: 120px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    width: 120px; height: 120px;
+    display: flex; align-items: center; justify-content: center;
     flex-shrink: 0;
   }
-  .lever-dirs {
-    position: relative;
-    width: 110px;
-    height: 110px;
-  }
+  .lever-dirs { position: relative; width: 110px; height: 110px; }
   .lever-dir {
     position: absolute;
-    width: 36px;
-    height: 36px;
+    width: 36px; height: 36px;
     background: linear-gradient(180deg, #2a2a44, #16162a);
     border: 2px solid #5555aa;
     border-radius: 8px;
     color: #aaaaff;
     font-size: 15px;
     cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    display: flex; align-items: center; justify-content: center;
     touch-action: none;
     user-select: none;
     transition: transform 0.08s, filter 0.08s;
@@ -364,14 +404,9 @@
   .lever-dir[data-dir="up"]    { left: 37px; top: 0; }
   .lever-dir[data-dir="down"]  { left: 37px; bottom: 0; }
 
-  .arcade-buttons {
-    display: flex;
-    gap: 18px;
-    align-items: center;
-  }
+  .arcade-buttons { display: flex; gap: 18px; align-items: center; }
   .arcade-btn {
-    width: 68px;
-    height: 68px;
+    width: 68px; height: 68px;
     border-radius: 50%;
     color: #fff;
     font-size: 13px;
@@ -407,11 +442,21 @@
     <div id="player-move" class="move-label"></div>
     <div id="enemy-move" class="move-label"></div>
     <div id="ground"></div>
-    <div id="player" class="fighter"></div>
-    <div id="enemy" class="fighter"></div>
+
+    <!-- 当たり判定表示エリア（デバッグ可視化） -->
+    <div id="hitbox-area"></div>
+
+    <div id="player" class="fighter">
+      <div class="punch-arm"></div>
+      <div class="kick-leg"></div>
+    </div>
+    <div id="enemy" class="fighter">
+      <div class="punch-arm"></div>
+      <div class="kick-leg"></div>
+    </div>
     <div id="message"></div>
 
-    <!-- PREV画面（オープニング） -->
+    <!-- PREV画面 -->
     <div id="opening">
       <img id="opening-bg" src="img369rider.jpg" alt="背景">
       <div class="opening-inner">
@@ -428,8 +473,6 @@
           <button id="view-bg-btn" class="open-btn">背景を見る</button>
         </div>
       </div>
-
-      <!-- 背景拡大ビューア -->
       <div id="bg-viewer">
         <img src="img369rider.jpg" alt="背景拡大">
         <button id="close-bg">✕</button>
@@ -438,7 +481,7 @@
   </div>
 </div>
 
-<!-- 情報パネル（ゲーセンのみ・小型） -->
+<!-- 情報パネル（アーケードのみ） -->
 <div id="info-panel">
   <div id="panel-header">
     <span class="title">▼ CONTROLLER（アーケード）</span>
@@ -461,6 +504,12 @@
 </div>
 
 <script>
+/* ============================================================
+   座標系：ゲーム画面内を 0-100 の % で管理
+   - x: 左端0, 右端100
+   - y: 地面=0(足元), 上に行くほど+
+   ============================================================ */
+const G = document.getElementById('game');
 const player = document.getElementById('player');
 const enemy = document.getElementById('enemy');
 const playerHpFill = document.querySelector('#player-hp .hp-fill');
@@ -473,34 +522,58 @@ const bgViewer = document.getElementById('bg-viewer');
 const closeBg = document.getElementById('close-bg');
 const playerMoveLbl = document.getElementById('player-move');
 const enemyMoveLbl  = document.getElementById('enemy-move');
+const hitboxArea = document.getElementById('hitbox-area');
 
-/* ===== 状態 ===== */
-let playerHp = 100;
-let enemyHp = 100;
+/* ===== キャラ定義 ===== */
+const CHAR = {
+  player: {
+    x: 20,          // 中心X(%)
+    hp: 100,
+    facing: 1,      // 1=右向き, -1=左向き
+    state: 'idle',  // idle / walking / punching / kicking / jumping / crouching / hit
+    stateTimer: 0,
+    jumpY: 0,       // ジャンプ中の高さ(%)
+    jumpVel: 0,
+    isCrouching: false,
+  },
+  enemy: {
+    x: 80,
+    hp: 100,
+    facing: -1,
+    state: 'idle',
+    stateTimer: 0,
+    jumpY: 0,
+    jumpVel: 0,
+    isCrouching: false,
+  }
+};
 
-// %ベースの位置管理（表示崩れ防止）
-let playerX = 18;   // %
-let enemyX  = 82;   // %（左基準ではなく右からの距離で扱わないよう統一）
-let playerJumping = false;
-let playerCrouching = false;
-let playerJumpTimer = 0;
+/* ===== 物理定数 ===== */
+const GROUND_Y = 0;        // 地面の高さ(%)
+const GRAVITY = 0.6;
+const JUMP_POWER = 7;
+const MOVE_SPEED = 0.5;    // %/frame
+const MIN_DIST = 10;       // キャラ同士の最小間隔(%)
+const PUNCH_RANGE = 12;    // パンチのリーチ(%)
+const KICK_RANGE = 14;     // キックのリーチ(%)
+const PUNCH_DAMAGE = 8;
+const KICK_DAMAGE = 12;
+const PUNCH_DURATION = 12; // フレーム
+const KICK_DURATION = 16;
+const HIT_DURATION = 10;
+const ATTACK_COOLDOWN = 20;
 
-let enemyJumping = false;
-let enemyCrouching = false;
-let enemyAttackCooldown = 0;
-let enemyMoveTimer = 0;
-let enemyNextAttack = 0;
+/* ===== 入力状態 ===== */
+const input = {
+  left: false, right: false,
+  up: false, down: false,     // up=ジャンプ, down=しゃがみ
+};
 
 let gameStarted = false;
 let gameOver = false;
 let canAttack = true;
-
-const MIN_DIST = 12;      // %（キャラ同士の最小間隔）
-const JUMP_FRAMES = 40;
-const ATTACK_COOLDOWN = 18;
-const PLAYER_SPEED = 0.7; // %/frame
-
-const keys = { left: false, right: false };
+let enemyAttackCooldown = 0;
+let enemyNextAttackTimer = 60;
 
 /* ===== オープニング ===== */
 startBtn.addEventListener('click', () => {
@@ -511,34 +584,36 @@ viewBgBtn.addEventListener('click', () => bgViewer.classList.add('active'));
 closeBg.addEventListener('click', () => bgViewer.classList.remove('active'));
 
 /* ===== コントローラー入力 ===== */
-document.querySelectorAll('[data-dir]').forEach(btn => {
+function bindDir(btn) {
   const dir = btn.dataset.dir;
   const on = (e) => {
     e.preventDefault();
     btn.classList.add('pressed');
-    if (dir === 'left')  keys.left = true;
-    if (dir === 'right') keys.right = true;
-    if (dir === 'up')    doJump();
-    if (dir === 'down')  doCrouch(true);
+    if (dir === 'left')  input.left = true;
+    if (dir === 'right') input.right = true;
+    if (dir === 'up')    { input.up = true; tryJump(CHAR.player); }
+    if (dir === 'down')  { input.down = true; tryCrouch(CHAR.player, true); }
   };
   const off = (e) => {
     e.preventDefault();
     btn.classList.remove('pressed');
-    if (dir === 'left')  keys.left = false;
-    if (dir === 'right') keys.right = false;
-    if (dir === 'down')  doCrouch(false);
+    if (dir === 'left')  input.left = false;
+    if (dir === 'right') input.right = false;
+    if (dir === 'up')    input.up = false;
+    if (dir === 'down')  { input.down = false; tryCrouch(CHAR.player, false); }
   };
   btn.addEventListener('pointerdown', on);
   btn.addEventListener('pointerup', off);
   btn.addEventListener('pointerleave', off);
   btn.addEventListener('pointercancel', off);
-});
+}
+document.querySelectorAll('[data-dir]').forEach(bindDir);
 
 document.querySelectorAll('[data-btn]').forEach(btn => {
   btn.addEventListener('pointerdown', (e) => {
     e.preventDefault();
     btn.classList.add('pressed');
-    attack(btn.dataset.btn);
+    tryAttack(CHAR.player, btn.dataset.btn);
   });
   const release = () => btn.classList.remove('pressed');
   btn.addEventListener('pointerup', release);
@@ -546,171 +621,357 @@ document.querySelectorAll('[data-btn]').forEach(btn => {
   btn.addEventListener('pointercancel', release);
 });
 
-/* ===== プレイヤー動作 ===== */
-function doJump() {
+/* ===== アクション ===== */
+function tryJump(c) {
   if (!gameStarted || gameOver) return;
-  if (playerJumping) return;
-  if (playerCrouching) doCrouch(false);
-  playerJumping = true;
-  playerJumpTimer = JUMP_FRAMES;
-  player.classList.add('jumping');
-  showLabel(playerMoveLbl, 'JUMP!');
+  if (c.jumpY > 0) return;      // 空中
+  if (c.state === 'hit') return;
+  c.isCrouching = false;
+  c.jumpVel = JUMP_POWER;
+  c.state = 'jumping';
+  showLabel(c === CHAR.player ? playerMoveLbl : enemyMoveLbl, 'JUMP');
 }
 
-function doCrouch(flag) {
+function tryCrouch(c, flag) {
   if (!gameStarted || gameOver) return;
-  playerCrouching = flag;
-  if (flag && !playerJumping) {
-    player.classList.add('crouching');
-    showLabel(playerMoveLbl, 'GUARD');
-  } else {
-    player.classList.remove('crouching');
+  if (c.jumpY > 0) return;
+  c.isCrouching = flag;
+  if (flag && c.state === 'idle') {
+    c.state = 'crouching';
+    showLabel(c === CHAR.player ? playerMoveLbl : enemyMoveLbl, 'GUARD');
+  } else if (!flag && c.state === 'crouching') {
+    c.state = 'idle';
   }
 }
 
-function attack(type) {
+function tryAttack(c, type) {
   if (!gameStarted || gameOver || !canAttack) return;
-  if (playerJumping) return;
+  if (c !== CHAR.player) return;
+  if (c.state === 'punching' || c.state === 'kicking') return;
+  if (c.jumpY > 0) return;
+
   canAttack = false;
-
-  const dist = Math.abs(playerX - enemyX);
-
   if (type === 'punch') {
-    player.classList.add('punching');
+    c.state = 'punching';
+    c.stateTimer = PUNCH_DURATION;
+    c.isCrouching = false;
     showLabel(playerMoveLbl, 'PUNCH');
-    if (!playerCrouching) {
-      if (dist < 13) {
-        if (enemyCrouching) {
-          showLabel(enemyMoveLbl, 'GUARD!');
-        } else if (!enemyJumping) {
-          damageEnemy(8);
-        } else {
-          showLabel(enemyMoveLbl, 'MISS (空中)');
-        }
-      }
-    }
   } else {
-    player.classList.add('kicking');
+    c.state = 'kicking';
+    c.stateTimer = KICK_DURATION;
+    c.isCrouching = false;
     showLabel(playerMoveLbl, 'KICK');
-    if (dist < 14) {
-      if (enemyJumping) {
-        showLabel(enemyMoveLbl, 'MISS (ジャンプ)');
-      } else {
-        damageEnemy(12);
-      }
-    }
+  }
+}
+
+/* ===== 当たり判定 ===== */
+/* キャラの当たり判定ボックス（中心X, 足元Y, 幅, 高さ）を返す */
+function getHitbox(c) {
+  const baseW = 6;    // 幅(%)
+  const baseH = 30;   // 通常時の高さ(%)
+  let h = baseH;
+  if (c.isCrouching) h = 18;
+  if (c.jumpY > 0) h = 26;
+  const footY = c.jumpY;
+  return {
+    cx: c.x,
+    bottom: footY,           // 足元の高さ
+    top: footY + h,          // 頭の高さ
+    left: c.x - baseW / 2,
+    right: c.x + baseW / 2,
+    w: baseW,
+    h: h,
+  };
+}
+
+/* 攻撃の当たり判定ボックスを返す（発動中のみ有効） */
+function getAttackBox(attacker, defender) {
+  if (attacker.state !== 'punching' && attacker.state !== 'kicking') return null;
+  const hb = getHitbox(attacker);
+  const facing = attacker.x < defender.x ? 1 : -1;
+
+  if (attacker.state === 'punching') {
+    // パンチ：胸の高さ(下半身)に横方向のリーチ
+    const y = hb.bottom + hb.h * 0.45; // 胸あたり
+    const range = PUNCH_RANGE;
+    const boxLeft  = facing === 1 ? hb.right : hb.left - range;
+    const boxRight = facing === 1 ? hb.right + range : hb.left;
+    return {
+      left: boxLeft, right: boxRight,
+      bottom: y - 3, top: y + 8,
+      type: 'punch',
+      damage: PUNCH_DAMAGE,
+    };
+  } else {
+    // キック：腰〜頭の高さに横方向のリーチ
+    const y = hb.bottom + hb.h * 0.55;
+    const range = KICK_RANGE;
+    const boxLeft  = facing === 1 ? hb.right : hb.left - range;
+    const boxRight = facing === 1 ? hb.right + range : hb.left;
+    return {
+      left: boxLeft, right: boxRight,
+      bottom: y - 5, top: y + 12,
+      type: 'kick',
+      damage: KICK_DAMAGE,
+    };
+  }
+}
+
+function boxesOverlap(a, b) {
+  return !(a.right < b.left || a.left > b.right || a.top < b.bottom || a.bottom > b.top);
+}
+
+/* ===== ダメージ処理 ===== */
+function damage(target, amount, source) {
+  if (target === CHAR.player) {
+    CHAR.player.hp = Math.max(0, CHAR.player.hp - amount);
+    playerHpFill.style.width = CHAR.player.hp + '%';
+    player.classList.add('hit');
+    setTimeout(() => player.classList.remove('hit'), 120);
+  } else {
+    CHAR.enemy.hp = Math.max(0, CHAR.enemy.hp - amount);
+    enemyHpFill.style.width = CHAR.enemy.hp + '%';
+    enemy.classList.add('hit');
+    setTimeout(() => enemy.classList.remove('hit'), 120);
+  }
+  if (target.state !== 'crouching' || source.type === 'kick') {
+    target.state = 'hit';
+    target.stateTimer = HIT_DURATION;
+  }
+  checkGameOver();
+}
+
+/* ===== 攻撃ヒット判定 ===== */
+function resolveAttack(attacker, defender) {
+  const atkBox = getAttackBox(attacker, defender);
+  if (!atkBox) return;
+
+  // デバッグ可視化
+  drawHitbox(atkBox, true);
+
+  const defBox = getHitbox(defender);
+
+  // しゃがみ中：パンチは当たらない
+  if (atkBox.type === 'punch' && defender.isCrouching) {
+    showLabel(defender === CHAR.player ? playerMoveLbl : enemyMoveLbl, 'GUARD (しゃがみ)');
+    return;
+  }
+  // ジャンプ中：キックは当たらない（相手が空中にいる＝高さが合わない）
+  if (atkBox.type === 'kick' && defender.jumpY > 0) {
+    showLabel(defender === CHAR.player ? playerMoveLbl : enemyMoveLbl, 'MISS (ジャンプ)');
+    return;
   }
 
-  setTimeout(() => {
-    player.classList.remove('punching', 'kicking');
-    canAttack = true;
-  }, 200);
+  if (boxesOverlap(atkBox, defBox)) {
+    damage(defender, atkBox.damage, atkBox);
+    showLabel(attacker === CHAR.player ? enemyMoveLbl : playerMoveLbl, 'HIT!');
+  }
 }
 
-function damageEnemy(dmg) {
-  enemyHp = Math.max(0, enemyHp - dmg);
-  enemyHpFill.style.width = enemyHp + '%';
-  enemy.style.filter = 'brightness(2.2)';
-  setTimeout(() => enemy.style.filter = '', 140);
-  checkGameOver();
+/* 当たり判定を一時表示 */
+let hitboxTimers = [];
+function drawHitbox(box, active) {
+  const el = document.createElement('div');
+  el.className = 'hitbox active';
+  el.style.left = box.left + '%';
+  el.style.width = (box.right - box.left) + '%';
+  el.style.bottom = box.bottom + '%';
+  el.style.height = (box.top - box.bottom) + '%';
+  hitboxArea.appendChild(el);
+  const t = setTimeout(() => el.remove(), 100);
+  hitboxTimers.push(t);
 }
 
-function damagePlayer(dmg) {
-  playerHp = Math.max(0, playerHp - dmg);
-  playerHpFill.style.width = playerHp + '%';
-  player.style.filter = 'brightness(2.2)';
-  setTimeout(() => player.style.filter = '', 140);
-  checkGameOver();
-}
-
+/* ===== ラベル表示 ===== */
 function showLabel(el, text) {
   el.textContent = text;
   el.classList.add('show');
   clearTimeout(el._t);
-  el._t = setTimeout(() => el.classList.remove('show'), 700);
+  el._t = setTimeout(() => el.classList.remove('show'), 600);
 }
 
 /* ===== 敵AI ===== */
-function enemyAI() {
+function updateEnemyAI() {
   if (gameOver) return;
-  const dist = Math.abs(playerX - enemyX);
+  const p = CHAR.player;
+  const e = CHAR.enemy;
+  const dist = Math.abs(p.x - e.x);
 
-  if (enemyJumping) {
-    enemyMoveTimer--;
-    if (enemyMoveTimer <= 0) {
-      enemyJumping = false;
-      enemy.classList.remove('jumping');
-    }
-    return;
-  }
-  if (enemyCrouching) {
-    enemyMoveTimer--;
-    if (enemyMoveTimer <= 0) {
-      enemyCrouching = false;
-      enemy.classList.remove('crouching');
-    }
-    return;
-  }
+  // 向き
+  e.facing = p.x > e.x ? 1 : -1;
+
+  // 状態異常中は行動しない
+  if (e.state === 'hit') return;
+  if (e.jumpY > 0) return;
+  if (e.state === 'punching' || e.state === 'kicking') return;
+  if (e.state === 'crouching') return;
+
   if (enemyAttackCooldown > 0) {
     enemyAttackCooldown--;
     return;
   }
 
-  if (dist > 14) {
-    // 近づく（右→左へ）
-    enemyX -= 0.45;
-  } else {
-    if (enemyNextAttack <= 0) {
-      if (player.classList.contains('punching') && Math.random() < 0.5) {
-        enemyCrouching = true;
-        enemyMoveTimer = 25;
-        enemy.classList.add('crouching');
-        showLabel(enemyMoveLbl, 'しゃがみ回避');
-        enemyNextAttack = 40;
-      } else if (player.classList.contains('kicking') && Math.random() < 0.5) {
-        enemyJumping = true;
-        enemyMoveTimer = 25;
-        enemy.classList.add('jumping');
-        showLabel(enemyMoveLbl, 'ジャンプ回避');
-        enemyNextAttack = 40;
-      } else {
-        const useKick = Math.random() < 0.4;
-        if (useKick) {
-          enemy.classList.add('kicking');
-          showLabel(enemyMoveLbl, 'KICK');
-          if (!playerJumping && Math.abs(playerX - enemyX) < 14) {
-            damagePlayer(12);
-          }
-          setTimeout(() => enemy.classList.remove('kicking'), 200);
-        } else {
-          enemy.classList.add('punching');
-          showLabel(enemyMoveLbl, 'PUNCH');
-          if (!playerCrouching && !playerJumping && Math.abs(playerX - enemyX) < 13) {
-            damagePlayer(8);
-          } else if (playerCrouching) {
-            showLabel(playerMoveLbl, '回避成功!');
-          }
-          setTimeout(() => enemy.classList.remove('punching'), 200);
-        }
-        enemyAttackCooldown = ATTACK_COOLDOWN;
-        enemyNextAttack = 30 + Math.floor(Math.random() * 30);
-      }
-    }
+  // プレイヤーの攻撃に反応して回避（技術力）
+  if (p.state === 'punching' && dist < PUNCH_RANGE + 4 && Math.random() < 0.4) {
+    e.isCrouching = true;
+    e.state = 'crouching';
+    e.stateTimer = 20;
+    showLabel(enemyMoveLbl, 'しゃがみ回避');
+    enemyAttackCooldown = ATTACK_COOLDOWN;
+    return;
+  }
+  if (p.state === 'kicking' && dist < KICK_RANGE + 4 && Math.random() < 0.4) {
+    tryJump(e);
+    showLabel(enemyMoveLbl, 'ジャンプ回避');
+    enemyAttackCooldown = ATTACK_COOLDOWN;
+    return;
   }
 
-  if (enemyNextAttack > 0) enemyNextAttack--;
+  // 距離による行動
+  if (dist > 18) {
+    // 近づく
+    e.x += e.facing * MOVE_SPEED;
+    e.state = 'walking';
+  } else if (enemyNextAttackTimer <= 0) {
+    // 攻撃
+    const useKick = Math.random() < 0.45;
+    e.state = useKick ? 'kicking' : 'punching';
+    e.stateTimer = useKick ? KICK_DURATION : PUNCH_DURATION;
+    showLabel(enemyMoveLbl, useKick ? 'KICK' : 'PUNCH');
+    enemyAttackCooldown = ATTACK_COOLDOWN;
+    enemyNextAttackTimer = 40 + Math.floor(Math.random() * 40);
+  } else {
+    enemyNextAttackTimer--;
+    if (Math.random() < 0.3) {
+      e.x += e.facing * MOVE_SPEED * 0.5;
+    }
+  }
+}
 
-  // 位置制限（%）
-  if (enemyX < playerX + MIN_DIST) enemyX = playerX + MIN_DIST;
-  if (enemyX > 92) enemyX = 92;
+/* ===== 更新処理 ===== */
+function updatePlayer() {
+  const p = CHAR.player;
+  p.facing = enemy.x > p.x ? 1 : -1;
+
+  if (p.state === 'hit') {
+    p.stateTimer--;
+    if (p.stateTimer <= 0) p.state = 'idle';
+    return;
+  }
+  if (p.state === 'punching' || p.state === 'kicking') {
+    p.stateTimer--;
+    if (p.stateTimer <= 0) {
+      p.state = 'idle';
+      canAttack = true;
+    }
+    return;
+  }
+
+  // 移動
+  if (p.jumpY > 0) {
+    // 空中移動も可能
+    if (input.left)  p.x -= MOVE_SPEED * 0.7;
+    if (input.right) p.x += MOVE_SPEED * 0.7;
+  } else {
+    if (input.left && !input.down)  p.x -= MOVE_SPEED;
+    if (input.right && !input.down) p.x += MOVE_SPEED;
+    if (!input.left && !input.right && !p.isCrouching) p.state = 'idle';
+    if ((input.left || input.right) && !p.isCrouching) p.state = 'walking';
+  }
+
+  // 位置制限
+  p.x = Math.max(4, Math.min(96, p.x));
+  // 敵との最小間隔
+  const dist = p.x - CHAR.enemy.x;
+  if (Math.abs(dist) < MIN_DIST) {
+    if (dist > 0) p.x = CHAR.enemy.x + MIN_DIST;
+    else p.x = CHAR.enemy.x - MIN_DIST;
+  }
+}
+
+function updatePhysics() {
+  [CHAR.player, CHAR.enemy].forEach(c => {
+    if (c.jumpY > 0 || c.jumpVel > 0) {
+      c.jumpVel -= GRAVITY;
+      c.jumpY += c.jumpVel;
+      if (c.jumpY <= 0) {
+        c.jumpY = 0;
+        c.jumpVel = 0;
+        if (c.state === 'jumping') c.state = 'idle';
+      }
+    }
+  });
+}
+
+function updateStates() {
+  [CHAR.player, CHAR.enemy].forEach(c => {
+    if (c.state === 'hit') {
+      c.stateTimer--;
+      if (c.stateTimer <= 0) c.state = 'idle';
+    }
+    if (c.state === 'punching' || c.state === 'kicking') {
+      c.stateTimer--;
+      if (c.stateTimer <= 0) {
+        c.state = 'idle';
+        if (c === CHAR.player) canAttack = true;
+      }
+    }
+    if (c.state === 'crouching') {
+      c.stateTimer--;
+      if (c.stateTimer <= 0 && !c.isCrouching) c.state = 'idle';
+    }
+  });
+}
+
+/* ===== 描画 ===== */
+function render() {
+  [CHAR.player, CHAR.enemy].forEach((c, i) => {
+    const el = i === 0 ? player : enemy;
+    // 位置
+    el.style.left = c.x + '%';
+    el.style.transform = `translateX(-50%)`;
+
+    // ジャンプ
+    if (c.jumpY > 0) {
+      el.classList.add('jumping');
+      el.style.bottom = (20 + c.jumpY) + '%';
+    } else {
+      el.classList.remove('jumping');
+      el.style.bottom = '20%';
+    }
+
+    // しゃがみ
+    if (c.isCrouching && c.jumpY === 0) el.classList.add('crouching');
+    else el.classList.remove('crouching');
+
+    // 状態クラス
+    el.classList.toggle('punching', c.state === 'punching');
+    el.classList.toggle('kicking', c.state === 'kicking');
+  });
+}
+
+/* ===== ゲームループ ===== */
+function loop() {
+  if (gameStarted && !gameOver) {
+    updatePlayer();
+    updateEnemyAI();
+    updatePhysics();
+    updateStates();
+
+    // 攻撃ヒット判定（両者）
+    resolveAttack(CHAR.player, CHAR.enemy);
+    resolveAttack(CHAR.enemy, CHAR.player);
+
+    render();
+  }
+  requestAnimationFrame(loop);
 }
 
 /* ===== 勝敗 ===== */
 function checkGameOver() {
-  if (enemyHp <= 0) endGame('YOU WIN!', '#00ff44');
-  else if (playerHp <= 0) endGame('YOU LOSE...', '#ff3344');
+  if (CHAR.enemy.hp <= 0) endGame('YOU WIN!', '#00ff44');
+  else if (CHAR.player.hp <= 0) endGame('YOU LOSE...', '#ff3344');
 }
-
 function endGame(text, color) {
   if (gameOver) return;
   gameOver = true;
@@ -724,31 +985,8 @@ function endGame(text, color) {
   }
 }
 
-/* ===== メインループ ===== */
-function loop() {
-  if (gameStarted && !gameOver) {
-    // プレイヤー移動（%）
-    if (keys.left && playerX > 4) playerX -= PLAYER_SPEED;
-    if (keys.right && playerX < enemyX - MIN_DIST) playerX += PLAYER_SPEED;
-
-    // ジャンプカウントダウン
-    if (playerJumping) {
-      playerJumpTimer--;
-      if (playerJumpTimer <= 0) {
-        playerJumping = false;
-        player.classList.remove('jumping');
-      }
-    }
-
-    enemyAI();
-
-    // 位置反映（%指定で確実に表示）
-    player.style.left = playerX + '%';
-    enemy.style.right = (100 - enemyX) + '%';
-  }
-  requestAnimationFrame(loop);
-}
-
+/* 初期描画 */
+render();
 loop();
 </script>
 </body>
