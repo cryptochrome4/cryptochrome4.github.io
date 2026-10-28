@@ -947,6 +947,24 @@
 
 <script>
 /* ============================================================
+   十字キーによるフォーカス移動を完全無効化
+   （コントローラー十字キーがボタンに吸い込まれるのを防ぐ）
+   ============================================================ */
+document.querySelectorAll('[data-dir], [data-btn]').forEach(el => {
+  el.setAttribute('tabindex', '-1');
+  el.addEventListener('focus', (e) => e.target.blur());
+});
+
+// 矢印キーでフォーカスが動かないようにする
+document.addEventListener('keydown', (e) => {
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) {
+    if (document.activeElement && document.activeElement.tagName === 'BUTTON') {
+      document.activeElement.blur();
+    }
+  }
+}, true);
+
+/* ============================================================
    ビル群を生成
    ============================================================ */
 (function generateSkyline() {
@@ -1116,6 +1134,54 @@ document.querySelectorAll('[data-btn]').forEach(btn => {
 
   btn.addEventListener('contextmenu', (e) => e.preventDefault());
 });
+
+/* ============================================================
+   Gamepad API（実機コントローラーの十字キー）
+   ============================================================ */
+let gamepadPrev = { up: false, down: false };
+const DEADZONE = 0.4;
+
+function pollGamepad() {
+  // 十字キーでフォーカスがボタンに飛ぶのを毎フレーム防ぐ
+  if (document.activeElement && document.activeElement.tagName === 'BUTTON') {
+    document.activeElement.blur();
+  }
+
+  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+  let pad = null;
+  for (let i = 0; i < pads.length; i++) {
+    if (pads[i] && pads[i].connected) { pad = pads[i]; break; }
+  }
+  if (!pad) {
+    gamepadPrev.up = false;
+    gamepadPrev.down = false;
+    return;
+  }
+
+  const btn = (i) => pad.buttons[i] && pad.buttons[i].pressed;
+  const axisX = pad.axes[0] || 0;
+  const axisY = pad.axes[1] || 0;
+
+  // 十字キー（標準: 12=上, 13=下, 14=左, 15=右）＋左スティック
+  const left  = btn(14) || axisX < -DEADZONE;
+  const right = btn(15) || axisX >  DEADZONE;
+  const up    = btn(12) || axisY < -DEADZONE;
+  const down  = btn(13) || axisY >  DEADZONE;
+
+  // 左右は押している間ずっと反映
+  input.left  = left;
+  input.right = right;
+
+  // 上は押した瞬間だけジャンプ
+  if (up && !gamepadPrev.up) tryJump(P);
+
+  // 下は押している間しゃがみ
+  if (down && !gamepadPrev.down) tryCrouch(P, true);
+  if (!down && gamepadPrev.down) tryCrouch(P, false);
+
+  gamepadPrev.up = up;
+  gamepadPrev.down = down;
+}
 
 /* ============================================================
    オープニング
@@ -1485,6 +1551,7 @@ function loop() {
     if (hitStopTimer > 0) {
       hitStopTimer--;
     } else {
+      pollGamepad();
       updatePlayer();
       updateEnemyAI();
       updatePhysics();
