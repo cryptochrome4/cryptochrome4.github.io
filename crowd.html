@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CROWD — Character Portfolio</title>
+<style>
+  /* ============================================
+     DESIGN TOKENS  (nontitle風: 黒×白×アクセント黄)
+  ============================================ */
+  :root {
+    --bg: #0a0a0a;
+    --bg-card: #141414;
+    --bg-panel: #101010;
+    --fg: #f5f5f5;
+    --fg-dim: #8a8a8a;
+    --line: #2a2a2a;
+    --accent: #e8ff3a;      /* 蛍光イエロー */
+    --accent-dim: rgba(232,255,58,0.15);
+    --card-width: clamp(130px, 18vw, 190px);
+    --card-gap: clamp(10px, 1.6vw, 20px);
+    --speed: 45s;
+    --img-fit: cover;        /* ← デフォルト。JSで切替 */
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: "Helvetica Neue", "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    letter-spacing: 0.02em;
+  }
+
+  body { padding-bottom: 80px; }
+
+  /* ============================================
+     HEADER
+  ============================================ */
+  .header {
+    padding: 48px clamp(20px, 6vw, 80px) 32px;
+    border-bottom: 1px solid var(--line);
+  }
+  .header__label {
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+  .header__title {
+    font-size: clamp(28px, 6vw, 64px);
+    font-weight: 800;
+    line-height: 0.95;
+    letter-spacing: -0.02em;
+    text-transform: uppercase;
+  }
+  .header__title span {
+    color: var(--accent);
+  }
+  .header__sub {
+    margin-top: 20px;
+    font-size: clamp(12px, 1.6vw, 14px);
+    color: var(--fg-dim);
+    max-width: 560px;
+    line-height: 1.7;
+  }
+
+  /* ============================================
+     SLIDER
+  ============================================ */
+  .slider-section {
+    padding: 40px 0 24px;
+    border-bottom: 1px solid var(--line);
+  }
+  .slider-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 clamp(20px, 6vw, 80px) 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .slider-head__title {
+    font-size: 12px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--fg-dim);
+  }
+  .fit-switch {
+    display: flex;
+    gap: 6px;
+  }
+  .fit-switch button {
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--fg-dim);
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding: 7px 14px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.2s;
+    font-family: inherit;
+  }
+  .fit-switch button:hover {
+    color: var(--fg);
+    border-color: var(--fg-dim);
+  }
+  .fit-switch button.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #000;
+    font-weight: 700;
+  }
+
+  .slider {
+    overflow: hidden;
+    width: 100%;
+    position: relative;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+            mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+  }
+  .track {
+    display: flex;
+    gap: var(--card-gap);
+    width: max-content;
+    animation: scroll-left var(--speed) linear infinite;
+    will-change: transform;
+  }
+  .slider:hover .track,
+  .slider.paused .track {
+    animation-play-state: paused;
+  }
+  @keyframes scroll-left {
+    from { transform: translateX(0); }
+    to   { transform: translateX(calc(-50% - var(--card-gap) / 2)); }
+  }
+
+  /* ============================================
+     CARD
+  ============================================ */
+  .card {
+    flex: 0 0 var(--card-width);
+    width: var(--card-width);
+    aspect-ratio: 3 / 4;
+    background: var(--bg-card);
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    transition: border-color 0.2s, transform 0.25s;
+  }
+  .card img {
+    width: 100%;
+    height: 100%;
+    object-fit: var(--img-fit);   /* ← 切替用 */
+    display: block;
+    pointer-events: none;
+    filter: grayscale(15%);
+    transition: filter 0.25s, transform 0.4s;
+  }
+  .card:hover {
+    transform: translateY(-4px);
+  }
+  .card:hover img {
+    filter: grayscale(0%);
+    transform: scale(1.04);
+  }
+  .card.selected {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent), 0 0 24px rgba(232,255,58,0.2);
+  }
+  .card.selected img {
+    filter: grayscale(0%);
+  }
+  .card__badge {
+    position: absolute;
+    top: 8px; left: 8px;
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    background: rgba(0,0,0,0.75);
+    color: var(--accent);
+    padding: 3px 7px;
+    border: 1px solid var(--accent);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .card.selected .card__badge { opacity: 1; }
+
+  /* ============================================
+     INFO PANEL
+  ============================================ */
+  .panel-section {
+    padding: 48px clamp(20px, 6vw, 80px);
+  }
+  .panel {
+    max-width: 1100px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+
+  .panel__empty {
+    text-align: center;
+    padding: 80px 20px;
+    color: var(--fg-dim);
+    font-size: 13px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    border: 1px dashed var(--line);
+  }
+  .panel__empty span { color: var(--accent); }
+
+  /* キャラヘッダー */
+  .char-head {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: clamp(20px, 4vw, 48px);
+    align-items: end;
+    padding-bottom: 32px;
+    border-bottom: 1px solid var(--line);
+  }
+  .char-head__img {
+    width: clamp(120px, 20vw, 200px);
+    aspect-ratio: 3 / 4;
+    object-fit: var(--img-fit);
+    border: 1px solid var(--line);
+    display: block;
+  }
+  .char-head__meta { min-width: 0; }
+  .char-head__no {
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+  .char-head__name {
+    font-size: clamp(32px, 6vw, 64px);
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    word-break: break-word;
+  }
+  .char-head__type {
+    margin-top: 12px;
+    font-size: clamp(13px, 2vw, 16px);
+    color: var(--fg-dim);
+    line-height: 1.6;
+  }
+
+  /* 総投資額 */
+  .total-block {
+    padding: 32px 0;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .total-block__label {
+    font-size: 11px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--fg-dim);
+  }
+  .total-block__value {
+    font-size: clamp(28px, 5vw, 44px);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--accent);
+  }
+  .total-block__value small {
+    font-size: 0.5em;
+    color: var(--fg-dim);
+    font-weight: 400;
+    margin-left: 6px;
+  }
+
+  /* カテゴリ（国内株 / 米国株） */
+  .cat { padding: 32px 0; border-bottom: 1px solid var(--line); }
+  .cat:last-child { border-bottom: none; }
+  .cat__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .cat__title {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+  .cat__title::before {
+    content: '';
+    display: inline-block;
+    width: 10px; height: 10px;
+    background: var(--accent);
+    margin-right: 10px;
+    transform: translateY(-1px);
+  }
+  .cat__sum {
+    font-size: 12px;
+    color: var(--fg-dim);
+    letter-spacing: 0.05em;
+  }
+
+  .holding {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 16px;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .holding:last-child { border-bottom: none; }
+  .holding__name {
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .holding__code {
+    font-size: 11px;
+    color: var(--fg-dim);
+    margin-left: 8px;
+    letter-spacing: 0.05em;
+  }
+  .holding__amount {
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    font-weight: 600;
+  }
+  .holding__pct {
+    font-size: 12px;
+    color: var(--fg-dim);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    width: 56px;
+  }
+
+  /* バー */
+  .holding__bar {
+    grid-column: 1 / -1;
+    height: 2px;
+    background: var(--line);
+    margin-top: 6px;
+    position: relative;
+    overflow: hidden;
+  }
+  .holding__bar-fill {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    background: var(--accent);
+    transition: width 0.4s ease;
+  }
+
+  /* レスポンシブ */
+  @media (max-width: 640px) {
+    .char-head { grid-template-columns: 1fr; align-items: start; }
+    .char-head__img { width: 120px; }
+    .holding { grid-template-columns: 1fr auto; }
+    .holding__pct { width: auto; }
+    .holding__bar { grid-column: 1 / -1; }
+  }
+
+  /* フッター */
+  .footer {
+    padding: 40px clamp(20px, 6vw, 80px);
+    border-top: 1px solid var(--line);
+    text-align: center;
+    font-size: 10px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--fg-dim);
+  }
+</style>
+</head>
+<body>
+
+  <!-- ============ HEADER ============ -->
+  <header class="header">
+    <div class="header__label">Character Portfolio / No.01</div>
+    <h1 class="header__title">
+      誰の<span>ポートフォリオ</span><br>見てみる？
+    </h1>
+    <p class="header__sub">
+      17人のキャラクターから1人を選んでください。<br>
+      性格がにじみ出る株式配分を、100万円台で再現しています。
+    </p>
+  </header>
+
+  <!-- ============ SLIDER ============ -->
+  <section class="slider-section">
+    <div class="slider-head">
+      <div class="slider-head__title">Select Character ── 自動で流れます / ホバーで停止</div>
+      <div class="fit-switch" id="fitSwitch">
+        <button data-fit="cover" class="active">COVER</button>
+        <button data-fit="fill">FILL</button>
+        <button data-fit="contain">CONTAIN</button>
+      </div>
+    </div>
+    <div class="slider" id="slider">
+      <div class="track" id="track"></div>
+    </div>
+  </section>
+
+  <!-- ============ INFO PANEL ============ -->
+  <section class="panel-section">
+    <div class="panel" id="panel">
+      <div class="panel__empty" id="panelEmpty">
+        キャラクターを選択してください <span>↑</span>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">© CROWD — Character Portfolio</footer>
+
+<script>
+/* ============================================================
+   銘柄マスタ（国内・米国）
+============================================================ */
+const JP_STOCKS = {
+  SHIFT:  { name: "SHIFT",              code: "3697" },
+  NTT:    { name: "NTT",                code: "9432" },
+  AEON:   { name: "イオン",             code: "8267" },
+  VALTES: { name: "バルテスHD",         code: "4442" },
+  TREND:  { name: "トレンド",           code: "4704" },
+  DIGIHA: { name: "デジハHD",           code: "3676" },
+  POLE:   { name: "ポールHD",           code: "3657" },
+  MEMBERS:{ name: "メンバーズ",         code: "2130" },
+  GMO:    { name: "GMO",                code: "9449" },
+  SAKURA: { name: "さくらインターネット", code: "3778" },
+  KEPCO:  { name: "関西電力",           code: "9503" },
+  TEPCO:  { name: "東電力HD",           code: "9501" },
+};
+
+const US_STOCKS = {
+  NVDA:  { name: "エヌビディア",                     ticker: "NVDA" },
+  AAPL:  { name: "アップル",                         ticker: "AAPL" },
+  TSLA:  { name: "テスラ",                           ticker: "TSLA" },
+  MSFT:  { name: "マイクロソフト",                   ticker: "MSFT" },
+  AMZN:  { name: "アマゾン ドット コム",             ticker: "AMZN" },
+  GTLB:  { name: "ギットラブ インク A",              ticker: "GTLB" },
+  U:     { name: "ユニティ ソフトウェア",            ticker: "U" },
+  DDOG:  { name: "データドッグ A",                   ticker: "DDOG" },
+  ACN:   { name: "アクセンチュア A",                 ticker: "ACN" },
+  EPAM:  { name: "EPAMシステムズ",                   ticker: "EPAM" },
+  CTSH:  { name: "コグニザント テクノロジー ソリューション A", ticker: "CTSH" },
+  IBM:   { name: "インターナショナル ビジネス マシーンズ", ticker: "IBM" },
+  DOCN:  { name: "デジタルオーシャン",               ticker: "DOCN" },
+  AMD:   { name: "アドバンスド マイクロ デバイシズ", ticker: "AMD" },
+  CRWD:  { name: "クラウドストライク ホールディングス A", ticker: "CRWD" },
+  PANW:  { name: "パロアルト ネットワークス",        ticker: "PANW" },
+  ORCL:  { name: "オラクル",                         ticker: "ORCL" },
+};
+
+/* ============================================================
+   キャラクターデータ
+   - jp / us: { key: 金額 } 形式
+   - 和田/あいかは isVariant: true でどちらか一方をランダム表示
+============================================================ */
+const CHARACTERS = [
+  {
+    id: 1, name: "ハマ", type: "陰キャ公認会計士",
+    img: "img372nontitle.jpg",
+    jp: { NTT: 180000, KEPCO: 150000, TEPCO: 80000, MEMBERS: 60000 },
+    us: { IBM: 180000, ACN: 150000, ORCL: 100000 },
+  },
+  {
+    id: 2, name: "モーリー", type: "陰キャ社長",
+    img: "img373nontitle.jpg",
+    jp: { SHIFT: 80000, GMO: 60000 },
+    us: { NVDA: 220000, MSFT: 180000, CRWD: 150000, DDOG: 120000, ORCL: 90000 },
+  },
+  {
+    id: 3, name: "グッチ", type: "土方労働者のパワー系",
+    img: "img374nontitle.jpg",
+    jp: { AEON: 200000, SHIFT: 100000, KEPCO: 80000, TEPCO: 60000 },
+    us: { AMD: 150000, TSLA: 120000, AAPL: 100000, IBM: 90000 },
+  },
+  {
+    id: 4, name: "松崎", type: "入れ墨ラッパーヤンキー",
+    img: "img375nontitle.jpg",
+    jp: { SHIFT: 80000, SAKURA: 60000, GMO: 50000 },
+    us: { TSLA: 220000, AMD: 180000, CRWD: 150000, U: 130000, PANW: 130000 },
+  },
+  {
+    id: 5, name: "松葉", type: "背が高く顔も良しだがポンコツ君",
+    img: "img376nontitle.jpg",
+    jp: { NTT: 100000, SHIFT: 80000, AEON: 60000, TREND: 50000, KEPCO: 50000 },
+    us: { AAPL: 120000, MSFT: 100000, NVDA: 100000, ORCL: 90000, IBM: 50000, ACN: 50000 },
+  },
+  {
+    id: 6, name: "藤巻", type: "優等生男子",
+    img: "img377nontitle.jpg",
+    jp: { NTT: 220000, KEPCO: 150000, TEPCO: 80000 },
+    us: { AAPL: 200000, MSFT: 180000, ORCL: 120000, IBM: 50000 },
+  },
+  {
+    id: 7, name: "青木", type: "パワハラ気質だか社会性の高い人",
+    img: "img378nontitle.jpg",
+    jp: { SHIFT: 200000, TREND: 150000, GMO: 120000, VALTES: 80000 },
+    us: { ORCL: 180000, ACN: 150000, NVDA: 120000 },
+  },
+  {
+    // 和田 / あいか ランダム枠
+    id: 8, isVariant: true,
+    variants: [
+      { name: "和田", img: "img379nontitle.jpg" },
+      { name: "あいか", img: "img380nontitle.jpg" },
+    ],
+    type: "ギャル",
+    jp: { AEON: 150000, SAKURA: 100000, SHIFT: 80000, GMO: 60000 },
+    us: { TSLA: 150000, AAPL: 120000, NVDA: 120000, U: 120000, CRWD: 100000 },
+  },
+  {
+    id: 9, name: "ニコ", type: "優等生女子",
+    img: "img381nontitle.jpg",
+    jp: { NTT: 180000, KEPCO: 120000, SHIFT: 80000 },
+    us: { MSFT: 200000, NVDA: 150000, AAPL: 120000, ORCL: 150000 },
+  },
+  {
+    id: 10, name: "まりな", type: "上品な女アイドル",
+    img: "img382nontitle.jpg",
+    jp: { NTT: 200000, KEPCO: 150000, TEPCO: 100000 },
+    us: { AAPL: 200000, ORCL: 150000, MSFT: 120000, IBM: 80000 },
+  },
+  {
+    id: 11, name: "エリナ", type: "女性の権利を主張するバツイチのグラビア女",
+    img: "img383nontitle.jpg",
+    jp: { SHIFT: 100000, SAKURA: 60000 },
+    us: { NVDA: 220000, MSFT: 200000, AMD: 180000, AAPL: 140000, CRWD: 100000 },
+  },
+  {
+    id: 12, name: "工場長", type: "工場で働く人",
+    img: "img384nontitle.jpg",
+    jp: { NTT: 220000, KEPCO: 180000, TEPCO: 150000, AEON: 100000 },
+    us: { IBM: 150000, ACN: 100000, MSFT: 100000 },
+  },
+  {
+    id: 13, name: "能戸", type: "借金まみれのパチンカス",
+    img: "img385nontitle.jpg",
+    jp: { SAKURA: 60000, SHIFT: 40000 },
+    us: { NVDA: 250000, TSLA: 220000, U: 180000, DOCN: 150000, AMD: 100000 },
+  },
+  {
+    id: 14, name: "為国", type: "成績優秀の営業マンだがリアリティーショーに参加すると尖ってる人",
+    img: "img386nontitle.jpg",
+    jp: { SHIFT: 150000, VALTES: 100000, TREND: 80000, GMO: 70000 },
+    us: { ACN: 150000, ORCL: 120000, MSFT: 120000, NVDA: 110000, CTSH: 100000 },
+  },
+  {
+    id: 15, name: "せお丸", type: "バンドマンのプログラマー",
+    img: "img387nontitle.jpg",
+    jp: { SAKURA: 180000, GMO: 150000, SHIFT: 120000, DIGIHA: 80000 },
+    us: { GTLB: 150000, DDOG: 150000, EPAM: 100000, MSFT: 70000 },
+  },
+  {
+    id: 16, name: "のすけ", type: "親が金持ちの慶応のちゃら男",
+    img: "img388nontitle.jpg",
+    jp: { AEON: 100000, NTT: 80000, SHIFT: 80000, KEPCO: 60000 },
+    us: { AAPL: 120000, NVDA: 120000, MSFT: 100000, AMZN: 100000, TSLA: 80000, ORCL: 80000, IBM: 60000 },
+  },
+  {
+    id: 17, name: "かな", type: "一般的な主婦",
+    img: "img389nontitle.jpg",
+    jp: { NTT: 220000, AEON: 180000, KEPCO: 180000, TEPCO: 100000 },
+    us: { AAPL: 150000, MSFT: 100000, ORCL: 70000 },
+  },
+];
+
+/* ============================================================
+   ユーティリティ
+============================================================ */
+function resolveCharacter(c) {
+  // 和田/あいかランダム解決
+  if (c.isVariant) {
+    const v = c.variants[Math.floor(Math.random() * c.variants.length)];
+    return { ...c, name: v.name, img: v.img };
+  }
+  return { ...c };
+}
+
+function sumValues(obj) {
+  return Object.values(obj).reduce((a, b) => a + b, 0);
+}
+
+/* ============================================================
+   スライダー生成（2セットで無限ループ）
+============================================================ */
+const track = document.getElementById('track');
+
+// ランダム解決済みのキャラ配列を作成（ページロード時1回）
+const RESOLVED = CHARACTERS.map(resolveCharacter);
+
+function createCard(char) {
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.dataset.id = char.id;
+  card.innerHTML = `
+    <img src="${char.img}" alt="${char.name}" loading="lazy" />
+    <div class="card__badge">SELECTED</div>
+  `;
+  card.addEventListener('click', () => selectCharacter(char.id));
+  return card;
+}
+
+function initSlider() {
+  track.innerHTML = '';
+  for (let set = 0; set < 2; set++) {
+    RESOLVED.forEach(char => track.appendChild(createCard(char)));
+  }
+}
+
+/* ============================================================
+   選択処理 → 情報パネル描画
+============================================================ */
+const panel = document.getElementById('panel');
+
+function selectCharacter(id) {
+  // 選択状態の反映（2セット分すべて）
+  document.querySelectorAll('.card').forEach(el => el.classList.remove('selected'));
+  document.querySelectorAll(`.card[data-id="${id}"]`).forEach(el => el.classList.add('selected'));
+
+  const char = RESOLVED.find(c => c.id === id);
+  if (!char) return;
+  renderPanel(char);
+}
+
+function formatYen(n) {
+  return '¥' + n.toLocaleString('ja-JP');
+}
+
+function renderPanel(char) {
+  const jpTotal = sumValues(char.jp);
+  const usTotal = sumValues(char.us);
+  const total = jpTotal + usTotal;
+
+  // 国内株ソート（金額降順）
+  const jpList = Object.entries(char.jp)
+    .map(([key, amount]) => ({ ...JP_STOCKS[key], amount }))
+    .sort((a, b) => b.amount - a.amount);
+
+  const usList = Object.entries(char.us)
+    .map(([key, amount]) => ({ ...US_STOCKS[key], amount }))
+    .sort((a, b) => b.amount - a.amount);
+
+  const pct = (n) => ((n / total) * 100).toFixed(1) + '%';
+
+  const renderHoldings = (list, isUS) => list.map(h => `
+    <div class="holding">
+      <div class="holding__name">
+        ${h.name}
+        <span class="holding__code">${isUS ? h.ticker : h.code}</span>
+      </div>
+      <div class="holding__amount">${formatYen(h.amount)}</div>
+      <div class="holding__pct">${pct(h.amount)}</div>
+      <div class="holding__bar">
+        <div class="holding__bar-fill" style="width:${pct(h.amount)}"></div>
+      </div>
+    </div>
+  `).join('');
+
+  panel.innerHTML = `
+    <div class="char-head">
+      <img class="char-head__img" src="${char.img}" alt="${char.name}" />
+      <div class="char-head__meta">
+        <div class="char-head__no">No.${String(char.id).padStart(2, '0')} / Character</div>
+        <div class="char-head__name">${char.name}</div>
+        <div class="char-head__type">${char.type}</div>
+      </div>
+    </div>
+
+    <div class="total-block">
+      <div class="total-block__label">Total Investment</div>
+      <div class="total-block__value">${formatYen(total)}<small>総投資額</small></div>
+    </div>
+
+    <div class="cat">
+      <div class="cat__head">
+        <div class="cat__title">国内株式</div>
+        <div class="cat__sum">${formatYen(jpTotal)} ・ ${pct(jpTotal)}</div>
+      </div>
+      ${renderHoldings(jpList, false)}
+    </div>
+
+    <div class="cat">
+      <div class="cat__head">
+        <div class="cat__title">米国株式</div>
+        <div class="cat__sum">${formatYen(usTotal)} ・ ${pct(usTotal)}</div>
+      </div>
+      ${renderHoldings(usList, true)}
+    </div>
+  `;
+}
+
+/* ============================================================
+   object-fit 切替
+============================================================ */
+document.getElementById('fitSwitch').addEventListener('click', (e) => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  const fit = btn.dataset.fit;
+
+  document.documentElement.style.setProperty('--img-fit', fit);
+  document.querySelectorAll('#fitSwitch button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+});
+
+/* ============================================================
+   起動
+============================================================ */
+initSlider();
+</script>
+</body>
+</html>
