@@ -17,7 +17,7 @@
     --line: #2a2a2a;
     --accent: #e8ff3a;      /* 蛍光イエロー */
     --accent-dim: rgba(232,255,58,0.15);
-    --card-width: clamp(130px, 18vw, 190px);
+    --card-width: clamp(130px, 18vw, 190px);  /* ★サイズ据え置き */
     --card-gap: clamp(10px, 1.6vw, 20px);
     --speed: 45s;
     --img-fit: cover;        /* ← デフォルト。JSで切替 */
@@ -140,7 +140,7 @@
   }
 
   /* ============================================
-     CARD
+     CARD  (★サイズ変更なし / 回転演出だけ追加)
   ============================================ */
   .card {
     flex: 0 0 var(--card-width);
@@ -152,6 +152,8 @@
     overflow: hidden;
     border: 1px solid var(--line);
     transition: border-color 0.2s, transform 0.25s;
+    perspective: 800px;             /* ★回転用の奥行き */
+    transform-style: preserve-3d;   /* ★3D保持 */
   }
   .card img {
     width: 100%;
@@ -161,6 +163,7 @@
     pointer-events: none;
     filter: grayscale(15%);
     transition: filter 0.25s, transform 0.4s;
+    backface-visibility: hidden;    /* ★裏面見せない */
   }
   .card:hover {
     transform: translateY(-4px);
@@ -190,6 +193,16 @@
     transition: opacity 0.2s;
   }
   .card.selected .card__badge { opacity: 1; }
+
+  /* ★ 選択時の回転演出（カードサイズは不変） */
+  .card.spin img {
+    animation: card-spin 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  @keyframes card-spin {
+    0%   { transform: rotateY(0deg)   scale(1); }
+    50%  { transform: rotateY(180deg) scale(0.96); }
+    100% { transform: rotateY(360deg) scale(1); }
+  }
 
   /* ============================================
      INFO PANEL
@@ -224,6 +237,7 @@
     align-items: end;
     padding-bottom: 32px;
     border-bottom: 1px solid var(--line);
+    perspective: 900px;             /* ★回転用 */
   }
   .char-head__img {
     width: clamp(120px, 20vw, 200px);
@@ -231,7 +245,18 @@
     object-fit: var(--img-fit);
     border: 1px solid var(--line);
     display: block;
+    backface-visibility: hidden;
   }
+  /* ★ パネル画像の回転イン */
+  .char-head__img.panel-in {
+    animation: panel-spin-in 0.55s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  @keyframes panel-spin-in {
+    0%   { opacity: 0; transform: rotateY(90deg); }
+    60%  { opacity: 1; transform: rotateY(-12deg); }
+    100% { opacity: 1; transform: rotateY(0deg); }
+  }
+
   .char-head__meta { min-width: 0; }
   .char-head__no {
     font-size: 11px;
@@ -464,124 +489,70 @@ const US_STOCKS = {
 
 /* ============================================================
    キャラクターデータ
-   - jp / us: { key: 金額 } 形式
-   - 和田/あいかは isVariant: true でどちらか一方をランダム表示
 ============================================================ */
 const CHARACTERS = [
-  {
-    id: 1, name: "ハマ", type: "陰キャ公認会計士",
-    img: "img372nontitle.jpg",
+  { id: 1, name: "ハマ", type: "陰キャ公認会計士", img: "img372nontitle.jpg",
     jp: { NTT: 180000, KEPCO: 150000, TEPCO: 80000, MEMBERS: 60000 },
-    us: { IBM: 180000, ACN: 150000, ORCL: 100000 },
-  },
-  {
-    id: 2, name: "モーリー", type: "陰キャ社長",
-    img: "img373nontitle.jpg",
+    us: { IBM: 180000, ACN: 150000, ORCL: 100000 } },
+  { id: 2, name: "モーリー", type: "陰キャ社長", img: "img373nontitle.jpg",
     jp: { SHIFT: 80000, GMO: 60000 },
-    us: { NVDA: 220000, MSFT: 180000, CRWD: 150000, DDOG: 120000, ORCL: 90000 },
-  },
-  {
-    id: 3, name: "グッチ", type: "土方労働者のパワー系",
-    img: "img374nontitle.jpg",
+    us: { NVDA: 220000, MSFT: 180000, CRWD: 150000, DDOG: 120000, ORCL: 90000 } },
+  { id: 3, name: "グッチ", type: "土方労働者のパワー系", img: "img374nontitle.jpg",
     jp: { AEON: 200000, SHIFT: 100000, KEPCO: 80000, TEPCO: 60000 },
-    us: { AMD: 150000, TSLA: 120000, AAPL: 100000, IBM: 90000 },
-  },
-  {
-    id: 4, name: "松崎", type: "入れ墨ラッパーヤンキー",
-    img: "img375nontitle.jpg",
+    us: { AMD: 150000, TSLA: 120000, AAPL: 100000, IBM: 90000 } },
+  { id: 4, name: "松崎", type: "入れ墨ラッパーヤンキー", img: "img375nontitle.jpg",
     jp: { SHIFT: 80000, SAKURA: 60000, GMO: 50000 },
-    us: { TSLA: 220000, AMD: 180000, CRWD: 150000, U: 130000, PANW: 130000 },
-  },
-  {
-    id: 5, name: "松葉", type: "背が高く顔も良しだがポンコツ君",
-    img: "img376nontitle.jpg",
+    us: { TSLA: 220000, AMD: 180000, CRWD: 150000, U: 130000, PANW: 130000 } },
+  { id: 5, name: "松葉", type: "背が高く顔も良しだがポンコツ君", img: "img376nontitle.jpg",
     jp: { NTT: 100000, SHIFT: 80000, AEON: 60000, TREND: 50000, KEPCO: 50000 },
-    us: { AAPL: 120000, MSFT: 100000, NVDA: 100000, ORCL: 90000, IBM: 50000, ACN: 50000 },
-  },
-  {
-    id: 6, name: "藤巻", type: "優等生男子",
-    img: "img377nontitle.jpg",
+    us: { AAPL: 120000, MSFT: 100000, NVDA: 100000, ORCL: 90000, IBM: 50000, ACN: 50000 } },
+  { id: 6, name: "藤巻", type: "優等生男子", img: "img377nontitle.jpg",
     jp: { NTT: 220000, KEPCO: 150000, TEPCO: 80000 },
-    us: { AAPL: 200000, MSFT: 180000, ORCL: 120000, IBM: 50000 },
-  },
-  {
-    id: 7, name: "青木", type: "パワハラ気質だか社会性の高い人",
-    img: "img378nontitle.jpg",
+    us: { AAPL: 200000, MSFT: 180000, ORCL: 120000, IBM: 50000 } },
+  { id: 7, name: "青木", type: "パワハラ気質だか社会性の高い人", img: "img378nontitle.jpg",
     jp: { SHIFT: 200000, TREND: 150000, GMO: 120000, VALTES: 80000 },
-    us: { ORCL: 180000, ACN: 150000, NVDA: 120000 },
-  },
-  {
-    // 和田 / あいか ランダム枠
-    id: 8, isVariant: true,
+    us: { ORCL: 180000, ACN: 150000, NVDA: 120000 } },
+  { id: 8, isVariant: true,
     variants: [
       { name: "和田", img: "img379nontitle.jpg" },
       { name: "あいか", img: "img380nontitle.jpg" },
     ],
     type: "ギャル",
     jp: { AEON: 150000, SAKURA: 100000, SHIFT: 80000, GMO: 60000 },
-    us: { TSLA: 150000, AAPL: 120000, NVDA: 120000, U: 120000, CRWD: 100000 },
-  },
-  {
-    id: 9, name: "ニコ", type: "優等生女子",
-    img: "img381nontitle.jpg",
+    us: { TSLA: 150000, AAPL: 120000, NVDA: 120000, U: 120000, CRWD: 100000 } },
+  { id: 9, name: "ニコ", type: "優等生女子", img: "img381nontitle.jpg",
     jp: { NTT: 180000, KEPCO: 120000, SHIFT: 80000 },
-    us: { MSFT: 200000, NVDA: 150000, AAPL: 120000, ORCL: 150000 },
-  },
-  {
-    id: 10, name: "まりな", type: "上品な女アイドル",
-    img: "img382nontitle.jpg",
+    us: { MSFT: 200000, NVDA: 150000, AAPL: 120000, ORCL: 150000 } },
+  { id: 10, name: "まりな", type: "上品な女アイドル", img: "img382nontitle.jpg",
     jp: { NTT: 200000, KEPCO: 150000, TEPCO: 100000 },
-    us: { AAPL: 200000, ORCL: 150000, MSFT: 120000, IBM: 80000 },
-  },
-  {
-    id: 11, name: "エリナ", type: "女性の権利を主張するバツイチのグラビア女",
-    img: "img383nontitle.jpg",
+    us: { AAPL: 200000, ORCL: 150000, MSFT: 120000, IBM: 80000 } },
+  { id: 11, name: "エリナ", type: "女性の権利を主張するバツイチのグラビア女", img: "img383nontitle.jpg",
     jp: { SHIFT: 100000, SAKURA: 60000 },
-    us: { NVDA: 220000, MSFT: 200000, AMD: 180000, AAPL: 140000, CRWD: 100000 },
-  },
-  {
-    id: 12, name: "工場長", type: "工場で働く人",
-    img: "img384nontitle.jpg",
+    us: { NVDA: 220000, MSFT: 200000, AMD: 180000, AAPL: 140000, CRWD: 100000 } },
+  { id: 12, name: "工場長", type: "工場で働く人", img: "img384nontitle.jpg",
     jp: { NTT: 220000, KEPCO: 180000, TEPCO: 150000, AEON: 100000 },
-    us: { IBM: 150000, ACN: 100000, MSFT: 100000 },
-  },
-  {
-    id: 13, name: "能戸", type: "借金まみれのパチンカス",
-    img: "img385nontitle.jpg",
+    us: { IBM: 150000, ACN: 100000, MSFT: 100000 } },
+  { id: 13, name: "能戸", type: "借金まみれのパチンカス", img: "img385nontitle.jpg",
     jp: { SAKURA: 60000, SHIFT: 40000 },
-    us: { NVDA: 250000, TSLA: 220000, U: 180000, DOCN: 150000, AMD: 100000 },
-  },
-  {
-    id: 14, name: "為国", type: "成績優秀の営業マンだがリアリティーショーに参加すると尖ってる人",
-    img: "img386nontitle.jpg",
+    us: { NVDA: 250000, TSLA: 220000, U: 180000, DOCN: 150000, AMD: 100000 } },
+  { id: 14, name: "為国", type: "成績優秀の営業マンだがリアリティーショーに参加すると尖ってる人", img: "img386nontitle.jpg",
     jp: { SHIFT: 150000, VALTES: 100000, TREND: 80000, GMO: 70000 },
-    us: { ACN: 150000, ORCL: 120000, MSFT: 120000, NVDA: 110000, CTSH: 100000 },
-  },
-  {
-    id: 15, name: "せお丸", type: "バンドマンのプログラマー",
-    img: "img387nontitle.jpg",
+    us: { ACN: 150000, ORCL: 120000, MSFT: 120000, NVDA: 110000, CTSH: 100000 } },
+  { id: 15, name: "せお丸", type: "バンドマンのプログラマー", img: "img387nontitle.jpg",
     jp: { SAKURA: 180000, GMO: 150000, SHIFT: 120000, DIGIHA: 80000 },
-    us: { GTLB: 150000, DDOG: 150000, EPAM: 100000, MSFT: 70000 },
-  },
-  {
-    id: 16, name: "のすけ", type: "親が金持ちの慶応のちゃら男",
-    img: "img388nontitle.jpg",
+    us: { GTLB: 150000, DDOG: 150000, EPAM: 100000, MSFT: 70000 } },
+  { id: 16, name: "のすけ", type: "親が金持ちの慶応のちゃら男", img: "img388nontitle.jpg",
     jp: { AEON: 100000, NTT: 80000, SHIFT: 80000, KEPCO: 60000 },
-    us: { AAPL: 120000, NVDA: 120000, MSFT: 100000, AMZN: 100000, TSLA: 80000, ORCL: 80000, IBM: 60000 },
-  },
-  {
-    id: 17, name: "かな", type: "一般的な主婦",
-    img: "img389nontitle.jpg",
+    us: { AAPL: 120000, NVDA: 120000, MSFT: 100000, AMZN: 100000, TSLA: 80000, ORCL: 80000, IBM: 60000 } },
+  { id: 17, name: "かな", type: "一般的な主婦", img: "img389nontitle.jpg",
     jp: { NTT: 220000, AEON: 180000, KEPCO: 180000, TEPCO: 100000 },
-    us: { AAPL: 150000, MSFT: 100000, ORCL: 70000 },
-  },
+    us: { AAPL: 150000, MSFT: 100000, ORCL: 70000 } },
 ];
 
 /* ============================================================
    ユーティリティ
 ============================================================ */
 function resolveCharacter(c) {
-  // 和田/あいかランダム解決
   if (c.isVariant) {
     const v = c.variants[Math.floor(Math.random() * c.variants.length)];
     return { ...c, name: v.name, img: v.img };
@@ -594,11 +565,9 @@ function sumValues(obj) {
 }
 
 /* ============================================================
-   スライダー生成（2セットで無限ループ）
+   スライダー生成
 ============================================================ */
 const track = document.getElementById('track');
-
-// ランダム解決済みのキャラ配列を作成（ページロード時1回）
 const RESOLVED = CHARACTERS.map(resolveCharacter);
 
 function createCard(char) {
@@ -626,9 +595,18 @@ function initSlider() {
 const panel = document.getElementById('panel');
 
 function selectCharacter(id) {
-  // 選択状態の反映（2セット分すべて）
-  document.querySelectorAll('.card').forEach(el => el.classList.remove('selected'));
-  document.querySelectorAll(`.card[data-id="${id}"]`).forEach(el => el.classList.add('selected'));
+  // 選択状態リセット
+  document.querySelectorAll('.card').forEach(el => {
+    el.classList.remove('selected', 'spin');
+  });
+
+  // 選択カードに spin クラス（2セット分すべて）
+  document.querySelectorAll(`.card[data-id="${id}"]`).forEach(el => {
+    el.classList.add('selected');
+    // アニメーション再生のため一度外して付与
+    void el.offsetWidth;
+    el.classList.add('spin');
+  });
 
   const char = RESOLVED.find(c => c.id === id);
   if (!char) return;
@@ -644,7 +622,6 @@ function renderPanel(char) {
   const usTotal = sumValues(char.us);
   const total = jpTotal + usTotal;
 
-  // 国内株ソート（金額降順）
   const jpList = Object.entries(char.jp)
     .map(([key, amount]) => ({ ...JP_STOCKS[key], amount }))
     .sort((a, b) => b.amount - a.amount);
@@ -671,7 +648,7 @@ function renderPanel(char) {
 
   panel.innerHTML = `
     <div class="char-head">
-      <img class="char-head__img" src="${char.img}" alt="${char.name}" />
+      <img class="char-head__img panel-in" src="${char.img}" alt="${char.name}" />
       <div class="char-head__meta">
         <div class="char-head__no">No.${String(char.id).padStart(2, '0')} / Character</div>
         <div class="char-head__name">${char.name}</div>
