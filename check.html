@@ -19,7 +19,8 @@
     --accent-dim: rgba(232,255,58,0.15);
     --card-width: clamp(130px, 18vw, 190px);  /* ★サイズ据え置き */
     --card-gap: clamp(10px, 1.6vw, 20px);
-    --speed: 45s;
+    --speed: 45s;            /* リング1周にかかる時間 */
+    --perspective: 1000px;   /* ★奥行きの強さ */
     --img-fit: cover;        /* ← デフォルト。JSで切替 */
   }
 
@@ -68,7 +69,7 @@
   }
 
   /* ============================================
-     SLIDER
+     SLIDER（★3Dリング）
   ============================================ */
   .slider-section {
     padding: 40px 0 24px;
@@ -90,7 +91,7 @@
     padding-top: 8px;
   }
 
-  /* ★ 切替エリア（個別 + 全体 を縦に並べる） */
+  /* 切替エリア（個別 + 全体 を縦に並べる） */
   .fit-area {
     display: flex;
     flex-direction: column;
@@ -139,7 +140,7 @@
     font-weight: 700;
   }
 
-  /* ★ 個別キャラ選択ドロップダウン */
+  /* 個別キャラ選択ドロップダウン */
   .char-picker {
     position: relative;
   }
@@ -217,44 +218,62 @@
     text-transform: uppercase;
   }
 
+  /* ★ 親コンテナ：奥行きを作る */
   .slider {
     overflow: hidden;
     width: 100%;
     position: relative;
+    perspective: var(--perspective);
+    height: calc(var(--card-width) * 4 / 3 + 48px);   /* カードの高さ + 余白 */
     -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
             mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
   }
+
+  /* ★ リング本体：全カードを内包して回転する */
   .track {
-    display: flex;
-    gap: var(--card-gap);
-    width: max-content;
-    animation: scroll-left var(--speed) linear infinite;
+    --n: 17;            /* 枚数（JSが上書き） */
+    --radius: 500px;    /* 半径（JSが上書き） */
+    position: absolute;
+    top: 24px;
+    left: 50%;
+    width: var(--card-width);
+    aspect-ratio: 3 / 4;
+    margin-left: calc(var(--card-width) / -2);
+    transform-style: preserve-3d;
+    animation: ring-spin var(--speed) linear infinite;
     will-change: transform;
   }
   .slider:hover .track,
   .slider.paused .track {
     animation-play-state: paused;
   }
-  @keyframes scroll-left {
-    from { transform: translateX(0); }
-    to   { transform: translateX(calc(-50% - var(--card-gap) / 2)); }
+  /* リング全体を半径ぶん奥に下げて、手前のカードが等倍で見えるようにする */
+  @keyframes ring-spin {
+    from { transform: translateZ(calc(var(--radius) * -1)) rotateY(0deg); }
+    to   { transform: translateZ(calc(var(--radius) * -1)) rotateY(360deg); }
   }
 
   /* ============================================
-     CARD  (★サイズ変更なし / 回転演出だけ追加)
+     CARD（外側=配置用 / 内側=見た目用）
   ============================================ */
   .card {
-    flex: 0 0 var(--card-width);
-    width: var(--card-width);
-    aspect-ratio: 3 / 4;
-    background: var(--bg-card);
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
     cursor: pointer;
+    backface-visibility: hidden;   /* 裏向きのカードは非表示 */
+    /* ★ 角度 = 番号 × 360° ÷ 枚数 で外向きに配置 */
+    transform: rotateY(calc(var(--i) * 360deg / var(--n))) translateZ(var(--radius));
+  }
+  .card__inner {
     position: relative;
+    width: 100%;
+    height: 100%;
     overflow: hidden;
+    background: var(--bg-card);
     border: 1px solid var(--line);
     transition: border-color 0.2s, transform 0.25s;
-    perspective: 800px;             /* ★回転用の奥行き */
-    transform-style: preserve-3d;   /* ★3D保持 */
   }
   .card img {
     width: 100%;
@@ -264,16 +283,16 @@
     pointer-events: none;
     filter: grayscale(15%);
     transition: filter 0.25s, transform 0.4s;
-    backface-visibility: hidden;    /* ★裏面見せない */
+    backface-visibility: hidden;
   }
-  .card:hover {
+  .card:hover .card__inner {
     transform: translateY(-4px);
   }
   .card:hover img {
     filter: grayscale(0%);
     transform: scale(1.04);
   }
-  .card.selected {
+  .card.selected .card__inner {
     border-color: var(--accent);
     box-shadow: 0 0 0 1px var(--accent), 0 0 24px rgba(232,255,58,0.2);
   }
@@ -295,7 +314,7 @@
   }
   .card.selected .card__badge { opacity: 1; }
 
-  /* ★ 選択時の回転演出（カードサイズは不変） */
+  /* 選択時の回転演出（カードサイズは不変） */
   .card.spin img {
     animation: card-spin 0.7s cubic-bezier(0.4, 0, 0.2, 1);
   }
@@ -338,7 +357,7 @@
     align-items: end;
     padding-bottom: 32px;
     border-bottom: 1px solid var(--line);
-    perspective: 900px;             /* ★回転用 */
+    perspective: 900px;
   }
   .char-head__img {
     width: clamp(120px, 20vw, 200px);
@@ -348,7 +367,6 @@
     display: block;
     backface-visibility: hidden;
   }
-  /* ★ パネル画像の回転イン */
   .char-head__img.panel-in {
     animation: panel-spin-in 0.55s cubic-bezier(0.2, 0.7, 0.2, 1);
   }
@@ -529,10 +547,10 @@
   <!-- ============ SLIDER ============ -->
   <section class="slider-section">
     <div class="slider-head">
-      <div class="slider-head__title">Select Character ── 自動で流れます / ホバーで停止</div>
+      <div class="slider-head__title">Select Character ── 自動で回ります / ホバーで停止</div>
 
       <div class="fit-area">
-        <!-- ★ 個別（キャラ選択ドロップダウン + そのキャラだけの切替） -->
+        <!-- 個別（キャラ選択ドロップダウン + そのキャラだけの切替） -->
         <div class="fit-row">
           <span class="fit-row__label">個別</span>
           <div class="char-picker" id="charPicker">
@@ -549,7 +567,7 @@
           </div>
         </div>
 
-        <!-- 既存：全体切替 -->
+        <!-- 全体切替 -->
         <div class="fit-row">
           <span class="fit-row__label">全体</span>
           <div class="fit-switch" id="fitSwitch">
@@ -693,7 +711,7 @@ function sumValues(obj) {
 }
 
 /* ============================================================
-   ★ 画像フィット管理（全体 / 個別）
+   画像フィット管理（全体 / 個別）
    - globalFit : 全体の設定
    - indivFit  : 画像ファイル名ごとの個別設定（あれば全体より優先）
 ============================================================ */
@@ -711,29 +729,45 @@ function applyIndivFitToDom(imgKey, fit) {
 }
 
 /* ============================================================
-   スライダー生成
+   ★ 3Dリング生成
+   - 角度 = 番号 × 360° ÷ 枚数 （CSS側で --i と --n から計算）
+   - 半径 = (カード幅 + すき間) ÷ 2 ÷ tan(π ÷ 枚数)
+     → 隣のカード同士がちょうど並ぶ距離。枚数が変わっても自動で綺麗な円になる
 ============================================================ */
 const track = document.getElementById('track');
 const RESOLVED = CHARACTERS.map(resolveCharacter);
+const RING_GAP = 14;   // カード同士のすき間(px)。広げたいときはここを大きく
 
-function createCard(char) {
+function createCard(char, index) {
   const card = document.createElement('div');
   card.className = 'card';
   card.dataset.id = char.id;
+  card.style.setProperty('--i', index);
   card.innerHTML = `
-    <img src="${char.img}" data-key="${char.img}" ${getIndivStyle(char.img)} alt="${char.name}" loading="lazy" />
-    <div class="card__badge">SELECTED</div>
+    <div class="card__inner">
+      <img src="${char.img}" data-key="${char.img}" ${getIndivStyle(char.img)} alt="${char.name}" loading="lazy" />
+      <div class="card__badge">SELECTED</div>
+    </div>
   `;
   card.addEventListener('click', () => selectCharacter(char.id));
   return card;
 }
 
+function layoutRing() {
+  const n = RESOLVED.length;
+  const cardW = track.offsetWidth;
+  const radius = (cardW + RING_GAP) / 2 / Math.tan(Math.PI / n);
+  track.style.setProperty('--n', n);
+  track.style.setProperty('--radius', radius.toFixed(1) + 'px');
+}
+
 function initSlider() {
   track.innerHTML = '';
-  for (let set = 0; set < 2; set++) {
-    RESOLVED.forEach(char => track.appendChild(createCard(char)));
-  }
+  RESOLVED.forEach((char, i) => track.appendChild(createCard(char, i)));
+  layoutRing();
 }
+
+window.addEventListener('resize', layoutRing);
 
 /* ============================================================
    選択処理 → 情報パネル描画
@@ -746,7 +780,7 @@ function selectCharacter(id) {
     el.classList.remove('selected', 'spin');
   });
 
-  // 選択カードに spin クラス（2セット分すべて）
+  // 選択カードに selected / spin
   document.querySelectorAll(`.card[data-id="${id}"]`).forEach(el => {
     el.classList.add('selected');
     // アニメーション再生のため一度外して付与
@@ -826,7 +860,7 @@ function renderPanel(char) {
 }
 
 /* ============================================================
-   ★ 個別：キャラ選択ドロップダウン（ポートフォリオ選択とは無関係）
+   個別：キャラ選択ドロップダウン（ポートフォリオ選択とは無関係）
 ============================================================ */
 // 18名ぶん（和田・あいかも別々に）
 const ALL_CHARS = [];
