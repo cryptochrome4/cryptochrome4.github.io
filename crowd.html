@@ -76,7 +76,7 @@
   }
   .slider-head {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
     padding: 0 clamp(20px, 6vw, 80px) 20px;
     flex-wrap: wrap;
@@ -87,7 +87,30 @@
     letter-spacing: 0.25em;
     text-transform: uppercase;
     color: var(--fg-dim);
+    padding-top: 8px;
   }
+
+  /* ★ 切替エリア（個別 + 全体 を縦に並べる） */
+  .fit-area {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+  }
+  .fit-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .fit-row__label {
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    color: var(--fg-dim);
+    text-transform: uppercase;
+  }
+
   .fit-switch {
     display: flex;
     gap: 6px;
@@ -114,6 +137,84 @@
     border-color: var(--accent);
     color: #000;
     font-weight: 700;
+  }
+
+  /* ★ 個別キャラ選択ドロップダウン */
+  .char-picker {
+    position: relative;
+  }
+  .char-picker__btn {
+    background: transparent;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    padding: 7px 14px;
+    cursor: pointer;
+    border-radius: 2px;
+    font-family: inherit;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.2s;
+  }
+  .char-picker__btn:hover {
+    background: var(--accent-dim);
+  }
+  .char-picker__arrow {
+    display: inline-block;
+    font-size: 10px;
+    transition: transform 0.2s;
+  }
+  .char-picker.open .char-picker__arrow {
+    transform: rotate(180deg);
+  }
+  .char-picker__menu {
+    display: none;
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    min-width: 180px;
+    max-height: min(50vh, 380px);
+    overflow-y: auto;
+    background: var(--bg-card);
+    border: 1px solid var(--line);
+    z-index: 50;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.6);
+  }
+  .char-picker.open .char-picker__menu {
+    display: block;
+  }
+  .char-picker__item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    color: var(--fg);
+    font-size: 13px;
+    text-align: left;
+    padding: 11px 16px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .char-picker__item:last-child { border-bottom: none; }
+  .char-picker__item:hover {
+    background: rgba(255,255,255,0.06);
+  }
+  .char-picker__item.active {
+    color: var(--accent);
+    font-weight: 700;
+  }
+  .char-picker__item small {
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    color: var(--fg-dim);
+    text-transform: uppercase;
   }
 
   .slider {
@@ -394,6 +495,9 @@
     .holding { grid-template-columns: 1fr auto; }
     .holding__pct { width: auto; }
     .holding__bar { grid-column: 1 / -1; }
+    .fit-area { align-items: flex-start; width: 100%; }
+    .fit-row { justify-content: flex-start; }
+    .char-picker__menu { right: auto; left: 0; }
   }
 
   /* フッター */
@@ -426,10 +530,34 @@
   <section class="slider-section">
     <div class="slider-head">
       <div class="slider-head__title">Select Character ── 自動で流れます / ホバーで停止</div>
-      <div class="fit-switch" id="fitSwitch">
-        <button data-fit="cover" class="active">COVER</button>
-        <button data-fit="fill">FILL</button>
-        <button data-fit="contain">CONTAIN</button>
+
+      <div class="fit-area">
+        <!-- ★ 個別（キャラ選択ドロップダウン + そのキャラだけの切替） -->
+        <div class="fit-row">
+          <span class="fit-row__label">個別</span>
+          <div class="char-picker" id="charPicker">
+            <button type="button" class="char-picker__btn" id="charPickerBtn">
+              <span id="charPickerLabel">ハマ</span>
+              <span class="char-picker__arrow">∨</span>
+            </button>
+            <div class="char-picker__menu" id="charPickerMenu"></div>
+          </div>
+          <div class="fit-switch" id="indivFitSwitch">
+            <button data-fit="cover" class="active">COVER</button>
+            <button data-fit="fill">FILL</button>
+            <button data-fit="contain">CONTAIN</button>
+          </div>
+        </div>
+
+        <!-- 既存：全体切替 -->
+        <div class="fit-row">
+          <span class="fit-row__label">全体</span>
+          <div class="fit-switch" id="fitSwitch">
+            <button data-fit="cover" class="active">COVER</button>
+            <button data-fit="fill">FILL</button>
+            <button data-fit="contain">CONTAIN</button>
+          </div>
+        </div>
       </div>
     </div>
     <div class="slider" id="slider">
@@ -565,6 +693,24 @@ function sumValues(obj) {
 }
 
 /* ============================================================
+   ★ 画像フィット管理（全体 / 個別）
+   - globalFit : 全体の設定
+   - indivFit  : 画像ファイル名ごとの個別設定（あれば全体より優先）
+============================================================ */
+let globalFit = 'cover';
+const indivFit = {};   // { "img372nontitle.jpg": "fill", ... }
+
+function getIndivStyle(imgKey) {
+  return indivFit[imgKey] ? `style="object-fit:${indivFit[imgKey]}"` : '';
+}
+
+function applyIndivFitToDom(imgKey, fit) {
+  document.querySelectorAll(`img[data-key="${imgKey}"]`).forEach(el => {
+    el.style.objectFit = fit || '';
+  });
+}
+
+/* ============================================================
    スライダー生成
 ============================================================ */
 const track = document.getElementById('track');
@@ -575,7 +721,7 @@ function createCard(char) {
   card.className = 'card';
   card.dataset.id = char.id;
   card.innerHTML = `
-    <img src="${char.img}" alt="${char.name}" loading="lazy" />
+    <img src="${char.img}" data-key="${char.img}" ${getIndivStyle(char.img)} alt="${char.name}" loading="lazy" />
     <div class="card__badge">SELECTED</div>
   `;
   card.addEventListener('click', () => selectCharacter(char.id));
@@ -648,7 +794,7 @@ function renderPanel(char) {
 
   panel.innerHTML = `
     <div class="char-head">
-      <img class="char-head__img panel-in" src="${char.img}" alt="${char.name}" />
+      <img class="char-head__img panel-in" src="${char.img}" data-key="${char.img}" ${getIndivStyle(char.img)} alt="${char.name}" />
       <div class="char-head__meta">
         <div class="char-head__no">No.${String(char.id).padStart(2, '0')} / Character</div>
         <div class="char-head__name">${char.name}</div>
@@ -680,22 +826,108 @@ function renderPanel(char) {
 }
 
 /* ============================================================
-   object-fit 切替
+   ★ 個別：キャラ選択ドロップダウン（ポートフォリオ選択とは無関係）
+============================================================ */
+// 18名ぶん（和田・あいかも別々に）
+const ALL_CHARS = [];
+CHARACTERS.forEach(c => {
+  if (c.isVariant) {
+    c.variants.forEach(v => ALL_CHARS.push({ name: v.name, img: v.img }));
+  } else {
+    ALL_CHARS.push({ name: c.name, img: c.img });
+  }
+});
+
+let fitTarget = ALL_CHARS[0];   // 初期は「ハマ」
+
+const charPicker      = document.getElementById('charPicker');
+const charPickerBtn   = document.getElementById('charPickerBtn');
+const charPickerLabel = document.getElementById('charPickerLabel');
+const charPickerMenu  = document.getElementById('charPickerMenu');
+const indivFitSwitch  = document.getElementById('indivFitSwitch');
+
+function currentFitOf(imgKey) {
+  return indivFit[imgKey] || globalFit;
+}
+
+// 個別ボタンの active 表示を、選んでいるキャラの現在のフィットに合わせる
+function syncIndivButtons() {
+  const fit = currentFitOf(fitTarget.img);
+  indivFitSwitch.querySelectorAll('button').forEach(b => {
+    b.classList.toggle('active', b.dataset.fit === fit);
+  });
+}
+
+function renderPickerMenu() {
+  charPickerMenu.innerHTML = '';
+  ALL_CHARS.forEach(ch => {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'char-picker__item' + (ch.img === fitTarget.img ? ' active' : '');
+    const custom = indivFit[ch.img];
+    item.innerHTML = `<span>${ch.name}</span>${custom ? `<small>${custom}</small>` : ''}`;
+    item.addEventListener('click', (e) => {
+      e.stopPropagation();
+      fitTarget = ch;
+      charPickerLabel.textContent = ch.name;
+      charPicker.classList.remove('open');
+      syncIndivButtons();
+      // ※ selectCharacter() は呼ばない＝ポートフォリオは変わらない
+    });
+    charPickerMenu.appendChild(item);
+  });
+}
+
+charPickerBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const willOpen = !charPicker.classList.contains('open');
+  if (willOpen) renderPickerMenu();
+  charPicker.classList.toggle('open', willOpen);
+});
+
+// 外側クリックで閉じる
+document.addEventListener('click', (e) => {
+  if (!charPicker.contains(e.target)) charPicker.classList.remove('open');
+});
+
+// 個別の COVER / FILL / CONTAIN
+indivFitSwitch.addEventListener('click', (e) => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  const fit = btn.dataset.fit;
+
+  indivFit[fitTarget.img] = fit;
+  applyIndivFitToDom(fitTarget.img, fit);
+  syncIndivButtons();
+});
+
+/* ============================================================
+   object-fit 切替（全体）
+   ※ 全体を押すと、個別設定はリセットして全員を揃える
 ============================================================ */
 document.getElementById('fitSwitch').addEventListener('click', (e) => {
   const btn = e.target.closest('button');
   if (!btn) return;
   const fit = btn.dataset.fit;
 
+  globalFit = fit;
+
+  // 個別設定をクリア
+  Object.keys(indivFit).forEach(k => delete indivFit[k]);
+  document.querySelectorAll('img[data-key]').forEach(el => { el.style.objectFit = ''; });
+
   document.documentElement.style.setProperty('--img-fit', fit);
   document.querySelectorAll('#fitSwitch button').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+
+  syncIndivButtons();
 });
 
 /* ============================================================
    起動
 ============================================================ */
 initSlider();
+syncIndivButtons();
 </script>
 </body>
 </html>
