@@ -69,7 +69,7 @@
   }
 
   /* ============================================
-     SLIDER（★3Dリング）
+     SLIDER（★3Dリング + 傾き）
   ============================================ */
   .slider-section {
     padding: 40px 0 24px;
@@ -218,23 +218,34 @@
     text-transform: uppercase;
   }
 
-  /* ★ 親コンテナ：奥行きを作る */
+  /* ★ 親コンテナ：奥行きを作る（高さはJSが傾きに合わせて自動設定） */
   .slider {
     overflow: hidden;
     width: 100%;
     position: relative;
     perspective: var(--perspective);
-    height: calc(var(--card-width) * 4 / 3 + 48px);   /* カードの高さ + 余白 */
+    height: 520px;   /* JSで上書き */
     -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
             mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+  }
+
+  /* ★ ステージ：リングと大理石を同じ3D空間に入れる（手前/奥の前後関係を正しくするため）
+     ※ マウス判定はオフ。カード（.card）だけがマウスを受ける */
+  .stage {
+    position: absolute;
+    inset: 0;
+    transform-style: preserve-3d;
+    transform: translateZ(0);
+    pointer-events: none;
   }
 
   /* ★ リング本体：全カードを内包して回転する */
   .track {
     --n: 17;            /* 枚数（JSが上書き） */
     --radius: 500px;    /* 半径（JSが上書き） */
+    --tilt: -18deg;     /* ★傾き（JSが上書き）。マイナスで上から見下ろす */
     position: absolute;
-    top: 24px;
+    top: 24px;          /* JSで上書き */
     left: 50%;
     width: var(--card-width);
     aspect-ratio: 3 / 4;
@@ -242,19 +253,69 @@
     transform-style: preserve-3d;
     animation: ring-spin var(--speed) linear infinite;
     will-change: transform;
+    pointer-events: none;
   }
-  .slider:hover .track,
+  /* ★ カードにカーソルが重なっている間だけ停止（何もない空間では止まらない） */
+  .track:has(.card:hover),
   .slider.paused .track {
     animation-play-state: paused;
   }
-  /* リング全体を半径ぶん奥に下げて、手前のカードが等倍で見えるようにする */
+  /* 半径ぶん奥に下げる → 傾ける → 回す（右から順に適用） */
   @keyframes ring-spin {
-    from { transform: translateZ(calc(var(--radius) * -1)) rotateY(0deg); }
-    to   { transform: translateZ(calc(var(--radius) * -1)) rotateY(360deg); }
+    from { transform: translateZ(calc(var(--radius) * -1)) rotateX(var(--tilt)) rotateY(0deg); }
+    to   { transform: translateZ(calc(var(--radius) * -1)) rotateX(var(--tilt)) rotateY(360deg); }
   }
 
   /* ============================================
-     CARD（外側=配置用 / 内側=見た目用）
+     ★ 中心の大理石（静止 / リングとは一緒に回らない）
+     ※ サイズと位置はJSが自動設定。ポートフォリオ・画像切替とは無関係
+     ※ マウス判定はオフ（カードの停止・選択をじゃましない）
+  ============================================ */
+  .marble {
+    --marble-w: 240px;      /* JSが上書き */
+    --radius: 500px;        /* JSが上書き */
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: var(--marble-w);
+    aspect-ratio: 3 / 4;
+    margin-left: calc(var(--marble-w) / -2);
+    margin-top: calc(var(--marble-w) * -2 / 3);   /* 高さの半分ぶん上げて中心に合わせる */
+    /* リングの中心と同じ奥行きに置く */
+    transform: translateZ(calc(var(--radius) * -1));
+    overflow: hidden;
+    background: #000;
+    border: 1px solid rgba(255,255,255,0.35);
+    box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+    pointer-events: none;
+  }
+  .marble__bg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    pointer-events: none;
+  }
+  /* 重ねる4枚（コラージュ風：大きさ・位置・角度をそれぞれ変える） */
+  .marble__pic {
+    position: absolute;
+    aspect-ratio: 3 / 4;
+    object-fit: cover;
+    display: block;
+    border: 2px solid rgba(255,255,255,0.9);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.55);
+    pointer-events: none;
+  }
+  /* ※ 上の「Professional Nontitle」の文字（上から約20〜26%）を避けて、30%より下に置く */
+  .marble__pic--1 { left: 5%;  top: 40%; width: 50%; transform: rotate(-4deg); z-index: 1; }  /* 一番大きい */
+  .marble__pic--2 { left: 50%; top: 32%; width: 40%; transform: rotate(5deg);  z-index: 2; }
+  .marble__pic--3 { left: 58%; top: 68%; width: 28%; transform: rotate(-6deg); z-index: 3; }
+  .marble__pic--4 { left: 3%;  top: 74%; width: 24%; transform: rotate(7deg);  z-index: 4; }  /* 一番小さい */
+
+  /* ============================================
+     CARD（外側=配置用 / 内側=表面 / back=裏面）
   ============================================ */
   .card {
     position: absolute;
@@ -262,18 +323,27 @@
     width: 100%;
     height: 100%;
     cursor: pointer;
-    backface-visibility: hidden;   /* 裏向きのカードは非表示 */
+    transform-style: preserve-3d;
+    pointer-events: auto;   /* ★ カードだけがマウスを受ける */
     /* ★ 角度 = 番号 × 360° ÷ 枚数 で外向きに配置 */
     transform: rotateY(calc(var(--i) * 360deg / var(--n))) translateZ(var(--radius));
   }
-  .card__inner {
-    position: relative;
-    width: 100%;
-    height: 100%;
+  .card__inner,
+  .card__back {
+    position: absolute;
+    inset: 0;
     overflow: hidden;
     background: var(--bg-card);
     border: 1px solid var(--line);
+    backface-visibility: hidden;
+  }
+  .card__inner {
     transition: border-color 0.2s, transform 0.25s;
+  }
+  /* ★ 裏面：奥側のカードを後ろから見たときに、画像が反転しないよう180度回しておく */
+  .card__back {
+    transform: rotateY(180deg);
+    transition: border-color 0.2s;
   }
   .card img {
     width: 100%;
@@ -283,7 +353,10 @@
     pointer-events: none;
     filter: grayscale(15%);
     transition: filter 0.25s, transform 0.4s;
-    backface-visibility: hidden;
+  }
+  /* 奥側（裏面）は少し暗くして奥行きを出す */
+  .card__back img {
+    filter: grayscale(15%) brightness(0.72);
   }
   .card:hover .card__inner {
     transform: translateY(-4px);
@@ -292,7 +365,8 @@
     filter: grayscale(0%);
     transform: scale(1.04);
   }
-  .card.selected .card__inner {
+  .card.selected .card__inner,
+  .card.selected .card__back {
     border-color: var(--accent);
     box-shadow: 0 0 0 1px var(--accent), 0 0 24px rgba(232,255,58,0.2);
   }
@@ -547,7 +621,7 @@
   <!-- ============ SLIDER ============ -->
   <section class="slider-section">
     <div class="slider-head">
-      <div class="slider-head__title">Select Character ── 自動で回ります / ホバーで停止</div>
+      <div class="slider-head__title">Select Character ── 自動で回ります / 画像にカーソルを重ねると停止</div>
 
       <div class="fit-area">
         <!-- 個別（キャラ選択ドロップダウン + そのキャラだけの切替） -->
@@ -579,7 +653,17 @@
       </div>
     </div>
     <div class="slider" id="slider">
-      <div class="track" id="track"></div>
+      <div class="stage" id="stage">
+        <!-- ★ 中心の大理石（静止）。中に391〜394を重ねる -->
+        <div class="marble" id="marble">
+          <img class="marble__bg" src="img390nontitle.jpg" alt="" />
+          <img class="marble__pic marble__pic--1" src="img391nontitle.jpg" alt="" />
+          <img class="marble__pic marble__pic--2" src="img392nontitle.jpg" alt="" />
+          <img class="marble__pic marble__pic--3" src="img393nontitle.jpg" alt="" />
+          <img class="marble__pic marble__pic--4" src="img394nontitle.jpg" alt="" />
+        </div>
+        <div class="track" id="track"></div>
+      </div>
     </div>
   </section>
 
@@ -729,14 +813,21 @@ function applyIndivFitToDom(imgKey, fit) {
 }
 
 /* ============================================================
-   ★ 3Dリング生成
+   3Dリング生成
    - 角度 = 番号 × 360° ÷ 枚数 （CSS側で --i と --n から計算）
    - 半径 = (カード幅 + すき間) ÷ 2 ÷ tan(π ÷ 枚数)
-     → 隣のカード同士がちょうど並ぶ距離。枚数が変わっても自動で綺麗な円になる
+   - 傾き TILT_DEG：マイナスで上から見下ろす（奥側が見える）
+     0にすると真横からの見た目に戻る
+   - ★ 大理石：リング中心に静止。見た目の大きさ = カード幅 × MARBLE_SCALE
 ============================================================ */
+const slider = document.getElementById('slider');
 const track = document.getElementById('track');
+const marble = document.getElementById('marble');
 const RESOLVED = CHARACTERS.map(resolveCharacter);
-const RING_GAP = 14;   // カード同士のすき間(px)。広げたいときはここを大きく
+const RING_GAP = 14;       // カード同士のすき間(px)。広げたいときはここを大きく
+const TILT_DEG = -18;      // 傾きの角度。-10(ゆるい) 〜 -30(強い) くらいがおすすめ
+const MARBLE_SCALE = 1.6;  // ★大理石の見た目の大きさ（カード幅の何倍か）。縦横とも大きくなる
+const MARBLE_Y = -30;      // ★大理石の上下位置の微調整(px)。マイナスで上へ
 
 function createCard(char, index) {
   const card = document.createElement('div');
@@ -748,6 +839,9 @@ function createCard(char, index) {
       <img src="${char.img}" data-key="${char.img}" ${getIndivStyle(char.img)} alt="${char.name}" loading="lazy" />
       <div class="card__badge">SELECTED</div>
     </div>
+    <div class="card__back">
+      <img src="${char.img}" data-key="${char.img}" ${getIndivStyle(char.img)} alt="" loading="lazy" />
+    </div>
   `;
   card.addEventListener('click', () => selectCharacter(char.id));
   return card;
@@ -756,9 +850,26 @@ function createCard(char, index) {
 function layoutRing() {
   const n = RESOLVED.length;
   const cardW = track.offsetWidth;
+  const cardH = track.offsetHeight;
   const radius = (cardW + RING_GAP) / 2 / Math.tan(Math.PI / n);
   track.style.setProperty('--n', n);
   track.style.setProperty('--radius', radius.toFixed(1) + 'px');
+  track.style.setProperty('--tilt', TILT_DEG + 'deg');
+
+  // 傾けると縦に広がるので、スライダーの高さと位置を自動調整
+  const tiltRad = Math.abs(TILT_DEG) * Math.PI / 180;
+  const extra = radius * Math.sin(tiltRad);            // 上下にはみ出す量
+  const sliderH = Math.ceil(cardH * Math.cos(tiltRad) + extra * 2 + 40);
+  slider.style.height = sliderH + 'px';
+  track.style.top = ((sliderH - cardH) / 2) + 'px';
+
+  // ★ 大理石：奥(半径ぶん)に置くと遠近で小さく見えるので、その分を補正して大きさを決める
+  const persp = parseFloat(getComputedStyle(slider).perspective) || 1000;
+  const depthScale = persp / (persp + radius);
+  const marbleW = (cardW * MARBLE_SCALE) / depthScale;
+  marble.style.setProperty('--marble-w', marbleW.toFixed(1) + 'px');
+  marble.style.setProperty('--radius', radius.toFixed(1) + 'px');
+  marble.style.top = `calc(50% + ${MARBLE_Y}px)`;
 }
 
 function initSlider() {
