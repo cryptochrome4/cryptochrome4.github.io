@@ -8,40 +8,87 @@
   html, body {
     margin: 0; padding: 0; background: #111; color: #eee;
     font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-    min-height: 100%;
+    height: 100%;
   }
   body {
-    display: flex; flex-direction: column; align-items: center;
-    gap: 16px; padding: 16px; box-sizing: border-box;
+    display: flex; flex-direction: column;
+    height: 100vh; overflow: hidden;
   }
+
+  /* 本編ステージ：画面いっぱい */
   #stage {
+    flex: 1 1 auto;
     display: flex; align-items: center; justify-content: center;
-    width: 100%; max-width: 90vw; height: 55vh;
-    background: #000; border-radius: 8px; overflow: hidden;
+    background: #000; overflow: hidden;
+    position: relative;
   }
   #stage img {
-    max-width: 100%; max-height: 100%; object-fit: contain; display: block;
+    width: 100%; height: 100%;
+    display: block;
+    object-fit: contain; /* デフォルト */
   }
-  #controls {
-    display: flex; flex-wrap: wrap; align-items: center;
-    gap: 12px; font-size: 14px;
+  #stage img.fit-fill    { object-fit: fill; }
+  #stage img.fit-cover   { object-fit: cover; }
+  #stage img.fit-contain { object-fit: contain; }
+  #stage img.fit-none    { object-fit: none; }
+
+  /* 下部バー（常時表示の最小UI） */
+  #bar {
+    flex: 0 0 auto;
+    display: flex; align-items: center; gap: 12px;
+    padding: 8px 12px; background: #181818;
+    border-top: 1px solid #333; font-size: 13px;
+    box-sizing: border-box;
   }
-  #controls label { display: flex; align-items: center; gap: 6px; }
-  #intervalValue { min-width: 3.5em; text-align: right; font-variant-numeric: tabular-nums; }
-  #counter { font-size: 12px; color: #888; }
+  #bar .spacer { flex: 1 1 auto; }
+  #counter { color: #888; font-variant-numeric: tabular-nums; }
   button {
     background: #333; color: #eee; border: 1px solid #555;
-    border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 14px;
+    border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 13px;
   }
   button:hover { background: #444; }
-  #orderPanel {
-    width: 100%; max-width: 90vw;
-    border-top: 1px solid #333; padding-top: 12px;
+  #panelToggle {
+    display: flex; align-items: center; gap: 4px;
   }
-  #orderPanel h2 {
-    font-size: 13px; color: #aaa; margin: 0 0 8px;
+  #panelToggle .arrow {
+    display: inline-block; transition: transform .2s;
+  }
+  #panelToggle.open .arrow { transform: rotate(180deg); }
+
+  /* 情報パネル（下から開閉） */
+  #panel {
+    flex: 0 0 auto;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height .25s ease;
+    background: #141414;
+    border-top: 1px solid #333;
+    box-sizing: border-box;
+  }
+  #panel.open {
+    max-height: 55vh;
+    overflow-y: auto;
+  }
+  #panelInner {
+    padding: 12px 16px 20px;
+    display: flex; flex-direction: column; gap: 14px;
+    max-width: 1100px; margin: 0 auto;
+  }
+  .section h2 {
+    font-size: 12px; color: #aaa; margin: 0 0 8px;
     font-weight: normal; letter-spacing: .05em;
   }
+  .row {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
+    font-size: 13px;
+  }
+  .row label { display: flex; align-items: center; gap: 6px; }
+  #intervalValue {
+    min-width: 3.8em; text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* 並べ替えリスト */
   #orderList {
     list-style: none; margin: 0; padding: 0;
     display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
@@ -64,52 +111,94 @@
 </head>
 <body>
 
-<div id="stage"><img id="frame" src="" alt=""></div>
+<!-- 本編：画面いっぱい -->
+<div id="stage"><img id="frame" src="" alt="" class="fit-contain"></div>
 
-<div id="controls">
-  <label>
-    間隔:
-    <input type="range" id="intervalRange" min="1" max="300" step="1" value="5">
-    <span id="intervalValue">5秒</span>
-  </label>
+<!-- 下部バー（最小UI） -->
+<div id="bar">
   <button id="toggleBtn">一時停止</button>
-  <button id="resetOrderBtn">順番をリセット</button>
   <span id="counter"></span>
+  <span class="spacer"></span>
+  <button id="panelToggle" class="open">
+    設定 <span class="arrow">∨</span>
+  </button>
 </div>
 
-<div id="orderPanel">
-  <h2>表示順（ドラッグで並べ替え／自動保存）</h2>
-  <ul id="orderList"></ul>
+<!-- 情報パネル -->
+<div id="panel" class="open">
+  <div id="panelInner">
+
+    <div class="section">
+      <h2>表示間隔（1秒〜10分）</h2>
+      <div class="row">
+        <label>
+          <input type="range" id="intervalRange" min="1" max="600" step="1" value="20">
+          <span id="intervalValue">20秒</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>画像サイズ</h2>
+      <div class="row">
+        <label><input type="radio" name="fit" value="fill"> fill</label>
+        <label><input type="radio" name="fit" value="cover"> cover</label>
+        <label><input type="radio" name="fit" value="contain" checked> contain（デフォルト）</label>
+        <label><input type="radio" name="fit" value="none"> none</label>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>表示順（ドラッグで並べ替え／自動保存）</h2>
+      <div class="row" style="margin-bottom:8px;">
+        <button id="resetOrderBtn">順番をリセット</button>
+      </div>
+      <ul id="orderList"></ul>
+    </div>
+
+  </div>
 </div>
 
 <script>
+  // ===== 設定 =====
   const DEFAULT_IMAGES = [
-    "zfill.jpg","z8fill.jpg","z.cease.jpg","zfee.jpg","zthen.jpg","zmites.jpg",
-    "ztorn.jpg","z8torn.jpg","zditzy.jp","zclean.jpg","ztin.jpg","zlousy.jpg",
+    "zfill.jpg","z8fill.jpg","zcease.jpg","zfee.jpg","zthen.jpg","zmites.jpg",
+    "ztorn.jpg","z8torn.jpg","zditzy.jpg","zclean.jpg","ztin.jpg","zlousy.jpg",
     "z8lousy.jpg","zopen.jpg","zbizarre.jpg","zblur.jpg","z8blur.jpg","zbeg.jpg"
   ];
-  const DEFAULT_INTERVAL_SEC = 5;
+  const DEFAULT_INTERVAL_SEC = 20;   // デフォ20秒
   const MIN_INTERVAL_SEC = 1;
-  const MAX_INTERVAL_SEC = 300;
-  const KEY_ORDER = "ashamed_order_v1";
-  const KEY_INTERVAL = "ashamed_interval_v1";
+  const MAX_INTERVAL_SEC = 600;      // 10分
+  const DEFAULT_FIT = "contain";
+  const FITS = ["fill","cover","contain","none"];
+
+  const KEY_ORDER = "ashamed_order_v2";
+  const KEY_INTERVAL = "ashamed_interval_v2";
+  const KEY_FIT = "ashamed_fit_v1";
+  const KEY_PANEL = "ashamed_panel_v1";
 
   const stageImg = document.getElementById("frame");
+  const stage = document.getElementById("stage");
   const range = document.getElementById("intervalRange");
   const intervalValue = document.getElementById("intervalValue");
   const toggleBtn = document.getElementById("toggleBtn");
   const resetOrderBtn = document.getElementById("resetOrderBtn");
   const counter = document.getElementById("counter");
   const orderList = document.getElementById("orderList");
+  const panel = document.getElementById("panel");
+  const panelToggle = document.getElementById("panelToggle");
 
   let order = loadOrder();
   let index = 0;
   let intervalSec = loadInterval();
+  let fit = loadFit();
   let timerId = null;
   let running = true;
 
-  function urlOf(name) { return name; } // 相対パス（同じフォルダ）
+  // 相対パス（ashamed.html と同じフォルダの画像）
+  function urlOf(name) { return name; }
 
+  // ---- 保存/復元 ----
   function loadOrder() {
     try {
       const saved = JSON.parse(localStorage.getItem(KEY_ORDER));
@@ -128,7 +217,25 @@
     return DEFAULT_INTERVAL_SEC;
   }
   function saveInterval() { localStorage.setItem(KEY_INTERVAL, String(intervalSec)); }
+  function loadFit() {
+    const v = localStorage.getItem(KEY_FIT);
+    return FITS.includes(v) ? v : DEFAULT_FIT;
+  }
+  function saveFit() { localStorage.setItem(KEY_FIT, fit); }
+  function loadPanel() {
+    const v = localStorage.getItem(KEY_PANEL);
+    return v === "closed" ? false : true; // デフォは開く
+  }
+  function savePanel(open) { localStorage.setItem(KEY_PANEL, open ? "open" : "closed"); }
 
+  // ---- 表示 ----
+  function applyFit() {
+    FITS.forEach(f => stageImg.classList.remove("fit-" + f));
+    stageImg.classList.add("fit-" + fit);
+    document.querySelectorAll('input[name="fit"]').forEach(r => {
+      r.checked = (r.value === fit);
+    });
+  }
   function showFrame(i) {
     const name = order[i];
     stageImg.src = urlOf(name);
@@ -143,6 +250,15 @@
     else { stopTimer(); toggleBtn.textContent = "再開"; }
   }
 
+  // ---- パネル開閉 ----
+  function setPanel(open) {
+    if (open) panel.classList.add("open");
+    else panel.classList.remove("open");
+    panelToggle.classList.toggle("open", open);
+    savePanel(open);
+  }
+
+  // ---- 並べ替えリスト ----
   function renderOrderList() {
     orderList.innerHTML = "";
     order.forEach((name, i) => {
@@ -178,7 +294,6 @@
       orderList.appendChild(li);
     });
   }
-
   function moveItem(fromName, toName) {
     const from = order.indexOf(fromName);
     const to = order.indexOf(toName);
@@ -191,6 +306,7 @@
     showFrame(index);
   }
 
+  // ---- UIイベント ----
   range.min = MIN_INTERVAL_SEC;
   range.max = MAX_INTERVAL_SEC;
   range.value = intervalSec;
@@ -202,7 +318,22 @@
     saveInterval();
     if (running) startTimer();
   });
+
+  document.querySelectorAll('input[name="fit"]').forEach(r => {
+    r.addEventListener("change", () => {
+      if (!r.checked) return;
+      fit = r.value;
+      saveFit();
+      applyFit();
+    });
+  });
+
   toggleBtn.addEventListener("click", () => { running = !running; updateRunning(); });
+
+  panelToggle.addEventListener("click", () => {
+    setPanel(!panel.classList.contains("open"));
+  });
+
   resetOrderBtn.addEventListener("click", () => {
     if (!confirm("表示順を初期状態に戻します。よろしいですか？")) return;
     order = DEFAULT_IMAGES.slice();
@@ -212,11 +343,15 @@
     showFrame(index);
   });
 
+  // プリロード
   DEFAULT_IMAGES.forEach(n => { const im = new Image(); im.src = urlOf(n); });
 
+  // 初期化
+  applyFit();
   renderOrderList();
   showFrame(index);
   updateRunning();
+  setPanel(loadPanel());
 </script>
 
 </body>
