@@ -3,83 +3,68 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>紙芝居ループ</title>
+<title>紙芝居ループ（並べ替え対応）</title>
 <style>
   html, body {
-    margin: 0;
-    padding: 0;
-    background: #111;
-    color: #eee;
+    margin: 0; padding: 0; background: #111; color: #eee;
     font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-    height: 100%;
+    min-height: 100%;
   }
   body {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 16px;
-    min-height: 100vh;
-    padding: 16px;
-    box-sizing: border-box;
+    display: flex; flex-direction: column; align-items: center;
+    gap: 16px; padding: 16px; box-sizing: border-box;
   }
   #stage {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    max-width: 90vw;
-    height: 70vh;
-    background: #000;
-    border-radius: 8px;
-    overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    width: 100%; max-width: 90vw; height: 55vh;
+    background: #000; border-radius: 8px; overflow: hidden;
   }
   #stage img {
-    max-width: 100%;
-    max-height: 100%;
-    object-fit: contain;
-    display: block;
+    max-width: 100%; max-height: 100%; object-fit: contain; display: block;
   }
   #controls {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 12px;
-    font-size: 14px;
+    display: flex; flex-wrap: wrap; align-items: center;
+    gap: 12px; font-size: 14px;
   }
-  #controls label {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-  #intervalValue {
-    min-width: 3.5em;
-    text-align: right;
-    font-variant-numeric: tabular-nums;
-  }
-  #counter {
-    font-size: 12px;
-    color: #888;
-  }
+  #controls label { display: flex; align-items: center; gap: 6px; }
+  #intervalValue { min-width: 3.5em; text-align: right; font-variant-numeric: tabular-nums; }
+  #counter { font-size: 12px; color: #888; }
   button {
-    background: #333;
-    color: #eee;
-    border: 1px solid #555;
-    border-radius: 6px;
-    padding: 6px 12px;
-    cursor: pointer;
-    font-size: 14px;
+    background: #333; color: #eee; border: 1px solid #555;
+    border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 14px;
   }
-  button:hover {
-    background: #444;
+  button:hover { background: #444; }
+  #orderPanel {
+    width: 100%; max-width: 90vw;
+    border-top: 1px solid #333; padding-top: 12px;
   }
+  #orderPanel h2 {
+    font-size: 13px; color: #aaa; margin: 0 0 8px;
+    font-weight: normal; letter-spacing: .05em;
+  }
+  #orderList {
+    list-style: none; margin: 0; padding: 0;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 8px;
+  }
+  #orderList li {
+    display: flex; align-items: center; gap: 8px;
+    background: #1c1c1c; border: 1px solid #333; border-radius: 6px;
+    padding: 6px 8px; cursor: grab; user-select: none; font-size: 12px;
+  }
+  #orderList li.dragging { opacity: .4; }
+  #orderList li.over { border-color: #6cf; }
+  #orderList img {
+    width: 36px; height: 36px; object-fit: cover;
+    border-radius: 4px; background: #000; flex: 0 0 auto;
+  }
+  #orderList .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #orderList .num { color: #666; font-variant-numeric: tabular-nums; flex: 0 0 auto; }
 </style>
 </head>
 <body>
 
-<div id="stage">
-  <img id="frame" src="" alt="">
-</div>
+<div id="stage"><img id="frame" src="" alt=""></div>
 
 <div id="controls">
   <label>
@@ -88,113 +73,148 @@
     <span id="intervalValue">5秒</span>
   </label>
   <button id="toggleBtn">一時停止</button>
+  <button id="resetOrderBtn">順番をリセット</button>
   <span id="counter"></span>
 </div>
 
+<div id="orderPanel">
+  <h2>表示順（ドラッグで並べ替え／自動保存）</h2>
+  <ul id="orderList"></ul>
+</div>
+
 <script>
-  // ===== 設定ここから =====
-
-  // GitHub上の画像があるベースURL（末尾スラッシュ付き）
-  // 例: https://yourname.github.io/yourrepo/images/
-  const BASE = "https://yourname.github.io/yourrepo/";
-
-  // 表示順。ここを並べ替えれば順番が変わる。
-  const IMAGES = [
-    "zfill.jpg",
-    "z8fill.jpg",
-    "z.cease.jpg",
-    "zfee.jpg",
-    "zthen.jpg",
-    "zmites.jpg",
-    "ztorn.jpg",
-    "z8torn.jpg",
-    "zditzy.jp",
-    "zclean.jpg",
-    "ztin.jpg",
-    "zlousy.jpg",
-    "z8lousy.jpg",
-    "zopen.jpg",
-    "zbizarre.jpg",
-    "zblur.jpg",
-    "z8blur.jpg",
-    "zbeg.jpg"
+  const DEFAULT_IMAGES = [
+    "zfill.jpg","z8fill.jpg","z.cease.jpg","zfee.jpg","zthen.jpg","zmites.jpg",
+    "ztorn.jpg","z8torn.jpg","zditzy.jp","zclean.jpg","ztin.jpg","zlousy.jpg",
+    "z8lousy.jpg","zopen.jpg","zbizarre.jpg","zblur.jpg","z8blur.jpg","zbeg.jpg"
   ];
-
-  const DEFAULT_INTERVAL_SEC = 5; // デフォルト5秒
+  const DEFAULT_INTERVAL_SEC = 5;
   const MIN_INTERVAL_SEC = 1;
-  const MAX_INTERVAL_SEC = 300;   // 5分
-
-  // ===== 設定ここまで =====
-
+  const MAX_INTERVAL_SEC = 300;
+  const KEY_ORDER = "ashamed_order_v1";
+  const KEY_INTERVAL = "ashamed_interval_v1";
 
   const stageImg = document.getElementById("frame");
   const range = document.getElementById("intervalRange");
   const intervalValue = document.getElementById("intervalValue");
   const toggleBtn = document.getElementById("toggleBtn");
+  const resetOrderBtn = document.getElementById("resetOrderBtn");
   const counter = document.getElementById("counter");
+  const orderList = document.getElementById("orderList");
 
+  let order = loadOrder();
   let index = 0;
-  let intervalSec = DEFAULT_INTERVAL_SEC;
+  let intervalSec = loadInterval();
   let timerId = null;
   let running = true;
 
-  // 画像URLを配列化（サイト内にURLを掲載する目的でここで生成）
-  const urls = IMAGES.map(name => BASE + name);
+  function urlOf(name) { return name; } // 相対パス（同じフォルダ）
 
-  // 初期UI設定
-  range.min = MIN_INTERVAL_SEC;
-  range.max = MAX_INTERVAL_SEC;
-  range.value = DEFAULT_INTERVAL_SEC;
-  intervalValue.textContent = DEFAULT_INTERVAL_SEC + "秒";
+  function loadOrder() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(KEY_ORDER));
+      if (Array.isArray(saved)) {
+        const valid = saved.filter(n => DEFAULT_IMAGES.includes(n));
+        const missing = DEFAULT_IMAGES.filter(n => !valid.includes(n));
+        return valid.concat(missing);
+      }
+    } catch (e) {}
+    return DEFAULT_IMAGES.slice();
+  }
+  function saveOrder() { localStorage.setItem(KEY_ORDER, JSON.stringify(order)); }
+  function loadInterval() {
+    const v = Number(localStorage.getItem(KEY_INTERVAL));
+    if (Number.isFinite(v) && v >= MIN_INTERVAL_SEC && v <= MAX_INTERVAL_SEC) return v;
+    return DEFAULT_INTERVAL_SEC;
+  }
+  function saveInterval() { localStorage.setItem(KEY_INTERVAL, String(intervalSec)); }
 
   function showFrame(i) {
-    stageImg.src = urls[i];
-    stageImg.alt = IMAGES[i];
-    counter.textContent = (i + 1) + " / " + urls.length;
+    const name = order[i];
+    stageImg.src = urlOf(name);
+    stageImg.alt = name;
+    counter.textContent = (i + 1) + " / " + order.length + "  " + name;
+  }
+  function next() { index = (index + 1) % order.length; showFrame(index); }
+  function startTimer() { stopTimer(); timerId = setInterval(next, intervalSec * 1000); }
+  function stopTimer() { if (timerId !== null) { clearInterval(timerId); timerId = null; } }
+  function updateRunning() {
+    if (running) { startTimer(); toggleBtn.textContent = "一時停止"; }
+    else { stopTimer(); toggleBtn.textContent = "再開"; }
   }
 
-  function next() {
-    index = (index + 1) % urls.length;
+  function renderOrderList() {
+    orderList.innerHTML = "";
+    order.forEach((name, i) => {
+      const li = document.createElement("li");
+      li.draggable = true;
+      li.dataset.name = name;
+      li.innerHTML = '<span class="num">' + (i + 1) + '</span>' +
+        '<img src="' + urlOf(name) + '" alt="">' +
+        '<span class="name">' + name + '</span>';
+      li.addEventListener("dragstart", e => {
+        li.classList.add("dragging");
+        e.dataTransfer.setData("text/plain", name);
+        e.dataTransfer.effectAllowed = "move";
+      });
+      li.addEventListener("dragend", () => {
+        li.classList.remove("dragging");
+        document.querySelectorAll("#orderList li.over").forEach(el => el.classList.remove("over"));
+      });
+      li.addEventListener("dragover", e => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        li.classList.add("over");
+      });
+      li.addEventListener("dragleave", () => li.classList.remove("over"));
+      li.addEventListener("drop", e => {
+        e.preventDefault();
+        li.classList.remove("over");
+        const fromName = e.dataTransfer.getData("text/plain");
+        const toName = li.dataset.name;
+        if (!fromName || fromName === toName) return;
+        moveItem(fromName, toName);
+      });
+      orderList.appendChild(li);
+    });
+  }
+
+  function moveItem(fromName, toName) {
+    const from = order.indexOf(fromName);
+    const to = order.indexOf(toName);
+    if (from < 0 || to < 0) return;
+    order.splice(to, 0, order.splice(from, 1)[0]);
+    saveOrder();
+    const currentName = stageImg.alt;
+    index = Math.max(0, order.indexOf(currentName));
+    renderOrderList();
     showFrame(index);
   }
 
-  function startTimer() {
-    stopTimer();
-    timerId = setInterval(next, intervalSec * 1000);
-  }
-
-  function stopTimer() {
-    if (timerId !== null) {
-      clearInterval(timerId);
-      timerId = null;
-    }
-  }
-
-  function updateRunning() {
-    if (running) {
-      startTimer();
-      toggleBtn.textContent = "一時停止";
-    } else {
-      stopTimer();
-      toggleBtn.textContent = "再開";
-    }
-  }
+  range.min = MIN_INTERVAL_SEC;
+  range.max = MAX_INTERVAL_SEC;
+  range.value = intervalSec;
+  intervalValue.textContent = intervalSec + "秒";
 
   range.addEventListener("input", () => {
     intervalSec = Number(range.value);
     intervalValue.textContent = intervalSec + "秒";
-    if (running) startTimer(); // 間隔変更を即反映
+    saveInterval();
+    if (running) startTimer();
+  });
+  toggleBtn.addEventListener("click", () => { running = !running; updateRunning(); });
+  resetOrderBtn.addEventListener("click", () => {
+    if (!confirm("表示順を初期状態に戻します。よろしいですか？")) return;
+    order = DEFAULT_IMAGES.slice();
+    saveOrder();
+    index = 0;
+    renderOrderList();
+    showFrame(index);
   });
 
-  toggleBtn.addEventListener("click", () => {
-    running = !running;
-    updateRunning();
-  });
+  DEFAULT_IMAGES.forEach(n => { const im = new Image(); im.src = urlOf(n); });
 
-  // プリロード（任意）
-  urls.forEach(u => { const im = new Image(); im.src = u; });
-
-  // 開始
+  renderOrderList();
   showFrame(index);
   updateRunning();
 </script>
