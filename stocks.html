@@ -20,7 +20,7 @@
   /* ===================== オープニング ===================== */
   #opening {
     position: fixed; inset: 0;
-    background-size: 100% 100%; background-position: center; background-repeat: no-repeat;
+    background-size: cover; background-position: center; background-repeat: no-repeat;
     display: flex; flex-direction: column; justify-content: center; align-items: center;
     z-index: 100;
   }
@@ -28,7 +28,9 @@
     content: ""; position: absolute; inset: 0;
     background: radial-gradient(circle at 50% 60%, rgba(255,253,248,0.35), rgba(244,239,230,0.8));
     z-index: 0;
+    opacity: 0; transition: opacity 0.35s ease; pointer-events: none;
   }
+  #opening.veil::before { opacity: 1; }
   #opening .title {
     position: relative; z-index: 1;
     font-family: 'Playfair Display', serif; color: #8a6a2f;
@@ -41,7 +43,7 @@
     font-family: 'Cormorant Garamond', serif; font-size: clamp(12px, 2vw, 18px);
     letter-spacing: 0.35em; margin-bottom: 46px; text-transform: uppercase;
   }
-  .btn-area { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 14px; align-items: center; }
+  .btn-area { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 12px; align-items: center; }
 
   /* 共通ボタン（白磁×金） */
   .btn {
@@ -63,10 +65,12 @@
   .btn:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 #d8c49a, 0 3px 8px rgba(120,90,40,0.2); }
   .btn:disabled { opacity: 0.35; cursor: not-allowed; box-shadow: 0 2px 0 #d8c49a; transform: translateY(0); }
 
+  .btn.small { min-width: 150px; padding: 8px 18px; font-size: 12px; letter-spacing: 0.16em; }
+
   /* 背景ビューア */
   #bgViewer { position: fixed; inset: 0; z-index: 200; background: #1a140c; display: none; justify-content: center; align-items: center; }
   #bgViewer.active { display: flex; }
-  #bgViewer img { width: 100%; height: 100%; object-fit: fill; display: block; }
+  #bgViewer img { width: 100%; height: 100%; object-fit: contain; display: block; }
   #bgViewer .close-viewer {
     position: absolute; top: 20px; right: 20px; z-index: 210; padding: 10px 24px;
     font-family: 'Cormorant Garamond', serif; letter-spacing: 0.2em; color: #f2e8d6;
@@ -90,6 +94,7 @@
     font-size: 14px; letter-spacing: 0.12em; flex-shrink: 0; gap: 12px;
   }
   #topBar .left-group { display: flex; align-items: center; gap: 10px; }
+  #topBar .right-group { display: flex; align-items: center; gap: 10px; }
   #topBar .clock {
     font-family: 'Inter', sans-serif; font-variant-numeric: tabular-nums;
     color: #8a6a2f;
@@ -127,10 +132,13 @@
     background-size: cover;
   }
   #leftBgLayer.active { display: block; }
+  /* 通常時はオーバーレイなし。透明度ON時のみ白味をかける */
   #leftBgLayer::after {
     content: ""; position: absolute; inset: 0;
     background: linear-gradient(90deg, rgba(255,253,248,0.55), rgba(244,236,221,0.75));
+    opacity: 0; transition: opacity 0.35s ease; pointer-events: none;
   }
+  #leftBgLayer.veil::after { opacity: 1; }
   #packArea > *:not(#leftBgLayer) { position: relative; z-index: 1; }
 
   #packCardWrap { display: none; flex-direction: column; align-items: center; gap: 10px; }
@@ -380,6 +388,7 @@
   <div class="btn-area">
     <button class="btn" id="startBtn">はじめる</button>
     <button class="btn" id="viewBgBtn">背景画像を見る</button>
+    <button class="btn small" id="openingVeilBtn">透明度：OFF</button>
   </div>
 </div>
 
@@ -401,6 +410,7 @@
           <option value="none">none</option>
           <option value="100% 100%">100% 100%</option>
         </select>
+        <button class="mini-btn" id="veilToggleBtn" title="背景に白味をかける">透明度：OFF</button>
       </div>
     </div>
     <div class="money" id="moneyDisplay">所持金：200円</div>
@@ -483,22 +493,49 @@
 
 <script>
 /* =========================================================
-   背景画像（読み込みごとにランダム）
+   背景画像（読み込みごとにランダム・.jpg）
+   オープン：img396〜406 / 本編：img407〜418
 ========================================================= */
-const BG_IMAGES = [
-  "img396stocks.html","img397stocks.html","img398stocks.html","img399stocks.html",
-  "img400stocks.html","img401stocks.html","img402stocks.html","img403stocks.html",
-  "img404stocks.html","img405stocks.html","img406stocks.html"
+const OPENING_BGS = [
+  "img396stocks.jpg","img397stocks.jpg","img398stocks.jpg","img399stocks.jpg",
+  "img400stocks.jpg","img401stocks.jpg","img402stocks.jpg","img403stocks.jpg",
+  "img404stocks.jpg","img405stocks.jpg","img406stocks.jpg"
 ];
-const OPENING_BG = BG_IMAGES[Math.floor(Math.random() * BG_IMAGES.length)];
-document.getElementById("opening").style.backgroundImage = `url("${OPENING_BG}")`;
-document.getElementById("bgViewerImg").src = OPENING_BG;
-document.getElementById("leftBgLayer").style.backgroundImage = `url("${OPENING_BG}")`;
+const LEFT_BGS = [
+  "img407vip.jpg","img408vip.jpg","img409vip.jpg","img410vip.jpg",
+  "img411vip.jpg","img412vip.jpg","img413vip.jpg","img414vip.jpg",
+  "img415vip.jpg","img416vip.jpg","img417vip.jpg","img418vip.jpg"
+];
+const PICKED_OPENING_BG = OPENING_BGS[Math.floor(Math.random() * OPENING_BGS.length)];
+const PICKED_LEFT_BG    = LEFT_BGS[Math.floor(Math.random() * LEFT_BGS.length)];
+
+document.getElementById("opening").style.backgroundImage = `url("${PICKED_OPENING_BG}")`;
+document.getElementById("bgViewerImg").src = PICKED_OPENING_BG;
+document.getElementById("leftBgLayer").style.backgroundImage = `url("${PICKED_LEFT_BG}")`;
 
 /* =========================================================
-   銘柄マスター（国内株式=domestic / 外国株式=foreign）
-   type: "link"=LINK型（堅実・上限あり）, "xrp"=XRP型（ポテンシャル）
-   指標: atk=MOMENTUM, def=DIVIDEND
+   透明度（オーバーレイ）ON/OFF — オープン画面と本編で共有
+========================================================= */
+let veilOn = false;
+const openingEl = document.getElementById("opening");
+const leftBgLayerEl = document.getElementById("leftBgLayer");
+const openingVeilBtn = document.getElementById("openingVeilBtn");
+const veilToggleBtn = document.getElementById("veilToggleBtn");
+
+function applyVeil() {
+  openingEl.classList.toggle("veil", veilOn);
+  leftBgLayerEl.classList.toggle("veil", veilOn);
+  openingVeilBtn.textContent = `透明度：${veilOn ? "ON" : "OFF"}`;
+  veilToggleBtn.textContent = `透明度：${veilOn ? "ON" : "OFF"}`;
+  veilToggleBtn.classList.toggle("on", veilOn);
+}
+function toggleVeil() { veilOn = !veilOn; applyVeil(); }
+openingVeilBtn.addEventListener("click", (e) => { e.stopPropagation(); toggleVeil(); });
+veilToggleBtn.addEventListener("click", (e) => { e.stopPropagation(); toggleVeil(); });
+applyVeil();
+
+/* =========================================================
+   銘柄マスター（新規追加分を含む）
 ========================================================= */
 const CARD_MASTER = [
   /* ===== 国内株式 ノーマル ===== */
@@ -519,20 +556,39 @@ const CARD_MASTER = [
   { name:"キーエンス", ticker:"6861", attr:"domestic", rarity:"N", type:"link", atk:19, def:25, effect:"配当+5", basePrice:12, emblem:"factory" },
   { name:"ソフトバンクグループ", ticker:"9984", attr:"domestic", rarity:"N", type:"xrp", atk:29, def:11, effect:"モメンタム+9", basePrice:13, emblem:"invest" },
 
-  /* ===== 国内株式 レア（R） ===== */
+  /* ===== 国内株式 新規ノーマル ===== */
+  { name:"本田技研工業", ticker:"7267", attr:"domestic", rarity:"N", type:"xrp", atk:23, def:19, effect:"モメンタム+6", basePrice:11, emblem:"auto" },
+  { name:"三井物産", ticker:"8031", attr:"domestic", rarity:"N", type:"link", atk:15, def:29, effect:"配当+7", basePrice:11, emblem:"trade" },
+  { name:"東日本旅客鉄道", ticker:"9020", attr:"domestic", rarity:"N", type:"link", atk:11, def:33, effect:"配当+9", basePrice:10, emblem:"rail" },
+  { name:"中外製薬", ticker:"4519", attr:"domestic", rarity:"N", type:"xrp", atk:24, def:18, effect:"モメンタム+7", basePrice:12, emblem:"pharma" },
+  { name:"エーザイ", ticker:"4523", attr:"domestic", rarity:"N", type:"link", atk:13, def:31, effect:"配当+6", basePrice:10, emblem:"pharma" },
+  { name:"三井住友フィナンシャル", ticker:"8316", attr:"domestic", rarity:"N", type:"link", atk:14, def:30, effect:"配当+7", basePrice:11, emblem:"bank" },
+  { name:"三菱電機", ticker:"6503", attr:"domestic", rarity:"N", type:"xrp", atk:22, def:20, effect:"モメンタム+6", basePrice:11, emblem:"tech" },
+  { name:"日本製鉄", ticker:"5401", attr:"domestic", rarity:"N", type:"link", atk:13, def:31, effect:"配当+8", basePrice:10, emblem:"steel" },
+  { name:"第一三共", ticker:"4568", attr:"domestic", rarity:"N", type:"xrp", atk:25, def:15, effect:"モメンタム+7", basePrice:12, emblem:"pharma" },
+  { name:"豊田自動織機", ticker:"6201", attr:"domestic", rarity:"N", type:"link", atk:16, def:28, effect:"配当+6", basePrice:11, emblem:"auto" },
+  { name:"セブン&アイ・ホールディングス", ticker:"3382", attr:"domestic", rarity:"N", type:"link", atk:14, def:30, effect:"配当+6", basePrice:11, emblem:"retail" },
+  { name:"KDDI", ticker:"9433", attr:"domestic", rarity:"N", type:"link", atk:12, def:32, effect:"配当+8", basePrice:10, emblem:"telecom" },
+
+  /* ===== 国内株式 レア ===== */
   { name:"東京エレクトロン デバイス", ticker:"2760", attr:"domestic", rarity:"R", type:"xrp", atk:58, def:52, effect:"モメンタム+18", basePrice:68, emblem:"chip" },
   { name:"信越化学 アドバンス", ticker:"4063R", attr:"domestic", rarity:"R", type:"link", atk:50, def:60, effect:"配当+15", basePrice:66, emblem:"chem" },
   { name:"三菱商事 グローバル", ticker:"8058", attr:"domestic", rarity:"R", type:"link", atk:52, def:58, effect:"配当+16", basePrice:65, emblem:"trade" },
   { name:"ソニー セミコンダクター", ticker:"6758R", attr:"domestic", rarity:"R", type:"xrp", atk:62, def:48, effect:"モメンタム+20", basePrice:70, emblem:"chip" },
   { name:"ファナック ロボティクス", ticker:"6954", attr:"domestic", rarity:"R", type:"link", atk:55, def:55, effect:"配当+15", basePrice:67, emblem:"robot" },
   { name:"任天堂 デジタル", ticker:"7974R", attr:"domestic", rarity:"R", type:"xrp", atk:60, def:50, effect:"モメンタム+19", basePrice:69, emblem:"game" },
+  { name:"デンソー モビリティ", ticker:"6902", attr:"domestic", rarity:"R", type:"link", atk:54, def:56, effect:"配当+15", basePrice:66, emblem:"auto" },
+  { name:"富士通 クラウド", ticker:"6702", attr:"domestic", rarity:"R", type:"xrp", atk:61, def:49, effect:"モメンタム+19", basePrice:70, emblem:"tech" },
+  { name:"イオン リテール", ticker:"8267", attr:"domestic", rarity:"R", type:"link", atk:51, def:59, effect:"配当+16", basePrice:65, emblem:"retail" },
 
-  /* ===== 国内株式 スーパーレア（SR） ===== */
+  /* ===== 国内株式 SR ===== */
   { name:"トヨタ モビリティ", ticker:"7203S", attr:"domestic", rarity:"SR", type:"link", atk:100, def:110, effect:"配当+40", basePrice:280, emblem:"auto" },
   { name:"ソニー エンタテインメント", ticker:"6758S", attr:"domestic", rarity:"SR", type:"xrp", atk:120, def:85, effect:"モメンタム+45", basePrice:295, emblem:"game" },
   { name:"東京エレクトロン 極", ticker:"8035S", attr:"domestic", rarity:"SR", type:"xrp", atk:115, def:90, effect:"モメンタム+40", basePrice:290, emblem:"chip" },
   { name:"三菱UFJ メガバンク", ticker:"8306S", attr:"domestic", rarity:"SR", type:"link", atk:95, def:115, effect:"配当+45", basePrice:275, emblem:"bank" },
   { name:"ファーストリテイリング 世界", ticker:"9983S", attr:"domestic", rarity:"SR", type:"xrp", atk:110, def:100, effect:"モメンタム+35", basePrice:285, emblem:"retail" },
+  { name:"任天堂 ワールド", ticker:"7974S", attr:"domestic", rarity:"SR", type:"link", atk:98, def:112, effect:"配当+42", basePrice:278, emblem:"game" },
+  { name:"日立 デジタル", ticker:"6501S", attr:"domestic", rarity:"SR", type:"xrp", atk:118, def:88, effect:"モメンタム+42", basePrice:292, emblem:"tech" },
 
   /* ===== 国内株式 UR ===== */
   { name:"日本経済 至宝", ticker:"JPX", attr:"domestic", rarity:"UR", type:"link", atk:180, def:200, effect:"配当を3倍にする", basePrice:1100, emblem:"crown" },
@@ -556,13 +612,34 @@ const CARD_MASTER = [
   { name:"TSMC", ticker:"TSM", attr:"foreign", rarity:"N", type:"xrp", atk:25, def:15, effect:"モメンタム+7", basePrice:12, emblem:"wafer" },
   { name:"Samsung Electronics", ticker:"005930", attr:"foreign", rarity:"N", type:"link", atk:17, def:27, effect:"配当+5", basePrice:11, emblem:"phone" },
 
-  /* ===== 外国株式 レア（R） ===== */
+  /* ===== 外国株式 新規ノーマル ===== */
+  { name:"Walmart", ticker:"WMT", attr:"foreign", rarity:"N", type:"link", atk:14, def:30, effect:"配当+6", basePrice:11, emblem:"retail" },
+  { name:"Procter & Gamble", ticker:"PG", attr:"foreign", rarity:"N", type:"link", atk:13, def:31, effect:"配当+7", basePrice:10, emblem:"bottle" },
+  { name:"Mastercard", ticker:"MA", attr:"foreign", rarity:"N", type:"link", atk:16, def:28, effect:"配当+5", basePrice:11, emblem:"card" },
+  { name:"Home Depot", ticker:"HD", attr:"foreign", rarity:"N", type:"link", atk:15, def:29, effect:"配当+6", basePrice:11, emblem:"factory" },
+  { name:"Chevron", ticker:"CVX", attr:"foreign", rarity:"N", type:"link", atk:14, def:30, effect:"配当+7", basePrice:11, emblem:"oil" },
+  { name:"Adobe", ticker:"ADBE", attr:"foreign", rarity:"N", type:"xrp", atk:24, def:18, effect:"モメンタム+7", basePrice:12, emblem:"tech" },
+  { name:"Netflix", ticker:"NFLX", attr:"foreign", rarity:"N", type:"xrp", atk:27, def:13, effect:"モメンタム+8", basePrice:12, emblem:"social" },
+  { name:"Advanced Micro Devices", ticker:"AMD", attr:"foreign", rarity:"N", type:"xrp", atk:28, def:12, effect:"モメンタム+9", basePrice:13, emblem:"gpu" },
+  { name:"Salesforce", ticker:"CRM", attr:"foreign", rarity:"N", type:"link", atk:18, def:26, effect:"配当+5", basePrice:11, emblem:"tech" },
+  { name:"PepsiCo", ticker:"PEP", attr:"foreign", rarity:"N", type:"link", atk:13, def:31, effect:"配当+8", basePrice:10, emblem:"bottle" },
+  { name:"Costco", ticker:"COST", attr:"foreign", rarity:"N", type:"link", atk:17, def:27, effect:"配当+5", basePrice:11, emblem:"retail" },
+  { name:"McDonald's", ticker:"MCD", attr:"foreign", rarity:"N", type:"link", atk:14, def:30, effect:"配当+6", basePrice:11, emblem:"retail" },
+  { name:"Bank of America", ticker:"BAC", attr:"foreign", rarity:"N", type:"link", atk:13, def:31, effect:"配当+7", basePrice:10, emblem:"bank" },
+  { name:"Pfizer", ticker:"PFE", attr:"foreign", rarity:"N", type:"link", atk:12, def:32, effect:"配当+8", basePrice:10, emblem:"pharma" },
+  { name:"Oracle", ticker:"ORCL", attr:"foreign", rarity:"N", type:"xrp", atk:22, def:20, effect:"モメンタム+6", basePrice:11, emblem:"tech" },
+  { name:"Intel", ticker:"INTC", attr:"foreign", rarity:"N", type:"xrp", atk:21, def:21, effect:"モメンタム+6", basePrice:11, emblem:"chip" },
+
+  /* ===== 外国株式 レア ===== */
   { name:"Apple プレミアム", ticker:"AAPLR", attr:"foreign", rarity:"R", type:"link", atk:52, def:58, effect:"配当+16", basePrice:66, emblem:"apple" },
   { name:"NVIDIA アドバンス", ticker:"NVDAR", attr:"foreign", rarity:"R", type:"xrp", atk:64, def:46, effect:"モメンタム+21", basePrice:72, emblem:"gpu" },
   { name:"Microsoft クラウド", ticker:"MSFTR", attr:"foreign", rarity:"R", type:"link", atk:55, def:55, effect:"配当+15", basePrice:67, emblem:"window" },
   { name:"Tesla フューチャー", ticker:"TSLAR", attr:"foreign", rarity:"R", type:"xrp", atk:66, def:44, effect:"モメンタム+22", basePrice:74, emblem:"ev" },
   { name:"Amazon グロース", ticker:"AMZNR", attr:"foreign", rarity:"R", type:"xrp", atk:60, def:50, effect:"モメンタム+19", basePrice:70, emblem:"box" },
   { name:"JPMorgan プライベート", ticker:"JPMR", attr:"foreign", rarity:"R", type:"link", atk:50, def:60, effect:"配当+17", basePrice:65, emblem:"bank" },
+  { name:"Alphabet インテリジェンス", ticker:"GOOGLR", attr:"foreign", rarity:"R", type:"xrp", atk:59, def:51, effect:"モメンタム+18", basePrice:69, emblem:"search" },
+  { name:"Meta メタバース", ticker:"METAR", attr:"foreign", rarity:"R", type:"xrp", atk:63, def:47, effect:"モメンタム+20", basePrice:71, emblem:"social" },
+  { name:"Visa グローバル", ticker:"VR", attr:"foreign", rarity:"R", type:"link", atk:53, def:57, effect:"配当+16", basePrice:66, emblem:"card" },
 
   /* ===== 外国株式 SR ===== */
   { name:"Apple 覇権", ticker:"AAPLS", attr:"foreign", rarity:"SR", type:"link", atk:100, def:115, effect:"配当+45", basePrice:280, emblem:"apple" },
@@ -570,6 +647,8 @@ const CARD_MASTER = [
   { name:"Microsoft 帝国", ticker:"MSFTS", attr:"foreign", rarity:"SR", type:"link", atk:105, def:110, effect:"配当+42", basePrice:285, emblem:"window" },
   { name:"Tesla 電光", ticker:"TSLAS", attr:"foreign", rarity:"SR", type:"xrp", atk:120, def:85, effect:"モメンタム+45", basePrice:290, emblem:"ev" },
   { name:"Amazon 大陸", ticker:"AMZNS", attr:"foreign", rarity:"SR", type:"xrp", atk:115, def:90, effect:"モメンタム+40", basePrice:288, emblem:"box" },
+  { name:"Meta 天下", ticker:"METAS", attr:"foreign", rarity:"SR", type:"link", atk:102, def:113, effect:"配当+43", basePrice:282, emblem:"social" },
+  { name:"Broadcom 極", ticker:"AVGOS", attr:"foreign", rarity:"SR", type:"xrp", atk:118, def:88, effect:"モメンタム+42", basePrice:292, emblem:"chip" },
 
   /* ===== 外国株式 UR ===== */
   { name:"世界市場 王者", ticker:"WORLD", attr:"foreign", rarity:"UR", type:"xrp", atk:200, def:180, effect:"モメンタムを3倍にする", basePrice:1200, emblem:"crown" },
@@ -598,7 +677,22 @@ CARD_MASTER.forEach(card => {
 });
 
 /* =========================================================
-   エンブレム描画（金線エッチング・白磁・薔薇・羽）
+   エンブレム本体の塗り色（装飾は金線のまま）
+========================================================= */
+const MOTIF_FILL = {
+  auto:"#c96a3a", tech:"#3a6a9a", bank:"#3a4a7a", chip:"#3a8a6a",
+  retail:"#c98a3a", game:"#b04868", chem:"#5a9a6a", trade:"#8a6a3a",
+  telecom:"#4a6a8a", pharma:"#a04a6a", heavy:"#6a5a4a", hr:"#8a5a8a",
+  factory:"#5a7a6a", invest:"#c9a03a", robot:"#6a7a8a",
+  rail:"#4a6a5a", steel:"#6a7a8a",
+  apple:"#c04040", window:"#3a7aa0", gpu:"#3a8a5a", box:"#c9803a",
+  search:"#4a8a8a", social:"#5a5aa0", ev:"#a03a5a", card:"#3a5a9a",
+  bottle:"#b04040", oil:"#5a4a3a", litho:"#3a6a8a", wafer:"#3a8a7a",
+  phone:"#4a5a7a", crown:"#c9a03a"
+};
+
+/* =========================================================
+   エンブレム描画
 ========================================================= */
 function drawEmblem(canvas, card) {
   const emblem = card.emblem;
@@ -617,7 +711,6 @@ function drawEmblem(canvas, card) {
   else { bg.addColorStop(0, "#fffdf8"); bg.addColorStop(1, "#efe4cf"); }
   ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
 
-  /* 薄い唐草模様 */
   ctx.strokeStyle = "rgba(201,168,100,0.18)";
   ctx.lineWidth = 1;
   const sc = 26;
@@ -637,7 +730,6 @@ function drawEmblem(canvas, card) {
   ctx.save();
   ctx.translate(cx, cy);
 
-  /* 金のメダリオン */
   const badgeR = 68 * s;
   const badgeGrad = ctx.createRadialGradient(-12*s, -12*s, 4*s, 0, 0, badgeR);
   if (rarity === "UR") { badgeGrad.addColorStop(0, "#fffdf4"); badgeGrad.addColorStop(1, "#e8d4a0"); }
@@ -659,17 +751,14 @@ function drawEmblem(canvas, card) {
   ctx.strokeStyle = "rgba(201,168,100,0.5)"; ctx.lineWidth = 1*s;
   ctx.beginPath(); ctx.arc(0, 0, badgeR - 6*s, 0, Math.PI*2); ctx.stroke();
 
-  /* メダリオン内：銘柄モチーフ */
   ctx.save();
   ctx.beginPath(); ctx.arc(0, 0, badgeR - 8*s, 0, Math.PI*2); ctx.clip();
   drawStockMotif(ctx, emblem, s, rarity, attr);
   ctx.restore();
   ctx.restore();
 
-  /* 四隅の薔薇飾り */
   drawRoseCorner(ctx, W, H, s, rarity);
 
-  /* 外枠 */
   if (rarity === "UR") { ctx.strokeStyle = "rgba(201,168,100,1)"; ctx.lineWidth = 3; ctx.strokeRect(2,2,W-4,H-4); }
   else if (rarity === "SR") { ctx.strokeStyle = "rgba(180,140,200,0.9)"; ctx.lineWidth = 2; ctx.strokeRect(2,2,W-4,H-4); }
   else if (rarity === "R") { ctx.strokeStyle = "rgba(201,168,100,0.8)"; ctx.lineWidth = 1; ctx.strokeRect(2,2,W-4,H-4); }
@@ -693,7 +782,6 @@ function drawRoseCorner(ctx, W, H, s, rarity) {
   for (const p of positions) {
     ctx.save();
     ctx.translate(p.x, p.y); ctx.rotate(p.rot);
-    /* 薔薇：渦巻き */
     ctx.beginPath();
     for (let i = 0; i < 24; i++) {
       const t = i / 24 * Math.PI * 2;
@@ -703,7 +791,6 @@ function drawRoseCorner(ctx, W, H, s, rarity) {
       i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
     }
     ctx.stroke();
-    /* 葉 */
     ctx.beginPath();
     ctx.ellipse(size*0.55, 0, size*0.35, size*0.16, 0.4, 0, Math.PI*2);
     ctx.fill();
@@ -722,18 +809,22 @@ function drawLabel(ctx, text, s, color) {
 }
 
 /* =========================================================
-   銘柄モチーフ（金線エッチング）
+   銘柄モチーフ（本体のみ色塗り・装飾は金線）
 ========================================================= */
 function drawStockMotif(ctx, emblem, s, rarity, attr) {
   const reset = () => { ctx.shadowBlur = 0; };
   const GOLD = "#b08a3a";
-  const GOLD_HI = "#d8b968";
   const INK = attr === "foreign" ? "#6a4a7a" : "#5a4526";
+  const FILL = MOTIF_FILL[emblem] || "#c9a864";
+  const FILL_SOFT = (() => {
+    const c = FILL.replace("#","");
+    const r = parseInt(c.substr(0,2),16), g = parseInt(c.substr(2,2),16), b = parseInt(c.substr(4,2),16);
+    const mix = (v) => Math.round(v + (255 - v) * 0.72);
+    return `rgb(${mix(r)},${mix(g)},${mix(b)})`;
+  })();
   const line = (w) => { ctx.lineWidth = (w||2)*s; ctx.lineCap = "round"; ctx.lineJoin = "round"; };
-
-  /* 共通：金線＋淡い面 */
-  const goldStroke = () => { ctx.strokeStyle = GOLD; ctx.fillStyle = "rgba(216,185,104,0.18)"; };
-  const inkStroke = () => { ctx.strokeStyle = INK; ctx.fillStyle = "rgba(90,69,38,0.10)"; };
+  const goldStroke = () => { ctx.strokeStyle = GOLD; ctx.fillStyle = FILL_SOFT; };
+  const inkStroke  = () => { ctx.strokeStyle = INK;  ctx.fillStyle = FILL_SOFT; };
 
   switch (emblem) {
     case "auto": {
@@ -742,6 +833,7 @@ function drawStockMotif(ctx, emblem, s, rarity, attr) {
       ctx.moveTo(-26*s, 6*s); ctx.lineTo(-18*s, -8*s); ctx.lineTo(10*s, -8*s);
       ctx.lineTo(22*s, 6*s); ctx.lineTo(26*s, 6*s); ctx.lineTo(24*s, 14*s);
       ctx.lineTo(-24*s, 14*s); ctx.closePath(); ctx.stroke(); ctx.fill();
+      ctx.strokeStyle = GOLD;
       ctx.beginPath(); ctx.arc(-12*s, 16*s, 5*s, 0, Math.PI*2); ctx.stroke();
       ctx.beginPath(); ctx.arc(12*s, 16*s, 5*s, 0, Math.PI*2); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(-14*s, -8*s); ctx.lineTo(-10*s, -16*s); ctx.lineTo(6*s, -16*s); ctx.lineTo(10*s, -8*s); ctx.stroke();
@@ -750,7 +842,8 @@ function drawStockMotif(ctx, emblem, s, rarity, attr) {
     }
     case "tech": {
       goldStroke(); line(2);
-      ctx.strokeRect(-22*s, -18*s, 44*s, 32*s);
+      ctx.strokeRect(-22*s, -18*s, 44*s, 32*s); ctx.fillRect(-22*s, -18*s, 44*s, 32*s);
+      ctx.strokeStyle = GOLD;
       ctx.beginPath(); ctx.moveTo(-14*s, -6*s); ctx.lineTo(14*s, -6*s); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(-14*s, 2*s); ctx.lineTo(14*s, 2*s); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(-6*s, -18*s); ctx.lineTo(-6*s, 14*s); ctx.stroke();
@@ -761,6 +854,7 @@ function drawStockMotif(ctx, emblem, s, rarity, attr) {
     case "bank": {
       goldStroke(); line(2);
       ctx.beginPath(); ctx.moveTo(-26*s, -10*s); ctx.lineTo(0, -24*s); ctx.lineTo(26*s, -10*s); ctx.closePath(); ctx.stroke(); ctx.fill();
+      ctx.strokeStyle = GOLD;
       for (let i=-2;i<=2;i++){ ctx.beginPath(); ctx.moveTo(i*10*s, -8*s); ctx.lineTo(i*10*s, 14*s); ctx.stroke(); }
       ctx.beginPath(); ctx.moveTo(-26*s, 16*s); ctx.lineTo(26*s, 16*s); ctx.stroke();
       drawLabel(ctx, "BANK", s, GOLD);
@@ -768,7 +862,8 @@ function drawStockMotif(ctx, emblem, s, rarity, attr) {
     }
     case "chip": {
       goldStroke(); line(2);
-      ctx.strokeRect(-18*s, -18*s, 36*s, 36*s);
+      ctx.strokeRect(-18*s, -18*s, 36*s, 36*s); ctx.fillRect(-18*s, -18*s, 36*s, 36*s);
+      ctx.strokeStyle = GOLD;
       ctx.strokeRect(-10*s, -10*s, 20*s, 20*s);
       for (let i=-2;i<=2;i++){
         ctx.beginPath(); ctx.moveTo(i*8*s, -18*s); ctx.lineTo(i*8*s, -24*s); ctx.stroke();
@@ -782,6 +877,7 @@ function drawStockMotif(ctx, emblem, s, rarity, attr) {
     case "retail": {
       goldStroke(); line(2);
       ctx.beginPath(); ctx.moveTo(-20*s, -14*s); ctx.lineTo(20*s, -14*s); ctx.lineTo(16*s, 16*s); ctx.lineTo(-16*s, 16*s); ctx.closePath(); ctx.stroke(); ctx.fill();
+      ctx.strokeStyle = GOLD;
       ctx.beginPath(); ctx.moveTo(-8*s, -14*s); ctx.quadraticCurveTo(-8*s, -24*s, 0, -24*s); ctx.quadraticCurveTo(8*s, -24*s, 8*s, -14*s); ctx.stroke();
       drawLabel(ctx, "RETAIL", s, GOLD);
       break;
@@ -789,6 +885,7 @@ function drawStockMotif(ctx, emblem, s, rarity, attr) {
     case "game": {
       goldStroke(); line(2);
       ctx.beginPath(); ctx.roundRect(-26*s, -10*s, 52*s, 24*s, 12*s); ctx.stroke(); ctx.fill();
+      ctx.strokeStyle = GOLD;
       ctx.beginPath(); ctx.moveTo(-16*s, 2*s); ctx.lineTo(-8*s, 2*s); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(-12*s, -2*s); ctx.lineTo(-12*s, 6*s); ctx.stroke();
       ctx.beginPath(); ctx.arc(12*s, -2*s, 2.5*s, 0, Math.PI*2); ctx.stroke();
@@ -799,6 +896,7 @@ function drawStockMotif(ctx, emblem, s, rarity, attr) {
     case "chem": {
       goldStroke(); line(2);
       ctx.beginPath(); ctx.moveTo(0, -22*s); ctx.lineTo(-18*s, 12*s); ctx.lineTo(18*s, 12*s); ctx.closePath(); ctx.stroke(); ctx.fill();
+      ctx.strokeStyle = GOLD;
       ctx.beginPath(); ctx.arc(0, 0, 4*s, 0, Math.PI*2); ctx.stroke();
       ctx.beginPath(); ctx.arc(-8*s, -8*s, 3*s, 0, Math.PI*2); ctx.stroke();
       ctx.beginPath(); ctx.arc(8*s, -8*s, 3*s, 0, Math.PI*2); ctx.stroke();
@@ -808,15 +906,17 @@ function drawStockMotif(ctx, emblem, s, rarity, attr) {
     case "trade": {
       goldStroke(); line(2);
       ctx.beginPath(); ctx.moveTo(-24*s, 12*s); ctx.lineTo(-24*s, -12*s); ctx.lineTo(0, -22*s); ctx.lineTo(24*s, -12*s); ctx.lineTo(24*s, 12*s); ctx.stroke(); ctx.fill();
+      ctx.strokeStyle = GOLD;
       ctx.beginPath(); ctx.moveTo(-8*s, -4*s); ctx.lineTo(8*s, -4*s); ctx.lineTo(8*s, 12*s); ctx.lineTo(-8*s, 12*s); ctx.closePath(); ctx.stroke();
       drawLabel(ctx, "TRADE", s, GOLD);
       break;
     }
     case "telecom": {
-      goldStroke(); line(2);
+      ctx.strokeStyle = GOLD; line(2);
       for (let i=0;i<4;i++){
         ctx.beginPath(); ctx.arc(0, 10*s, (8+i*6)*s, -Math.PI*0.75, -Math.PI*0.25); ctx.stroke();
       }
+      ctx.fillStyle = FILL_SOFT;
       ctx.beginPath(); ctx.arc(0, 10*s, 4*s, 0, Math.PI*2); ctx.fill(); ctx.stroke();
       drawLabel(ctx, "TELECOM", s, GOLD);
       break;
@@ -824,6 +924,7 @@ function drawStockMotif(ctx, emblem, s, rarity, attr) {
     case "pharma": {
       goldStroke(); line(2);
       ctx.beginPath(); ctx.roundRect(-20*s, -8*s, 40*s, 16*s, 8*s); ctx.stroke(); ctx.fill();
+      ctx.strokeStyle = GOLD;
       ctx.beginPath(); ctx.moveTo(-6*s, -8*s); ctx.lineTo(-6*s, 8*s); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(6*s, -8*s); ctx.lineTo(6*s, 8*s); ctx.stroke();
       drawLabel(ctx, "PHARMA", s, GOLD);
@@ -832,6 +933,7 @@ function drawStockMotif(ctx, emblem, s, rarity, attr) {
     case "heavy": {
       goldStroke(); line(2);
       ctx.beginPath(); ctx.moveTo(-24*s, 14*s); ctx.lineTo(-24*s, -6*s); ctx.lineTo(-8*s, -6*s); ctx.lineTo(-8*s, -18*s); ctx.lineTo(8*s, -18*s); ctx.lineTo(8*s, 14*s); ctx.closePath(); ctx.stroke(); ctx.fill();
+      ctx.strokeStyle = GOLD;
       ctx.beginPath(); ctx.arc(-12*s, 16*s, 5*s, 0, Math.PI*2); ctx.stroke();
       ctx.beginPath(); ctx.arc(14*s, 16*s, 5*s, 0, Math.PI*2); ctx.stroke();
       drawLabel(ctx, "HEAVY", s, GOLD);
@@ -840,6 +942,7 @@ function drawStockMotif(ctx, emblem, s, rarity, attr) {
     case "hr": {
       goldStroke(); line(2);
       ctx.beginPath(); ctx.arc(0, -12*s, 7*s, 0, Math.PI*2); ctx.stroke(); ctx.fill();
+      ctx.strokeStyle = GOLD;
       ctx.beginPath(); ctx.moveTo(-16*s, 16*s); ctx.quadraticCurveTo(-16*s, -2*s, 0, -2*s); ctx.quadraticCurveTo(16*s, -2*s, 16*s, 16*s); ctx.stroke();
       drawLabel(ctx, "HR", s, GOLD);
       break;
@@ -847,6 +950,7 @@ function drawStockMotif(ctx, emblem, s, rarity, attr) {
     case "factory": {
       goldStroke(); line(2);
       ctx.beginPath(); ctx.moveTo(-24*s, 14*s); ctx.lineTo(-24*s, -6*s); ctx.lineTo(-8*s, -6*s); ctx.lineTo(-8*s, 2*s); ctx.lineTo(8*s, 2*s); ctx.lineTo(8*s, -10*s); ctx.lineTo(24*s, -10*s); ctx.lineTo(24*s, 14*s); ctx.closePath(); ctx.stroke(); ctx.fill();
+      ctx.strokeStyle = GOLD;
       ctx.beginPath(); ctx.arc(0, 16*s, 4*s, 0, Math.PI*2); ctx.stroke();
       drawLabel(ctx, "FACTORY", s, GOLD);
       break;
@@ -860,8 +964,10 @@ function drawStockMotif(ctx, emblem, s, rarity, attr) {
     }
     case "robot": {
       goldStroke(); line(2);
-      ctx.strokeRect(-16*s, -16*s, 32*s, 24*s);
+      ctx.strokeRect(-16*s, -16*s, 32*s, 24*s); ctx.fillRect(-16*s, -16*s, 32*s, 24*s);
+      ctx.strokeStyle = GOLD;
       ctx.beginPath(); ctx.arc(0, -22*s, 5*s, 0, Math.PI*2); ctx.stroke();
+      ctx.fillStyle = GOLD;
       ctx.beginPath(); ctx.arc(-6*s, -8*s, 2*s, 0, Math.PI*2); ctx.fill();
       ctx.beginPath(); ctx.arc(6*s, -8*s, 2*s, 0, Math.PI*2); ctx.fill();
       ctx.beginPath(); ctx.moveTo(-8*s, 8*s); ctx.lineTo(-8*s, 18*s); ctx.stroke();
@@ -869,19 +975,41 @@ function drawStockMotif(ctx, emblem, s, rarity, attr) {
       drawLabel(ctx, "ROBOT", s, GOLD);
       break;
     }
+    case "rail": {
+      goldStroke(); line(2);
+      ctx.beginPath(); ctx.moveTo(-22*s, -6*s); ctx.lineTo(22*s, -6*s); ctx.lineTo(22*s, 14*s); ctx.lineTo(-22*s, 14*s); ctx.closePath(); ctx.stroke(); ctx.fill();
+      ctx.strokeStyle = GOLD;
+      for (let i=-2;i<=2;i++){ ctx.beginPath(); ctx.arc(i*9*s, 4*s, 2*s, 0, Math.PI*2); ctx.stroke(); }
+      ctx.beginPath(); ctx.moveTo(-22*s, 16*s); ctx.lineTo(22*s, 16*s); ctx.stroke();
+      drawLabel(ctx, "RAIL", s, GOLD);
+      break;
+    }
+    case "steel": {
+      goldStroke(); line(2);
+      ctx.beginPath(); ctx.moveTo(-24*s, -8*s); ctx.lineTo(-10*s, -8*s); ctx.lineTo(-10*s, 10*s); ctx.lineTo(-24*s, 10*s); ctx.closePath(); ctx.stroke(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(2*s, -12*s); ctx.lineTo(24*s, -12*s); ctx.lineTo(20*s, 12*s); ctx.lineTo(-2*s, 12*s); ctx.closePath(); ctx.stroke(); ctx.fill();
+      ctx.strokeStyle = GOLD;
+      ctx.beginPath(); ctx.moveTo(-18*s, -2*s); ctx.lineTo(-14*s, -2*s); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(6*s, -2*s); ctx.lineTo(18*s, -2*s); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(6*s, 4*s); ctx.lineTo(18*s, 4*s); ctx.stroke();
+      drawLabel(ctx, "STEEL", s, GOLD);
+      break;
+    }
     case "apple": {
       inkStroke(); line(2);
       ctx.beginPath(); ctx.arc(0, 2*s, 18*s, 0, Math.PI*2); ctx.stroke(); ctx.fill();
+      ctx.strokeStyle = INK;
       ctx.beginPath(); ctx.moveTo(0, -16*s); ctx.quadraticCurveTo(6*s, -26*s, 14*s, -24*s); ctx.stroke();
       drawLabel(ctx, "APPLE", s, GOLD);
       break;
     }
     case "window": {
       inkStroke(); line(2);
-      ctx.strokeRect(-20*s, -18*s, 18*s, 18*s);
-      ctx.strokeRect(2*s, -18*s, 18*s, 18*s);
-      ctx.strokeRect(-20*s, 2*s, 18*s, 18*s);
-      ctx.strokeRect(2*s, 2*s, 18*s, 18*s);
+      ctx.strokeRect(-20*s, -18*s, 18*s, 18*s); ctx.fillRect(-20*s, -18*s, 18*s, 18*s);
+      ctx.strokeRect(2*s, -18*s, 18*s, 18*s); ctx.fillRect(2*s, -18*s, 18*s, 18*s);
+      ctx.strokeRect(-20*s, 2*s, 18*s, 18*s); ctx.fillRect(-20*s, 2*s, 18*s, 18*s);
+      ctx.strokeRect(2*s, 2*s, 18*s, 18*s); ctx.fillRect(2*s, 2*s, 18*s, 18*s);
+      ctx.strokeStyle = INK;
       drawLabel(ctx, "WINDOW", s, GOLD);
       break;
     }
@@ -889,12 +1017,14 @@ function drawStockMotif(ctx, emblem, s, rarity, attr) {
       inkStroke(); line(2);
       ctx.beginPath(); ctx.moveTo(0, -24*s); ctx.lineTo(20*s, -12*s); ctx.lineTo(0, 0); ctx.lineTo(-20*s, -12*s); ctx.closePath(); ctx.stroke(); ctx.fill();
       ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(20*s, 12*s); ctx.lineTo(0, 24*s); ctx.lineTo(-20*s, 12*s); ctx.closePath(); ctx.stroke(); ctx.fill();
+      ctx.strokeStyle = INK;
       drawLabel(ctx, "GPU", s, GOLD);
       break;
     }
     case "box": {
       inkStroke(); line(2);
       ctx.beginPath(); ctx.moveTo(-20*s, -12*s); ctx.lineTo(0, -22*s); ctx.lineTo(20*s, -12*s); ctx.lineTo(20*s, 12*s); ctx.lineTo(0, 22*s); ctx.lineTo(-20*s, 12*s); ctx.closePath(); ctx.stroke(); ctx.fill();
+      ctx.strokeStyle = INK;
       ctx.beginPath(); ctx.moveTo(-20*s, -12*s); ctx.lineTo(0, -2*s); ctx.lineTo(20*s, -12*s); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(0, -2*s); ctx.lineTo(0, 22*s); ctx.stroke();
       drawLabel(ctx, "BOX", s, GOLD);
@@ -903,6 +1033,7 @@ function drawStockMotif(ctx, emblem, s, rarity, attr) {
     case "search": {
       inkStroke(); line(2);
       ctx.beginPath(); ctx.arc(-6*s, -6*s, 14*s, 0, Math.PI*2); ctx.stroke(); ctx.fill();
+      ctx.strokeStyle = INK;
       ctx.beginPath(); ctx.moveTo(6*s, 6*s); ctx.lineTo(20*s, 20*s); ctx.stroke();
       drawLabel(ctx, "SEARCH", s, GOLD);
       break;
@@ -924,6 +1055,7 @@ function drawStockMotif(ctx, emblem, s, rarity, attr) {
     case "card": {
       inkStroke(); line(2);
       ctx.beginPath(); ctx.roundRect(-22*s, -14*s, 44*s, 28*s, 5*s); ctx.stroke(); ctx.fill();
+      ctx.strokeStyle = INK;
       ctx.beginPath(); ctx.moveTo(-22*s, -4*s); ctx.lineTo(22*s, -4*s); ctx.stroke();
       ctx.fillRect(-18*s, 4*s, 8*s, 4*s);
       drawLabel(ctx, "CARD", s, GOLD);
@@ -932,6 +1064,7 @@ function drawStockMotif(ctx, emblem, s, rarity, attr) {
     case "bottle": {
       inkStroke(); line(2);
       ctx.beginPath(); ctx.moveTo(-8*s, -24*s); ctx.lineTo(8*s, -24*s); ctx.lineTo(8*s, -14*s); ctx.quadraticCurveTo(18*s, -6*s, 14*s, 12*s); ctx.lineTo(-14*s, 12*s); ctx.quadraticCurveTo(-18*s, -6*s, -8*s, -14*s); ctx.closePath(); ctx.stroke(); ctx.fill();
+      ctx.strokeStyle = INK;
       ctx.beginPath(); ctx.moveTo(-14*s, 4*s); ctx.lineTo(14*s, 4*s); ctx.stroke();
       drawLabel(ctx, "SODA", s, GOLD);
       break;
@@ -939,13 +1072,15 @@ function drawStockMotif(ctx, emblem, s, rarity, attr) {
     case "oil": {
       inkStroke(); line(2);
       ctx.beginPath(); ctx.moveTo(0, -24*s); ctx.quadraticCurveTo(14*s, -8*s, 14*s, 6*s); ctx.arc(0, 6*s, 14*s, 0, Math.PI); ctx.closePath(); ctx.stroke(); ctx.fill();
+      ctx.strokeStyle = INK;
       ctx.beginPath(); ctx.moveTo(-6*s, 2*s); ctx.lineTo(6*s, 2*s); ctx.stroke();
       drawLabel(ctx, "OIL", s, GOLD);
       break;
     }
     case "litho": {
       inkStroke(); line(2);
-      ctx.strokeRect(-18*s, -18*s, 36*s, 36*s);
+      ctx.strokeRect(-18*s, -18*s, 36*s, 36*s); ctx.fillRect(-18*s, -18*s, 36*s, 36*s);
+      ctx.strokeStyle = INK;
       ctx.beginPath(); ctx.moveTo(-18*s, -6*s); ctx.lineTo(18*s, -6*s); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(-18*s, 6*s); ctx.lineTo(18*s, 6*s); ctx.stroke();
       ctx.beginPath(); ctx.arc(0, 0, 5*s, 0, Math.PI*2); ctx.stroke();
@@ -955,6 +1090,7 @@ function drawStockMotif(ctx, emblem, s, rarity, attr) {
     case "wafer": {
       inkStroke(); line(2);
       ctx.beginPath(); ctx.arc(0, 0, 22*s, 0, Math.PI*2); ctx.stroke(); ctx.fill();
+      ctx.strokeStyle = INK;
       for (let i=0;i<3;i++){
         ctx.beginPath(); ctx.moveTo(-14*s + i*4*s, -14*s); ctx.lineTo(14*s - i*4*s, 14*s); ctx.stroke();
       }
@@ -964,16 +1100,19 @@ function drawStockMotif(ctx, emblem, s, rarity, attr) {
     case "phone": {
       inkStroke(); line(2);
       ctx.beginPath(); ctx.roundRect(-10*s, -22*s, 20*s, 44*s, 4*s); ctx.stroke(); ctx.fill();
+      ctx.strokeStyle = INK;
       ctx.beginPath(); ctx.arc(0, 16*s, 2*s, 0, Math.PI*2); ctx.fill();
       drawLabel(ctx, "PHONE", s, GOLD);
       break;
     }
     case "crown": {
       goldStroke(); line(2.5);
+      ctx.fillStyle = "rgba(232,200,120,0.55)";
       ctx.beginPath();
       ctx.moveTo(-24*s, 12*s); ctx.lineTo(-24*s, -12*s); ctx.lineTo(-12*s, 0); ctx.lineTo(0, -18*s);
       ctx.lineTo(12*s, 0); ctx.lineTo(24*s, -12*s); ctx.lineTo(24*s, 12*s); ctx.closePath();
       ctx.stroke(); ctx.fill();
+      ctx.fillStyle = GOLD;
       ctx.beginPath(); ctx.arc(-24*s, -14*s, 3*s, 0, Math.PI*2); ctx.fill();
       ctx.beginPath(); ctx.arc(0, -22*s, 3*s, 0, Math.PI*2); ctx.fill();
       ctx.beginPath(); ctx.arc(24*s, -14*s, 3*s, 0, Math.PI*2); ctx.fill();
@@ -997,18 +1136,14 @@ function drawStockMotif(ctx, emblem, s, rarity, attr) {
 }
 
 /* =========================================================
-   クリック演出（A：耽美装飾 × B：金融モチーフ）14種
+   クリック演出（A：耽美 × B：金融）14種
 ========================================================= */
 const fxCanvas = document.getElementById("fxCanvas");
 const fxCtx = fxCanvas.getContext("2d");
 
-let fxParticles = [];
-let fxShake = 0;
-let fxFlash = 0;
-let fxFlashColor = "255,240,200";
+let fxGlitters = [];
 let fxFeathers = [];
 let fxPetals = [];
-let fxGlitters = [];
 let fxEmblems = [];
 let fxRibbons = [];
 let fxCandles = [];
@@ -1018,6 +1153,8 @@ let fxRates = [];
 let fxBoards = [];
 let fxLaurels = [];
 let fxAngels = [];
+let fxFlash = 0;
+let fxFlashColor = "255,240,200";
 let fxActive = false;
 
 function resizeFx() {
@@ -1107,14 +1244,15 @@ function fxRibbon(x, y) {
   showFxLog(x, y - 60, "リボン", "RUBAN", "#b04868");
 }
 function fxCandle(x, y) {
-  fxCandles.push({ x, y, life: 1, bars: [], age: 0 });
+  const bars = [];
   for (let i = 0; i < 8; i++) {
     const open = Math.random();
     const close = Math.random();
     const high = Math.max(open, close) + Math.random()*0.15;
     const low = Math.min(open, close) - Math.random()*0.15;
-    fxCandles[fxCandles.length-1].bars.push({ open, close, high, low });
+    bars.push({ open, close, high, low });
   }
+  fxCandles.push({ x, y, life: 1, bars, age: 0 });
   showFxLog(x, y - 60, "燭台", "CHANDELIER", "#b08a3a");
 }
 function fxStamp(x, y) {
@@ -1216,7 +1354,6 @@ function showFxLog(x, y, mainText, subText, color) {
 function fxLoop() {
   requestAnimationFrame(fxLoop);
   if (!fxActive) return;
-  if (fxShake > 0) fxShake = Math.max(0, fxShake - 1.2);
   if (fxFlash > 0) fxFlash = Math.max(0, fxFlash - 0.05);
 
   for (let i = fxGlitters.length-1; i >= 0; i--) {
@@ -1300,17 +1437,13 @@ function fxLoop() {
 
 function renderFx() {
   fxCtx.clearRect(0, 0, fxCanvas.width, fxCanvas.height);
-  fxCtx.save();
-  if (fxShake > 0) fxCtx.translate((Math.random()-0.5)*fxShake, (Math.random()-0.5)*fxShake);
 
-  /* 金箔 */
   for (const g of fxGlitters) {
     fxCtx.globalAlpha = Math.max(0, g.life);
     fxCtx.fillStyle = "#d8b968";
     fxCtx.shadowBlur = 8; fxCtx.shadowColor = "#d8b968";
     fxCtx.beginPath(); fxCtx.arc(g.x, g.y, g.size * g.life, 0, Math.PI*2); fxCtx.fill();
   }
-  /* 羽 */
   for (const f of fxFeathers) {
     fxCtx.save();
     fxCtx.translate(f.x, f.y); fxCtx.rotate(f.rot);
@@ -1324,7 +1457,6 @@ function renderFx() {
     fxCtx.beginPath(); fxCtx.moveTo(0, -f.len); fxCtx.lineTo(0, f.len); fxCtx.stroke();
     fxCtx.restore();
   }
-  /* 花びら */
   for (const p of fxPetals) {
     fxCtx.save();
     fxCtx.translate(p.x, p.y); fxCtx.rotate(p.rot);
@@ -1335,7 +1467,6 @@ function renderFx() {
     fxCtx.fill();
     fxCtx.restore();
   }
-  /* 紋章 */
   for (const e of fxEmblems) {
     fxCtx.save();
     fxCtx.translate(e.x, e.y); fxCtx.rotate(e.rot);
@@ -1351,7 +1482,6 @@ function renderFx() {
     }
     fxCtx.restore();
   }
-  /* リボン */
   for (const r of fxRibbons) {
     fxCtx.save();
     fxCtx.translate(r.x, r.y);
@@ -1366,7 +1496,6 @@ function renderFx() {
     }
     fxCtx.restore();
   }
-  /* ローソク足 */
   for (const c of fxCandles) {
     fxCtx.save();
     fxCtx.translate(c.x, c.y);
@@ -1387,7 +1516,6 @@ function renderFx() {
     }
     fxCtx.restore();
   }
-  /* 約定スタンプ */
   for (const s of fxStamps) {
     fxCtx.save();
     fxCtx.translate(s.x, s.y); fxCtx.rotate(s.rot); fxCtx.scale(s.scale, s.scale);
@@ -1399,7 +1527,6 @@ function renderFx() {
     fxCtx.fillText("EXÉCUTÉ", 0, 0);
     fxCtx.restore();
   }
-  /* ティッカー */
   for (const t of fxTickers) {
     fxCtx.save();
     fxCtx.translate(t.x, t.y);
@@ -1415,7 +1542,6 @@ function renderFx() {
     }
     fxCtx.restore();
   }
-  /* 為替 */
   for (const r of fxRates) {
     fxCtx.save();
     fxCtx.translate(r.x, r.y);
@@ -1431,7 +1557,6 @@ function renderFx() {
     }
     fxCtx.restore();
   }
-  /* 株価板 */
   for (const b of fxBoards) {
     fxCtx.save();
     fxCtx.translate(b.x, b.y);
@@ -1446,7 +1571,6 @@ function renderFx() {
     }
     fxCtx.restore();
   }
-  /* 月桂冠 */
   for (const l of fxLaurels) {
     fxCtx.save();
     fxCtx.translate(l.x, l.y); fxCtx.rotate(l.rot);
@@ -1462,7 +1586,6 @@ function renderFx() {
     }
     fxCtx.restore();
   }
-  /* 天使の羽ばたき */
   for (const a of fxAngels) {
     fxCtx.save();
     fxCtx.translate(a.x, a.y);
@@ -1484,7 +1607,6 @@ function renderFx() {
   }
 
   fxCtx.globalAlpha = 1; fxCtx.shadowBlur = 0;
-  fxCtx.restore();
 
   if (fxFlash > 0) {
     fxCtx.fillStyle = `rgba(${fxFlashColor},${fxFlash*0.35})`;
@@ -1509,7 +1631,7 @@ let startTime = Date.now();
 let gameStarted = false;
 
 const $ = (id) => document.getElementById(id);
-const opening = $("opening"), startBtn = $("startBtn"), viewBgBtn = $("viewBgBtn");
+const startBtn = $("startBtn"), viewBgBtn = $("viewBgBtn");
 const bgViewer = $("bgViewer"), closeViewerBtn = $("closeViewerBtn"), game = $("game");
 const clockEl = $("clock"), moneyDisplay = $("moneyDisplay");
 const buyPackBtn = $("buyPackBtn"), buyArea = $("buyArea"), packCardWrap = $("packCardWrap");
@@ -1521,15 +1643,15 @@ const modal = $("modal"), modalCard = $("modalCard"), modalName = $("modalName")
 const modalAtk = $("modalAtk"), modalDef = $("modalDef"), modalEffect = $("modalEffect");
 const modalCloseBtn = $("modalCloseBtn"), modalSellBtn = $("modalSellBtn");
 
-const bgToggleBtn = $("bgToggleBtn"), fitSelect = $("fitSelect"), leftBgLayer = $("leftBgLayer");
+const bgToggleBtn = $("bgToggleBtn"), fitSelect = $("fitSelect");
 let bgVisible = false;
 bgToggleBtn.addEventListener("click", () => {
   bgVisible = !bgVisible;
-  leftBgLayer.classList.toggle("active", bgVisible);
+  leftBgLayerEl.classList.toggle("active", bgVisible);
   bgToggleBtn.classList.toggle("on", bgVisible);
 });
 fitSelect.addEventListener("change", () => {
-  leftBgLayer.style.backgroundSize = fitSelect.value;
+  leftBgLayerEl.style.backgroundSize = fitSelect.value;
 });
 
 function updateClock() {
@@ -1667,18 +1789,17 @@ function sellFromModal() {
 function updateMoneyDisplay() { moneyDisplay.textContent = `所持金：${money}円`; }
 function checkStudyLink() { if (packsBought >= 3) studyLink.classList.add("visible"); }
 
-/* クリック演出：画面のどこをクリックしても発動 */
 document.addEventListener("click", (e) => {
   triggerRandomFx(e.clientX, e.clientY);
 });
 
 startBtn.addEventListener("click", () => {
-  opening.style.display = "none";
+  openingEl.style.display = "none";
   game.classList.add("active");
   gameStarted = true; startTime = Date.now();
   updateMoneyDisplay(); renderInfoList(); renderPriceTable();
   fitSelect.value = "cover";
-  leftBgLayer.style.backgroundSize = "cover";
+  leftBgLayerEl.style.backgroundSize = "cover";
 });
 viewBgBtn.addEventListener("click", () => bgViewer.classList.add("active"));
 closeViewerBtn.addEventListener("click", () => bgViewer.classList.remove("active"));
