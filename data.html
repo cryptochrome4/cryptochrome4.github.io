@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>HUDDLED — DDOG MULTI DESK</title>
+<style>
+:root{--u:100vh;--w:min(46vw,520px);--w1:min(76vw,900px);--w6:min(72vw,640px)}
+@supports(height:100dvh){:root{--u:100dvh}}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:#d8cfbd;font-family:"Hiragino Sans","Noto Sans JP",system-ui,sans-serif;color:#e8ecef}
+#view{position:fixed;inset:0;overflow:hidden}
+#stage{position:absolute;left:0;top:0;width:400vw;height:calc(var(--u)*3);transition:transform .85s cubic-bezier(.65,0,.25,1);background:linear-gradient(#f2ecdf,#e3dac8)}
+#view[data-s=home] #stage{transform:translate(-200vw,calc(var(--u)*-1))}
+#view[data-s=up] #stage{transform:translate(-200vw,0)}
+#view[data-s=down] #stage{transform:translate(-200vw,calc(var(--u)*-2))}
+#view[data-s=left] #stage{transform:translate(-100vw,calc(var(--u)*-1))}
+#view[data-s=left2] #stage{transform:translate(0,calc(var(--u)*-1))}
+#view[data-s=right] #stage{transform:translate(-300vw,calc(var(--u)*-1))}
+.desk{position:absolute;left:0;width:400vw;top:calc(var(--u)*1.72);height:calc(var(--u)*.28);background:linear-gradient(#cfc6b5 0,#cfc6b5 16%,#8d9298 16%,#6f747a)}
+.room{position:absolute;left:200vw;top:calc(var(--u)*2);width:100vw;height:var(--u);z-index:6;background:url(img395view.jpg) center/100% 100% no-repeat,linear-gradient(#cdbfa6,#8d7b60)}
+/* monitors */
+.mon{position:absolute;display:flex;flex-direction:column;z-index:2;--bzbg:#1b1d20;--pad:7px 7px 26px;--scr:#06090c;--b1:#2b3a4a;--b2:#18222d;--c:#9fd;--g:#35d07f;--y:#f2c94c;--brc:#888}
+.p1,.p4,.p5{top:calc(var(--u)*1.10);width:var(--w1);height:calc(var(--u)*.58)}
+.p1{left:calc(250vw - var(--w1)/2)}.p4{left:calc(150vw - var(--w1)/2)}.p5{left:calc(350vw - var(--w1)/2)}
+.p2,.p3{top:calc(var(--u)*.10);width:var(--w);height:calc(var(--u)*.62)}
+.p2{left:calc(225vw - var(--w)/2)}.p3{left:calc(275vw - var(--w)/2)}
+.p6{left:calc(50vw - var(--w6)/2);top:calc(var(--u)*1.14);width:var(--w6);height:calc(var(--u)*.52)}
+/* メーカー別テーマ */
+.p1{--bzbg:linear-gradient(#e8e9ec,#b5b8be);--scr:#0a0b10;--b1:#2c2c30;--b2:#1b1b1e;--c:#7db4ff;--g:#7be3ff;--brc:#666}
+.p1 .scr{border:4px solid #000}
+.p2{--bzbg:linear-gradient(#4a4f49,#2f332e);--pad:12px 12px 28px;--scr:#05110a;--b1:#1f4a31;--b2:#12301f;--c:#5cf0a0;--g:#5cf0a0;--y:#d7f06a}
+.p3{--bzbg:#0b0b0d;--scr:#0b0506;--b1:#4a0d0d;--b2:#240606;--c:#ff6a5c;--g:#ff3b3b;--y:#ffb347}
+.p3 .bz{box-shadow:0 8px 18px #0006,inset 0 0 0 2px #c41e1e,0 0 14px #c41e1e88}
+.p4{--bzbg:#161616;--scr:#080808;--b1:#2a2a2a;--b2:#1a1a1a;--c:#e9e9e9;--g:#ff4444;--y:#ffd24a}
+.p5{--bzbg:linear-gradient(#ddd5be,#bdb399);--pad:16px 16px 30px;--scr:#020a04;--b1:#2f3d2b;--b2:#1d281b;--c:#9dffb0;--g:#7dff9a;--y:#e8ff8a;--brc:#665f4a}
+.p5 .bz{border-radius:22px}.p5 .scr{border-radius:16px/20px}.p5 .body{color:#b9ffc6}
+.p6{--bzbg:linear-gradient(#2c3037,#1a1d22);--scr:#050b14;--b1:#164a7a;--b2:#0e2e4d;--c:#4aa8ff;--g:#4aa8ff;--y:#ffd36a;--pad:8px 8px 24px}
+.bz{flex:1;min-height:0;display:flex;flex-direction:column;position:relative;background:var(--bzbg);border-radius:10px;padding:var(--pad);box-shadow:0 8px 18px #0006,inset 0 0 0 1px #4448}
+.scr{flex:1;min-height:0;display:flex;flex-direction:column;background:var(--scr);border-radius:4px;overflow:hidden;position:relative;border:1px solid #000}
+.scr::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:3;background:repeating-linear-gradient(#0000 0 2px,#0000000d 2px 3px)}
+.bar{display:flex;justify-content:space-between;align-items:center;background:linear-gradient(var(--b1),var(--b2));padding:4px 7px;font:700 10px/1 monospace;color:var(--c);letter-spacing:1px;white-space:nowrap;overflow:hidden}
+.body{flex:1;min-height:0;overflow:auto;padding:8px;font-size:12px;line-height:1.55;-webkit-overflow-scrolling:touch}
+.p2 .body,.p3 .body{font-size:11px;padding:6px}
+/* 電源状態 off / boot / on */
+.mon:not([data-p=on]) .scr>:not(.bl){visibility:hidden}
+.mon[data-p=off] .scr{background:#030405;box-shadow:inset 0 0 30px #000a}
+.bl{position:absolute;inset:0;z-index:2;display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:#000;color:#fff;text-align:center;padding:10px}
+.mon[data-p=boot] .bl{display:flex}
+.mon[data-p=on] .scr{animation:on .5s}
+@keyframes on{0%{filter:brightness(3)}100%{filter:none}}
+.ld{font:700 10px monospace;letter-spacing:3px;color:#aaa}
+.ld::after{content:"";animation:dots 1s steps(1) infinite}
+@keyframes dots{0%{content:""}25%{content:"."}50%{content:".."}75%{content:"..."}}
+.pb{width:62%;height:4px;background:#2a2a2a;border-radius:2px;overflow:hidden}
+.pb i{display:block;height:100%;width:0;background:var(--c)}
+.mon[data-p=boot] .pb i{animation:pbar var(--bt,3s) linear forwards}
+@keyframes pbar{to{width:100%}}
+@keyframes fi{from{opacity:0;transform:scale(.8);filter:blur(4px)}to{opacity:1;transform:none;filter:none}}
+.lgo{animation:fi 1.4s ease both;width:64px;height:64px}
+.eizo{font:900 32px/1 "Arial Black",Arial,sans-serif;color:#5cf0a0;animation:sp 2.4s ease both}
+@keyframes sp{from{letter-spacing:-6px;opacity:0}to{letter-spacing:6px;opacity:1}}
+.rb s{display:inline-block;width:10px;height:44px;background:#e11;transform:skewX(-25deg);margin:0 4px;animation:sl .8s ease both}
+.rb s:nth-child(2){animation-delay:.2s}.rb s:nth-child(3){animation-delay:.4s}
+@keyframes sl{from{opacity:0;transform:translateX(-40px) skewX(-25deg)}to{opacity:1}}
+.rog{font:900 italic 30px Arial,sans-serif;color:#f33;animation:gl 1.2s infinite}
+@keyframes gl{0%,88%,100%{transform:none}92%{transform:translate(-3px,1px)}96%{transform:translate(3px,-1px)}}
+.tp{font:700 30px Arial,sans-serif;color:#eee;animation:fi 1.2s ease both}.tp span{font-weight:300}
+.tp i{display:inline-block;width:7px;height:7px;border-radius:50%;background:#e22;margin-left:4px;vertical-align:top;animation:bl .6s infinite alternate}
+.bios{align-self:flex-start;text-align:left;font:11px/1.6 monospace;color:#7dff9a}
+.bios div{opacity:0;animation:fi2 .1s forwards;animation-delay:var(--d)}
+@keyframes fi2{to{opacity:1}}
+.ring{stroke-dasharray:214;stroke-dashoffset:214;animation:dr 2.2s ease forwards}
+@keyframes dr{to{stroke-dashoffset:0}}
+.upd{font-size:10px;color:#9cc;line-height:1.5}
+.pw{position:absolute;right:10px;bottom:3px;width:20px;height:20px;border-radius:50%;border:2px solid #777;background:radial-gradient(#4a4a4a,#111);color:#cfcfcf;font-size:11px;line-height:14px;text-align:center}
+.pw:active{transform:scale(.88)}
+.led{position:absolute;right:38px;bottom:10px;width:6px;height:6px;border-radius:50%;background:#333}
+.mon[data-p=boot] .led{background:#fa0;animation:bl .5s infinite alternate}
+.mon[data-p=on] .led{background:var(--g);box-shadow:0 0 6px var(--g)}
+.br{position:absolute;left:12px;bottom:7px;font:700 9px monospace;color:var(--brc);letter-spacing:1px}
+.neck{position:absolute;top:100%;left:44%;width:12%;height:calc(var(--u)*.05);background:linear-gradient(90deg,#222,#666,#222)}
+.neck::after{content:"";position:absolute;left:-90%;right:-90%;bottom:-4px;height:8px;border-radius:4px;background:#2a2c2f}
+.p1 .neck{background:linear-gradient(90deg,#999,#e2e3e6,#999)}.p1 .neck::after{background:#c3c5ca}
+.p5 .neck{background:linear-gradient(90deg,#a89f86,#d8d0b8,#a89f86)}.p5 .neck::after{background:#b9b097}
+/* ノートPC(PC6) */
+.lbase{position:absolute;top:calc(100% - 2px);left:-7%;width:114%;height:calc(var(--u)*.065);clip-path:polygon(5% 0,95% 0,100% 100%,0 100%);
+background:repeating-linear-gradient(90deg,#0003 0 2px,#0000 2px 9px),linear-gradient(#b9bec6,#7d838c)}
+.dust{position:absolute;inset:-10px -30px;pointer-events:none;z-index:5;opacity:.6;
+background:radial-gradient(circle at 18% 35%,#e9e4d866,#0000 38%),radial-gradient(circle at 75% 25%,#e9e4d855,#0000 40%),radial-gradient(circle at 55% 105%,#e9e4d899,#0000 40%)}
+/* 支柱(土台はPC1の机に描画) */
+.pole{position:absolute;top:calc(var(--u)*.72);height:calc(var(--u)*1.02);width:16px;z-index:3}
+.pl{left:calc(225vw - var(--w)/2 + 8px)}.pr{left:calc(275vw + var(--w)/2 - 24px)}
+.pole::before{content:"";position:absolute;top:-10px;left:-9px;width:34px;height:16px;border-radius:3px;background:linear-gradient(#777,#333);box-shadow:0 2px 4px #0006}
+.pole i{display:block;margin:0 auto;height:33.3%;border-top:3px solid #3a3d42;background:linear-gradient(90deg,#666,#dadce0 45%,#858890)}
+.pole i:nth-child(1){width:10px}.pole i:nth-child(2){width:13px}.pole i:nth-child(3){width:16px}
+.pole::after{content:"";position:absolute;bottom:-7px;left:50%;margin-left:-30px;width:60px;height:12px;border-radius:6px;background:linear-gradient(#999,#444);box-shadow:0 2px 3px #0008}
+.kb{position:absolute;left:calc(250vw - 140px);width:280px;top:calc(var(--u)*1.745);height:calc(var(--u)*.028);border-radius:4px;background:#2d3035;z-index:2;box-shadow:0 2px 3px #0006}
+/* ナビキー */
+.nv{position:fixed;z-index:20;width:62px;height:52px;border-radius:12px;border:1px solid #555;color:#fff;background:linear-gradient(#5a5f66,#2b2e33);box-shadow:0 4px 0 #15171a,0 6px 10px #0006;display:none;flex-direction:column;align-items:center;justify-content:center;font-family:monospace}
+.nv:active{transform:translateY(3px);box-shadow:0 1px 0 #15171a}
+.nv b{font-size:22px;line-height:1}.nv small{font-size:9px;color:#9fd;margin-top:2px}
+#nu{top:calc(env(safe-area-inset-top,0px) + 8px);left:50%;margin-left:-31px}
+#nd{bottom:calc(env(safe-area-inset-bottom,0px) + 12px);left:50%;margin-left:-31px}
+#nl{bottom:calc(env(safe-area-inset-bottom,0px) + 12px);left:10px}
+#nr{bottom:calc(env(safe-area-inset-bottom,0px) + 12px);right:10px}
+#fx{position:fixed;inset:0;z-index:30;pointer-events:none;opacity:0;background:radial-gradient(circle,#fff0 30%,#4fc3f766 100%)}
+#fx.go{animation:fl .85s}
+@keyframes fl{0%{opacity:0}30%{opacity:1}100%{opacity:0}}
+/* 中身 */
+h2{font:700 11px monospace;color:var(--c);margin-bottom:7px;letter-spacing:1px}
+.tl{list-style:none}
+.tl li{border-left:2px solid #234;padding:2px 0 9px 14px;position:relative;cursor:pointer}
+.tl li::before{content:"";position:absolute;left:-7px;top:6px;width:12px;height:12px;border-radius:50%;background:#345;border:2px solid #06090c}
+.tl li.done{border-color:var(--g)}.tl li.done::before{background:var(--g);box-shadow:0 0 8px var(--g)}
+.tl li.now{border-color:var(--y)}.tl li.now::before{background:var(--y);box-shadow:0 0 10px var(--y);animation:bl 1s infinite alternate}
+@keyframes bl{to{opacity:.35}}
+.d{font:11px monospace;color:#8ab}.t{font-weight:700;color:#fff}
+.tag{display:inline-block;font:700 10px monospace;padding:0 5px;border-radius:2px;margin-left:6px;vertical-align:middle}
+.tag.c{background:var(--g);color:#012}.tag.n{background:var(--y);color:#210}.tag.e{background:#345;color:#9ab}
+.more{display:none;margin-top:5px;padding:7px 9px;background:#0f1a24;border-radius:4px;color:#cfe;font-size:12px}
+.tl li.open .more{display:block}
+.soc{display:block;margin-top:5px;color:var(--y)}
+.big{font:900 44px/1 monospace;color:var(--g);text-shadow:0 0 12px var(--g);text-align:center;margin-top:4px}
+.cap{text-align:center;color:#8ab;font-size:10px;margin:4px 0 8px}
+.pg{height:10px;background:#123;border-radius:5px;overflow:hidden;margin:5px 0}
+.pg i{display:block;height:100%;background:linear-gradient(90deg,var(--g),var(--y));width:0}
+.row{display:flex;justify-content:space-between;font:10px monospace;color:#8ab}
+.kv{margin-top:8px;font:11px monospace;color:#cfe}.kv div{display:flex;justify-content:space-between;border-bottom:1px dotted #234;padding:3px 0}
+.inner{border:2px solid #556;border-radius:6px;margin-top:10px;background:#0b1118}
+.inner .bar{font-size:9px;background:#2a2f3a;color:#9fd}.inner p{padding:6px;font-size:10.5px;color:#cfe}
+svg.ch{width:100%;height:auto;display:block}
+.lg{list-style:none;margin-top:8px}.lg li{padding:3px 0;border-bottom:1px dotted #234;color:#cfe}.lg b{color:var(--y)}
+ul.ck{list-style:none}ul.ck li{padding:6px 0 6px 20px;position:relative;border-bottom:1px dotted #234}
+ul.ck li::before{content:"▶";position:absolute;left:0;color:var(--c);font-size:10px;top:9px}
+.gl dt{color:var(--y);font-weight:700;margin-top:9px}.gl dd{color:#cfe}
+.p5 .gl dd,.p5 .note{color:#9fe3ae}
+.note{margin-top:9px;font-size:10.5px;color:#89a}
+</style>
+</head>
+<body>
+<div id="view" data-s="home">
+<div id="stage">
+
+<!-- PC2 EIZO風(上・左・縦長) -->
+<section class="mon p2" data-p="off" data-boot="3000"><div class="bz"><div class="scr">
+<div class="bl"><div class="eizo">EIZO</div><div class="ld">LOADING</div><div class="pb"><i></i></div></div>
+<div class="bar"><span>PC2 DDOG DASHBOARD</span><span>●</span></div>
+<div class="body">
+<h2>■ DDOG 現在地</h2>
+<div class="big" id="days">--</div>
+<div class="cap" id="cap">日(2026-11-02時点の情報を基準)</div>
+<div class="pg"><i id="pg"></i></div>
+<div class="row"><span>2020</span><span id="pct">--%</span><span>2026</span></div>
+<div class="kv" id="kv"></div>
+<div class="inner"><div class="bar"><span>▣ INNER-PC / MEMO</span><span>●●●</span></div>
+<p>Datadogはクラウド監視の「計器盤」。サーバー、アプリ、ネットワーク、ログ、セキュリティまでを一つの画面に集める。2020年9月にNasdaqへ上場(ティッカーDDOG)。</p></div>
+</div></div><div class="br">EIZO風 PC2</div><div class="led"></div><button class="pw" aria-label="PC2電源">⏻</button></div></section>
+
+<!-- PC3 ROG風(上・右・縦長) -->
+<section class="mon p3" data-p="off" data-boot="3200"><div class="bz"><div class="scr">
+<div class="bl"><div class="rb"><s></s><s></s><s></s></div><div class="rog">ROG</div><div class="ld">LOADING</div><div class="pb"><i></i></div></div>
+<div class="bar"><span>PC3 CHART (SCHEMA)</span><span>●</span></div>
+<div class="body">
+<h2>■ イメージ図(株価ではなく沿革の模式図)</h2>
+<svg class="ch" viewBox="0 0 160 200">
+<rect width="160" height="200" fill="#0b0506"/>
+<path d="M0 50H160M0 100H160M0 150H160" stroke="#2a1010"/>
+<path d="M4 170H28" stroke="#867" stroke-width="2" stroke-dasharray="4 3" fill="none"/>
+<path d="M28 170 L36 150 L44 152 L52 130 L60 138 L68 116 L76 120 L84 96 L92 104 L100 88 L108 94 L116 78 L124 86 L132 66 L140 72 L148 52 L156 60" stroke="#ff3b3b" stroke-width="2" fill="none"/>
+<g stroke="#ffb347" stroke-dasharray="2 2"><path d="M36 14V190M84 14V190M124 14V190"/></g>
+<g fill="#ffb347" font-size="11" font-family="monospace"><text x="32" y="11">①</text><text x="80" y="11">②</text><text x="120" y="11">③</text></g>
+</svg>
+<ul class="lg"><li><b>①</b> 2010年 創業(ニューヨーク)</li><li><b>②</b> 2020年9月 Nasdaq上場(DDOG)</li><li><b>③</b> 2024〜 観測可能性×AIへ拡張</li></ul>
+<p class="note">実際の株価ではありません。事業の拡大と節目の順番を示す模式図です。</p>
+</div></div><div class="br">ROG風 PC3</div><div class="led"></div><button class="pw" aria-label="PC3電源">⏻</button></div></section>
+
+<div class="pole pl"><i></i><i></i><i></i></div>
+<div class="pole pr"><i></i><i></i><i></i></div>
+
+<!-- PC6 DELL風 予備ノートPC(PC4のさらに左) -->
+<section class="mon p6" data-p="off" data-boot="5500"><div class="bz"><div class="scr">
+<div class="bl"><svg class="lgo" viewBox="0 0 80 80"><circle class="ring" cx="40" cy="40" r="34" fill="none" stroke="#3aa0ff" stroke-width="6"/><text x="40" y="53" text-anchor="middle" font-size="40" font-weight="900" fill="#3aa0ff" transform="rotate(-18 40 40)" font-family="Arial">D</text></svg>
+<div class="ld">LOADING</div><div class="pb"><i></i></div>
+<div class="upd">更新プログラムを構成しています<br>半年ぶりの起動です。電源を切らないでください</div></div>
+<div class="bar"><span>PC6 SPARE — 予備機 / DDOG DEEP DIVE</span><span>●</span></div>
+<div class="body">
+<h2>■ 予備のノートPC(半年ぶりの起動・DDOG深掘り)</h2>
+<div class="kv"><div><span>最終起動</span><span>半年前</span></div><div><span>バッテリー</span><span>3%</span></div><div><span>更新プログラム</span><span>482件待ち</span></div><div><span>ホコリ</span><span>厚め</span></div></div>
+
+<h2 style="margin-top:10px">■ 沿革・歴史(年表)</h2>
+<ul class="lg">
+<li><b>2010</b> Olivier PomelとAlexis Lê-Quôcがニューヨークで創業。サーバー監視の痛みから出発。</li>
+<li><b>2010〜2014</b> 開発者向けの監視SaaSとして、メトリクス・イベント・ダッシュボードを統合する方向へ。</li>
+<li><b>2012</b> シリーズA調達。クラウド移行の波に乗る。</li>
+<li><b>2014〜2016</b> APM(アプリ性能監視)やログ管理へ製品を拡張。単品ツールから「プラットフォーム」へ。</li>
+<li><b>2017</b> シリーズDで大型調達、ユニコーン評価へ。</li>
+<li><b>2018〜2019</b> ネットワーク監視、セキュリティ、ユーザー体験監視などへ買収と自社開発で拡張。</li>
+<li><b>2019</b> 機密でS-1を提出(SEC審査開始)。</li>
+<li><b>2020-09</b> Nasdaqに上場。ティッカーDDOG。初日から高評価。</li>
+<li><b>2021〜2022</b> 高成長が続く一方、金利上昇局面で高バリュエーション株が調整。ARR拡大と赤字縮小のバランスが問われる。</li>
+<li><b>2023</b> コスト最適化の逆風。顧客がクラウド利用を最適化し、成長率が減速。AIネイティブ企業の顧客化が進む。</li>
+<li><b>2024〜2025</b> LLM ObservabilityなどAI時代の監視製品を投入。マルチプロダクト化と大型顧客の拡大を推進。</li>
+<li><b>2026</b> 観測可能性の「標準の計器盤」として、AIエージェントの監視・セキュリティへ領域を広げる。</li>
+</ul>
+
+<h2 style="margin-top:10px">■ ビジネスモデル</h2>
+<ul class="ck">
+<li>サブスクリプション(SaaS)。従量課金(使用量ベース)と契約期間の組み合わせ。</li>
+<li>ホスト数・ログ量・カスタムメトリクス数などで課金。使えば使うほど売上が伸びる構造。</li>
+<li>無料枠とセルフサーブで開発者が入り、組織全体へ横展開(ボトムアップ型の導入)。</li>
+<li>複数製品を束ねる「マルチプロダクト」。1顧客あたりの製品数とARRが拡大するほど解約率が下がる。</li>
+<li>ネットレベニューリテンション(NRR)が高く、既存顧客の拡大が成長の主エンジン。</li>
+</ul>
+
+<h2 style="margin-top:10px">■ 従業員・カルチャー・理念</h2>
+<ul class="ck">
+<li>創業者は「開発者が使いたい道具を作る」という開発者中心の思想。</li>
+<li>本社はニューヨーク。世界各地に拠点を持ち、リモートとオフィスのハイブリッド。</li>
+<li>カルチャーの柱: 顧客への執着、オーナーシップ、透明性、スピード、謙虚さ。</li>
+<li>プロダクトは「開発者ファースト」。ドキュメントとAPIの使いやすさを重視。</li>
+<li>エンジニアリング文化を重視し、現場のエンジニアが顧客の痛みを直接理解することを大事にする。</li>
+</ul>
+
+<h2 style="margin-top:10px">■ AIとの相性</h2>
+<ul class="ck">
+<li>AI時代は「監視すべき対象」が爆発的に増える。LLMアプリ、エージェント、ベクトルDB、GPUクラスタなど。</li>
+<li>LLM Observabilityで、プロンプト・トークン・レイテンシ・コスト・品質を可視化。</li>
+<li>AIが生成する大量のログとメトリクスは、観測可能性プラットフォームの追い風。</li>
+<li>一方で、AIが監視作業自体を自動化する競争も激化。AI SRE/エージェント機能は必須の投資領域。</li>
+<li>相性は「良い」が、競合もAIを武器にするため、優位性はデータ量と統合度にかかる。</li>
+</ul>
+
+<h2 style="margin-top:10px">■ 競合他社</h2>
+<ul class="ck">
+<li>Splunk(Cisco傘下) — ログ・SIEMの老舗。</li>
+<li>Dynatrace — APMと自動化に強い。</li>
+<li>New Relic — 観測可能性の直接競合。</li>
+<li>Elastic — 検索基盤と観測可能性。</li>
+<li>Grafana Labs / Prometheus — オープンソース系の監視。</li>
+<li>クラウド各社のネイティブ監視(AWS CloudWatch、Azure Monitor、Google Cloud Operations)。</li>
+<li>SolarWinds、Sumo Logic、Honeycombなども領域別に競合。</li>
+</ul>
+
+<h2 style="margin-top:10px">■ マクロ・政治の影響(トランプ氏が中間選挙で敗北した場合)</h2>
+<ul class="ck">
+<li>米中間選挙の結果は、財政・規制・通商政策の方向性を通じてハイテク株のセンチメントに影響する。</li>
+<li>トランプ氏が敗北した場合、関税や対中強硬策の緩和期待が一部で出る可能性。サプライチェーンとクラウド需要に間接影響。</li>
+<li>一方で、規制強化(プライバシー、AI規制、独占禁止)が進む可能性も。データ管理とセキュリティ需要はむしろ拡大しうる。</li>
+<li>金利と成長株のバリュエーションは政治より金融政策に敏感。選挙結果は短期的なボラティリティ要因。</li>
+<li>政府・公共部門のクラウド調達やサイバーセキュリティ予算の増減も、観測可能性需要に波及する。</li>
+<li>※あくまでシナリオであり、投資助言ではない。</li>
+</ul>
+
+<h2 style="margin-top:10px">■ 資金調達と財務</h2>
+<ul class="ck">
+<li>上場前はベンチャーキャピタルから複数ラウンド調達。上場時に大型の資金を調達。</li>
+<li>上場後は株式市場からの調達力を背景に、買収と自社開発を並行。</li>
+<li>売上総利益率はSaaSとしては高め。一方で営業投資と研究開発投資が大きく、GAAPベースでは赤字の時期が長い。</li>
+<li>フリーキャッシュフローは黒字化・拡大の傾向。株式報酬(SBC)の希薄化は留意点。</li>
+<li>大型顧客(ARR100万ドル超)の数が成長指標として重視される。</li>
+</ul>
+
+<h2 style="margin-top:10px">■ 経営力</h2>
+<ul class="ck">
+<li>創業者CEOのOlivier Pomelが長期視点で経営。プロダクトと技術への理解が深い。</li>
+<li>「短期的な利益より長期的な顧客価値」を掲げ、投資を継続するスタイル。</li>
+<li>マルチプロダクト戦略を明確に打ち出し、クロスセルで成長を続ける実行力。</li>
+<li>コスト最適化の逆風下でも製品数を増やし、顧客の財布のシェアを広げた。</li>
+<li>リスク: 成長率の鈍化、競合の価格攻勢、AIによる監視の自動化競争、SBC希薄化。</li>
+</ul>
+
+<span class="soc" style="font-size:12px">⚽ 控えのキーパーは「観測可能性」という名のベテラン。出番が来たら、まずウォームアップ(更新)から。DDOGの強みは、試合全体を一つの画面で見られること。</span>
+<p class="note" style="font-size:11px;color:#cfe">情報は2026-11-02時点の公開情報・一般的な理解に基づく整理。数値・年表は概略であり、正確な開示は公式の投資家向け資料を確認のこと。投資助言ではない。</p>
+</div></div><div class="br">DELL風 PC6</div><div class="led"></div><button class="pw" aria-label="PC6電源">⏻</button><div class="dust"></div></div><div class="lbase"></div></section>
+
+<!-- PC4 ThinkPad風(補佐・左) -->
+<section class="mon p4" data-p="off" data-boot="2800"><div class="bz"><div class="scr">
+<div class="bl"><div class="tp">Think<span>Pad</span><i></i></div><div class="ld">LOADING</div><div class="pb"><i></i></div></div>
+<div class="bar"><span>PC4 補佐 — MY_ORDER.exe</span><span>●</span></div>
+<div class="body">
+<h2>■ 個人投資家の確認リスト(判断材料)</h2>
+<ul class="ck">
+<li>DDOGは2020年9月にNasdaqへ上場済み。新規IPOではないので、通常の現物取引で売買できる。</li>
+<li>米国株の口座と、円→ドルの入金手段を先に用意しておく。</li>
+<li>決算発表・ガイダンス・NRR・大型顧客数が株価の主要因。発表前後の値動きに注意。</li>
+<li>高成長株は金利と市場センチメントに敏感。成行より指値、分割購入という選択肢もある。</li>
+<li>AI関連の観測可能性需要と、クラウド最適化の逆風をどう織り込むかが論点。</li>
+<li>競合の動向(Splunk/Cisco、Dynatrace、New Relic、Grafana、クラウドネイティブ)を確認。</li>
+</ul>
+<p class="note">投資助言ではありません。最新の決算資料と公式発表を必ず確認してください。</p>
+</div></div><div class="br">ThinkPad風 PC4</div><div class="led"></div><button class="pw" aria-label="PC4電源">⏻</button></div><div class="neck"></div></section>
+
+<!-- PC1 Apple風(中央・デフォルト) -->
+<section class="mon p1" data-p="off" data-boot="2800"><div class="bz"><div class="scr">
+<div class="bl"><svg class="lgo" viewBox="0 0 100 100"><circle cx="38" cy="58" r="26" fill="#fff"/><circle cx="62" cy="58" r="26" fill="#fff"/><path d="M50 36c0-10 4-16 12-20-1 9-4 16-12 20z" fill="#fff"/><circle cx="88" cy="46" r="10" fill="#000"/></svg><div class="pb"><i></i></div><div class="ld">LOADING</div></div>
+<div class="bar"><span>PC1 MAIN — DDOG TIMELINE — (Nasdaq: DDOG)</span><span>●</span></div>
+<div class="body">
+<h2>■ 創業 → 上場 → 現在(タップで詳細)</h2>
+<ul class="tl" id="tl"></ul>
+</div></div><div class="br">Apple風 PC1</div><div class="led"></div><button class="pw" aria-label="PC1電源">⏻</button></div><div class="neck"></div></section>
+
+<!-- PC5 PC-98風(補佐・右) -->
+<section class="mon p5" data-p="off" data-boot="3400"><div class="bz"><div class="scr">
+<div class="bl"><div class="bios"><div style="--d:.1s">HUDDLED BIOS Ver 1.00</div><div style="--d:.7s">MEMORY CHECK ... 640KB OK</div><div style="--d:1.3s">FDD A: OK / HDD OK</div><div style="--d:1.9s">BOOTING...</div></div><div class="ld" style="color:#7dff9a">LOADING</div><div class="pb"><i></i></div></div>
+<div class="bar"><span>PC5 補佐 — DDOG GLOSSARY.txt</span><span>●</span></div>
+<div class="body">
+<h2>■ 用語メモ(サッカーで)</h2>
+<dl class="gl">
+<dt>観測可能性(Observability)</dt><dd>チームの状態を外から見て分かるようにすること。選手の走行距離、心拍、パスコースを全部可視化する。</dd>
+<dt>APM</dt><dd>アプリの性能監視。フォワードの決定力(レスポンス)を測る。</dd>
+<dt>ログ管理</dt><dd>試合の全プレー記録。あとから原因を振り返るための映像。</dd>
+<dt>NRR(ネットレベニューリテンション)</dt><dd>既存顧客がどれだけ支出を増やしたか。リピーターが年間シートを拡大する率。</dd>
+<dt>マルチプロダクト</dt><dd>一人の顧客に複数の製品を売ること。一人のファンにグッズもチケットも買ってもらう。</dd>
+<dt>LLM Observability</dt><dd>AIの回答の質・速度・コストを監視すること。AI選手の調子を計測する。</dd>
+<dt>SBC(株式報酬)</dt><dd>現金の代わりに株で報酬を払うこと。給与の一部をクラブ株で支払うイメージ。</dd>
+</dl>
+<p class="note">情報の目安: DDOGは2020年9月Nasdaq上場。創業2010年、ニューヨーク。数値・年表は概略で、正式な開示は公式IR資料を確認のこと。</p>
+</div></div><div class="br">PC-98風 PC5</div><div class="led"></div><button class="pw" aria-label="PC5電源">⏻</button></div><div class="neck"></div></section>
+
+<div class="desk"></div>
+<div class="kb"></div>
+<div class="room"></div>
+</div>
+
+<button class="nv" id="nu"><b>∧</b><small></small></button>
+<button class="nv" id="nd"><b>∨</b><small></small></button>
+<button class="nv" id="nl"><b>＜</b><small></small></button>
+<button class="nv" id="nr"><b>＞</b><small></small></button>
+<div id="fx"></div>
+</div>
+
+<script>
+var TODAY=new Date(),LIST=new Date("2026-11-02T00:00:00"),START=new Date("2010-01-01T00:00:00");
+var S=[
+["2010-01-01","2010年","Datadog創業","Olivier PomelとAlexis Lê-Quôcがニューヨークで創業。開発者向けのサーバー監視SaaSとしてスタート。","クラブ創設。まだ小さなユースチーム。"],
+["2012-06-01","2012年ごろ","シリーズA調達","クラウド移行の波に乗り、監視SaaSの基盤を固める。","ユースから昇格。スポンサーが付き始める。"],
+["2014-01-01","2014〜2016年","APM・ログへ拡張","メトリクス監視から、アプリ性能監視とログ管理へ製品領域を広げる。","守備だけでなく攻撃の練習も始める。"],
+["2017-06-01","2017年","シリーズDで大型調達","ユニコーン評価へ。プロダクト拡張と海外展開を加速。","大型補強。トップリーグが見えてくる。"],
+["2019-01-01","2019年","機密でS-1を提出","SECに非公開で上場申請書類を提出し、審査を開始。","昇格申請。まだ発表前。"],
+["2020-09-15","2020年9月","Nasdaq上場(DDOG)","ティッカーDDOGで上場。クラウド監視の成長株として注目を集める。","トップリーグ昇格。ここから観客も入場できる。"],
+["2021-11-01","2021年","高成長と高バリュエーション","ARR拡大が続く一方、金利上昇局面で高バリュエーション株が調整。","首位争い。ただし市場の風向きが変わり始める。"],
+["2023-02-01","2023年","コスト最適化の逆風","顧客がクラウド利用を最適化し、成長率が減速。AIネイティブ企業の顧客化が進む。","相手の守備が固くなる。決定力の工夫が必要。"],
+["2024-06-01","2024〜2025年","AI時代の観測可能性","LLM ObservabilityなどAI監視製品を投入。マルチプロダクトと大型顧客の拡大を推進。","新しい戦術(AI)を練習し、試合で使う。"],
+["2026-11-02","2026年(現在)","観測可能性の標準へ","AIエージェントの監視・セキュリティへ領域を広げ、企業の計器盤としての地位を狙う。","シーズン中盤。上位を狙う位置にいる。"]
+];
+var tl=document.getElementById("tl"),first=-1;
+S.forEach(function(s,i){
+ var done=new Date(s[0]+"T00:00:00")<=TODAY;
+ if(!done&&first<0)first=i;
+ var li=document.createElement("li");
+ var cls=done?"done":(i===first?"now":""),tg=done?["c","完了"]:(i===first?["n","いまここ"]:["e","予定"]);
+ li.className=cls;
+ li.innerHTML='<div class="d">'+s[1]+'</div><div class="t">'+s[2]+'<span class="tag '+tg[0]+'">'+tg[1]+'</span></div><div class="more">'+s[3]+'<span class="soc">⚽ '+s[4]+'</span></div>';
+ li.onclick=function(){li.classList.toggle("open")};
+ tl.appendChild(li);
+});
+var d=Math.ceil((LIST-TODAY)/86400000);
+document.getElementById("days").textContent=d>0?d:"0";
+if(d<=0)document.getElementById("cap").textContent="基準日を過ぎました。最新の公式情報を確認";
+var p=Math.max(0,Math.min(100,(TODAY-START)/(LIST-START)*100));
+document.getElementById("pg").style.width=p+"%";
+document.getElementById("pct").textContent=Math.round(p)+"%";
+document.getElementById("kv").innerHTML='<div><span>ティッカー</span><span>DDOG</span></div><div><span>市場</span><span>Nasdaq</span></div><div><span>創業</span><span>2010年 NY</span></div><div><span>上場</span><span>2020年9月</span></div><div><span>モデル</span><span>SaaS(従量+契約)</span></div>';
+
+/* 電源: off -> boot(ロゴ+LOADING) -> on */
+[].forEach.call(document.querySelectorAll(".pw"),function(b){
+ b.onclick=function(){
+  var m=b.closest(".mon");clearTimeout(m._t);
+  if(m.dataset.p==="off"){
+   var t=+m.dataset.boot||3000;
+   m.style.setProperty("--bt",t+"ms");m.dataset.p="boot";
+   m._t=setTimeout(function(){m.dataset.p="on"},t);
+  }else m.dataset.p="off";
+ };
+});
+
+/* ワープ移動 */
+var V=document.getElementById("view"),FX=document.getElementById("fx");
+var MAP={
+ home:{nu:["up","PC2・3"],nd:["down","部屋"],nl:["left","PC4"],nr:["right","PC5"]},
+ up:{nd:["home","PC1"]},
+ down:{nu:["home","PC1"]},
+ left:{nl:["left2","PC6"],nr:["home","PC1"]},
+ left2:{nr:["left","PC4"]},
+ right:{nl:["home","PC1"]}
+};
+function render(){
+ var m=MAP[V.dataset.s];
+ ["nu","nd","nl","nr"].forEach(function(id){
+  var b=document.getElementById(id),x=m[id];
+  if(x){b.style.display="flex";b.querySelector("small").textContent=x[1];b.dataset.go=x[0]}
+  else b.style.display="none";
+ });
+}
+function go(s){
+ V.dataset.s=s;
+ FX.classList.remove("go");void FX.offsetWidth;FX.classList.add("go");
+ render();
+}
+["nu","nd","nl","nr"].forEach(function(id){
+ var b=document.getElementById(id);b.onclick=function(){go(b.dataset.go)};
+});
+document.addEventListener("keydown",function(e){
+ var id={ArrowUp:"nu",ArrowDown:"nd",ArrowLeft:"nl",ArrowRight:"nr"}[e.key];
+ if(id&&MAP[V.dataset.s][id])go(MAP[V.dataset.s][id][0]);
+});
+render();
+</script>
+</body>
+</html>
