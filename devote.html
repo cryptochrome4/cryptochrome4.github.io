@@ -78,6 +78,12 @@
   .legend-item { display: flex; align-items: center; gap: 4px; }
   .legend-dot { width: 10px; height: 10px; border-radius: 2px; }
 
+  /* 修正：表をスクロール枠に入れて、見出しを枠の上端に固定（1位との重なり解消） */
+  .table-wrap {
+    overflow: auto;
+    max-height: 70vh;
+  }
+
   table {
     width: 100%;
     border-collapse: collapse;
@@ -85,7 +91,8 @@
   }
   thead th {
     position: sticky;
-    top: var(--sticky-top, 0px);
+    top: 0;
+    z-index: 5;
     background: #eef2ff;
     color: #1e3a8a;
     font-size: 11px;
@@ -103,7 +110,15 @@
     vertical-align: middle;
   }
   tbody tr:hover { background: #f8fafc; }
-  .rank { font-weight: 700; color: var(--accent); font-size: 13px; min-width: 60px; padding-left: 16px; padding-right: 16px; white-space: nowrap; }
+  /* 修正：順位の列幅を確保して、2桁以上でも見切れないようにする */
+  .rank {
+    font-weight: 700;
+    color: var(--accent);
+    font-size: 13px;
+    min-width: 40px;
+    white-space: nowrap;
+  }
+  thead th:first-child { min-width: 40px; }
   .name { text-align: left; font-weight: 600; white-space: nowrap; }
   .code { color: var(--muted); font-size: 11px; font-family: monospace; }
   .market-badge {
@@ -206,7 +221,7 @@
 
 <div class="legend" id="legend"></div>
 
-<div style="overflow-x:auto;">
+<div class="table-wrap">
 <table id="rankTable">
   <thead>
     <tr id="theadRow"></tr>
@@ -854,33 +869,10 @@ function renderTable() {
   }).join("");
 }
 
-// 見出しの sticky 位置を実測して合わせる
-function updateStickyTop() {
-  const header = document.querySelector("header");
-  const controls = document.querySelector(".controls");
-  const legend = document.getElementById("legend");
-  const h = (header?.offsetHeight || 0) + (controls?.offsetHeight || 0) + (legend?.offsetHeight || 0);
-  document.documentElement.style.setProperty("--sticky-top", h + "px");
-}
-window.addEventListener("resize", updateStickyTop);
-
 // ===== 初期化 =====
 renderLegend();
 renderThead();
 renderTable();
-updateStickyTop();
-
-// レイアウト確定後に再計測（フォント読込・リサイズ・sticky要素の高さ変化に対応）
-window.addEventListener("load", updateStickyTop);
-if (document.fonts && document.fonts.ready) {
-  document.fonts.ready.then(updateStickyTop);
-}
-if (window.ResizeObserver) {
-  const ro = new ResizeObserver(updateStickyTop);
-  [document.querySelector("header"), document.querySelector(".controls"), document.getElementById("legend")]
-    .forEach(el => { if (el) ro.observe(el); });
-}
-
 document.getElementById("sort1").addEventListener("change", renderTable);
 document.getElementById("sort2").addEventListener("change", renderTable);
 </script>
